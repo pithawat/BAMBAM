@@ -1,0 +1,167 @@
+# S03 — ฟอร์มแจ้งซ่อม
+
+Status: APPROVED (2026-10-14)
+
+- **Flows:** F02 (all steps), F04 (team handled option), F13-B (prefill from QR) (see ../../02-flows.md)
+- **Persona:** every role, mobile first (employee standing at the broken thing); desktop usable (see ../../01-users.md)
+- **Purpose of this screen (one sentence):** report a problem with category, symptoms, place, photos and urgency in under a minute — or, for team leads, record a job the team already fixed.
+- **Route:** `/repair/new` · with QR: `/repair/new?asset={asset_code}`
+- **Mockup:** `../mockups/S03-report-form.html` (wizard steps, QR prefill, validation errors, team-handled option, desktop single page; also S04 and S05 frames)
+- **Data:** categories + symptoms, buildings + floors, asset lookup by code, photo upload, create ticket (returns either the new ticket or a list of open duplicates → S04) → `modules/repair/api.ts` (names fixed in 04-api-contract.md)
+
+## Layout — mobile first
+
+Mobile is a 4-step wizard, one step per screen. Steps and fields (F02 order):
+
+| Step | Heading | Fields |
+|---|---|---|
+| 1 | เกิดปัญหาเกี่ยวกับอะไร | หมวดงาน * (single) · อาการ * (multiple, shows after a category is picked) |
+| 2 | เกิดที่ไหน | อาคาร * · ชั้น * · จุดที่เกิด |
+| 3 | รูปและรายละเอียด | รูปภาพ * (1–5) · รายละเอียด |
+| 4 | ความเร่งด่วน | ความเร่งด่วน * (default ปกติ) · ตรวจสอบก่อนส่ง (summary) · ทีมดำเนินการเอง (leads only) |
+
+```
+┌────────────────────────────┐
+│ [UAT strip — dev/UAT only]  │
+│ ←        แจ้งซ่อม         ✕ │ ← white top bar: back = previous step (step 1: leave), ✕ = leave
+│ ขั้นที่ 1 จาก 4  ▬▬▬▭▭▭▭▭▭▭ │ ← Caption + Progress (4 segments)
+│┌ QR banner (only with ?asset) ┐│
+││ [QR] เติมข้อมูลจาก QR แล้ว      ││
+││ เครื่องปรับอากาศ ห้องประชุม 5B · AC-05-012 ││
+││ แก้ไขได้ถ้าไม่ตรง   ไม่ใช่อุปกรณ์นี้ ││ ← link button clears the asset only
+│└────────────────────────────┘│
+│ เกิดปัญหาเกี่ยวกับอะไร          │ ← H2 (mobile 18)
+│ หมวดงาน *                    │
+│ ┌──────────┐┌──────────┐     │ ← radio cards, 2 columns, ≥ 72px high
+│ │(❄) ระบบปรับ││(💡) ไฟฟ้าและ│     │   icon circle 40px + name; selected = ring-2 ring-primary
+│ │   อากาศ   ││  แสงสว่าง  │     │   + bg-secondary + check badge
+│ └──────────┘└──────────┘     │
+│ …                            │
+│ อาการ * (เลือกได้หลายข้อ)      │
+│ (แอร์ไม่เย็น✓)(มีน้ำหยด✓)(มีเสียงดัง) │ ← pill chips, multi-select, ≥ 44px
+│ (มีกลิ่นอับ)(เปิดไม่ติด)          │
+│                              │
+├────────────────────────────┤
+│ [          ถัดไป          ] │ ← sticky bottom bar, Button default full width
+└────────────────────────────┘
+```
+
+Step 2: `Select` อาคาร, `Select` ชั้น (disabled until a building is picked; options = that building's floors), `Input` จุดที่เกิด with hint.
+Step 3: `PhotoPicker` (`_common.md` §5) then `Textarea` รายละเอียด (4 rows, counter `0/500`).
+Step 4:
+
+```
+│ ความเร่งด่วน *                │
+│ ┌────────────────────────┐  │ ← RadioGroup as 4 stacked cards (≥ 64px)
+│ │ ▮▮▮ ฉุกเฉิน               ○│  │   PriorityIndicator + label (H3) + one-line hint
+│ │ อันตราย หรือกระทบงานหลายคนทันที│  │
+│ ├────────────────────────┤  │
+│ │ ▮▮▮ สูง …                ○│  │
+│ │ ▮▮  ปกติ …               ●│  │ ← default
+│ │ ▮   ต่ำ …                ○│  │
+│ └────────────────────────┘  │
+│ ตรวจสอบก่อนส่ง                 │ ← Card, rows with "แก้ไข" link → jumps to that step
+│  หมวดงาน   ระบบปรับอากาศ  แก้ไข │
+│  อาการ     แอร์ไม่เย็น · มีน้ำหยด │
+│  สถานที่    อาคารหลัก ชั้น 5 · ห้องประชุม 5B แก้ไข │
+│  รูปภาพ    [▢][▢] 2 รูป      แก้ไข │
+│┌ leads only ─────────────────┐│
+││ ทีมของฉันแก้ปัญหานี้เรียบร้อยแล้ว [⏻]││ ← Switch
+││ งานจะปิดทันที ไม่เข้าคิวช่าง      ││
+││ (when on) สิ่งที่ทีมทำ * [Textarea] ││
+││ (when on) รูปหลังทำ * [PhotoPicker] ││
+│└────────────────────────────┘│
+├────────────────────────────┤
+│ [ 🔧 ส่งแจ้งซ่อม ]  (brand)   │ ← label becomes "บันทึกงานทีม" (default variant) when the switch is on
+└────────────────────────────┘
+```
+
+Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"). One page, centered column max 760px, one `Card` per step with a numbered heading ("1 เกิดปัญหาเกี่ยวกับอะไร", …). Category radio cards in 3 columns; อาคาร / ชั้น side by side; photo tiles 120px in a 5-column row; priority as 4 radio cards in a 2×2 grid. No summary card (everything is visible). Team-handled card under priority (leads). Right-aligned button row at the bottom: "ยกเลิก" (outline) · "ส่งแจ้งซ่อม" (brand). QR banner sits above card 1.
+
+## Components
+
+| Area | Component (design-system.md) | Notes |
+|---|---|---|
+| Top bar | white top bar (back · title · close) | mobile only |
+| Progress | `Progress` or 4 segment bars + Caption | mobile only; `aria-label` "ขั้นที่ 1 จาก 4" |
+| Category | `RadioGroup` styled as cards + icon circle (`a-ri` look, `svc-repair` tint) | category icon comes from the category data (lucide name); fallback `Wrench` |
+| Symptoms | `ToggleGroup type="multiple"` styled as pills | selected = `bg-foreground text-white` (design-system filter pill) + check icon |
+| Building / floor | `Select` h-13 rounded-sm | |
+| Location detail | `Input` | |
+| Photos | `PhotoPicker` (`_common.md` §5) | |
+| Details | `Textarea` + counter | |
+| Priority | `RadioGroup` cards + `PriorityIndicator` | |
+| Summary | `Card` with rows + `Button` link "แก้ไข" | mobile step 4 only |
+| Team handled | `Card` + `Switch` + `Textarea` + `PhotoPicker` | only `housekeeper_lead`, `security_lead` (BR-F04-1) |
+| QR banner | `Alert` default with `QrCode` icon + `Button` link | |
+| Leave confirm | `AlertDialog` discard (`_common.md` §7) | |
+| Submit | `Button` variant `brand` (normal) / default (team handled), sticky bottom (mobile) | spinner + disabled while sending |
+| Duplicates | S04 (Sheet / Dialog) | |
+
+## Content and copy (exact Thai text)
+
+| Element | Text |
+|---|---|
+| Title | แจ้งซ่อม |
+| Step caption | ขั้นที่ {n} จาก 4 |
+| Step headings | เกิดปัญหาเกี่ยวกับอะไร · เกิดที่ไหน · รูปและรายละเอียด · ความเร่งด่วน |
+| Labels | หมวดงาน * · อาการ * · อาคาร * · ชั้น * · จุดที่เกิด · รูปภาพ * · รายละเอียด · ความเร่งด่วน * |
+| Symptom hint | เลือกได้หลายข้อ |
+| Symptom placeholder (no category yet) | เลือกหมวดงานก่อน แล้วอาการจะแสดงที่นี่ |
+| Placeholders | อาคาร: เลือกอาคาร · ชั้น: เลือกชั้น · จุดที่เกิด: เช่น ห้องประชุม 5B ฝั่งหน้าต่าง · รายละเอียด: เล่าเพิ่มเติม เช่น เริ่มเป็นตั้งแต่เมื่อไร |
+| Hints | จุดที่เกิด: บอกจุดที่ช่างหาเจอง่าย · รูปภาพ: อย่างน้อย 1 รูป สูงสุด 5 รูป |
+| Priority options | ฉุกเฉิน — อันตราย หรือกระทบงานหลายคนทันที · สูง — กระทบการทำงานของคุณหรือทีม · ปกติ — ใช้งานได้ แต่ไม่สะดวก · ต่ำ — ไม่เร่งด่วน |
+| Summary | ตรวจสอบก่อนส่ง · rows หมวดงาน / อาการ / สถานที่ / รูปภาพ ({n} รูป) · link แก้ไข |
+| Team handled | switch label: ทีมของฉันแก้ปัญหานี้เรียบร้อยแล้ว · hint: งานจะปิดทันที ไม่เข้าคิวช่าง · fields: สิ่งที่ทีมทำ * (placeholder "เช่น เช็ดพื้นและวางป้ายระวังลื่นแล้ว") · รูปหลังทำ * |
+| Buttons | ถัดไป · ส่งแจ้งซ่อม · บันทึกงานทีม · ยกเลิก (desktop) |
+| QR banner (found) | เติมข้อมูลจาก QR แล้ว · {asset name} · {asset_code} · แก้ไขได้ถ้าไม่ตรง · link ไม่ใช่อุปกรณ์นี้ |
+| QR banner (not found) | Alert title: ไม่พบอุปกรณ์นี้ · body: กรอกข้อมูลเองได้เลย |
+| No categories configured | ยังไม่มีหมวดงานในระบบ ติดต่อ Admin |
+| Send failed | Alert destructive above the bottom bar: ส่งไม่สำเร็จ / ลองอีกครั้ง ข้อมูลในฟอร์มยังอยู่ครบ |
+| Error codes → message | see Validation below; others → `_common.md` §6 |
+
+## States
+
+| State | What shows |
+|---|---|
+| Loading | Skeleton of step 1 (heading, 6 category cards, chips row) while categories/buildings load; with `?asset` the QR banner shows a skeleton line until the lookup returns. |
+| Empty | No categories → empty card with mascot `bust` + "ยังไม่มีหมวดงานในระบบ ติดต่อ Admin" + button "กลับหน้าแรก". |
+| Error | Master data fails → whole-page error (`_common.md` §6). Asset lookup fails → treat as not found (Alert) and keep the form usable. Submit fails → Alert "ส่งไม่สำเร็จ" (form data kept). |
+| Forbidden | — (every role can report). |
+| Success feedback | No duplicates → S05 (`/repair/new/done?id={id}`). Duplicates → S04. Team handled → S05 team variant. |
+
+## Interactions
+
+- **Step navigation (mobile):** "ถัดไป" validates only the current step; on error stay, show messages, focus the first invalid field. Back arrow goes to the previous step without validating. Data survives moving between steps.
+- **Category change** clears symptoms that do not belong to the new category.
+- **Building change** clears ชั้น.
+- **QR prefill (F13-B):** with `?asset` found → prefill หมวดงาน, อาคาร, ชั้น, จุดที่เกิด; all editable (BR-F13B-2); open at step 1 with symptoms to pick. "ไม่ใช่อุปกรณ์นี้" removes the asset link and banner but keeps the field values. The asset code survives the login redirect (F13-B) because it is part of the URL.
+- **Leaving with any data entered** (back on step 1, ✕, browser back, nav) → discard dialog. Nothing entered → leave silently.
+- **Submit:** validates all steps (mobile: jumps to the first step with an error). Then sends; the server runs the duplicate check (F03) first:
+  - duplicates → open S04 with the list; nothing created yet
+  - none → create → S05
+- **Team handled (leads only, BR-F04-1/2/3):** switch on reveals two required fields; submit label "บันทึกงานทีม"; still goes through the duplicate check (S04).
+- **Validation (field → rule → message):**
+  - หมวดงาน → required → กรุณาเลือกหมวดงาน
+  - อาการ → at least 1 → เลือกอาการอย่างน้อย 1 ข้อ
+  - อาคาร → required → กรุณาเลือกอาคาร
+  - ชั้น → required → กรุณาเลือกชั้น
+  - จุดที่เกิด → max 100 → ไม่เกิน 100 ตัวอักษร
+  - รูปภาพ → at least 1 (BR-F02-1) → แนบรูปอย่างน้อย 1 รูป · other photo messages: `_common.md` §5
+  - รายละเอียด → max 500 → ไม่เกิน 500 ตัวอักษร
+  - ความเร่งด่วน → required (has default) → กรุณาเลือกความเร่งด่วน
+  - สิ่งที่ทีมทำ (switch on) → required, max 500 → กรุณาบอกสิ่งที่ทีมทำ
+  - รูปหลังทำ (switch on) → at least 1 (BR-F04-2) → แนบรูปหลังทำอย่างน้อย 1 รูป
+  - server says category/symptom/floor no longer exists → Alert: ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่ + reload master data
+
+## Acceptance checklist (Codex reports results in ../HANDOFF.md — does not edit this file)
+
+- [ ] Matches `S03-report-form.html` at 375px (4 steps, QR banner, errors, team-handled) and 1280px (single page)
+- [ ] Uses only design-system tokens and shadcn components; `brand` button only for "ส่งแจ้งซ่อม"
+- [ ] Per-step validation on mobile, full validation on submit, exact messages
+- [ ] Team-handled card renders only for `housekeeper_lead` / `security_lead`
+- [ ] QR found / not found / "ไม่ใช่อุปกรณ์นี้" behave as above
+- [ ] Discard dialog appears only when data was entered
+- [ ] Submit keeps all data on failure; photo upload errors stay per tile
+- [ ] Keyboard and screen-reader basics (radio cards and chips reachable by keyboard, labels, error text linked with `aria-describedby`)
+- [ ] Works with mocks (`NEXT_PUBLIC_USE_MOCKS=true`), including a mock that returns duplicates and one asset code that is not found

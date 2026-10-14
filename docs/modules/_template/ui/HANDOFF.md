@@ -1,5 +1,7 @@
 # UI handoff — <Module name> — Stage <n>
 
+Status: NOT READY — specs only (Claude sets `READY FOR CODEX — Stage <n>` in /build-stage prepare; Codex sets `UI DONE — Stage <n>, waiting for Claude wire`)
+
 <!-- Written by Claude (/ui-spec, updated by /build-stage prepare). Codex starts here. -->
 
 ## Read in this order

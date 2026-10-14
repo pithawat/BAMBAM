@@ -1,0 +1,29 @@
+version: "2"
+sql:
+  # platform: shared users, roles, sessions, audit log
+  - engine: postgresql
+    schema: db/migrations
+    queries: internal/platform/queries
+    gen:
+      go:
+        package: platformdb
+        out: internal/platform/platformdb
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+              pointer: true
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+  # modules: add one entry per module (queries: internal/modules/<m>/queries, out: internal/modules/<m>/db)

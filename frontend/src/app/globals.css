@@ -1,0 +1,154 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Theme tokens — values from docs/shared/design-system.md (Option A, D-018).
+   Light mode only: there is no .dark block on purpose. */
+
+:root {
+  --radius: 1.25rem;                 /* 20px */
+
+  --background: #F2F5FF;
+  --foreground: #0E1736;
+  --card: #FFFFFF;
+  --card-foreground: #0E1736;
+  --popover: #FFFFFF;
+  --popover-foreground: #0E1736;
+  --primary: #2741FA;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E7ECFF;
+  --secondary-foreground: #1A2FC9;
+  --muted: #EAEEFA;
+  --muted-foreground: #535D82;
+  --accent: #E7ECFF;
+  --accent-foreground: #1A2FC9;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #DFE5F5;
+  --input: #CDD6EE;
+  --ring: #2741FA;
+
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0E1736;
+  --sidebar-primary: #2741FA;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E7ECFF;
+  --sidebar-accent-foreground: #1A2FC9;
+  --sidebar-border: #DFE5F5;
+  --sidebar-ring: #2741FA;
+
+  /* app-specific */
+  --success: #067647;
+  --warning: #B54708;
+  --status-new: #B54708;             /* รอช่างรับงาน */
+  --status-in-progress: #1F4FD8;     /* ช่างกำลังดำเนินการ */
+  --status-resolved: #6D28D9;        /* ซ่อมเสร็จ รอตรวจรับ */
+  --status-closed: #067647;          /* ปิดงานแล้ว */
+  --priority-high: #C4320A;          /* สูง; ฉุกเฉิน uses --destructive */
+  --svc-repair: #F97316;             /* แจ้งซ่อม — icons/backgrounds only, never text */
+  --svc-car: #0EA5A4;                /* จองรถ */
+  --svc-room: #8B5CF6;               /* จองห้องประชุม */
+  --brand-gradient: linear-gradient(120deg, #1075FA 0%, #2741FA 52%, #7930FA 100%);
+}
+
+@theme inline {
+  --font-sans: var(--font-anuphan);
+  --font-heading: var(--font-prompt);
+
+  --radius-sm: calc(var(--radius) - 4px);   /* 16px inputs, nav items */
+  --radius-md: calc(var(--radius) - 2px);   /* 18px */
+  --radius-lg: var(--radius);               /* 20px */
+  --radius-xl: calc(var(--radius) + 4px);   /* 24px cards */
+  --radius-2xl: calc(var(--radius) + 10px); /* 30px desktop banner */
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-status-new: var(--status-new);
+  --color-status-in-progress: var(--status-in-progress);
+  --color-status-resolved: var(--status-resolved);
+  --color-status-closed: var(--status-closed);
+  --color-priority-high: var(--priority-high);
+  --color-svc-repair: var(--svc-repair);
+  --color-svc-car: var(--svc-car);
+  --color-svc-room: var(--svc-room);
+
+  --shadow-card: 0 12px 30px -14px rgb(39 65 250 / 0.22), 0 2px 6px rgb(14 23 54 / 0.04);
+  --shadow-float: 0 18px 36px -16px rgb(39 65 250 / 0.35);   /* card overlapping a header */
+  --shadow-brand: 0 10px 20px -10px rgb(39 65 250 / 0.7);    /* gradient buttons, scan button */
+  --shadow-nav: 0 -8px 30px -12px rgb(14 23 54 / 0.18);      /* mobile bottom nav */
+}
+
+@utility bg-brand {
+  background-image: var(--brand-gradient);
+}
+
+/* ServiceHeader gradient in the service color. Set --c to a --svc-* color. */
+@utility bg-service {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--c) 82%, #fff) 0%,
+    var(--c) 60%,
+    color-mix(in srgb, var(--c) 80%, #000) 100%
+  );
+}
+
+/* Soft 3D service icon (design-system.md ServiceIcon). Set --c to a --svc-* color. */
+@utility ic3d {
+  background: radial-gradient(
+    circle at 32% 26%,
+    color-mix(in srgb, var(--c) 45%, #fff) 0%,
+    var(--c) 62%,
+    color-mix(in srgb, var(--c) 75%, #000) 100%
+  );
+  box-shadow:
+    0 10px 18px -8px color-mix(in srgb, var(--c) 80%, transparent),
+    inset 0 -3px 6px rgb(0 0 0 / 0.12),
+    inset 0 3px 6px rgb(255 255 255 / 0.35);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 15px;
+    line-height: 25px;
+  }
+  h1, h2, h3, h4 {
+    @apply font-heading;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}

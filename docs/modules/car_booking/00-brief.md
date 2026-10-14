@@ -1,0 +1,47 @@
+# ระบบจองรถ — Brief
+
+<!-- ✏️ คุณกรอกไฟล์นี้ (หรือแนบเอกสาร requirement ไว้ในโฟลเดอร์ attachments/ แล้วเขียนสรุปสั้นๆ ตรงนี้)
+     ไม่ต้องสมบูรณ์ Claude จะสัมภาษณ์เพิ่มใน /discovery -->
+
+## Known so far (kickoff 2026-10-14)
+
+- เป็น 1 ใน 3 ระบบของ BAMBAM ใช้ผู้ใช้และ role ชุดเดียวกับระบบอื่น (D-003, D-004)
+- BAMBAM POC เดิมแค่ลิงก์ออกไปจองรถที่ Ploishared (flow F18 ใน `../repair/attachments/BAMBAM-User-Flow02.html`) ✏️ ระบบใหม่นี้แทน Ploishared หรือไม่
+- ยังไม่อยู่ในช่วงแรก (ช่วงแรก = ระบบแจ้งซ่อม F01–F07)
+
+## Goal
+
+<!-- ระบบนี้ทำให้ใคร ทำอะไรได้ดีขึ้น วัดจากอะไร -->
+
+## Problem today
+
+<!-- ตอนนี้ทำงานนี้กันยังไง เจ็บปวดตรงไหน -->
+
+## Users (rough)
+
+<!-- ใครใช้บ้าง แต่ละกลุ่มทำอะไร ใช้บนอุปกรณ์อะไร -->
+
+## Features (must have)
+
+-
+
+## Nice to have (later)
+
+-
+
+## Out of scope
+
+-
+
+## Existing user flow (optional)
+
+<!-- ถ้ามี flow ร่างอยู่แล้ว ใส่ได้ทุกรูปแบบ: ข้อความทีละขั้น, Mermaid, หรือรูปใน attachments/
+     Claude จะยึดอันนี้เป็นหลัก แล้วเติม edge case ให้ -->
+
+## Constraints
+
+<!-- กฎหมาย/PDPA, ระบบเดิมที่ต้องเชื่อม, deadline, ข้อมูลที่ต้อง import -->
+
+## Attachments
+
+<!-- รายชื่อไฟล์ใน attachments/ และอธิบายสั้นๆ ว่าคืออะไร -->

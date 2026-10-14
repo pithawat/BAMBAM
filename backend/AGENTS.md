@@ -56,7 +56,7 @@ backend/
 
 ## Config and environments
 
-- All config from env vars; `APP_ENV=development|production`.
+- All config from env vars; `APP_ENV=development|uat|production` (D-027).
 - Load a `.env` file **only** when `APP_ENV=development`. Production gets env from the deploy platform.
 - `GIN_MODE=release` in production. CORS origins from env.
 - Never branch business logic on `APP_ENV`; only config values differ.
