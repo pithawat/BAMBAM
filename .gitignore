@@ -1,0 +1,27 @@
+# secrets
+.env
+.env.local
+*.pem
+
+# frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/playwright-report/
+frontend/test-results/
+frontend/coverage/
+
+# backend
+backend/bin/
+backend/tmp/
+backend/coverage.out
+
+# obsidian (keep app.json so link settings are shared)
+docs/.obsidian/workspace*.json
+docs/.obsidian/cache
+docs/.obsidian/plugins/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
