@@ -20,6 +20,7 @@ func env(over map[string]string) func(string) (string, bool) {
 		"SSO_POST_LOGOUT_REDIRECT_URI": "http://localhost:3000/signed-out",
 		"APP_SESSION_SECRET":           strings.Repeat("s", 40),
 		"ROLE_SWITCHER_ENABLED":        "true",
+		"PHOTO_STORAGE_DIR":            "/var/lib/bambam/photos",
 	}
 	for k, v := range over {
 		base[k] = v
@@ -57,5 +58,15 @@ func TestValidation(t *testing.T) {
 	}
 	if _, err := FromLookup(env(map[string]string{"APP_ENV": "staging"})); err == nil {
 		t.Fatal("unknown APP_ENV accepted")
+	}
+}
+
+func TestPhotoStorageDir(t *testing.T) {
+	dev, err := FromLookup(env(map[string]string{"PHOTO_STORAGE_DIR": ""}))
+	if err != nil || dev.PhotoStorageDir != "data/photos" {
+		t.Fatalf("dev default: dir=%q err=%v", dev.PhotoStorageDir, err)
+	}
+	if _, err := FromLookup(env(map[string]string{"APP_ENV": "production", "PHOTO_STORAGE_DIR": ""})); err == nil || !strings.Contains(err.Error(), "PHOTO_STORAGE_DIR") {
+		t.Fatalf("missing PHOTO_STORAGE_DIR in production not reported: %v", err)
 	}
 }

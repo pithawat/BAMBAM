@@ -2,30 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, House, ListChecks, ScanLine, UserRound } from "lucide-react";
+import { Bell, House, ListChecks, ScanLine, UserRound, Wrench } from "lucide-react";
+import { useCurrentUser } from "@/components/shared/me-provider";
 import { cn } from "@/lib/utils";
 
-// Mobile bottom nav — same 5 slots for every role (_common.md §1, D-019).
+// Mobile bottom nav — 5 slots (_common.md §1, D-019). The technician's second slot is
+// their work list instead of "ติดตามงาน" (CR-005).
 const ITEMS = [
   { href: "/", label: "หน้าแรก", icon: House },
-  { href: "/repair/my", label: "งานของฉัน", icon: ListChecks },
+  { href: "/repair/my", label: "ติดตามงาน", icon: ListChecks },
   { href: "/repair/scan", label: "สแกน", icon: ScanLine, center: true },
   { href: "/notifications", label: "แจ้งเตือน", icon: Bell },
   { href: "/profile", label: "โปรไฟล์", icon: UserRound },
 ] as const;
 
 /** Pages that show the bottom nav (S02, S06, S09, S13, S14). Others are sub-pages or full-screen flows. */
-export const BOTTOM_NAV_PATHS = ["/", "/repair/my", "/repair/queue", "/notifications", "/profile"];
+export const BOTTOM_NAV_PATHS = ["/", "/repair/my", "/repair/work", "/notifications", "/profile"];
 
 export function BottomNav({ unread = false }: { unread?: boolean }) {
   const pathname = usePathname();
+  const me = useCurrentUser();
+  const items = me.role === "technician"
+    ? ITEMS.map((item) => item.href === "/repair/my" ? { href: "/repair/work", label: "งานซ่อม", icon: Wrench } as const : item)
+    : ITEMS;
   return (
     <nav
       aria-label="เมนูหลัก"
       className="fixed inset-x-0 bottom-0 z-30 rounded-t-[26px] bg-card pb-[env(safe-area-inset-bottom)] shadow-nav lg:hidden"
     >
       <ul className="mx-auto grid h-22 max-w-140 grid-cols-5 px-1.5 pt-2.5">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           const Icon = item.icon;
           if ("center" in item) {

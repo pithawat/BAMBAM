@@ -1,0 +1,426 @@
+// ER diagram — repair module (+ the platform tables it uses)
+// Paste into https://dbdiagram.io (DBML).
+//
+// Source of truth: backend/db/migrations/
+//   20261014000001_platform_init.sql   (platform.*)
+//   20261014000002_repair_init.sql     (repair.*)
+//   20261015000001_repair_cr005.sql    (CR-005: no queue, assessment, contractors)
+// Grey tables = PLANNED in 03-plan.md, not migrated yet.
+// Generated 2026-10-15. Regenerate after every migration.
+
+Project bambam_repair {
+  database_type: 'PostgreSQL'
+  Note: 'Repair module schema after CR-005 (Stages 1–2). Every table also has created_at / updated_at.'
+}
+
+// ───────────────────────── enums (CHECK constraints in SQL) ─────────────────────────
+
+Enum platform.role {
+  employee
+  housekeeper_lead
+  security_lead
+  technician
+  admin
+  executive
+}
+
+Enum repair.ticket_status {
+  in_progress [note: 'with the technician; step awaiting_assessment / in_repair / reworking (CR-005)']
+  resolved    [note: 'technician finished; waiting for the reporter rating / auto-close']
+  closed
+}
+
+Enum repair.work_by {
+  in_house
+  contractor
+}
+
+Enum repair.closed_reason {
+  confirmed
+  auto_closed
+  team_handled
+  admin_closed
+}
+
+Enum repair.priority {
+  critical
+  high
+  medium
+  low
+}
+
+Enum repair.photo_kind {
+  report
+  result
+  send_back
+  follow
+  team
+}
+
+Enum repair.event_type {
+  created
+  subscribed
+  assessed
+  assessment_changed
+  resolved
+  sent_back
+  confirmed
+  auto_closed
+  team_handled
+  handed_over
+  admin_closed
+  priority_changed
+}
+
+Enum repair.year_format {
+  be [note: 'Buddhist year, e.g. 2569']
+  ce [note: 'Gregorian year, e.g. 2026']
+}
+
+// ───────────────────────── platform ─────────────────────────
+
+Table platform.users [headercolor: #3d5a80] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  employee_code text [not null, unique, note: 'SSO claim USER — the person key']
+  sso_subject text [unique, note: 'SSO sub']
+  first_name_th text
+  last_name_th text
+  first_name_en text
+  last_name_en text
+  email text
+  department text
+  division text
+  position_th text
+  is_demo boolean [not null, default: false, note: 'role-switcher demo user (dev/UAT)']
+  last_login_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  Note: 'Refreshed from SSO claims on every login. View repair.people = id, display name, department.'
+}
+
+Table platform.user_roles [headercolor: #3d5a80] {
+  employee_code text [pk, note: 'NOT a foreign key: a role can be seeded before the first login']
+  role platform.role [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  Note: 'One role per person. No row = employee (D-003, D-004).'
+}
+
+Table platform.sessions [headercolor: #3d5a80] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  token_hash bytea [not null, unique, note: 'SHA-256 of the cookie token']
+  user_id uuid [not null, ref: > platform.users.id]
+  origin_user_id uuid [ref: > platform.users.id, note: 'real SSO user behind a role-switcher session']
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    user_id
+    expires_at
+  }
+}
+
+Table platform.audit_log [headercolor: #3d5a80] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  actor_user_id uuid [ref: > platform.users.id, note: 'ON DELETE SET NULL']
+  action text [not null]
+  target_type text
+  target_id text
+  data jsonb [not null, default: '{}']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table platform.notifications [headercolor: #9aa5b1] {
+  id uuid [pk]
+  user_id uuid [not null, ref: > platform.users.id]
+  type text [not null]
+  ticket_id uuid [ref: > repair.tickets.id]
+  params jsonb
+  read_at timestamptz
+  created_at timestamptz
+  Note: 'PLANNED — Stage 6 (03-plan.md). Columns are from the plan, not final.'
+}
+
+// ───────────────────────── repair: master data ─────────────────────────
+
+Table repair.categories [headercolor: #2a9d8f] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  icon text [not null, default: 'wrench', note: 'lucide icon name']
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table repair.symptoms [headercolor: #2a9d8f] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  category_id uuid [not null, ref: > repair.categories.id]
+  name text [not null]
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (category_id, sort_order)
+  }
+}
+
+Table repair.buildings [headercolor: #2a9d8f] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table repair.floors [headercolor: #2a9d8f] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  building_id uuid [not null, ref: > repair.buildings.id]
+  name text [not null, note: 'display name, e.g. "5"']
+  level integer [not null, note: 'vertical order, bottom first']
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (building_id, level) [unique]
+  }
+}
+
+Table repair.assets [headercolor: #9aa5b1] {
+  id uuid [pk]
+  code text [not null, unique, note: 'case-insensitive, e.g. AC-05-012 (QR)']
+  category_id uuid [ref: > repair.categories.id]
+  building_id uuid [ref: > repair.buildings.id]
+  floor_id uuid [ref: > repair.floors.id]
+  location_detail text
+  Note: 'PLANNED — Stage 5 (03-plan.md). tickets.asset_code matches assets.code by value (no FK).'
+}
+
+// ───────────────────────── repair: settings ─────────────────────────
+
+Table repair.settings [headercolor: #6d597a] {
+  id boolean [pk, default: true, note: 'CHECK (id) — exactly one row']
+  ticket_prefix text [not null, note: "seed 'RP'"]
+  ticket_year_format repair.year_format [not null, note: "seed 'be'"]
+  ticket_digits integer [not null, note: '1–12, seed 6']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  Note: 'Ticket number format, e.g. RP-2569-000001 (BR-F02-5).'
+}
+
+Table repair.ticket_counters [headercolor: #6d597a] {
+  year integer [pk, note: 'Gregorian year in Asia/Bangkok']
+  last_no bigint [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  Note: 'Running number per year, restarts every year (BR-F02-4).'
+}
+
+// ───────────────────────── repair: tickets ─────────────────────────
+
+Table repair.tickets [headercolor: #e76f51] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  ticket_no text [not null, unique]
+  status repair.ticket_status [not null]
+  closed_reason repair.closed_reason [note: 'set iff status = closed']
+  priority repair.priority [not null]
+  category_id uuid [not null, ref: > repair.categories.id]
+  building_id uuid [not null, ref: > repair.buildings.id]
+  floor_id uuid [not null, ref: > repair.floors.id]
+  location_detail text
+  details text
+  asset_code text [note: 'matches repair.assets.code (Stage 5), no FK']
+  reporter_id uuid [not null, ref: > platform.users.id]
+  holder_id uuid [ref: > platform.users.id, note: 'technician who assessed / resolved it']
+  expected_done_on date [note: 'assessment (CR-005); NULL = waiting for the technician']
+  assessed_at timestamptz
+  result_note text [note: 'latest resolution; earlier ones in ticket_events']
+  resolved_by_id uuid [ref: > platform.users.id]
+  work_by repair.work_by [note: 'set on assess (CR-006)']
+  contractor_id uuid [ref: > repair.contractors.id, note: 'set on assess iff work_by = contractor']
+  contractor_rating smallint [note: '1–5 from the technician (staff-only)']
+  contractor_rating_comment text
+  rating smallint [note: '1–5 from the reporter (required to confirm)']
+  rating_comment text
+  send_back_count integer [not null, default: 0, note: '> 0 while in_progress = step reworking']
+  auto_close_at timestamptz [note: 'resolved_at + 72 h']
+  resolved_at timestamptz
+  closed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (reporter_id, updated_at)
+    (status, updated_at)
+    (status, priority, created_at) [note: 'technician work list']
+    (floor_id, status)
+    building_id
+    created_at
+    closed_at [note: 'WHERE status = closed']
+    holder_id [note: 'WHERE holder_id IS NOT NULL']
+    (contractor_id, resolved_at) [note: 'WHERE contractor_id IS NOT NULL']
+  }
+}
+
+Table repair.ticket_symptoms [headercolor: #e76f51] {
+  ticket_id uuid [not null, ref: > repair.tickets.id, note: 'ON DELETE CASCADE']
+  symptom_id uuid [not null, ref: > repair.symptoms.id]
+  sort_order integer [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (ticket_id, symptom_id) [pk]
+    symptom_id
+  }
+}
+
+Table repair.ticket_events [headercolor: #e76f51] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  ticket_id uuid [not null, ref: > repair.tickets.id, note: 'ON DELETE CASCADE']
+  type repair.event_type [not null]
+  actor_id uuid [ref: > platform.users.id, note: 'NULL = system (e.g. auto_closed)']
+  note text
+  data jsonb [not null, default: '{}', note: 'type-specific: rating, from/to, reservedFor …']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (ticket_id, created_at)
+  }
+  Note: 'Ticket timeline (BR-F06-3).'
+}
+
+Table repair.ticket_subscribers [headercolor: #e76f51] {
+  ticket_id uuid [not null, ref: > repair.tickets.id, note: 'ON DELETE CASCADE']
+  user_id uuid [not null, ref: > platform.users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (ticket_id, user_id) [pk]
+    (user_id, ticket_id)
+  }
+  Note: 'People following a ticket (F03, Stage 4). The reporter is not a subscriber.'
+}
+
+// ───────────────────────── repair: contractors (F24, CR-005) ─────────────────────────
+
+Table repair.contractors [headercolor: #8a5a44] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  contact_name text
+  phone text
+  note text
+  is_active boolean [not null, default: true, note: 'never deleted — deactivate']
+  created_by_id uuid [ref: > platform.users.id, note: 'the technician']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    `lower(name)`
+  }
+  Note: 'External contractors hired by the in-house technician. Job history + scores = repair.tickets where contractor_id = id.'
+}
+
+Table repair.contractor_types [headercolor: #8a5a44] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  created_by_id uuid [ref: > platform.users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    `lower(name)` [unique]
+  }
+  Note: 'Added inline by the technician, e.g. แอร์, ไฟฟ้า.'
+}
+
+Table repair.contractor_type_links [headercolor: #8a5a44] {
+  contractor_id uuid [not null, ref: > repair.contractors.id, note: 'ON DELETE CASCADE']
+  type_id uuid [not null, ref: > repair.contractor_types.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (contractor_id, type_id) [pk]
+    type_id
+  }
+}
+
+// ───────────────────────── repair: photos ─────────────────────────
+
+Table repair.photos [headercolor: #e9c46a] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  uploader_id uuid [not null, ref: > platform.users.id]
+  content_type text [not null]
+  size_bytes bigint [not null]
+  storage_key text [not null, note: 'file under PHOTO_STORAGE_DIR']
+  thumb_key text [not null, note: '= storage_key when no thumbnail (HEIC)']
+  thumb_content_type text [not null]
+  attached_at timestamptz [note: 'NULL = not on a ticket yet; purged after 24 h']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    created_at [note: 'WHERE attached_at IS NULL']
+  }
+  Note: 'Uploaded first, attached to a ticket when the form is submitted (D-022).'
+}
+
+Table repair.ticket_photos [headercolor: #e9c46a] {
+  photo_id uuid [pk, ref: - repair.photos.id, note: 'a photo belongs to at most one ticket']
+  ticket_id uuid [not null, ref: > repair.tickets.id, note: 'ON DELETE CASCADE']
+  kind repair.photo_kind [not null]
+  event_id uuid [ref: > repair.ticket_events.id, note: 'links follow / send-back / team photos to their event']
+  sort_order integer [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (ticket_id, kind, sort_order)
+    event_id [note: 'WHERE event_id IS NOT NULL']
+  }
+}
+
+// Logical link (no FK in SQL): role is looked up by employee_code
+Ref: platform.user_roles.employee_code - platform.users.employee_code
+
+TableGroup platform {
+  platform.users
+  platform.user_roles
+  platform.sessions
+  platform.audit_log
+  platform.notifications
+}
+
+TableGroup master_data {
+  repair.categories
+  repair.symptoms
+  repair.buildings
+  repair.floors
+  repair.assets
+}
+
+TableGroup contractors {
+  repair.contractors
+  repair.contractor_types
+  repair.contractor_type_links
+}
+
+TableGroup tickets {
+  repair.tickets
+  repair.ticket_symptoms
+  repair.ticket_events
+  repair.ticket_subscribers
+  repair.photos
+  repair.ticket_photos
+  repair.settings
+  repair.ticket_counters
+}

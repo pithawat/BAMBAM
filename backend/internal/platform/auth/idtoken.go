@@ -22,13 +22,13 @@ type idTokenResult struct {
 // configured issuer (trailing slash normalised). A missing iss is allowed for this
 // provider only and reported back so the caller can log a warning.
 // Remove the missing-iss exception once RMC SSO issues RS256 tokens via JWKS.
-func validateIDToken(raw, clientID string, secret []byte, issuer string, now func() time.Time) (idTokenResult, error) {
+func validateIDToken(raw, clientID string, secret []byte, issuer string, leeway time.Duration, now func() time.Time) (idTokenResult, error) {
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithAudience(clientID),
 		jwt.WithExpirationRequired(),
 		jwt.WithIssuedAt(),
-		jwt.WithLeeway(60*time.Second),
+		jwt.WithLeeway(leeway),
 		jwt.WithTimeFunc(now),
 	)
 	claims := jwt.MapClaims{}

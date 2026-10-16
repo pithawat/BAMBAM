@@ -1,6 +1,23 @@
-# UI handoff — ระบบแจ้งซ่อม — Stage <n>
+# UI handoff — ระบบแจ้งซ่อม — Stages 1–2
 
-Status: NOT READY — specs only (Claude sets `READY FOR CODEX — Stage <n>` in /build-stage prepare; Codex sets `UI DONE — Stage <n>, waiting for Claude wire`)
+Status: BUILT BY CLAUDE — Stages 1–2 (CR-005), real API wired, waiting for user acceptance
+
+## CR-005 (2026-10-15) — built by Claude, not by Codex
+
+The user asked Claude to change the flow and wire the real API for report + tracking (reporter and technician) in one go. Codex does not need to build these; read this before touching the files.
+
+| Screen | Route → file |
+|---|---|
+| S06 / S07 updates (step labels, forward-only tracker, action bar) | `modules/repair/components/{my-tickets,ticket-detail,ticket-progress,ticket-actions}.tsx` |
+| S08 ประเมินงาน / ส่งกลับ, S17 ประเมินงาน (dialogs) | `ticket-actions.tsx` |
+| S09 งานซ่อม | `/repair/work` → `app/(app)/repair/work/page.tsx`, `technician-work.tsx` |
+| S10 บันทึกผลซ่อม | `/repair/tickets/[id]/resolve` → `resolve-form.tsx` |
+| S18 ช่างภายนอก | `/repair/contractors`, `/repair/contractors/[id]` → `contractors.tsx` |
+| Nav | `components/shared/app-sidebar.tsx`, `bottom-nav.tsx` (shared code) |
+
+Mock mode (`NEXT_PUBLIC_USE_MOCKS=true`) covers Stage 1 reads only; Stage 2 actions and contractors always call the API.
+
+<!-- Claude sets `READY FOR CODEX — Stage <n>` in /build-stage prepare; Codex sets `UI DONE — Stage <n>, waiting for Claude wire`. -->
 
 <!-- Written by Claude (/ui-spec 2026-10-14, updated by /build-stage prepare). Codex starts here.
      The Stage column is filled by /stage-plan. Only build the screens of the current stage. -->
@@ -14,16 +31,51 @@ Status: NOT READY — specs only (Claude sets `READY FOR CODEX — Stage <n>` in
 5. Mockups next to them (open the .html in a browser; phone frames scroll)
 6. `frontend/src/modules/repair/types.ts` and `mocks.ts` (data shapes — do not change)
 
+## Stage 1 — what to build now
+
+Goal: พนักงานแจ้งซ่อมพร้อมรูปได้จริง ได้เลขงาน และเปิดดูงานของตัวเองได้ (`../03-plan.md` Stage 1).
+
+| Screen | Build in Stage 1 | Leave out (later stage) | Route → file |
+|---|---|---|---|
+| S03 ฟอร์มแจ้งซ่อม | mobile 4-step wizard + desktop sections with sticky summary panel (CR-002), อาคาร / ชั้น via `ChoiceField` (CR-002), `PhotoPicker` (`_common.md` §5), validation with exact copy, discard dialog | QR banner / `?asset=` (6), team-handled card (5), duplicate check + S04 (5): submit goes straight to `createTicket` | `/repair/new` → `app/(app)/repair/new/page.tsx` |
+| S05 แจ้งสำเร็จ | normal variant | team variant (5) | `/repair/new/done?id={ticketId}` → `app/(app)/repair/new/done/page.tsx` |
+| S06 ติดตามงานซ่อม | status groups (CR-002), search (300 ms), scope segmented control, date filter sheet / `FilterPill`, awaiting cards, rows with thumb + progress, closed preview + `?closed=all`, desktop list + preview panes, "โหลดเพิ่ม" per group, all states | — | `/repair/my` → `app/(app)/repair/my/page.tsx` |
+| S07 รายละเอียดงาน | view only: header card, details, photos + lightbox, result card, timeline (all event labels), loading / not-found / forbidden / error states | the action bar and every action dialog (2–5); `allowedActions` is always `[]` in Stage 1 — render it generically so later stages only add buttons | `/repair/tickets/[id]` → `app/(app)/repair/tickets/[id]/page.tsx` |
+
+Empty route folders exist (with `.gitkeep`; delete it when you add the page). Put reusable pieces in `modules/repair/components/` (e.g. `PhotoPicker`, `TicketStatusBadge`, `TicketListRow`, `Timeline`).
+
+### Data — `frontend/src/modules/repair/api.ts` (do not call `fetch` yourself)
+
+| Function | Used by | Notes |
+|---|---|---|
+| `getCategories()`, `getBuildings()` | S03 | reload both after `MASTER_DATA_CHANGED` |
+| `uploadPhoto(file, { onProgress, signal })` | S03 `PhotoPicker` | resizes to 1920px JPEG itself (D-022); `onProgress` 0–1 drives the ring; abort on tile remove / unmount; rejects `PHOTO_TYPE_NOT_ALLOWED` / `PHOTO_TOO_LARGE` / `NETWORK` |
+| `createTicket(req)` | S03 submit | send `teamHandled: null`; on success → `router.replace("/repair/new/done?id=" + ticket.id)` |
+| `getTicket(id)` | S05, S07 | 404 `TICKET_NOT_FOUND` → not-found state · 403 `FORBIDDEN` → forbidden state |
+| `getTickets(query)`, `getTicketCounts(query)` | S06 | one call per group (CR-002) — group `open` → `status: ["new","in_progress"]` · `resolved` → `["resolved"]` · `closed` → `["closed"]`; range → `createdFrom`; scope select → `relation`; server already orders (awaiting-mine first, closed by close time) |
+
+- Errors: `modules/repair/errors.ts` → `errorMessage(err)` for toasts / alerts, `createTicketFieldErrors(err)` maps `VALIDATION_FAILED` fields to the S03 messages. Never show `err.message`.
+- `MAX_PHOTOS` (5) and `MAX_PHOTO_BYTES` are exported from `api.ts`.
+- Photo URLs (`thumbUrl`, `url`) are same-origin API paths in real mode and data/blob URLs in mock mode — use a plain `<img>` (not `next/image`).
+- Date formatting: `lib/format.ts` (`formatDateTime`); add a list-date helper inside `modules/repair/components/` if you need the `_common.md` §3 list format (today / เมื่อวาน / this year / older).
+
+### Mocks — `NEXT_PUBLIC_USE_MOCKS=true` (default in `.env.development`)
+
+- Viewer = the role chosen in the role switcher (S15); sample tickets are seen from วรรณา (พนักงานทั่วไป). Use "ดูในบทบาท" → หัวหน้าแม่บ้าน to see the S07 forbidden state for her tickets.
+- Scenario: add `?mock=<name>` to any URL (remembered; `?mock=normal` resets): `normal` · `empty` · `error` · `forbidden` · `slow` · `validation` · `master_changed` · `upload_error`.
+- Fixed ids in `mocks.ts` `MOCK_IDS`: `forbiddenTicket` (someone else's ticket), `notFoundTicket`, `awaitingTicket` (resolved, waiting for วรรณา).
+- Tickets created in mock mode appear in S06 / S07 until the page reloads.
+
 ## Screens
 
 | Screen | Spec | Mockup (closest if none) | Route | Stage |
 |---|---|---|---|---|
 | S01 เข้าสู่ระบบ / ออกจากระบบแล้ว | `screens/S01-login.md` | — (`docs/shared/style/options/option-a.html`) | `/login`, `/signed-out` | 0 (platform) |
 | S02 หน้าแรก | `screens/S02-home.md` | `docs/shared/style/options/option-a.html` (employee); `mockups/S09-technician-queue.html` (technician); `mockups/S11-admin-queue.html` (admin) | `/` | 7 (Stage 0: placeholder) |
-| S03 ฟอร์มแจ้งซ่อม | `screens/S03-report-form.md` | `mockups/S03-report-form.html` | `/repair/new` | 1 (+5 team card, +6 QR banner) |
+| S03 ฟอร์มแจ้งซ่อม | `screens/S03-report-form.md` | `mockups/S03-report-form.html` (mobile) · `mockups/S03-report-form-desktop.html` (desktop, CR-002) | `/repair/new` | 1 (+5 team card, +6 QR banner) |
 | S04 พบงานซ้ำ | `screens/S04-duplicate-found.md` | `mockups/S03-report-form.html` → "พบงานซ้ำ" | — (sheet / dialog) | 5 |
 | S05 แจ้งสำเร็จ | `screens/S05-report-success.md` | `mockups/S03-report-form.html` → S05 frames | `/repair/new/done` | 1 (+5 team variant) |
-| S06 งานของฉัน | `screens/S06-my-tickets.md` | — (`option-a.html` list + `mockups/S09-technician-queue.html` header) | `/repair/my` | 1 |
+| S06 ติดตามงานซ่อม | `screens/S06-my-tickets.md` | `mockups/S06-my-tickets.html` (CR-002) | `/repair/my` | 1 |
 | S07 รายละเอียดงาน | `screens/S07-ticket-detail.md` | `mockups/S07-ticket-detail.html` | `/repair/tickets/[id]` | 1 view (+2, 3, 4, 5 actions) |
 | S08 ตรวจรับ / ส่งกลับให้แก้ | `screens/S08-confirm-or-send-back.md` | `mockups/S07-ticket-detail.html` → S08 frames | — (sheet / dialog) | 3 |
 | S09 คิวงานช่าง | `screens/S09-technician-queue.md` | `mockups/S09-technician-queue.html` | `/repair/queue` | 2 (+3 reserved states) |
@@ -46,8 +98,8 @@ Status: NOT READY — specs only (Claude sets `READY FOR CODEX — Stage <n>` in
 
 ## Do not edit
 
-- `backend/**`, `docs/**` (except this file), `modules/repair/{types,mocks,api}.ts`, `src/proxy.ts`, `src/lib/**`
-- `components/shared/**` — if you need a change there, write it in Open questions
+- `backend/**`, `docs/**` (except this file), `modules/repair/{types,mocks,api,errors}.ts`, `src/proxy.ts`, `src/lib/**`
+- `components/shared/**` — if you need a change there, write it in Open questions. Use its pickers for every choice: `ChoiceField` / `Picker` (form), `FilterPill`, `SegmentedControl` — never `components/ui/select` directly (CR-002, design-system "Pickers")
 
 ## Run
 
@@ -59,20 +111,24 @@ npm run lint && npm run typecheck
 
 ## Done when
 
-- [ ] Every item in each screen's acceptance checklist passes (record below)
-- [ ] lint + typecheck pass
-- [ ] Each screen compared with its mockup at 375px and 1280px; differences listed below
+- [x] Every item in each screen's acceptance checklist passes for Stage 1 scope (record below)
+- [x] lint + typecheck pass
+- [x] Each screen compared with its mockup at 375px and 1280px; differences listed below
 
 ## Checklist results (Codex fills)
 
 | Screen | All checklist items pass? | Notes |
 |---|---|---|
-| | | |
+| S03 | Yes (Stage 1 scope, re-checked after CR-002) | CR-002 (Claude): desktop sections show ครบแล้ว / ต้องแก้ {n} ช่อง, sticky summary panel at ≥ 1280px (checklist rows jump to the section; submit scrolls to the first error), bottom bar at 1024–1279px; อาคาร = pills, ชั้น = grid (Picker with search when > 12, checked with a 25-floor sample). 4-step wizard (mobile) / single page (desktop), per-step + full validation with exact copy, PhotoPicker, discard dialog only when data entered, data kept on submit failure. QR banner, team-handled card, duplicate check: later stages (5, 6), not built. Draft resets when the route is left (cacheComponents keeps hidden routes alive) — 17 reports in a row via client navigation, form fresh and unlocked each time. |
+| S05 | Yes (normal variant) | Mobile gradient + mascot, desktop centered card; copy button; error state with "ไปที่ติดตามงานซ่อม"; forbidden; `router.replace` so back never returns to the form. Team variant: Stage 5. |
+| S06 | Yes (CR-002 redesign, Claude) | Groups รอตรวจรับ → กำลังดำเนินการ → ปิดแล้ว (latest 3, `?closed=all` with load more + "แสดง {a} จาก {n} งาน"), empty groups hidden, awaiting cards with deadline chip, rows with thumb + mini progress, desktop list + preview pane (`?id`, default = first awaiting), date `FilterPill` + scope segmented control. Checked with 21 open tickets: 20 shown, "โหลดเพิ่ม" → 21 unique, button hides; no console errors. |
+| S07 | Yes (view only) | Header, details, photos + lightbox (keyboard Enter/Esc, focus returns; arrows + swipe), result card with "รูปหลังซ่อม", timeline (all event labels, time right-aligned as mockup), info card incl. อุปกรณ์ "—"; forbidden / not-found / error states. `allowedActions` rendered generically (empty in Stage 1). |
 
 ## Differences from mockup (Codex fills)
 
--
+- S06 / S03 desktop follow the CR-002 mockups; thumbnails in mock mode are SVG placeholders.
+- Mockups show the UAT strip; dev shows the DEV role strip (platform, expected).
 
 ## Open questions (Codex fills — never guess)
 
--
+- For Claude (wire): `cacheComponents` keeps visited routes alive with their state — worth a note in `frontend/AGENTS.md` so later screens reset drafts / refresh lists on reveal.

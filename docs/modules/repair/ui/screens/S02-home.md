@@ -28,7 +28,7 @@ The page has three variants chosen by role. Header, services row and bottom nav 
 │└──────────────────────────┘│
 │ บริการ                       │
 │ [แจ้งซ่อม][จองรถ เร็วๆนี้][จองห้อง เร็วๆนี้] │
-│ งานของฉัน          ดูทั้งหมด › │
+│ ติดตามงานซ่อม      ดูทั้งหมด › │
 │┌ รอคุณตรวจรับ  ปิดอัตโนมัติ 17 ต.ค.…┐│ ← one tinted card per ticket awaiting me (max 2, newest first)
 ││ แอร์ไม่เย็น · มีน้ำหยด        ││
 ││ 📍 อาคารหลัก ชั้น 5 · ห้องประชุม 5B ││
@@ -61,7 +61,7 @@ The page has three variants chosen by role. Header, services row and bottom nav 
 ││ 3 ▮▮ ปกติ แอร์ไม่เย็น · อาคารหลัก ชั้น 6  › ││
 │└──────────────────────────┘│
 │ บริการ (same as A)            │
-│ งานที่ฉันแจ้ง (same block as A "งานของฉัน", hidden when none) │
+│ งานที่ฉันแจ้ง (same block as A "ติดตามงานซ่อม", hidden when none) │
 ├────────────────────────────┤
 │ BottomNav                   │
 └────────────────────────────┘
@@ -90,13 +90,13 @@ Queue rows here have no claim button — tap opens S07 (claim is done there or o
 ││ [เปิดคิวงาน]               ││
 │└──────────────────────────┘│
 │ ภาพรวมอาคาร › (row link; S12 shows the floor list on mobile) │
-│ บริการ · งานของฉัน (same as A)        │
+│ บริการ · ติดตามงานซ่อม (same as A)    │
 └────────────────────────────┘
 ```
 
 Desktop (≥1024px):
 
-- **A (employee / leads):** exactly option-a.html desktop — sidebar, top bar, `bg-brand` banner with mascot `full` ("สวัสดี คุณวรรณา" + "คุณมี 1 งานรอตรวจรับ และอีก 2 งานกำลังดำเนินการ" + white "แจ้งซ่อม" + glass "ดูงานของฉัน"), 3 service cards, then grid `1fr 282px`: "งานของฉันที่ยังไม่ปิด" table card (pill tabs ทั้งหมด / รอตรวจรับ / กำลังดำเนินการ with counts) + "แจ้งเตือนล่าสุด" card (5 latest).
+- **A (employee / leads):** exactly option-a.html desktop — sidebar, top bar, `bg-brand` banner with mascot `full` ("สวัสดี คุณวรรณา" + "คุณมี 1 งานรอตรวจรับ และอีก 2 งานกำลังดำเนินการ" + white "แจ้งซ่อม" + glass "ดูงานของฉัน"), 3 service cards, then grid `1fr 282px`: "งานซ่อมที่ยังไม่ปิด (CR-003)" table card (pill tabs ทั้งหมด / รอตรวจรับ / กำลังดำเนินการ with counts) + "แจ้งเตือนล่าสุด" card (5 latest).
 - **B (technician):** banner text "วันนี้มี 12 งานในคิวหมวดของคุณ" + white "ดูคิวงาน" + glass "แจ้งซ่อม"; under it grid `1fr 320px`: left "คิวงานหมวดของคุณ" table (first 5 rows, same columns as S09 desktop, without claim buttons) · right current-job card (states above) + "แจ้งเตือนล่าสุด".
 - **C (admin / executive):** banner text "วันนี้มี 14 งานรอช่างรับ · ฉุกเฉิน 1 งาน" + white "เปิดคิวงาน" + glass "ภาพรวมอาคาร"; row of 4 stat cards (same 4 counts, each links to the S11 tab — "ฉุกเฉินที่ยังไม่ปิด" links to S11 tab รอช่างรับ… with priority filter ฉุกเฉิน); grid `1fr 282px`: "งานฉุกเฉินและสูงที่รอช่างรับ" table (top 5 by queue order: เลขงาน · เรื่อง / สถานที่ · หมวดงาน · ความเร่งด่วน · แจ้งเมื่อ · ›) + "แจ้งเตือนล่าสุด".
 
@@ -125,15 +125,15 @@ Desktop (≥1024px):
 | CTA title / body | เจออะไรเสีย บอก BAMBAM / ถ่ายรูป เลือกอาการ ส่งถึงช่างในหมวดนั้นทันที |
 | CTA buttons | แจ้งซ่อม · สแกน QR |
 | Services section | บริการ · tile captions: แจ้งซ่อม "{n} งานยังไม่ปิด" (or "แจ้งปัญหา ติดตามงาน" when 0) · จองรถ / จองห้องประชุม chip "เร็วๆ นี้" |
-| My tickets section | งานของฉัน · link ดูทั้งหมด (technician: งานที่ฉันแจ้ง) |
+| My tickets section (CR-003) | ติดตามงานซ่อม · link ดูทั้งหมด (technician: งานที่ฉันแจ้ง) |
 | Awaiting card | badge รอคุณตรวจรับ · caption ปิดอัตโนมัติ {d MMM} หากไม่ตรวจรับ · meta `{ticket_no} · ช่างบันทึกผล {time}` · buttons ส่งกลับให้แก้ / ตรวจรับงาน |
 | Row meta (examples) | `ช่างธนากร · 09:20` · `คุณติดตามเคสนี้ · 13 ต.ค. 16:48` · `แจ้งเมื่อ 08:52` |
 | Technician queue section | คิวงานหมวดของคุณ · link ดูทั้งหมด {n} |
 | Technician card | งานที่กำลังทำ · รับงาน {time} · คืนงาน · บันทึกผลซ่อม · ส่งกลับให้แก้ · งานถัดไปของคุณ · เริ่มงาน · มีงานส่งกลับให้แก้รออยู่ 1 งาน — เริ่มได้หลังจบงานนี้ · ยังไม่มีงานที่ถืออยู่ · เลือกงานจากคิว แล้วกด รับงาน · ดูคิวงาน |
 | Admin counts | รอช่างรับงาน · กำลังดำเนินการ · รอตรวจรับ · ฉุกเฉินที่ยังไม่ปิด · button เปิดคิวงาน · row ภาพรวมอาคาร |
 | Desktop banner text | A: คุณมี {n} งานรอตรวจรับ และอีก {m} งานกำลังดำเนินการ (when both 0: เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย) · B: วันนี้มี {n} งานในคิวหมวดของคุณ · C: วันนี้มี {n} งานรอช่างรับ · ฉุกเฉิน {m} งาน (omit the second part when m = 0) |
-| Desktop banner buttons | A: แจ้งซ่อม / ดูงานของฉัน · B: ดูคิวงาน / แจ้งซ่อม · C: เปิดคิวงาน / ภาพรวมอาคาร |
-| Desktop cards | งานของฉันที่ยังไม่ปิด · แจ้งเตือนล่าสุด (link ทั้งหมด) · งานฉุกเฉินและสูงที่รอช่างรับ |
+| Desktop banner buttons | A: แจ้งซ่อม / ติดตามงานซ่อม (CR-003) · B: ดูคิวงาน / แจ้งซ่อม · C: เปิดคิวงาน / ภาพรวมอาคาร |
+| Desktop cards | งานซ่อมที่ยังไม่ปิด (CR-003) · แจ้งเตือนล่าสุด (link ทั้งหมด) · งานฉุกเฉินและสูงที่รอช่างรับ |
 | Empty — my tickets | ยังไม่มีงานที่คุณแจ้ง / เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย หรือสแกน QR ที่ติดบนอุปกรณ์ / button แจ้งซ่อม |
 | Empty — technician queue | ยังไม่มีงานในหมวดของคุณ / งานใหม่จะแจ้งเตือนที่กระดิ่ง |
 | Technician without categories | ยังไม่ได้กำหนดหมวดงาน ติดต่อ Admin |

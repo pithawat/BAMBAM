@@ -1,6 +1,11 @@
 # S07 — รายละเอียดงาน
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14)
+
+> **CR-005 (2026-10-15):** badge from `step` (`STEP` labels in `ticket-presentation.ts`); "รอคุณตรวจรับ" → "รอคุณประเมิน"; chip "คาดว่าจะเสร็จ {d MMM yyyy}" while in progress; result card adds "ผู้ดำเนินการ" (ช่างในระบบ / ช่างภายนอก · {types}, + name for staff) and, for staff, the contractor score; reporter score titled "คะแนนจากผู้แจ้ง". Info rows: ช่างผู้รับผิดชอบ ("รอช่างประเมิน" when empty), คาดว่าจะเสร็จ, ผู้ดำเนินการ, ส่งกลับให้แก้ (when > 0). Action bar (desktop aside + mobile bottom bar, dialogs rendered once): technician → **ประเมินงาน / เลื่อนวันคาดว่าเสร็จ** (S17), **บันทึกผลซ่อม** (→ S10, disabled with "ประเมินงาน (วันที่คาดว่าจะเสร็จ) ก่อนบันทึกผล" until assessed); reporter → **ส่งกลับให้แก้**, **ประเมินงาน** (S08). Timeline types: assessed / assessment_changed (คาดว่าจะเสร็จ …), resolved (ดำเนินการโดย …), sent_back, confirmed. Reserved-job and queue-move UI removed.
+
+
+**CR-003 header card:** ticket no + copy · status badge (or solid "รอคุณตรวจรับ") · extra badges · title · one meta line (หมวดงาน · priority · location) · asset · the 4-step progress tracker from S06 (`TicketProgress`, captions per S06 "Progress tracker") · awaiting-mine deadline chip. Desktop: รายละเอียดจากผู้แจ้ง and ผลการซ่อม side by side from `2xl`. Visual reference: the S06 desktop preview pane (`../mockups/S06-my-tickets.html`); `../mockups/S07-ticket-detail.html` stays the reference for everything else.
 
 - **Flows:** F06 (detail + timeline), F07 entry, F05 (hand over), F08-B (admin close), F21 (claim, start reserved, give back, go to record result), F22 (priority change) (see ../../02-flows.md)
 - **Persona:** every role; reporter and technician on mobile, admin and executive on desktop (see ../../01-users.md)
@@ -113,7 +118,7 @@ Each event shows actor and full date-time (`14 ต.ค. 2569 10:15`). Photos in 
 | Title | รายละเอียดงาน |
 | Section titles | รายละเอียดจากผู้แจ้ง · ผลการซ่อม · ความคืบหน้า |
 | Header meta | แจ้งโดย {ชื่อ} · {ฝ่าย} · {date} · ผู้ติดตาม {n} คน |
-| Auto-close notice | ปิดอัตโนมัติ {date time} หากไม่ตรวจรับ |
+| Auto-close notice (CR-003) | same deadline chip as S06: ปิดอัตโนมัติใน {n} วัน ({d MMM}) หากไม่ตรวจรับ · less than 1 day: ปิดอัตโนมัติวันนี้ {HH:mm} หากไม่ตรวจรับ |
 | Result meta | ช่าง{ชื่อเต็ม} · {date} · label for photos: รูปหลังซ่อม |
 | Rating labels | 1 ต้องปรับปรุง · 2 พอใช้ · 3 ดี · 4 ดีมาก · 5 ยอดเยี่ยม |
 | No details | ไม่มีรายละเอียดเพิ่มเติม |

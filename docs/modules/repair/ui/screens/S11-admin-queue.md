@@ -2,6 +2,9 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-005 (2026-10-15):** no queue → S11 becomes **งานทั้งหมด** (Stage 3): tabs by step, filters, priority change and close; drag and drop, "จัดลำดับเอง", undo and the reserved group are removed. Re-spec in Stage 3 before building.
+
+
 - **Flows:** F22 (reorder, change priority), F08-B (close any ticket), F05 entry for admin (hand over team-handled tickets), BR-F06-1 (admin and executive see all tickets), BR-F22-6 (executive read-only) (see ../../02-flows.md)
 - **Persona:** admin on desktop all day; executive on desktop, read-only (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** one place to see every ticket by status, keep each category's queue in the right order, and step in (priority, close, hand over).

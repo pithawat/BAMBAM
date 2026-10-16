@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/pithawat/BAMBAM/backend/internal/modules/repair"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/auth"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/config"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/db"
@@ -52,11 +53,25 @@ func run() error {
 	sessions := auth.NewSessionStore(pool, userSvc, cfg.SessionTTL)
 	authH := auth.NewHandler(cfg, sessions, userSvc, userCtl, func(ctx context.Context) error { return pool.Ping(ctx) })
 
+	// modules
+	photoStore, err := repair.NewLocalPhotoStore(cfg.PhotoStorageDir)
+	if err != nil {
+		return err
+	}
+	repairSvc := repair.NewService(repair.NewRepository(pool), photoStore)
+	repairCtl := repair.NewController(repairSvc)
+
 	if cfg.RoleSwitcherEnabled {
 		if err := userSvc.EnsureDemoUsers(ctx); err != nil {
 			return err
 		}
 		slog.Info("role switcher enabled, demo users seeded")
+		// dev/UAT: sample master data until the real seed files arrive (D-032)
+		if seeded, err := repairSvc.EnsureSampleData(ctx); err != nil {
+			return err
+		} else if seeded {
+			slog.Info("repair sample master data seeded")
+		}
 	}
 
 	r := gin.New()
@@ -74,9 +89,11 @@ func run() error {
 		users.RegisterDevRoutes(dev, userCtl)
 		auth.RegisterDevRoutes(dev, authH)
 	}
-	// modules: <module>.RegisterRoutes(authed.Group("/<module>"), ctl)
+	repair.RegisterRoutes(authed.Group("/repair"), repairCtl)
 
 	go purgeSessions(ctx, sessions)
+	go purgePhotos(ctx, repairSvc)
+	go autoCloseTickets(ctx, repairSvc)
 
 	srv := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: r, ReadHeaderTimeout: 10 * time.Second}
 	errCh := make(chan error, 1)
@@ -110,6 +127,46 @@ func purgeSessions(ctx context.Context, s *auth.SessionStore) {
 			} else if n > 0 {
 				slog.Info("purged expired sessions", "count", n)
 			}
+		}
+	}
+}
+
+func purgePhotos(ctx context.Context, s *repair.Service) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if n, err := s.PurgeUnattachedPhotos(ctx); err != nil {
+				slog.Error("purge unattached photos", "err", err)
+			} else if n > 0 {
+				slog.Info("purged unattached photo files", "count", n)
+			}
+		}
+	}
+}
+
+// autoCloseTickets closes resolved tickets nobody rated within 3 days (BR-F07-4):
+// once at start, then every 15 minutes.
+func autoCloseTickets(ctx context.Context, s *repair.Service) {
+	run := func() {
+		if n, err := s.AutoClose(ctx); err != nil {
+			slog.Error("auto-close tickets", "err", err)
+		} else if n > 0 {
+			slog.Info("auto-closed tickets", "count", n)
+		}
+	}
+	run()
+	t := time.NewTicker(15 * time.Minute)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			run()
 		}
 	}
 }

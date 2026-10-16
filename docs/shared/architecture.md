@@ -64,5 +64,6 @@ How dev → production switching works: **code is identical; only env vars diffe
 | `NEXT_PUBLIC_ROLE_SWITCHER` | frontend | `true` (also UAT) | `false` (set at **build** time) |
 | `APP_SESSION_SECRET` | backend | random, `.env` only | secret from platform (not the SSO client secret) |
 | `APP_SESSION_TTL` | backend | `12h` | from platform (default `12h`) |
+| `PHOTO_STORAGE_DIR` | backend | optional, default `data/photos` (gitignored) | required: persistent volume, backed up (D-022) |
 
 Add new variables to this table, to `backend/.env.example` or `frontend/.env.*`, and to `lib/env.ts` / `platform/config` in the same change.

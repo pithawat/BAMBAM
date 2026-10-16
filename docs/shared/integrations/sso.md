@@ -44,7 +44,7 @@ Stack (D-026, decided in Stage 0): Next.js rewrites `/api/*` to the Go backend, 
 Signing is legacy **HS256**, verified with the client secret. RMC SSO may issue `id_token` **without `iss`**. Accept such a token only when all of these pass:
 - signature verified (never trust a decoded payload)
 - `aud` equals or contains `bam`
-- `exp` present and not expired; `iat` checked when present
+- `exp` present and not expired; `iat` checked when present; leeway = `SSO_CLOCK_SKEW` (default 60s, D-037)
 - `sub` present and equal to `sub` from UserInfo
 - `state` and PKCE verifier checked as usual
 - if `iss` **is** present: normalise trailing slash and require exactly `https://rmc-sso.cipcloud.net`, else reject

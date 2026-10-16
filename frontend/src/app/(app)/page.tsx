@@ -13,7 +13,7 @@ import { formatLongDate } from "@/lib/format";
 import { initials } from "@/lib/platform/roles";
 
 // S02 Home — Stage 0 placeholder (D-023): greeting, the option-a CTA card and
-// the services only. Role widgets, "งานของฉัน" and the bell count come in repair Stage 7.
+// the services only. Role widgets, "ติดตามงานซ่อม" and the bell count come in repair Stage 7.
 
 const SERVICE_LIST: { service: Service; href?: string; hint: string }[] = [
   { service: "repair", href: "/repair/new", hint: "แจ้งปัญหาในอาคาร" },
@@ -113,7 +113,7 @@ export default function HomePage() {
               </Link>
             </Button>
             <Button asChild variant="glass">
-              <Link href="/repair/my">ดูงานของฉัน</Link>
+              <Link href="/repair/my">ติดตามงานซ่อม</Link>
             </Button>
           </div>
           <Mascot pose="full" size={208} className="absolute right-17 -bottom-1.5" />

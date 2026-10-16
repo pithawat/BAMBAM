@@ -44,7 +44,7 @@ test.describe("employee session", () => {
       await expect(page.getByRole("navigation", { name: "เมนูหลัก" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "สวัสดี คุณวรรณา" })).toBeVisible();
     } else {
-      await expect(page.getByRole("link", { name: "งานของฉัน" }).filter({ visible: true }).first()).toBeVisible();
+      await expect(page.getByRole("link", { name: /^ติดตามงาน/ }).filter({ visible: true }).first()).toBeVisible();
       await expect(page.getByText("วรรณา สุขประเสริฐ").filter({ visible: true }).first()).toBeVisible();
       await expect(page.getByText("เร็วๆ นี้").filter({ visible: true }).first()).toBeVisible();
     }

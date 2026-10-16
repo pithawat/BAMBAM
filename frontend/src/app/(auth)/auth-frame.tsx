@@ -27,7 +27,7 @@ export function AuthFrame({ pose, children }: { pose: MascotPose; children: Reac
           <Circles />
           <h1 className="relative font-heading text-[28px] leading-[38px] font-bold">เจออะไรเสีย บอก BAMBAM</h1>
           <p className="relative mt-2 max-w-sm text-[15px] text-white/95">
-            แจ้งซ่อม ติดตามงาน และตรวจรับ ได้ทั้งบนมือถือและคอมพิวเตอร์
+            แจ้งซ่อม ติดตามงาน และประเมินงาน ได้ทั้งบนมือถือและคอมพิวเตอร์
           </p>
           <Mascot pose={pose} size={280} priority className="absolute right-6 bottom-0" />
         </div>

@@ -8,7 +8,8 @@ import { ROLES, type DemoUser, type Me, type Role } from "./types";
 
 const MOCK_ROLE_KEY = "bambam.mockRole";
 
-function mockRole(): Role {
+/** The role the mock session is in (mock mode only); module mocks use it as the viewer. */
+export function mockRole(): Role {
   try {
     const r = window.localStorage.getItem(MOCK_ROLE_KEY);
     if (r && (ROLES as readonly string[]).includes(r)) return r as Role;

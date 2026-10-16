@@ -60,7 +60,56 @@ export function redirectToLogin(reason?: "expired") {
   window.location.assign(`/login?${q}`);
 }
 
+export type UploadOptions = {
+  /** 0–1 while the request body is sent. */
+  onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
+};
+
+/**
+ * multipart/form-data POST with upload progress (fetch cannot report it, so this uses XHR).
+ * Same envelope, 401 and network handling as `request`. Abort rejects with an `AbortError` DOMException.
+ */
+function upload<T>(path: string, form: FormData, opts: UploadOptions = {}): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${env.apiBaseUrl}${path}`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) opts.onProgress?.(e.loaded / e.total);
+    };
+    xhr.onerror = () => reject(new ApiError(0, "NETWORK", "network error"));
+    xhr.onabort = () => reject(new DOMException("upload aborted", "AbortError"));
+    xhr.onload = () => {
+      if (xhr.status === 401 && typeof window !== "undefined") redirectToLogin("expired");
+      let json: { data?: T; error?: { code?: string; message?: string; fields?: Record<string, string> } } | null = null;
+      try {
+        json = JSON.parse(xhr.responseText);
+      } catch {
+        json = null;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const e = json?.error;
+        reject(new ApiError(xhr.status, e?.code ?? "UNKNOWN", e?.message ?? xhr.statusText, e?.fields ?? {}));
+        return;
+      }
+      opts.onProgress?.(1);
+      resolve(json?.data as T);
+    };
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        reject(new DOMException("upload aborted", "AbortError"));
+        return;
+      }
+      opts.signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
+    xhr.send(form);
+  });
+}
+
 export const http = {
+  upload,
   get: <T>(path: string, opts?: RequestOptions) => request<T>(path, { ...opts, method: "GET" }).then((r) => r.data),
   list: <T>(path: string, opts?: RequestOptions) => request<T[]>(path, { ...opts, method: "GET" }),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) =>

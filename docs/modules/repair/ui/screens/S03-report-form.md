@@ -1,12 +1,12 @@
 # S03 — ฟอร์มแจ้งซ่อม
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14)
 
 - **Flows:** F02 (all steps), F04 (team handled option), F13-B (prefill from QR) (see ../../02-flows.md)
 - **Persona:** every role, mobile first (employee standing at the broken thing); desktop usable (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** report a problem with category, symptoms, place, photos and urgency in under a minute — or, for team leads, record a job the team already fixed.
 - **Route:** `/repair/new` · with QR: `/repair/new?asset={asset_code}`
-- **Mockup:** `../mockups/S03-report-form.html` (wizard steps, QR prefill, validation errors, team-handled option, desktop single page; also S04 and S05 frames)
+- **Mockup:** `../mockups/S03-report-form.html` (wizard steps, QR prefill, validation errors, team-handled option; also S04 and S05 frames — its desktop frame is superseded) · desktop: `../mockups/S03-report-form-desktop.html` (CR-002)
 - **Data:** categories + symptoms, buildings + floors, asset lookup by code, photo upload, create ticket (returns either the new ticket or a list of open duplicates → S04) → `modules/repair/api.ts` (names fixed in 04-api-contract.md)
 
 ## Layout — mobile first
@@ -46,7 +46,7 @@ Mobile is a 4-step wizard, one step per screen. Steps and fields (F02 order):
 └────────────────────────────┘
 ```
 
-Step 2: `Select` อาคาร, `Select` ชั้น (disabled until a building is picked; options = that building's floors), `Input` จุดที่เกิด with hint.
+Step 2: อาคาร and ชั้น as `ChoiceField` (CR-002, design-system "Pickers"): ≤ 5 options → pill radios, 6–12 → grid of buttons, > 12 → `Picker` (bottom sheet on mobile, search when > 10). With the sample data: อาคาร = 2 pills, ชั้น = grid "ชั้น 1 … ชั้น 7". ชั้น shows the hint "เลือกอาคารก่อน" (no options) until a building is picked; options = that building's floors. `Input` จุดที่เกิด with hint.
 Step 3: `PhotoPicker` (`_common.md` §5) then `Textarea` รายละเอียด (4 rows, counter `0/500`).
 Step 4:
 
@@ -76,7 +76,11 @@ Step 4:
 └────────────────────────────┘
 ```
 
-Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"). One page, centered column max 760px, one `Card` per step with a numbered heading ("1 เกิดปัญหาเกี่ยวกับอะไร", …). Category radio cards in 3 columns; อาคาร / ชั้น side by side; photo tiles 120px in a 5-column row; priority as 4 radio cards in a 2×2 grid. No summary card (everything is visible). Team-handled card under priority (leads). Right-aligned button row at the bottom: "ยกเลิก" (outline) · "ส่งแจ้งซ่อม" (brand). QR banner sits above card 1.
+Desktop (≥1024px) (CR-002): sidebar + top bar (title "แจ้งซ่อม"). One column of 4 section cards + a **sticky summary panel** on the right (grid `minmax(0,1fr) 316px`, gap 18, max width 1000px, centered). Below `xl` (1280px) the panel turns into a sticky bottom bar (progress + "ส่งแจ้งซ่อม").
+- Section cards have a numbered heading ("1 เกิดปัญหาเกี่ยวกับอะไร", …). The number turns into a green check and the heading shows "ครบแล้ว" when the section's required fields are valid; after a failed submit a section with errors gets a red number, a red ring and "ต้องแก้ {n} ช่อง".
+- Denser than mobile so the page is about 1.4 screens: category cards in one row of 5 (icon above name); symptoms chips 40px; อาคาร + ชั้น side by side (`ChoiceField`, desktop floor grid shows numbers only "1 … 7" under the label ชั้น); photo tiles 92px in one row; รายละเอียด 3 rows; priority as 4 radio cards in one row.
+- **Summary panel** (`Card` `shadow-float`, sticky top): title "สรุปการแจ้งซ่อม" · progress bar + "ครบ {n} จาก 4" · checklist rows (หมวดงาน · อาการ / สถานที่ / รูปภาพ / ความเร่งด่วน) each with a done / missing icon and the current value or the missing text; clicking a row scrolls to and focuses that section · next-step note "งานจะเข้าคิวช่างหมวด{หมวดงาน} เราจะแจ้งเตือนเมื่อช่างรับงาน" (shown once a category is picked) · "ส่งแจ้งซ่อม" (brand, full width) · "ยกเลิก" (ghost). The submit button is never disabled for missing fields: submit validates, scrolls to the first section with an error and focuses the field.
+- No step-4 summary card on desktop (the panel replaces it). Team-handled card under priority (leads, Stage 5). QR banner above card 1 (Stage 6).
 
 ## Components
 
@@ -86,12 +90,13 @@ Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"). One p
 | Progress | `Progress` or 4 segment bars + Caption | mobile only; `aria-label` "ขั้นที่ 1 จาก 4" |
 | Category | `RadioGroup` styled as cards + icon circle (`a-ri` look, `svc-repair` tint) | category icon comes from the category data (lucide name); fallback `Wrench` |
 | Symptoms | `ToggleGroup type="multiple"` styled as pills | selected = `bg-foreground text-white` (design-system filter pill) + check icon |
-| Building / floor | `Select` h-13 rounded-sm | |
+| Building / floor | `ChoiceField` (pills / grid / `Picker`) (CR-002) | rule by option count — design-system "Pickers" |
 | Location detail | `Input` | |
 | Photos | `PhotoPicker` (`_common.md` §5) | |
 | Details | `Textarea` + counter | |
 | Priority | `RadioGroup` cards + `PriorityIndicator` | |
 | Summary | `Card` with rows + `Button` link "แก้ไข" | mobile step 4 only |
+| Summary panel | `Card` sticky + `Progress` + checklist (CR-002) | desktop only; bottom bar below `xl` |
 | Team handled | `Card` + `Switch` + `Textarea` + `PhotoPicker` | only `housekeeper_lead`, `security_lead` (BR-F04-1) |
 | QR banner | `Alert` default with `QrCode` icon + `Button` link | |
 | Leave confirm | `AlertDialog` discard (`_common.md` §7) | |
@@ -112,6 +117,9 @@ Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"). One p
 | Hints | จุดที่เกิด: บอกจุดที่ช่างหาเจอง่าย · รูปภาพ: อย่างน้อย 1 รูป สูงสุด 5 รูป |
 | Priority options | ฉุกเฉิน — อันตราย หรือกระทบงานหลายคนทันที · สูง — กระทบการทำงานของคุณหรือทีม · ปกติ — ใช้งานได้ แต่ไม่สะดวก · ต่ำ — ไม่เร่งด่วน |
 | Summary | ตรวจสอบก่อนส่ง · rows หมวดงาน / อาการ / สถานที่ / รูปภาพ ({n} รูป) · link แก้ไข |
+| Summary panel (desktop) (CR-002) | title สรุปการแจ้งซ่อม · ครบ {n} จาก 4 · rows หมวดงาน · อาการ / สถานที่ / รูปภาพ / ความเร่งด่วน · missing: ยังไม่ได้เลือก (หมวดงาน · อาการ, สถานที่) · ยังไม่ได้แนบ — อย่างน้อย 1 รูป (รูปภาพ) · uploading: กำลังอัปโหลด {n} รูป · photos done: {n} รูป · next step: งานจะเข้าคิวช่างหมวด{หมวดงาน} เราจะแจ้งเตือนเมื่อช่างรับงาน |
+| Section status (desktop) (CR-002) | ครบแล้ว · ต้องแก้ {n} ช่อง |
+| Floor hint before a building (CR-002) | เลือกอาคารก่อน |
 | Team handled | switch label: ทีมของฉันแก้ปัญหานี้เรียบร้อยแล้ว · hint: งานจะปิดทันที ไม่เข้าคิวช่าง · fields: สิ่งที่ทีมทำ * (placeholder "เช่น เช็ดพื้นและวางป้ายระวังลื่นแล้ว") · รูปหลังทำ * |
 | Buttons | ถัดไป · ส่งแจ้งซ่อม · บันทึกงานทีม · ยกเลิก (desktop) |
 | QR banner (found) | เติมข้อมูลจาก QR แล้ว · {asset name} · {asset_code} · แก้ไขได้ถ้าไม่ตรง · link ไม่ใช่อุปกรณ์นี้ |
@@ -156,7 +164,9 @@ Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"). One p
 
 ## Acceptance checklist (Codex reports results in ../HANDOFF.md — does not edit this file)
 
-- [ ] Matches `S03-report-form.html` at 375px (4 steps, QR banner, errors, team-handled) and 1280px (single page)
+- [ ] Matches `S03-report-form.html` at 375px (4 steps, QR banner, errors, team-handled) and `S03-report-form-desktop.html` at 1280px (sections + sticky summary panel) (CR-002)
+- [ ] Summary panel tracks the 4 checklist rows live; clicking a row scrolls to the section; below 1280px it is a sticky bottom bar (CR-002)
+- [ ] อาคาร / ชั้น follow the `ChoiceField` rule (pills / grid / Picker) (CR-002)
 - [ ] Uses only design-system tokens and shadcn components; `brand` button only for "ส่งแจ้งซ่อม"
 - [ ] Per-step validation on mobile, full validation on submit, exact messages
 - [ ] Team-handled card renders only for `housekeeper_lead` / `security_lead`

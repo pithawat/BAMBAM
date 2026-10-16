@@ -2,6 +2,9 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-005 / CR-006 (2026-10-15):** page `/repair/tickets/[id]/resolve` (`resolve-form.tsx`). The summary card shows the expected date and the ผู้ดำเนินการ chosen in the assessment (S17); no choice here (CR-006). Fields: สิ่งที่ทำ* (≤ 500), รูปหลังซ่อม* (1–5). **Contractor job only:** **คะแนนช่างภายนอก*** stars (hint "เห็นเฉพาะช่าง Admin และผู้บริหาร"; if a score already exists from an earlier resolve it is optional and replaces the old one), ความเห็นต่อช่างภายนอก. Errors: กรุณาบอกสิ่งที่ทำ · แนบรูปหลังซ่อมอย่างน้อย 1 รูป · ให้คะแนนช่างภายนอก. Not allowed / not assessed → forbidden state with the reason. Success → toast "บันทึกผลซ่อมแล้ว ผู้แจ้งจะได้รับแจ้งให้ประเมิน" and back to S07.
+
+
 - **Flows:** F21 "บันทึกผล: สิ่งที่ทำ + รูปหลังซ่อม → resolved", BR-F21-4; "ทำต่อไม่ได้ → คืนงาน" entry (see ../../02-flows.md)
 - **Persona:** technician on mobile, at the repaired spot (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** record what was done with after-repair photos so the reporter can confirm.

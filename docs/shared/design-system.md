@@ -1,6 +1,6 @@
 # Design system
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · pickers / filters updated by CR-002 (repair, approved 2026-10-14)
 
 <!-- Written by Claude in /style-options. User picked Option A as-is (D-018).
      Before Stage 0 this file holds the token values; after Stage 0 the VALUES live in
@@ -159,7 +159,7 @@ No `.dark` block. Dark mode is out of scope.
 - **Mobile (< lg):**
   - page padding 16px; content max-width 560px, centered (tablets in mobile layout)
   - Header: `bg-brand` with rounded bottom (34px) and 2–3 translucent circles. Greeting/title in white. The first card overlaps the header by ~54px (`shadow-float`).
-  - Bottom nav: white, top radius 26px, `shadow-nav`, 88px + `env(safe-area-inset-bottom)`. Five slots: หน้าแรก · งานของฉัน · **สแกน** (raised 58px `bg-brand` circle, 4px white ring, `shadow-brand`) · แจ้งเตือน · โปรไฟล์. Scrolling content gets ~110px bottom padding.
+  - Bottom nav: white, top radius 26px, `shadow-nav`, 88px + `env(safe-area-inset-bottom)`. Five slots: หน้าแรก · ติดตามงาน (CR-003) · **สแกน** (raised 58px `bg-brand` circle, 4px white ring, `shadow-brand`) · แจ้งเตือน · โปรไฟล์. Scrolling content gets ~110px bottom padding.
   - Sub-pages (forms, details) use a white top bar instead: back button + centered title (`paotang-09`).
 - **Desktop (≥ lg):**
   - left sidebar 256px (shadcn `Sidebar`), main padding 32px, content max-width 1280px
@@ -188,7 +188,9 @@ No `.dark` block. Dark mode is out of scope.
 | Data list (mobile) | `Card` list: status icon circle 40px · title · meta · badge · `›` | Rows divided by `border` lines inside one card (`paotang-06`) |
 | Data list (desktop) | `Table` inside `Card` (rounded-xl, `shadow-card`), header row `bg-muted` with rounded ends | Title column wraps; meta under the title |
 | Filters / tabs | Pill segments (`Tabs` or `ToggleGroup` styled as pills; active = `bg-foreground text-white`) | Show counts: "รอตรวจรับ 1" |
-| Forms | shadcn `Form` + `Input` / `Select` / `Textarea`, `h-13 rounded-sm` (16px) | See Patterns |
+| Choice with ≤ 4 options in a toolbar (CR-002) | Segmented control: `ToggleGroup` single in a white pill track, active segment `bg-foreground text-white` | e.g. S06 scope, date range in a sheet |
+| Dropdown filter (CR-002) | `FilterPill` (`components/shared`) | See Patterns → Pickers |
+| Forms | shadcn `Form` + `Input` / `Textarea`, `h-13 rounded-sm` (16px); choices via `ChoiceField` / `Picker` (CR-002) — never `components/ui/select` directly | See Patterns |
 | Notifications | Bell with red count badge; list rows with icon circle + time, unread dot `bg-primary` | |
 | Mobile navigation | `BottomNav` (`components/shared`) | Spec in Layout |
 | Desktop navigation | shadcn `Sidebar` | Active item `bg-secondary text-secondary-foreground` rounded 16px |
@@ -218,6 +220,15 @@ No `.dark` block. Dark mode is out of scope.
   - **Errors:** shown below the field with an alert icon, red border plus a light red ring. Validate on submit first, then on change.
   - **Mobile:** the main submit is a full-width button in a sticky bottom bar.
   - **Desktop:** right-aligned button row.
+- **Pickers (dropdowns) (CR-002)** — research and visuals: `docs/modules/repair/changes/CR-002/dropdowns.html`:
+  - **Which control** (`ChoiceField`, `components/shared`): ≤ 5 options → pill radios (`RadioGroup`, 48px pills, selected `bg-foreground text-white`) · 6–12 → grid of buttons (4 columns mobile, one row on desktop when it fits) · > 12 → `Picker`. A filter with ≤ 4 options in a toolbar → segmented control.
+  - **`Picker` trigger:** label above (never the placeholder as label) · 52px, `rounded-sm`, `border-input`, optional leading icon (only if sibling pickers have one) · value 15px, placeholder `text-muted-foreground` · chevron rotates when open · hover: darker border · open/focus: `border-ring` + 3px `ring/20` · invalid: `border-destructive` + message below linked with `aria-describedby` · disabled: `bg-muted` + a hint that says why.
+  - **Desktop menu:** opens **under** the trigger (`position="popper"`, offset 6px), same width as the trigger, `rounded-md` (18px), 6px padding, `shadow-float`, max height ≈ 5.5 rows so the 6th row peeks; flips up near the bottom edge.
+  - **Options:** 44px rows (56px with a description), 15px, `rounded-sm`; highlighted (pointer / keyboard) = `bg-muted`; **selected = `bg-secondary text-secondary-foreground font-semibold` + `Check` on the right** — the two never look the same; unavailable options are dimmed, not hidden.
+  - **Long lists:** > 10 options → a search field at the top of the menu / sheet; no match → "ไม่พบ{ชื่อช่อง}ที่ค้นหา". Typeahead always works.
+  - **Mobile (< lg):** a bottom `Sheet`: title = field label (+ context line, e.g. the building), close button, 52px rows with the same selected style, picking closes the sheet, Back closes it, never stack sheets.
+  - **`FilterPill`:** 44px pill (40px in dense desktop toolbars) reading "{ชื่อ}: {ค่า}" with a leading icon; default value first ("ทั้งหมด…"); active (non-default) = `bg-secondary` + primary-tinted border + ✕ button that clears only that filter; show "ล้างตัวกรอง" when ≥ 1 filter is active; a pick applies at once. On mobile, filters collapse into a "ตัวกรอง" button with a count that opens a sheet.
+  - **Accessibility:** Radix / APG keyboard model (Enter / Space / ↓ open, Esc closes without changing, Home / End); the accessible name always includes the field label, not just the value; targets ≥ 44px.
 - **Success after submit:** full screen or sheet with the mascot, ticket number and next step (as in F02).
 - **Lists:** items waiting for the current user go on top in their own highlighted card (BR-F06-2), then the rest in one list card.
 

@@ -2,6 +2,9 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-005 (2026-10-15):** info box copy → "ส่งเรื่องถึงช่างแล้ว ช่างจะประเมินงานและแจ้งวันที่คาดว่าจะเสร็จ ติดตามได้ที่หน้าติดตามงานซ่อม" (no category queue).
+
+
 - **Flows:** F02 last step ("หน้าแจ้งสำเร็จ + เลข Ticket"), F04 (team record closed at once) (see ../../02-flows.md)
 - **Persona:** every role, mostly mobile (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** confirm the ticket exists, show its number, and say what happens next.
@@ -68,7 +71,7 @@ Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"); cente
 |---|---|
 | Loading | Skeleton card (icon circle, title bar, 4 rows, 2 buttons). |
 | Empty | — |
-| Error | Whole-page error (`_common.md` §6) with an extra outline button "ไปที่งานของฉัน" — the ticket was already created. |
+| Error | Whole-page error (`_common.md` §6) with an extra outline button "ไปที่ติดตามงานซ่อม" (CR-003) — the ticket was already created. |
 | Forbidden | Ticket not visible to this user (e.g. opened by someone else's link) → forbidden (`_common.md` §6), reason "หน้านี้แสดงเฉพาะงานที่คุณแจ้ง". |
 | Success feedback | This screen is the feedback. |
 

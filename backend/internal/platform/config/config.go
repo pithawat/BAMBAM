@@ -30,6 +30,10 @@ type Config struct {
 	SessionSecret []byte
 	SessionTTL    time.Duration
 
+	// PhotoStorageDir is the persistent directory for repair photos (D-022).
+	// Required outside development; development defaults to ./data/photos.
+	PhotoStorageDir string
+
 	// RoleSwitcherEnabled is true only when ROLE_SWITCHER_ENABLED=true and APP_ENV is not production (D-005).
 	RoleSwitcherEnabled bool
 
@@ -47,6 +51,10 @@ type SSO struct {
 	RedirectURI           string
 	PostLogoutRedirectURI string
 	Scope                 string
+
+	// ClockSkew is the leeway for id_token iat/exp checks. Raise it only while the
+	// SSO server clock is known to be off (D-037).
+	ClockSkew time.Duration
 }
 
 // EnvironmentLabel is the tag shown in the UI (GET /api/v1/me "environment"): DEV, UAT, or "" in production.
@@ -109,6 +117,11 @@ func FromLookup(lookup func(string) (string, bool)) (Config, error) {
 			c.CORSAllowedOrigins = append(c.CORSAllowedOrigins, o)
 		}
 	}
+	if c.AppEnv == EnvDevelopment {
+		c.PhotoStorageDir = get("PHOTO_STORAGE_DIR", "data/photos")
+	} else {
+		c.PhotoStorageDir = req("PHOTO_STORAGE_DIR")
+	}
 	secret := req("APP_SESSION_SECRET")
 	c.SessionSecret = []byte(secret)
 
@@ -127,6 +140,12 @@ func FromLookup(lookup func(string) (string, bool)) (Config, error) {
 	if secret != "" && secret == c.SSO.ClientSecret {
 		errs = append(errs, errors.New("APP_SESSION_SECRET must differ from SSO_CLIENT_SECRET"))
 	}
+
+	skew, err := time.ParseDuration(get("SSO_CLOCK_SKEW", "60s"))
+	if err != nil || skew < 0 || skew > 10*time.Minute {
+		errs = append(errs, errors.New("SSO_CLOCK_SKEW must be a Go duration between 0 and 10m, e.g. 5m"))
+	}
+	c.SSO.ClockSkew = skew
 
 	ttl, err := time.ParseDuration(get("APP_SESSION_TTL", "12h"))
 	if err != nil || ttl <= 0 {

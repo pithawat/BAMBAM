@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S20–S21 อาคารและชั้น · BAMBAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Anuphan:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --radius:1.25rem;
+  --background:#F2F5FF; --foreground:#0E1736;
+  --card:#FFFFFF; --primary:#2741FA; --primary-foreground:#FFFFFF;
+  --secondary:#E7ECFF; --secondary-foreground:#1A2FC9;
+  --muted:#EAEEFA; --muted-foreground:#535D82;
+  --destructive:#DC2626; --border:#DFE5F5; --input:#CDD6EE; --ring:#2741FA;
+  --success:#067647; --warning:#B54708; --svc-repair:#F97316; --svc-car:#0EA5A4; --svc-room:#8B5CF6;
+  --brand-gradient:linear-gradient(120deg,#1075FA 0%,#2741FA 52%,#7930FA 100%);
+  --shadow-card:0 12px 30px -14px rgba(39,65,250,.22),0 2px 6px rgba(14,23,54,.04);
+  --shadow-float:0 18px 36px -16px rgba(39,65,250,.35);
+  --shadow-brand:0 10px 20px -10px rgba(39,65,250,.7);
+  --font-head:"Prompt",sans-serif; --font-body:"Anuphan",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);color:#14182a;background:#E3E6EE;line-height:1.6}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.ico{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;display:inline-block;vertical-align:middle}
+.ico.sm{width:16px;height:16px}.ico.xs{width:13px;height:13px}
+/* presentation chrome */
+.page-head{max-width:1880px;margin:0 auto;padding:36px 32px 4px}
+.kicker{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#5b6176}
+.page-head h1{font:700 32px/1.35 var(--font-head);color:#0f1222;margin:6px 0 8px}
+.page-head p{max-width:980px;color:#383e52;font-size:15.5px}
+.page-head code,.cap code{font-size:12px;background:#d8dce6;padding:1px 6px;border-radius:4px}
+.sec{max-width:1880px;margin:0 auto;padding:26px 32px}
+.sec>h2{font:600 20px/1.4 var(--font-head);color:#0f1222}
+.sec>.sub{color:#4a5068;font-size:14px;margin:2px 0 16px}
+.stage{display:flex;gap:32px;align-items:flex-start;overflow-x:auto;padding:6px 6px 26px}
+.cap{font-size:12.5px;color:#4a5068;margin-bottom:10px;max-width:1280px}
+.cap b{color:#0f1222;font-weight:600}
+.desk{width:1280px;height:860px;border-radius:14px;overflow:hidden;background:var(--background);color:var(--foreground);box-shadow:0 30px 60px -24px rgba(16,19,40,.45);flex:none;display:flex;flex-direction:column}
+.desk.short{height:600px}
+.chrome{height:38px;background:#e8eaf0;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid #d3d7e0;flex:none}
+.chrome>i{width:11px;height:11px;border-radius:50%;background:#ff5f57}.chrome>i+i{background:#febc2e}.chrome>i+i+i{background:#28c840}
+.chrome .url{margin-left:16px;width:420px;height:24px;border-radius:6px;background:#fff;font:12px/24px -apple-system,"Segoe UI",sans-serif;color:#555b6e;padding:0 12px}
+.vp{flex:1;min-height:0;display:flex;position:relative}
+.phone{box-sizing:content-box;width:375px;height:812px;border:10px solid #0f121b;border-radius:52px;overflow:hidden;position:relative;background:var(--background);color:var(--foreground);box-shadow:0 30px 60px -24px rgba(16,19,40,.45);flex:none}
+.phone .scr{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding-bottom:120px}
+.statusbar{height:46px;display:flex;align-items:center;justify-content:space-between;padding:4px 28px 0 34px;font:600 14.5px/1 -apple-system,"Segoe UI",sans-serif}
+.home-ind{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#0f121b;z-index:30}
+.uat{height:28px;background:#FEF3C7;color:#713F12;font-size:12px;display:flex;align-items:center;gap:6px;padding:0 16px}
+.uat b{font-size:10.5px;letter-spacing:.06em;background:#FDE68A;border-radius:999px;padding:2px 6px}
+/* components */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 20px;border-radius:999px;font:600 15px/1 var(--font-head);border:1px solid transparent;white-space:nowrap}
+.btn.sm{height:36px;padding:0 14px;font-size:13.5px}
+.btn-default{background:var(--primary);color:#fff;box-shadow:var(--shadow-brand)}
+.btn-outline{background:#fff;border-color:var(--input)}
+.btn-ghost{color:var(--foreground)}
+.btn-destructive{background:var(--destructive);color:#fff}
+.btn:focus-visible,.cb:focus-visible,.sw:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.card{background:var(--card);border-radius:24px;box-shadow:var(--shadow-card)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;line-height:1.7;white-space:nowrap}
+.b-sys{background:var(--secondary);color:var(--secondary-foreground)}
+.b-muted{background:var(--muted);color:var(--muted-foreground)}
+.b-dark{background:var(--foreground);color:#fff}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-radius:16px;font-size:13.5px;line-height:1.55}
+.alert.info{background:#fff;border:1px solid var(--border);color:var(--muted-foreground)}
+.alert.info .ico{color:var(--primary)}
+.alert.warn{background:#FFF7ED;border:1px solid #FED7AA;color:#7C2D12}
+.alert.warn .ico{color:var(--warning)}
+.seg{display:inline-flex;background:#fff;border-radius:999px;padding:4px;box-shadow:0 1px 2px rgba(14,23,54,.06);border:1px solid var(--border)}
+.seg button{height:36px;padding:0 18px;border-radius:999px;font:600 13.5px/1 var(--font-head);color:var(--muted-foreground)}
+.seg button.on{background:var(--foreground);color:#fff}
+.seg button .n{opacity:.7;margin-left:4px}
+/* checkbox + switch */
+.cb{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--input);background:#fff;display:inline-flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s}
+.cb .ico{width:15px;height:15px;stroke-width:3;color:#fff;opacity:0}
+.cb.on{background:var(--primary);border-color:var(--primary)}
+.cb.on .ico{opacity:1}
+.cb.lock{background:color-mix(in srgb,var(--primary) 40%,#fff);border-color:transparent;cursor:not-allowed}
+.cb.lock .ico{opacity:1}
+.sw{width:46px;height:28px;border-radius:999px;background:var(--input);position:relative;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(14,23,54,.25);transition:left .15s}
+.sw.on{background:var(--primary)}
+.sw.on::after{left:21px}
+.sw.lock{background:color-mix(in srgb,var(--primary) 40%,#fff);cursor:not-allowed}
+.dot-chg{width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block}
+/* sidebar */
+.sb{width:256px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;flex:none}
+.sb .logo{height:68px;display:flex;align-items:center;gap:10px;padding:0 22px;font:700 19px/1 var(--font-head)}
+.sb .logo span{width:34px;height:34px;border-radius:11px;background:var(--brand-gradient);display:inline-block;box-shadow:var(--shadow-brand)}
+.sb nav{flex:1;overflow-y:auto;padding:4px 14px 14px;scrollbar-width:thin}
+.sb .grp{font:600 11.5px/1 var(--font-head);color:var(--muted-foreground);letter-spacing:.04em;padding:16px 10px 8px}
+.sb a{display:flex;align-items:center;gap:11px;height:40px;padding:0 12px;border-radius:16px;font-size:14px;color:var(--foreground);text-decoration:none}
+.sb a .ico{width:18px;height:18px;color:var(--muted-foreground)}
+.sb a.on{background:var(--secondary);color:var(--secondary-foreground);font-weight:600}
+.sb a.on .ico{color:var(--secondary-foreground)}
+.sb a .soon{margin-left:auto;font-size:10.5px;background:var(--muted);color:var(--muted-foreground);border-radius:999px;padding:1px 7px}
+.sb a.dis{color:var(--muted-foreground)}
+.sb .me{border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:center}
+.av{width:38px;height:38px;border-radius:50%;background:var(--secondary);color:var(--secondary-foreground);display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--font-head);flex:none}
+.sb .me b{display:block;font-size:13.5px;line-height:1.3}
+.sb .me small{font-size:12px;color:var(--muted-foreground)}
+/* main */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.top{height:84px;display:flex;align-items:center;gap:14px;padding:0 32px;background:#fff;border-bottom:1px solid var(--border);flex:none}
+.top h1{font:600 24px/1.3 var(--font-head)}
+.top p{font-size:13.5px;color:var(--muted-foreground)}
+.top .sp{flex:1}
+.rs{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;border:1.5px dashed #F59E0B;background:#FFFBEB;color:#713F12;border-radius:999px;padding:6px 12px 6px 8px}
+.rs b{font-size:10.5px;letter-spacing:.06em;background:#FDE68A;border-radius:999px;padding:2px 6px}
+.bell{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative}
+.bell i{position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--destructive);border:2px solid #fff}
+.content{flex:1;overflow-y:auto;padding:22px 32px 110px;scrollbar-width:thin}
+.toolbar{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.toolbar .sp{flex:1}
+.syshead{display:flex;align-items:center;gap:10px;margin:20px 0 12px}
+.syshead h2{font:600 18px/1.3 var(--font-head)}
+.svc{width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FDBA74,var(--svc-repair) 70%);display:flex;align-items:center;justify-content:center;color:#fff}
+.svc .ico{width:17px;height:17px}
+/* matrix */
+.mx{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+.mxcard{overflow:hidden;margin-bottom:16px}
+.mx th{background:var(--muted);font:600 13.5px/1.3 var(--font-head);color:var(--foreground);height:52px;text-align:center;padding:0 8px}
+.mx th:first-child{text-align:left;padding-left:22px;width:260px;font-size:15px}
+.mx th .ti{display:inline-flex;align-items:center;gap:5px}
+.mx th .ti button{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:var(--muted-foreground)}
+.mx th .ti button:hover{background:#fff}
+.mx td{height:56px;border-top:1px solid var(--border);text-align:center}
+.mx td:first-child{text-align:left;padding-left:22px}
+.mx td.cell{cursor:pointer}
+.mx td.cell:hover{background:#F7F9FF}
+.mx td.chg{background:var(--secondary)}
+.mx td.chg .wrap{position:relative;display:inline-flex}
+.mx td.chg .wrap::after{content:"";position:absolute;top:-4px;right:-5px;width:8px;height:8px;border-radius:50%;background:var(--warning);border:2px solid var(--secondary)}
+.mx tr.locked td{background:#F8F9FD}
+.mx tr.locked td.cell{cursor:not-allowed}
+.mx tr.flash td{animation:flash 1.6s ease}
+@keyframes flash{0%,60%{background:var(--secondary)}100%{background:#fff}}
+.rname{display:flex;align-items:center;gap:7px;font-weight:500}
+.rname .ico{color:var(--muted-foreground)}
+.rname small{font-size:12.5px;color:var(--muted-foreground);font-weight:400}
+.future{font-size:13.5px;color:var(--muted-foreground);display:flex;align-items:center;gap:8px;padding:6px 4px}
+.tip{position:absolute;z-index:40;background:var(--foreground);color:#fff;font-size:12.5px;line-height:1.5;padding:8px 11px;border-radius:12px;max-width:240px;pointer-events:none;box-shadow:var(--shadow-float);display:none}
+/* save bar */
+.savebar{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;background:#fff;border-radius:999px;box-shadow:var(--shadow-float),0 0 0 1px var(--border);display:flex;align-items:center;gap:10px;padding:8px 8px 8px 22px;font-size:14.5px;z-index:20}
+.savebar b{font:600 14.5px/1 var(--font-head)}
+.savebar[hidden]{display:none}
+/* dialog */
+.overlay{position:absolute;inset:0;background:rgba(14,23,54,.42);display:flex;align-items:center;justify-content:center;z-index:50}
+.overlay[hidden]{display:none}
+.dlg{width:520px;background:#fff;border-radius:24px;box-shadow:0 30px 70px -20px rgba(14,23,54,.45);padding:24px}
+.dlg h3{font:600 20px/1.35 var(--font-head);margin-bottom:6px}
+.dlg .body{font-size:14.5px;color:var(--muted-foreground)}
+.dlg .acts{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.sum{margin:14px 0 4px;display:flex;flex-direction:column;gap:10px}
+.sum div{background:var(--muted);border-radius:16px;padding:11px 14px;font-size:14px;line-height:1.6}
+.sum b{font-weight:600}
+.sum .add{color:var(--success);font-weight:500}
+.sum .rem{color:var(--destructive);font-weight:500}
+.field{margin-top:14px}
+.field label{display:block;font-size:13.5px;font-weight:500;margin-bottom:6px}
+.field label i{color:var(--destructive);font-style:normal}
+.inp{height:52px;border-radius:16px;border:1px solid var(--input);display:flex;align-items:center;padding:0 16px;font-size:15px;background:#fff}
+.inp.ph{color:var(--muted-foreground)}
+.inp.ta{height:84px;align-items:flex-start;padding-top:13px}
+.inp.pick{justify-content:space-between}
+.hint{font-size:12.5px;color:var(--muted-foreground);margin-top:5px}
+.dlgstage{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.dlgstage .dlg{position:relative}
+/* table (role tab) */
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+.tbl th{background:var(--muted);font:600 13.5px/1 var(--font-head);text-align:left;height:48px;padding:0 18px}
+.tbl th:first-child{border-radius:14px 0 0 14px}.tbl th:last-child{border-radius:0 14px 14px 0}
+.tbl td{height:62px;padding:0 18px;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl a{color:var(--secondary-foreground);font-weight:500;text-decoration:none}
+.kebab{width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--muted-foreground)}
+.kebab:hover{background:var(--muted)}
+/* mobile */
+.mbar{height:56px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1px solid var(--border)}
+.mbar b{font:600 17px/1 var(--font-head)}
+.mbar button{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.mpad{padding:14px 16px 0}
+.mrow{display:flex;align-items:center;gap:12px;min-height:66px;padding:10px 16px;border-top:1px solid var(--border)}
+.mrow:first-of-type{border-top:0}
+.mrow .t{flex:1;min-width:0}
+.mrow .t b{display:block;font-weight:500;font-size:15px;line-height:1.35}
+.mrow .t small{display:block;font-size:12.5px;color:var(--muted-foreground);line-height:1.45;margin-top:2px}
+.mcardh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;font:600 15px/1.3 var(--font-head)}
+.msave{position:absolute;left:12px;right:12px;bottom:26px;background:#fff;border-radius:22px;box-shadow:var(--shadow-float),0 0 0 1px var(--border);display:flex;align-items:center;gap:10px;padding:10px 10px 10px 18px;z-index:20}
+.msave b{font:600 14px/1 var(--font-head);flex:1}
+.note{max-width:1880px;margin:0 auto;padding:4px 32px 48px;font-size:12.5px;color:#4a5068}
+/* master list */
+.ml-h{display:flex;align-items:center;gap:10px;padding:16px 18px 10px}
+.ml-h h3{font:600 16px/1.3 var(--font-head);flex:1}
+.chk{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted-foreground)}
+.chk span{width:18px;height:18px;border-radius:6px;border:1.5px solid var(--input);background:#fff}
+.ml-row{display:flex;align-items:center;gap:10px;min-height:58px;padding:8px 10px 8px 12px;border-top:1px solid var(--border);position:relative}
+.ml-row .grip{color:#AEB6D3;cursor:grab}
+.ml-row .nm{flex:1;min-width:0}
+.ml-row .nm b{font-weight:600;font-size:15px}
+.ml-row .nm small{display:block;font-size:12.5px;color:var(--muted-foreground)}
+.ml-row .meta{font-size:13px;color:var(--muted-foreground);white-space:nowrap}
+.ml-row.sel{background:var(--secondary)}
+.ml-row.sel::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--primary)}
+.ml-row.off .nm b{color:var(--muted-foreground)}
+.chev{color:var(--muted-foreground)}
+.b-ok{background:color-mix(in srgb,var(--success) 11%,#fff);color:var(--success)}
+.panes{display:grid;grid-template-columns:5fr 7fr;gap:18px;align-items:start}
+.bhead{display:flex;align-items:center;gap:10px;padding:18px 18px 4px}
+.bhead h3{font:600 18px/1.3 var(--font-head);flex:1}
+.bsub{padding:0 18px 10px;font-size:13px;color:var(--muted-foreground)}
+.floors{display:flex}
+.elev{width:34px;padding:10px 0 12px 18px;display:flex;flex-direction:column;gap:4px}
+.elev i{height:51px;border-radius:4px;background:var(--muted)}
+.elev i.plan{background:color-mix(in srgb,var(--primary) 30%,#fff)}
+.floors .list{flex:1}
+.menu{position:absolute;right:46px;top:44px;z-index:30;background:#fff;border-radius:18px;box-shadow:var(--shadow-float),0 0 0 1px var(--border);padding:6px;width:230px}
+.menu div{height:42px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:14px;font-size:14px}
+.menu div:hover{background:var(--muted)}
+.menu .dis{color:#A3AAC4}
+.menu .dis small{display:block;font-size:11.5px;line-height:1.2}
+.menu .sep{height:1px;padding:0;margin:4px 6px;background:var(--border)}
+.crumb{font-size:13px;color:var(--muted-foreground);display:flex;gap:6px;align-items:center}
+.crumb a{color:var(--secondary-foreground);text-decoration:none}
+.plan{border-radius:16px;background:var(--muted);height:420px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.plan svg{width:92%;height:auto}
+.plan .full{position:absolute;right:12px;top:12px;background:rgba(14,23,54,.72);color:#fff;border-radius:999px;height:34px;padding:0 12px;display:flex;align-items:center;gap:6px;font-size:12.5px}
+.drop{border:2px dashed var(--input);border-radius:16px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted-foreground);font-size:14px;text-align:center;padding:20px;background:#FAFBFF}
+.drop b{color:var(--foreground);font-weight:600}
+.pmeta{font-size:13px;color:var(--muted-foreground);margin-top:10px}
+.pacts{display:flex;gap:8px;margin-top:12px}
+.btn-ghost-d{color:var(--destructive)}
+.prog{height:6px;border-radius:999px;background:var(--muted);margin-top:10px;overflow:hidden}
+.prog i{display:block;height:100%;width:62%;background:var(--primary);border-radius:999px}
+.err{font-size:13px;color:var(--destructive);display:flex;gap:6px;align-items:center;margin-top:8px}
+.empty{margin:6px 14px 14px;border-radius:20px;background:linear-gradient(180deg,var(--secondary),color-mix(in srgb,#6D28D9 5%,#fff));padding:22px;text-align:center}
+.empty img{width:64px;height:64px;object-fit:contain}
+.empty b{display:block;font:600 16px/1.4 var(--font-head);margin-top:6px}
+.empty p{font-size:13.5px;color:var(--muted-foreground);margin:2px 0 12px}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <span class="kicker">BAMBAM · ตั้งค่าระบบ · P3 mockup</span>
+  <h1>S20 อาคารและชั้น · S21 รายละเอียดชั้น</h1>
+  <p>รูปแบบรายการแบบสองฝั่ง (two-pane) ที่ S22 หมวดงานและอาการใช้ซ้ำ: ซ้ายคือรายการหลัก ขวาคือรายการย่อยของรายการที่เลือก ชั้นเรียงจากบนลงล่างเหมือนตึกจริง พร้อมแถบตึกเล็กด้านซ้ายที่ตรงกับภาพรวมอาคาร (repair S12) แถบตึกสีน้ำเงินคือชั้นที่มีผังชั้น</p>
+</div>
+
+<!-- 1 -->
+<section class="sec">
+  <h2>1 · Desktop S20 — เลือกอาคารหลัก, เมนูของชั้น 3 เปิดอยู่</h2>
+  <p class="sub">Spec: <code>screens/S20-buildings.md</code> · ชั้น 3 เคยถูกใช้ในงานซ่อมแล้ว จึงลบไม่ได้ (ปิดใช้งานแทน) · ลากที่ ⠿ เพื่อเรียงลำดับ</p>
+  <div class="stage">
+    <div class="desk">
+      <div class="chrome"><i></i><i></i><i></i><div class="url">bambam.cpac.co.th/settings/buildings/อาคารหลัก</div></div>
+      <div class="vp">
+        <aside class="sb">
+          <div class="logo"><span></span>BAMBAM</div>
+          <nav>
+            <a href="#"><i data-i="house"></i>หน้าแรก</a>
+            <a href="#"><i data-i="clipboard"></i>ติดตามงานซ่อม</a>
+            <a href="#"><i data-i="bell"></i>แจ้งเตือน</a>
+            <div class="grp">บริการ</div>
+            <a href="#"><i data-i="wrench"></i>แจ้งซ่อม</a>
+            <a href="#" class="dis"><i data-i="car"></i>จองรถ<span class="soon">เร็วๆ นี้</span></a>
+            <a href="#" class="dis"><i data-i="door"></i>จองห้องประชุม<span class="soon">เร็วๆ นี้</span></a>
+            <div class="grp">งานช่าง</div>
+            <a href="#"><i data-i="wrench"></i>งานซ่อม</a>
+            <a href="#"><i data-i="hardhat"></i>ช่างภายนอก</a>
+            <div class="grp">จัดการงานซ่อม</div>
+            <a href="#"><i data-i="list"></i>งานทั้งหมด</a>
+            <a href="#"><i data-i="map"></i>ภาพรวมอาคาร</a>
+            <div class="grp">ตั้งค่าระบบ</div>
+            <a href="#" class="on"><i data-i="building"></i>อาคารและชั้น</a>
+            <a href="#"><i data-i="tags"></i>หมวดงานและอาการ</a>
+            <a href="#"><i data-i="hardhat"></i>ประเภทผู้รับเหมา</a>
+            <a href="S24-roles-permissions.html"><i data-i="shield"></i>Role และสิทธิ์</a>
+            <a href="S25-users.html"><i data-i="users"></i>ผู้ใช้</a>
+            <a href="#"><i data-i="history"></i>ประวัติการเปลี่ยนแปลง</a>
+          </nav>
+          <div class="me"><div class="av">ณอ</div><div><b>ณัฐพล อินทรวงศ์</b><small>Superadmin</small></div></div>
+        </aside>
+        <div class="main">
+          <header class="top">
+            <div><h1>อาคารและชั้น</h1><p>อาคารและชั้นที่ใช้ในฟอร์มแจ้งซ่อมและภาพรวมอาคาร</p></div>
+            <div class="sp"></div>
+            <button class="btn btn-default sm"><i data-i="plus" class="sm"></i>เพิ่มอาคาร</button>
+            <span class="bell"><i data-i="bell"></i><i></i></span>
+          </header>
+          <div class="content" style="padding-bottom:30px">
+            <div class="panes">
+              <div class="card">
+                <div class="ml-h"><h3>อาคาร (2)</h3><span class="chk"><span></span>แสดงที่ปิดใช้งาน</span></div>
+                <div class="ml-row sel"><i data-i="grip" class="sm grip"></i><div class="nm"><b>อาคารหลัก</b></div><span class="meta">7 ชั้น</span><button class="kebab" aria-label="ตัวเลือกของ อาคารหลัก"><i data-i="more"></i></button><i data-i="right" class="sm chev"></i></div>
+                <div class="ml-row"><i data-i="grip" class="sm grip"></i><div class="nm"><b>อาคารด้านหลัง</b></div><span class="meta">2 ชั้น</span><button class="kebab" aria-label="ตัวเลือกของ อาคารด้านหลัง"><i data-i="more"></i></button><i data-i="right" class="sm chev"></i></div>
+              </div>
+              <div class="card" style="position:relative">
+                <div class="bhead"><h3>อาคารหลัก</h3><button class="btn btn-outline sm">เพิ่มหลายชั้น</button><button class="btn btn-default sm"><i data-i="plus" class="sm"></i>เพิ่มชั้น</button></div>
+                <div class="bsub">ชั้น (7) · เรียงจากบนลงล่าง</div>
+                <div class="floors">
+                  <div class="elev" aria-hidden="true"><i></i><i></i><i class="plan"></i><i></i><i></i><i></i><i></i></div>
+                  <div class="list" id="floorRows"></div>
+                </div>
+                <div class="menu" style="top:318px">
+                  <div><i data-i="pencil" class="sm"></i>แก้ไข</div>
+                  <div><i data-i="up" class="sm"></i>เลื่อนขึ้น</div>
+                  <div><i data-i="down" class="sm"></i>เลื่อนลง</div>
+                  <div class="sep"></div>
+                  <div><i data-i="eyeoff" class="sm"></i>ปิดใช้งาน</div>
+                  <div class="dis"><i data-i="trash" class="sm"></i><span>ลบ<small>เคยถูกใช้แล้ว ปิดใช้งานแทน</small></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="sec">
+  <h2>2 · Dialogs (บนมือถือเป็น bottom sheet)</h2>
+  <p class="sub">ฟอร์มเดียวต่อ dialog, Enter = บันทึก</p>
+  <div class="dlgstage">
+    <div>
+      <p class="cap"><b>เพิ่มชั้น</b> — ตำแหน่งเริ่มต้น "บนสุด"</p>
+      <div class="dlg" style="width:460px">
+        <h3>เพิ่มชั้น</h3>
+        <div class="field"><label>ชื่อชั้น <i>*</i></label><div class="inp">ดาดฟ้า</div><p class="hint">แสดงเป็น "{อาคาร} ชั้น {ชื่อชั้น}" เช่น 5, G, ดาดฟ้า</p></div>
+        <div class="field"><label>ตำแหน่ง</label><div class="inp pick">บนสุด (เหนือชั้น 7) <i data-i="down" class="sm"></i></div></div>
+        <div class="acts"><button class="btn btn-outline">ยกเลิก</button><button class="btn btn-default">บันทึก</button></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap"><b>เพิ่มหลายชั้น</b> — อาคารยังไม่มีชั้น</p>
+      <div class="dlg" style="width:460px">
+        <h3>เพิ่มหลายชั้น</h3>
+        <div class="field"><label>จำนวนชั้น <i>*</i></label><div class="inp">7</div><p class="hint">สร้างชั้น 1 ถึง 7 ต่อจากชั้นบนสุด ชื่อเป็นตัวเลข แก้ชื่อทีหลังได้</p></div>
+        <div class="alert info" style="margin-top:12px"><i data-i="building" class="sm"></i><div>จะสร้าง: ชั้น 1–7</div></div>
+        <div class="acts"><button class="btn btn-outline">ยกเลิก</button><button class="btn btn-default">สร้าง 7 ชั้น</button></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap"><b>ปิดใช้งานชั้นที่มีงานค้าง</b></p>
+      <div class="dlg" style="width:460px">
+        <h3>ปิดใช้งาน "ชั้น 3"?</h3>
+        <p class="body">ชั้นนี้จะไม่แสดงในตัวเลือกใหม่ งานเดิมยังแสดงชื่อนี้ เปิดใช้งานกลับได้ภายหลัง</p>
+        <div class="alert warn" style="margin-top:12px"><i data-i="alert" class="sm"></i><div>มีงานที่ยังไม่ปิด 2 งานในชั้นนี้ งานเหล่านี้ทำต่อได้ตามปกติ</div></div>
+        <div class="acts"><button class="btn btn-outline">ยกเลิก</button><button class="btn btn-default">ปิดใช้งาน</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="sec">
+  <h2>3 · Desktop S21 — อาคารหลัก ชั้น 5</h2>
+  <p class="sub">Spec: <code>screens/S21-floor-detail.md</code> · ห้อง / โซน ยังไม่ใช้ในฟอร์มแจ้งซ่อม (BR-F26-2) · ผังชั้นดูอย่างเดียว ไม่ปักหมุด (BR-F26-3) · ภาพผังด้านล่างเป็นภาพตัวอย่าง</p>
+  <div class="stage">
+    <div class="desk">
+      <div class="chrome"><i></i><i></i><i></i><div class="url">bambam.cpac.co.th/settings/buildings/…/floors/…</div></div>
+      <div class="vp">
+        <aside class="sb">
+          <div class="logo"><span></span>BAMBAM</div>
+          <nav>
+            <a href="#"><i data-i="house"></i>หน้าแรก</a>
+            <a href="#"><i data-i="clipboard"></i>ติดตามงานซ่อม</a>
+            <a href="#"><i data-i="bell"></i>แจ้งเตือน</a>
+            <div class="grp">บริการ</div>
+            <a href="#"><i data-i="wrench"></i>แจ้งซ่อม</a>
+            <a href="#" class="dis"><i data-i="car"></i>จองรถ<span class="soon">เร็วๆ นี้</span></a>
+            <a href="#" class="dis"><i data-i="door"></i>จองห้องประชุม<span class="soon">เร็วๆ นี้</span></a>
+            <div class="grp">งานช่าง</div>
+            <a href="#"><i data-i="wrench"></i>งานซ่อม</a>
+            <a href="#"><i data-i="hardhat"></i>ช่างภายนอก</a>
+            <div class="grp">จัดการงานซ่อม</div>
+            <a href="#"><i data-i="list"></i>งานทั้งหมด</a>
+            <a href="#"><i data-i="map"></i>ภาพรวมอาคาร</a>
+            <div class="grp">ตั้งค่าระบบ</div>
+            <a href="#" class="on"><i data-i="building"></i>อาคารและชั้น</a>
+            <a href="#"><i data-i="tags"></i>หมวดงานและอาการ</a>
+            <a href="#"><i data-i="hardhat"></i>ประเภทผู้รับเหมา</a>
+            <a href="S24-roles-permissions.html"><i data-i="shield"></i>Role และสิทธิ์</a>
+            <a href="S25-users.html"><i data-i="users"></i>ผู้ใช้</a>
+            <a href="#"><i data-i="history"></i>ประวัติการเปลี่ยนแปลง</a>
+          </nav>
+          <div class="me"><div class="av">ณอ</div><div><b>ณัฐพล อินทรวงศ์</b><small>Superadmin</small></div></div>
+        </aside>
+        <div class="main">
+          <header class="top" style="height:96px">
+            <div><div class="crumb"><a href="#">อาคารและชั้น</a>›<a href="#">อาคารหลัก</a>›<span>ชั้น 5</span></div><h1>อาคารหลัก ชั้น 5</h1></div>
+            <div class="sp"></div>
+            <button class="btn btn-outline sm"><i data-i="pencil" class="sm"></i>แก้ไขชั้น</button>
+            <button class="kebab" aria-label="ตัวเลือกของชั้น"><i data-i="more"></i></button>
+          </header>
+          <div class="content" style="padding-bottom:30px">
+            <div class="panes">
+              <div class="card">
+                <div class="ml-h"><h3>ห้อง / โซน (8)</h3><button class="btn btn-default sm"><i data-i="plus" class="sm"></i>เพิ่มห้อง / โซน</button></div>
+                <p class="bsub" style="margin-top:-4px">ยังไม่ใช้ในฟอร์มแจ้งซ่อม ใช้แสดงรายละเอียดชั้น และเตรียมไว้ให้ระบบจองห้องประชุม</p>
+                <div id="roomRows"></div>
+              </div>
+              <div class="card" style="padding:18px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><h3 style="font:600 16px/1.3 var(--font-head);flex:1">ผังชั้น</h3><span class="badge b-ok"><i data-i="image" class="xs"></i>มีผังชั้น</span></div>
+                <div class="plan"><svg viewBox="0 0 640 420" role="img" aria-label="ผังชั้น อาคารหลัก ชั้น 5 (ภาพตัวอย่าง)" font-family="Anuphan,sans-serif">
+<rect x="8" y="8" width="624" height="404" rx="6" fill="#fff" stroke="#0E1736" stroke-width="4"/>
+<g fill="#F8FAFF" stroke="#0E1736" stroke-width="2">
+<rect x="8" y="8" width="150" height="130"/><rect x="158" y="8" width="150" height="130"/><rect x="308" y="8" width="120" height="130"/>
+<rect x="428" y="8" width="204" height="190"/><rect x="8" y="232" width="200" height="180"/><rect x="208" y="292" width="110" height="120"/>
+<rect x="318" y="292" width="110" height="120"/><rect x="428" y="262" width="204" height="150"/></g>
+<rect x="8" y="138" width="420" height="94" fill="#EEF2FF"/><rect x="208" y="232" width="220" height="60" fill="#EEF2FF"/>
+<g font-size="15" fill="#0E1736" text-anchor="middle">
+<text x="83" y="78">ห้องประชุม 5A</text><text x="233" y="78">ห้องประชุม 5B</text><text x="368" y="78">ห้องประชุม 5C</text>
+<text x="530" y="108">ฝ่ายบัญชี</text><text x="108" y="326">ฝ่ายจัดซื้อ</text><text x="263" y="356">ห้องน้ำชาย</text>
+<text x="373" y="356">ห้องน้ำหญิง</text><text x="530" y="342">พันทรี</text></g>
+<text x="218" y="190" font-size="14" fill="#535D82" text-anchor="middle">ทางเดิน</text>
+<rect x="455" y="214" width="34" height="34" fill="#E7ECFF" stroke="#2741FA" stroke-width="2"/><text x="472" y="236" font-size="11" fill="#1A2FC9" text-anchor="middle">ลิฟต์</text>
+</svg><span class="full"><i data-i="max" class="sm"></i>ดูเต็มจอ</span></div>
+                <p class="pmeta">ผังชั้น5.png · 1.2 MB · อัปเดต 14 ต.ค. 2569 10:20 โดยปวีณา ศรีสุข</p>
+                <div class="pacts"><button class="btn btn-outline sm"><i data-i="imageplus" class="sm"></i>เปลี่ยนรูป</button><button class="btn btn-ghost sm btn-ghost-d"><i data-i="trash" class="sm"></i>ลบรูป</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dlgstage" style="margin-top:8px">
+    <div style="width:380px">
+      <p class="cap"><b>ยังไม่มีผังชั้น</b> — ลากรูปมาวาง หรือคลิก</p>
+      <div class="card" style="padding:18px"><h3 style="font:600 16px/1.3 var(--font-head);margin-bottom:12px">ผังชั้น</h3>
+        <div class="drop"><i data-i="imageplus" style="width:32px;height:32px"></i><b>ยังไม่มีผังชั้น</b>ลากรูปมาวาง หรือ คลิกเพื่อเลือกรูป<br><small>JPG, PNG ไม่เกิน 10 MB</small></div></div>
+    </div>
+    <div style="width:380px">
+      <p class="cap"><b>กำลังอัปโหลด</b> / <b>ไฟล์ไม่ถูกต้อง</b></p>
+      <div class="card" style="padding:18px"><h3 style="font:600 16px/1.3 var(--font-head);margin-bottom:12px">ผังชั้น</h3>
+        <div class="plan" style="height:200px;opacity:.55"><svg viewBox="0 0 640 420" role="img" aria-label="ผังชั้น อาคารหลัก ชั้น 5 (ภาพตัวอย่าง)" font-family="Anuphan,sans-serif">
+<rect x="8" y="8" width="624" height="404" rx="6" fill="#fff" stroke="#0E1736" stroke-width="4"/>
+<g fill="#F8FAFF" stroke="#0E1736" stroke-width="2">
+<rect x="8" y="8" width="150" height="130"/><rect x="158" y="8" width="150" height="130"/><rect x="308" y="8" width="120" height="130"/>
+<rect x="428" y="8" width="204" height="190"/><rect x="8" y="232" width="200" height="180"/><rect x="208" y="292" width="110" height="120"/>
+<rect x="318" y="292" width="110" height="120"/><rect x="428" y="262" width="204" height="150"/></g>
+<rect x="8" y="138" width="420" height="94" fill="#EEF2FF"/><rect x="208" y="232" width="220" height="60" fill="#EEF2FF"/>
+<g font-size="15" fill="#0E1736" text-anchor="middle">
+<text x="83" y="78">ห้องประชุม 5A</text><text x="233" y="78">ห้องประชุม 5B</text><text x="368" y="78">ห้องประชุม 5C</text>
+<text x="530" y="108">ฝ่ายบัญชี</text><text x="108" y="326">ฝ่ายจัดซื้อ</text><text x="263" y="356">ห้องน้ำชาย</text>
+<text x="373" y="356">ห้องน้ำหญิง</text><text x="530" y="342">พันทรี</text></g>
+<text x="218" y="190" font-size="14" fill="#535D82" text-anchor="middle">ทางเดิน</text>
+<rect x="455" y="214" width="34" height="34" fill="#E7ECFF" stroke="#2741FA" stroke-width="2"/><text x="472" y="236" font-size="11" fill="#1A2FC9" text-anchor="middle">ลิฟต์</text>
+</svg></div>
+        <div class="prog"><i></i></div>
+        <p class="err"><i data-i="alert" class="sm"></i>รองรับ JPG, PNG ไม่เกิน 10 MB</p></div>
+    </div>
+    <div style="width:380px">
+      <p class="cap"><b>ห้องว่าง</b></p>
+      <div class="card"><div class="ml-h"><h3>ห้อง / โซน (0)</h3><button class="btn btn-default sm"><i data-i="plus" class="sm"></i>เพิ่ม</button></div>
+        <div class="empty"><img src="../../../../../frontend/public/brand/mascot-face.webp" alt=""><b>ยังไม่มีห้องในชั้นนี้</b><p>เพิ่มห้องหรือโซน เช่น ห้องประชุม ห้องน้ำ แผนก</p><button class="btn btn-default sm">เพิ่มห้อง / โซน</button></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="sec">
+  <h2>4 · Mobile (375px)</h2>
+  <p class="sub">เจาะลงทีละหน้า: อาคาร → ชั้น → รายละเอียดชั้น · เรียงลำดับด้วยเมนู "เลื่อนขึ้น / ลง"</p>
+  <div class="stage">
+    <div><p class="cap"><b>S20</b> รายการอาคาร</p>
+      <div class="phone"><div class="scr">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="mbar"><button aria-label="กลับ"><i data-i="left"></i></button><b>อาคารและชั้น</b><button aria-label="เพิ่มอาคาร"><i data-i="plus"></i></button></div>
+        <div class="mpad"><div class="card">
+          <div class="ml-h"><h3>อาคาร (2)</h3><span class="chk"><span></span>ที่ปิดใช้งาน</span></div>
+          <div class="ml-row"><div class="nm"><b>อาคารหลัก</b><small>7 ชั้น</small></div><button class="kebab"><i data-i="more"></i></button><i data-i="right" class="sm chev"></i></div>
+          <div class="ml-row"><div class="nm"><b>อาคารด้านหลัง</b><small>2 ชั้น</small></div><button class="kebab"><i data-i="more"></i></button><i data-i="right" class="sm chev"></i></div>
+        </div></div>
+      </div><div class="home-ind"></div></div></div>
+    <div><p class="cap"><b>S20</b> ชั้นของอาคารหลัก</p>
+      <div class="phone"><div class="scr">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="mbar"><button aria-label="กลับ"><i data-i="left"></i></button><b>อาคารหลัก</b><button aria-label="ตัวเลือกของอาคาร"><i data-i="more"></i></button></div>
+        <div class="mpad">
+          <div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-outline sm" style="flex:1"><i data-i="plus" class="sm"></i>เพิ่มชั้น</button><button class="btn btn-outline sm" style="flex:1">เพิ่มหลายชั้น</button></div>
+          <div class="card"><div class="ml-h"><h3>ชั้น (7)</h3><span class="meta" style="font-size:12.5px;color:var(--muted-foreground)">บนลงล่าง</span></div><div id="mFloorRows"></div></div>
+        </div>
+      </div><div class="home-ind"></div></div></div>
+    <div><p class="cap"><b>S21</b> อาคารหลัก ชั้น 5</p>
+      <div class="phone"><div class="scr">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="mbar"><button aria-label="กลับ"><i data-i="left"></i></button><b>อาคารหลัก ชั้น 5</b><button aria-label="ตัวเลือกของชั้น"><i data-i="more"></i></button></div>
+        <div class="mpad">
+          <div class="card" style="padding:16px"><h3 style="font:600 15px/1.3 var(--font-head);margin-bottom:10px">ผังชั้น</h3>
+            <div class="plan" style="height:220px"><svg viewBox="0 0 640 420" role="img" aria-label="ผังชั้น อาคารหลัก ชั้น 5 (ภาพตัวอย่าง)" font-family="Anuphan,sans-serif">
+<rect x="8" y="8" width="624" height="404" rx="6" fill="#fff" stroke="#0E1736" stroke-width="4"/>
+<g fill="#F8FAFF" stroke="#0E1736" stroke-width="2">
+<rect x="8" y="8" width="150" height="130"/><rect x="158" y="8" width="150" height="130"/><rect x="308" y="8" width="120" height="130"/>
+<rect x="428" y="8" width="204" height="190"/><rect x="8" y="232" width="200" height="180"/><rect x="208" y="292" width="110" height="120"/>
+<rect x="318" y="292" width="110" height="120"/><rect x="428" y="262" width="204" height="150"/></g>
+<rect x="8" y="138" width="420" height="94" fill="#EEF2FF"/><rect x="208" y="232" width="220" height="60" fill="#EEF2FF"/>
+<g font-size="15" fill="#0E1736" text-anchor="middle">
+<text x="83" y="78">ห้องประชุม 5A</text><text x="233" y="78">ห้องประชุม 5B</text><text x="368" y="78">ห้องประชุม 5C</text>
+<text x="530" y="108">ฝ่ายบัญชี</text><text x="108" y="326">ฝ่ายจัดซื้อ</text><text x="263" y="356">ห้องน้ำชาย</text>
+<text x="373" y="356">ห้องน้ำหญิง</text><text x="530" y="342">พันทรี</text></g>
+<text x="218" y="190" font-size="14" fill="#535D82" text-anchor="middle">ทางเดิน</text>
+<rect x="455" y="214" width="34" height="34" fill="#E7ECFF" stroke="#2741FA" stroke-width="2"/><text x="472" y="236" font-size="11" fill="#1A2FC9" text-anchor="middle">ลิฟต์</text>
+</svg></div>
+            <p class="pmeta">ผังชั้น5.png · 1.2 MB<br>อัปเดต 14 ต.ค. 2569 โดยปวีณา ศรีสุข</p>
+            <div class="pacts"><button class="btn btn-outline sm" style="flex:1">เปลี่ยนรูป</button><button class="btn btn-ghost sm btn-ghost-d">ลบรูป</button></div></div>
+          <div class="card" style="margin-top:12px"><div class="ml-h"><h3>ห้อง / โซน (8)</h3><button class="btn btn-default sm"><i data-i="plus" class="sm"></i>เพิ่ม</button></div><div id="mRoomRows"></div></div>
+        </div>
+      </div><div class="home-ind"></div></div></div>
+  </div>
+</section>
+
+<p class="note">Mockup only — not production code. Colors, radius, fonts follow <code>docs/shared/design-system.md</code>. Sample data: <code>screens/_common.md</code> §7. The floor plan is a drawn sample, not the real building.</p>
+
+<script>
+const ICONS={
+house:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+clipboard:'<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+bell:'<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+car:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+door:'<path d="M11 20H2"/><path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"/><path d="M11 4H8a2 2 0 0 0-2 2v14"/><path d="M14 12h.01"/><path d="M22 20h-3"/>',
+hardhat:'<path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/>',
+list:'<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
+building:'<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
+tags:'<path d="m15 5 6.3 6.3a2.4 2.4 0 0 1 0 3.4L17 19"/><path d="M9.586 5.586A2 2 0 0 0 8.172 5H3a1 1 0 0 0-1 1v5.172a2 2 0 0 0 .586 1.414L8.29 18.29a2.426 2.426 0 0 0 3.42 0l3.58-3.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="6.5" cy="9.5" r=".5"/>',
+shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+history:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+lock:'<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+check:'<path d="M20 6 9 17l-5-5"/>',
+plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+down:'<path d="m6 9 6 6 6-6"/>',
+left:'<path d="m15 18-6-6 6-6"/>',
+right:'<path d="m9 18 6-6-6-6"/>',
+more:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
+};
+function ico(n,c){return `<svg class="ico ${c||''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`}
+function paintIcons(root){root.querySelectorAll('i[data-i]').forEach(el=>{el.outerHTML=ico(el.dataset.i,el.className)})}
+
+Object.assign(ICONS,{
+grip:'<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
+pencil:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+up:'<path d="m18 15-6-6-6 6"/>',
+eyeoff:'<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+trash:'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+imageplus:'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
+max:'<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>'
+});
+const FLOORS=[['7',4,false],['6',5,false],['5',8,true],['4',6,false],['3',6,false],['2',5,false],['1',6,false]];
+const fRow=(f,i,m)=>`<div class="ml-row">${m?'':ico('grip','sm grip')}<div class="nm"><b>ชั้น ${f[0]}</b>${m?`<small>${f[1]} ห้อง</small>`:''}</div>${f[2]?'<span class="badge b-ok">'+ico('image','xs')+'มีผังชั้น</span>':''}${m?'':`<span class="meta">${f[1]} ห้อง</span>`}<button class="kebab" aria-label="ตัวเลือกของ ชั้น ${f[0]}">${ico('more')}</button>${ico('right','sm chev')}</div>`;
+document.getElementById('floorRows').innerHTML=FLOORS.map((f,i)=>fRow(f,i,false)).join('');
+document.getElementById('mFloorRows').innerHTML=FLOORS.map((f,i)=>fRow(f,i,true)).join('');
+const ROOMS=['ห้องประชุม 5A','ห้องประชุม 5B','ห้องประชุม 5C','ฝ่ายบัญชี','ฝ่ายจัดซื้อ','ห้องน้ำชาย','ห้องน้ำหญิง','พันทรี'];
+const rRow=(r,m)=>`<div class="ml-row">${m?'':ico('grip','sm grip')}<div class="nm"><b style="font-weight:500">${r}</b></div><button class="kebab" aria-label="ตัวเลือกของ ${r}">${ico('more')}</button></div>`;
+document.getElementById('roomRows').innerHTML=ROOMS.map(r=>rRow(r,false)).join('');
+document.getElementById('mRoomRows').innerHTML=ROOMS.map(r=>rRow(r,true)).join('');
+paintIcons(document);
+</script>
+</body>
+</html>

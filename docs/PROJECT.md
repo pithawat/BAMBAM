@@ -8,7 +8,7 @@
 - **Project name:** BAMBAM (Workplace Service Assistant) — client ID ใน SSO: `bam`
 - **One-line purpose:** ศูนย์รวมบริการที่ทำงานของพนักงาน: แจ้งซ่อม จองรถ และจองห้องประชุม ใช้ได้ทั้งบนมือถือและ desktop
 - **Organisation / client:** CPAC สำนักงานใหญ่ (บริษัท ผลิตภัณฑ์และวัตถุก่อสร้าง จำกัด, 1516 ถ.ประชาราษฎร์ 1 บางซื่อ) — ผู้ใช้เข้าผ่าน RMC SSO
-- **Who uses it overall:** พนักงานทุกคน (แจ้ง/จอง), หัวหน้าแม่บ้าน, หัวหน้ารปภ., ช่างเทคนิค, Admin, ผู้บริหาร — role เดียวกันทุกระบบ (D-004)
+- **Who uses it overall:** พนักงานทุกคน (แจ้ง/จอง), หัวหน้าแม่บ้าน, หัวหน้ารปภ., ช่างเทคนิค, Admin, ผู้บริหาร — role เดียวกันทุกระบบ (D-004); Superadmin ตั้งค่าระบบ (D-044)
 - **Source material:** `docs/modules/repair/attachments/BAMBAM-User-Flow02.html` (flow F01–F20 จาก POC เดิม + ข้อกำหนด 13 ต.ค. 2569)
 
 ## Modules (systems)
@@ -18,8 +18,9 @@
 | `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 1 of 9 | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stage 1 in progress |
 | `car_booking` | ระบบจองรถ | จองรถส่วนกลาง | ✏️ | – | – | brief needed |
 | `room_booking` | ระบบจองห้องประชุม | จองห้องประชุม | ✏️ | – | – | brief needed |
+| `settings` | ตั้งค่าระบบ (Superadmin) | ตั้งค่า master ผังอาคาร role / สิทธิ์ และผู้ใช้ ใช้ร่วมทั้ง 3 ระบบ | `super_admin` | P4 | 0 of 6 | flows approved 2026-10-16; UI spec + plan + CR-007 drafted, waiting for approval |
 
-Cross-module dependencies: ผู้ใช้และ role อยู่ที่ `platform` ใช้ร่วมกันทั้ง 3 ระบบ (D-003, D-004). หน้าแรก (Home) รวมบริการทั้ง 3 ระบบ
+Cross-module dependencies: ผู้ใช้และ role อยู่ที่ `platform` ใช้ร่วมกันทั้ง 3 ระบบ (D-003, D-004); role / สิทธิ์ / ผู้ใช้ และ master (อาคาร ชั้น ห้อง หมวดงาน ประเภทผู้รับเหมา) ตั้งค่าในโมดูล `settings` (D-043–D-047). หน้าแรก (Home) รวมบริการทั้ง 3 ระบบ
 
 ## Stack (fixed)
 
@@ -75,6 +76,14 @@ Cross-module dependencies: ผู้ใช้และ role อยู่ที�
 | งานที่ทีมดำเนินการเอง | `team_handled` | หัวหน้าแม่บ้าน/รปภ. ปิดเองทันที ไม่มีประเมิน (F04) |
 | ส่งต่อให้ช่าง | `handover` | ส่ง ticket เดิมกลับเข้าคิวช่าง (F05) |
 | อาคาร / ชั้น | `building` / `floor` | ตำแหน่งปัญหา |
+| Superadmin | `super_admin` | role ของระบบ มีทุกสิทธิ์เสมอ ใช้โมดูล `settings` ได้คนเดียว (D-044) |
+| ตั้งค่าระบบ | `settings` | โมดูลหน้าตั้งค่าของ Superadmin |
+| สิทธิ์ | `permission` | การกระทำ 1 อย่างที่ role ทำได้ เช่น `repair.ticket.close_any`; รายการกำหนดในโค้ด (D-045) |
+| Matrix สิทธิ์ | `role_permission` | role × สิทธิ์ ที่ Superadmin ติ๊ก |
+| ห้อง / โซน | `room` | พื้นที่ในชั้น (ห้องประชุมของระบบจองห้องจะอ้างอิงจากนี้) |
+| ผังชั้น | `floor_plan` | รูปผังของชั้น 1 รูป ดูอย่างเดียว |
+| ปิดใช้งาน | `is_active = false` | ซ่อนจากตัวเลือกใหม่ ไม่ลบ (D-047) |
+| ประวัติการเปลี่ยนแปลง | `audit_log` | บันทึกทุกการเปลี่ยนในโมดูล `settings` (F30) |
 
 ## Non-functional requirements
 

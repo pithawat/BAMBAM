@@ -63,7 +63,7 @@ func TestValidateIDToken(t *testing.T) {
 			if tt.key != nil {
 				key = tt.key
 			}
-			res, err := validateIDToken(sign(t, jwt.SigningMethodHS256, key, c), testClient, testSecret, testIssuer, clock)
+			res, err := validateIDToken(sign(t, jwt.SigningMethodHS256, key, c), testClient, testSecret, testIssuer, time.Minute, clock)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -74,14 +74,29 @@ func TestValidateIDToken(t *testing.T) {
 	}
 }
 
+func TestValidateIDTokenClockSkew(t *testing.T) {
+	now := time.Now()
+	c := baseClaims(now)
+	c["iat"] = now.Add(2*time.Minute + 11*time.Second).Unix() // SSO clock ahead of ours
+	raw := sign(t, jwt.SigningMethodHS256, testSecret, c)
+	clock := func() time.Time { return now }
+
+	if _, err := validateIDToken(raw, testClient, testSecret, testIssuer, time.Minute, clock); err == nil {
+		t.Fatal("iat 2m11s ahead accepted with 1m leeway")
+	}
+	if _, err := validateIDToken(raw, testClient, testSecret, testIssuer, 5*time.Minute, clock); err != nil {
+		t.Fatalf("iat 2m11s ahead rejected with 5m leeway: %v", err)
+	}
+}
+
 func TestValidateIDTokenRejectsOtherAlgorithms(t *testing.T) {
 	now := time.Now()
 	raw := sign(t, jwt.SigningMethodHS512, testSecret, baseClaims(now))
-	if _, err := validateIDToken(raw, testClient, testSecret, testIssuer, func() time.Time { return now }); err == nil {
+	if _, err := validateIDToken(raw, testClient, testSecret, testIssuer, time.Minute, func() time.Time { return now }); err == nil {
 		t.Fatal("HS512 token accepted, want only HS256")
 	}
 	none := sign(t, jwt.SigningMethodNone, jwt.UnsafeAllowNoneSignatureType, baseClaims(now))
-	if _, err := validateIDToken(none, testClient, testSecret, testIssuer, func() time.Time { return now }); err == nil {
+	if _, err := validateIDToken(none, testClient, testSecret, testIssuer, time.Minute, func() time.Time { return now }); err == nil {
 		t.Fatal("alg=none token accepted")
 	}
 }

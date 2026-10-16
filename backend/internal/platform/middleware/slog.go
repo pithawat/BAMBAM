@@ -13,7 +13,7 @@ func NewLogger(w io.Writer, json bool) *slog.Logger {
 	if json {
 		h = slog.NewJSONHandler(w, nil)
 	} else {
-		h = slog.NewTextHandler(w, nil)
+		h = newDevHandler(w)
 	}
 	return slog.New(requestIDHandler{h})
 }

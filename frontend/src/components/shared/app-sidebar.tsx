@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Building2, House, ListChecks, ListOrdered, LogOut, type LucideIcon } from "lucide-react";
+import { Bell, Building2, HardHat, House, ListChecks, ListOrdered, LogOut, Wrench, type LucideIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import {
   Sidebar,
@@ -31,19 +31,27 @@ type Group = { label: string; items: NavItem[]; roles: Role[] };
 
 const MAIN: NavItem[] = [
   { label: "หน้าแรก", href: "/", icon: House },
-  { label: "งานของฉัน", href: "/repair/my", icon: ListChecks },
+  { label: "ติดตามงานซ่อม", href: "/repair/my", icon: ListChecks },
   { label: "แจ้งเตือน", href: "/notifications", icon: Bell },
 ];
 
 const SERVICE_ITEMS: ServiceItem[] = [{ service: "repair", href: "/repair/new" }, { service: "car" }, { service: "room" }];
 
 const GROUPS: Group[] = [
-  { label: "งานช่าง", roles: ["technician"], items: [{ label: "คิวงาน", href: "/repair/queue", icon: ListOrdered }] },
+  {
+    label: "งานช่าง",
+    roles: ["technician"],
+    items: [
+      { label: "งานซ่อม", href: "/repair/work", icon: Wrench },
+      { label: "ช่างภายนอก", href: "/repair/contractors", icon: HardHat },
+    ],
+  },
   {
     label: "จัดการงานซ่อม",
     roles: ["admin", "executive"],
     items: [
-      { label: "คิวงาน", href: "/repair/admin/queue", icon: ListOrdered },
+      { label: "งานทั้งหมด", href: "/repair/admin/queue", icon: ListOrdered },
+      { label: "ช่างภายนอก", href: "/repair/contractors", icon: HardHat },
       { label: "ภาพรวมอาคาร", href: "/repair/admin/overview", icon: Building2 },
     ],
   },

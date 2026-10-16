@@ -2,6 +2,9 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-005 (2026-10-15) — replaces this spec.** S09 is now **งานซ่อม** at `/repair/work` (`technician-work.tsx`): the one technician sees every open ticket, most urgent first then oldest. Header action "ช่างภายนอก" → S18. Segmented tabs with counts: **รอประเมิน** (`step=awaiting_assessment`) · **กำลังซ่อม** (`in_repair,reworking`) · **รอผู้แจ้งประเมิน** (`awaiting_rating`); FilterPill อาคาร ("ทุกอาคาร"). Row: thumb, title + priority, category · location, ticketNo · reporter · แจ้ง {time}, mini tracker, "คาดว่าเสร็จ {d MMM}" or red "เลยกำหนด". Paging "โหลดเพิ่ม" (20). Empty per tab; filter-empty "ไม่มีงานในอาคารนี้" + ดูทุกอาคาร. No claim, no one-job rule, no reserved card, no categories state. Mobile bottom nav: the technician's 2nd slot is "งานซ่อม".
+
+
 - **Flows:** F21 (queue, building filter, claim, current job, reserved job, give back), BR-F21-1 … BR-F21-8, CR-001 (see ../../02-flows.md)
 - **Persona:** technician on mobile, all day, hands busy (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** show the queue of my categories in queue order, my one current job on top, and let me claim the next job.

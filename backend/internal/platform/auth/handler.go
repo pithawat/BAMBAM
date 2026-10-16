@@ -108,7 +108,7 @@ func (h *Handler) Callback(c *gin.Context) {
 		fail("token_exchange", err)
 		return
 	}
-	idt, err := validateIDToken(tok.IDToken, h.cfg.SSO.ClientID, []byte(h.cfg.SSO.ClientSecret), h.cfg.SSO.Issuer, h.now)
+	idt, err := validateIDToken(tok.IDToken, h.cfg.SSO.ClientID, []byte(h.cfg.SSO.ClientSecret), h.cfg.SSO.Issuer, h.cfg.SSO.ClockSkew, h.now)
 	if err != nil {
 		fail("id_token_invalid", err)
 		return

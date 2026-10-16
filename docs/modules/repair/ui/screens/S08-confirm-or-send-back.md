@@ -2,6 +2,9 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-005 (2026-10-15):** "ตรวจรับ" → **"ประเมินงาน"**: stars 1–5 are **required** ("กรุณาให้คะแนน"), comment optional ≤ 500; buttons "ไว้ทีหลัง" / "ส่งคะแนน". Send back: reason required ("กรุณาบอกสิ่งที่ยังไม่เรียบร้อย"), photos 0–5, button "ส่งกลับให้แก้" (destructive); after it the ticket moves on to "แก้ไขตามที่ส่งกลับ" (no reserved job). Both are dialogs from the S07 action bar (bottom sheet look on mobile).
+
+
 - **Flows:** F07 (all), BR-F07-1 … BR-F07-3 (see ../../02-flows.md)
 - **Persona:** the reporter only, mostly mobile (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** let the reporter accept the repair with an optional rating, or send it back to the same technician with a reason.

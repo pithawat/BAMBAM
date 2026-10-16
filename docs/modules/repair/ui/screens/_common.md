@@ -10,7 +10,7 @@ Status: APPROVED (2026-10-14)
 Layouts switch at `lg` (1024px) — mobile app layout below, desktop web layout from it (D-008).
 
 **Mobile bottom nav (`BottomNav`) — same for every role:**
-หน้าแรก (`/`) · งานของฉัน (`/repair/my`) · **สแกน** (`/repair/scan`, raised center button) · แจ้งเตือน (`/notifications`, red dot when unread) · โปรไฟล์ (`/profile`)
+หน้าแรก (`/`) · ติดตามงาน (`/repair/my`, CR-003) · **สแกน** (`/repair/scan`, raised center button) · แจ้งเตือน (`/notifications`, red dot when unread) · โปรไฟล์ (`/profile`)
 
 Shown on: S02, S06, S09, S13, S14. Hidden on sub-pages and full-screen flows: S03, S05, S07, S10, S11, S12, S16.
 
@@ -19,7 +19,7 @@ Shown on: S02, S06, S09, S13, S14. Hidden on sub-pages and full-screen flows: S0
 | Group | Item | Route | Roles |
 |---|---|---|---|
 | — | หน้าแรก | `/` | all |
-| — | งานของฉัน `n` | `/repair/my` | all (count = open tickets I reported or follow) |
+| — | ติดตามงานซ่อม `n` (CR-003) | `/repair/my` | all (count = open tickets I reported or follow) |
 | — | แจ้งเตือน `n` | `/notifications` | all (count = unread) |
 | บริการ | แจ้งซ่อม | `/repair/new` | all |
 | บริการ | จองรถ · chip "เร็วๆ นี้" | — (disabled) | all |
@@ -42,6 +42,8 @@ Shown on: S02, S06, S09, S13, S14. Hidden on sub-pages and full-screen flows: S0
 | Full screen, no header | S01, S05, S16 |
 
 **Role switcher (dev/UAT only):** pages with a gradient header (`bg-brand` or `ServiceHeader`) show the translucent pill inside the header; mobile pages with a white top bar or full screen show a 28px amber strip above everything: `UAT · กำลังดูในบทบาท: {role label} · เปลี่ยน`; desktop shows the amber pill in the top bar. Details in S15.
+
+**Pickers (CR-002):** wherever a screen spec says `Select`, build it as `Picker` (form field) or `FilterPill` (filter) from `components/shared`, following design-system.md → Patterns → Pickers. Never use `components/ui/select` directly.
 
 ## 2. Labels (use exactly)
 
@@ -96,6 +98,8 @@ One white `Card` holding rows separated by `border` lines (`paotang-06`). Row �
 Whole row is the link (≥ 44px). Items that wait for the viewer go above the list in their own highlighted card (design-system "Lists").
 
 Desktop lists use `Table` inside a `Card` (header row `bg-muted`, rows 60–64px, title column wraps with meta under it).
+
+S06 uses a richer row: 56px photo thumb + title + location + mini progress (S06 spec "Progress tracker") (CR-002).
 
 ## 5. Photo picker (`PhotoPicker`, module component — used by S03, S08, S10)
 
