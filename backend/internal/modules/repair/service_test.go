@@ -24,10 +24,12 @@ import (
 type fakeRepo struct {
 	cats      map[uuid.UUID]bool               // id → active
 	catDef    map[uuid.UUID]string             // category → default priority
+	catOther  map[uuid.UUID]bool               // the "อื่น ๆ" category (CR-014)
 	symptoms  map[uuid.UUID]uuid.UUID          // symptom → category
 	symPrio   map[uuid.UUID]string             // symptom → priority
 	recent    []RecentPlace                    // #28 result
 	floors    map[uuid.UUID]uuid.UUID          // floor → building
+	rooms     map[uuid.UUID]uuid.UUID          // active room → floor (CR-014)
 	photos    map[uuid.UUID]*Photo             // all photos
 	photoAt   map[uuid.UUID]time.Time          // created at
 	format    TicketNumberFormat               // repair.settings
@@ -36,14 +38,15 @@ type fakeRepo struct {
 	order     []uuid.UUID                      // insertion order
 	subs      map[uuid.UUID]map[uuid.UUID]bool // ticket → subscribers
 	inserted  []NewTicket
-	masterIns int
+	sampleIns []Building
 	refreshed int
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		cats: map[uuid.UUID]bool{}, catDef: map[uuid.UUID]string{}, symptoms: map[uuid.UUID]uuid.UUID{},
-		symPrio: map[uuid.UUID]string{}, floors: map[uuid.UUID]uuid.UUID{},
+		cats: map[uuid.UUID]bool{}, catDef: map[uuid.UUID]string{}, catOther: map[uuid.UUID]bool{},
+		symptoms: map[uuid.UUID]uuid.UUID{}, symPrio: map[uuid.UUID]string{},
+		floors: map[uuid.UUID]uuid.UUID{}, rooms: map[uuid.UUID]uuid.UUID{},
 		photos: map[uuid.UUID]*Photo{}, photoAt: map[uuid.UUID]time.Time{},
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
@@ -53,15 +56,11 @@ func newFakeRepo() *fakeRepo {
 
 func (f *fakeRepo) ListCategories(context.Context) ([]Category, error) { return nil, nil }
 func (f *fakeRepo) ListBuildings(context.Context) ([]Building, error)  { return nil, nil }
-func (f *fakeRepo) CountCategories(context.Context) (int64, error)     { return int64(len(f.cats)), nil }
-func (f *fakeRepo) InsertMasterData(_ context.Context, cats []Category, _ []Building) error {
-	f.masterIns++
-	for _, c := range cats {
-		f.cats[c.ID] = true
-	}
+func (f *fakeRepo) InsertSampleLocations(_ context.Context, b []Building) error {
+	f.sampleIns = b
 	return nil
 }
-func (f *fakeRepo) RefreshSampleData(context.Context, []Category, []SampleRename) error {
+func (f *fakeRepo) RefreshSampleData(context.Context, []SampleRename) error {
 	f.refreshed++
 	return nil
 }
@@ -193,11 +192,11 @@ func (f *fakeRepo) InTx(ctx context.Context, fn func(tx TxRepository) error) err
 	return nil
 }
 
-func (f *fakeRepo) LockActiveCategory(_ context.Context, id uuid.UUID) (string, bool, error) {
+func (f *fakeRepo) LockActiveCategory(_ context.Context, id uuid.UUID) (ActiveCategory, bool, error) {
 	if !f.cats[id] {
-		return "", false, nil
+		return ActiveCategory{}, false, nil
 	}
-	return f.catDef[id], true, nil
+	return ActiveCategory{DefaultPriority: f.catDef[id], IsOther: f.catOther[id]}, true, nil
 }
 
 func (f *fakeRepo) ActiveSymptomPriorities(_ context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error) {
@@ -213,6 +212,11 @@ func (f *fakeRepo) ActiveSymptomPriorities(_ context.Context, categoryID uuid.UU
 func (f *fakeRepo) ActiveFloorInBuilding(_ context.Context, floorID, buildingID uuid.UUID) (bool, error) {
 	b, ok := f.floors[floorID]
 	return ok && b == buildingID, nil
+}
+
+func (f *fakeRepo) ActiveRoomOnFloor(_ context.Context, roomID, floorID uuid.UUID) (bool, error) {
+	fl, ok := f.rooms[roomID]
+	return ok && fl == floorID, nil
 }
 
 func (f *fakeRepo) LockAttachablePhotos(_ context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error) {
@@ -241,14 +245,11 @@ func (f *fakeRepo) InsertTicket(_ context.Context, t NewTicket) error {
 		f.photos[pid].TicketID = &tid
 	}
 	reporter := t.ReporterID
-	var cat *Ref
-	if t.CategoryID != nil {
-		cat = &Ref{ID: *t.CategoryID}
-	}
 	f.tickets[t.ID] = &TicketDetail{
 		TicketSummary: TicketSummary{
 			ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority, PrioritySource: t.PrioritySource,
-			Category: cat, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther,
+			Category: &Ref{ID: t.CategoryID}, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther,
+			Room: &Ref{ID: t.RoomID}, LocationDetail: t.LocationDetail,
 			Reporter: Person{ID: t.ReporterID}, CreatedAt: t.CreatedAt, UpdatedAt: t.CreatedAt,
 		},
 		Photos:   t.PhotoIDs,
@@ -301,6 +302,9 @@ type fixture struct {
 	sym2     uuid.UUID
 	building uuid.UUID
 	floor    uuid.UUID
+	room     uuid.UUID
+	other    uuid.UUID // the "อื่น ๆ" category (CR-014)
+	otherSym uuid.UUID // its critical symptom
 	reporter Viewer
 }
 
@@ -308,7 +312,8 @@ func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	f := &fixture{repo: newFakeRepo(), store: newMemStore(),
 		now: time.Date(2026, 10, 14, 3, 15, 0, 0, time.UTC),
-		cat: uuid.New(), sym1: uuid.New(), sym2: uuid.New(), building: uuid.New(), floor: uuid.New(),
+		cat: uuid.New(), sym1: uuid.New(), sym2: uuid.New(), building: uuid.New(), floor: uuid.New(), room: uuid.New(),
+		other: uuid.New(), otherSym: uuid.New(),
 		reporter: Viewer{ID: uuid.New(), Role: users.RoleEmployee},
 	}
 	f.repo.cats[f.cat] = true
@@ -318,6 +323,11 @@ func newFixture(t *testing.T) *fixture {
 	f.repo.symptoms[f.sym2] = f.cat
 	f.repo.symPrio[f.sym2] = PriorityHigh
 	f.repo.floors[f.floor] = f.building
+	f.repo.rooms[f.room] = f.floor
+	f.repo.cats[f.other], f.repo.catOther[f.other] = true, true
+	f.repo.catDef[f.other] = PriorityMedium
+	f.repo.symptoms[f.otherSym] = f.other
+	f.repo.symPrio[f.otherSym] = PriorityCritical
 	f.svc = NewService(f.repo, f.store)
 	f.svc.now = func() time.Time { return f.now }
 	return f
@@ -347,7 +357,7 @@ func (f *fixture) upload(t *testing.T, v Viewer) uuid.UUID {
 func (f *fixture) input(photos ...uuid.UUID) CreateTicketInput {
 	return CreateTicketInput{
 		CategoryID: &f.cat, SymptomIDs: []uuid.UUID{f.sym1, f.sym2}, BuildingID: &f.building, FloorID: &f.floor,
-		LocationDetail: " ห้องประชุม 5B ", Details: "น้ำหยดใส่โต๊ะประชุม", PhotoIDs: photos,
+		RoomID: &f.room, LocationDetail: " ฝั่งหน้าต่าง ", Details: "น้ำหยดใส่โต๊ะประชุม", PhotoIDs: photos,
 	}
 }
 
@@ -384,10 +394,9 @@ func TestValidateCreate(t *testing.T) {
 		{"symptoms", func(in *CreateTicketInput) { in.SymptomIDs = nil }, "symptomIds", "MIN_ITEMS"},
 		{"building", func(in *CreateTicketInput) { in.BuildingID = nil }, "buildingId", "REQUIRED"},
 		{"floor", func(in *CreateTicketInput) { in.FloorID = nil }, "floorId", "REQUIRED"},
-		{"typed category without symptom", func(in *CreateTicketInput) { in.CategoryID, in.CategoryOther = nil, "ลิฟต์" }, "symptomOther", "REQUIRED"},
-		{"category other too long", func(in *CreateTicketInput) {
-			in.CategoryID, in.CategoryOther, in.SymptomOther = nil, strings.Repeat("ก", 101), "ค้าง"
-		}, "categoryOther", "TOO_LONG"},
+		{"room (CR-014)", func(in *CreateTicketInput) { in.RoomID = nil }, "roomId", "REQUIRED"},
+		{"typed category alone (CR-014)", func(in *CreateTicketInput) { in.CategoryID, in.CategoryOther = nil, "ลิฟต์" }, "categoryId", "REQUIRED"},
+		{"category other too long", func(in *CreateTicketInput) { in.CategoryOther = strings.Repeat("ก", 101) }, "categoryOther", "TOO_LONG"},
 		{"symptom other too long", func(in *CreateTicketInput) { in.SymptomOther = strings.Repeat("ก", 101) }, "symptomOther", "TOO_LONG"},
 		{"no photo", func(in *CreateTicketInput) { in.PhotoIDs = nil }, "photoIds", "MIN_ITEMS"},
 		{"six photos", func(in *CreateTicketInput) {
@@ -417,26 +426,22 @@ func TestValidateCreate(t *testing.T) {
 	}
 
 	_, err := f.svc.CreateTicket(context.Background(), f.reporter, CreateTicketInput{})
-	if e, ok := apperr.As(err); !ok || e.Code != "VALIDATION_FAILED" || len(e.Fields) != 4 {
+	// categoryId, symptomIds, buildingId, floorId, roomId, photoIds
+	if e, ok := apperr.As(err); !ok || e.Code != "VALIDATION_FAILED" || len(e.Fields) != 6 {
 		t.Fatalf("empty form: %v", err)
 	}
 
-	// CR-008: a typed symptom is enough; a typed category drops listed symptoms; a listed
-	// category wins over a typed one.
+	// CR-008: a typed symptom is enough.
 	in = full
 	in.SymptomIDs, in.SymptomOther = nil, " มีควัน "
 	if out, fields = validateCreate(in); len(fields) != 0 || out.SymptomOther != "มีควัน" {
 		t.Fatalf("typed symptom only: %v %q", fields, out.SymptomOther)
 	}
+	// CR-014: the typed category name is trimmed and kept; the service checks the category allows it.
 	in = full
-	in.CategoryID, in.CategoryOther, in.SymptomOther = nil, "ลิฟต์", "ค้าง"
-	if out, fields = validateCreate(in); len(fields) != 0 || out.SymptomIDs != nil {
-		t.Fatalf("typed category: %v %v", fields, out.SymptomIDs)
-	}
-	in = full
-	in.CategoryOther = "ลิฟต์"
-	if out, _ = validateCreate(in); out.CategoryOther != "" {
-		t.Fatalf("listed category kept typed name %q", out.CategoryOther)
+	in.CategoryOther = " ลิฟต์ "
+	if out, fields = validateCreate(in); len(fields) != 0 || out.CategoryOther != "ลิฟต์" || len(out.SymptomIDs) != 2 {
+		t.Fatalf("typed category name: %v %q", fields, out.CategoryOther)
 	}
 }
 
@@ -447,18 +452,16 @@ func TestTicketPriority(t *testing.T) {
 		name         string
 		syms         []string
 		def          string
-		typed        bool
 		want, source string
 	}{
-		{"most urgent symptom", []string{PriorityLow, PriorityCritical, PriorityMedium}, PriorityLow, false, PriorityCritical, PrioritySourceSymptom},
-		{"one symptom", []string{PriorityHigh}, PriorityLow, false, PriorityHigh, PrioritySourceSymptom},
-		{"typed symptom only", nil, PriorityHigh, false, PriorityHigh, PrioritySourceCategory},
-		{"no category default", nil, "", false, PriorityMedium, PrioritySourceDefault},
-		{"typed category", []string{PriorityCritical}, PriorityHigh, true, PriorityMedium, PrioritySourceDefault},
+		{"most urgent symptom", []string{PriorityLow, PriorityCritical, PriorityMedium}, PriorityLow, PriorityCritical, PrioritySourceSymptom},
+		{"one symptom", []string{PriorityHigh}, PriorityLow, PriorityHigh, PrioritySourceSymptom},
+		{"typed symptom only", nil, PriorityHigh, PriorityHigh, PrioritySourceCategory},
+		{"no category default", nil, "", PriorityMedium, PrioritySourceDefault},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p, src := ticketPriority(tc.syms, tc.def, tc.typed)
+			p, src := ticketPriority(tc.syms, tc.def)
 			if p != tc.want || src != tc.source {
 				t.Fatalf("got %s/%s, want %s/%s", p, src, tc.want, tc.source)
 			}
@@ -482,14 +485,67 @@ func TestCreateTicketSetsPriority(t *testing.T) {
 		t.Fatalf("typed symptom: %s/%s err=%v", d.Priority, d.PrioritySource, err)
 	}
 
+	// CR-014 AC2: "อื่น ๆ" + typed name + typed symptom → category อื่น ๆ with the name as its value.
 	in = f.input(f.upload(t, f.reporter))
-	in.CategoryID, in.CategoryOther, in.SymptomOther = nil, "ลิฟต์", "ค้างระหว่างชั้น"
+	in.CategoryID, in.SymptomIDs, in.CategoryOther = &f.other, nil, "ลิฟต์"
+	in.SymptomOther = "ค้างระหว่างชั้น"
 	d, err = f.svc.CreateTicket(ctx, f.reporter, in)
-	if err != nil || d.Category != nil || *d.CategoryOther != "ลิฟต์" || d.Priority != PriorityMedium || d.PrioritySource != PrioritySourceDefault {
-		t.Fatalf("typed category: %+v err=%v", d.TicketSummary, err)
+	if err != nil || d.Category == nil || d.Category.ID != f.other || *d.CategoryOther != "ลิฟต์" ||
+		d.Priority != PriorityMedium || d.PrioritySource != PrioritySourceCategory {
+		t.Fatalf("อื่น ๆ with typed name: %+v err=%v", d.TicketSummary, err)
 	}
-	if ins := f.repo.inserted[len(f.repo.inserted)-1]; ins.CategoryID != nil || len(ins.SymptomIDs) != 0 {
-		t.Fatalf("typed category inserted %v %v", ins.CategoryID, ins.SymptomIDs)
+	in = f.input(f.upload(t, f.reporter))
+	in.CategoryID, in.SymptomIDs = &f.other, []uuid.UUID{f.otherSym}
+	d, err = f.svc.CreateTicket(ctx, f.reporter, in)
+	if err != nil || d.Priority != PriorityCritical || d.PrioritySource != PrioritySourceSymptom || d.CategoryOther != nil {
+		t.Fatalf("อื่น ๆ with a critical symptom: %+v err=%v", d.TicketSummary, err)
+	}
+}
+
+// BR-F02-1 / BR-F02-7 (CR-014): the room and the typed category name are checked in the transaction.
+func TestCreateTicketRoomAndOtherRules(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name  string
+		edit  func(f *fixture, in *CreateTicketInput)
+		code  string
+		field string
+	}{
+		{"room of another floor", func(f *fixture, in *CreateTicketInput) {
+			otherFloor := uuid.New()
+			f.repo.floors[otherFloor] = f.building
+			r := uuid.New()
+			f.repo.rooms[r] = otherFloor
+			in.RoomID = &r
+		}, "MASTER_DATA_CHANGED", ""},
+		{"inactive or unknown room", func(_ *fixture, in *CreateTicketInput) {
+			r := uuid.New()
+			in.RoomID = &r
+		}, "MASTER_DATA_CHANGED", ""},
+		{"typed name on a normal category", func(_ *fixture, in *CreateTicketInput) { in.CategoryOther = "ลิฟต์" }, "VALIDATION_FAILED", "categoryOther"},
+		{"symptom of another category", func(f *fixture, in *CreateTicketInput) { in.SymptomIDs = []uuid.UUID{f.otherSym} }, "MASTER_DATA_CHANGED", ""},
+		{"inactive category", func(f *fixture, _ *CreateTicketInput) { f.repo.cats[f.cat] = false }, "MASTER_DATA_CHANGED", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			in := f.input(f.upload(t, f.reporter))
+			tc.edit(f, &in)
+			_, err := f.svc.CreateTicket(ctx, f.reporter, in)
+			e, ok := apperr.As(err)
+			if !ok || e.Code != tc.code || (tc.field != "" && e.Fields[tc.field] != "NOT_ALLOWED") {
+				t.Fatalf("err = %v, want %s %s", err, tc.code, tc.field)
+			}
+			if len(f.repo.inserted) != 0 || len(f.repo.counters) != 0 {
+				t.Fatal("a rejected ticket was inserted or used a number")
+			}
+		})
+	}
+
+	f := newFixture(t)
+	d := f.create(t)
+	if ins := f.repo.inserted[0]; ins.RoomID != f.room || *ins.LocationDetail != "ฝั่งหน้าต่าง" || d.Room == nil {
+		t.Fatalf("room / extra spot not stored: %+v", ins)
 	}
 }
 
@@ -638,7 +694,7 @@ func TestCreateTicketResult(t *testing.T) {
 	if d.Status != StatusInProgress || d.Step() != StepAwaitingAssessment || d.ViewerRelation != RelationReporter || d.Timeline[0].Type != EventCreated {
 		t.Fatalf("detail: status=%s relation=%s timeline=%v", d.Status, d.ViewerRelation, d.Timeline)
 	}
-	if *ins.LocationDetail != "ห้องประชุม 5B" || ins.AssetCode != nil {
+	if *ins.LocationDetail != "ฝั่งหน้าต่าง" || ins.AssetCode != nil {
 		t.Fatalf("normalised input: location=%q asset=%v", *ins.LocationDetail, ins.AssetCode)
 	}
 	if len(d.AllowedActions) != 0 || d.BlockedActions == nil {
@@ -824,32 +880,48 @@ func TestPurgeUnattachedPhotos(t *testing.T) {
 	}
 }
 
-func TestEnsureSampleDataOnlyWhenEmpty(t *testing.T) {
-	f := newFixture(t) // has one category already
-	if seeded, err := f.svc.EnsureSampleData(context.Background()); seeded || err != nil || f.repo.refreshed != 1 {
-		t.Fatalf("seeded into non-empty db: %v %v refreshed=%d", seeded, err, f.repo.refreshed)
+func TestEnsureSampleData(t *testing.T) {
+	f := newFixture(t)
+	if err := f.svc.EnsureSampleData(context.Background()); err != nil || f.repo.refreshed != 1 || len(f.repo.sampleIns) == 0 {
+		t.Fatalf("sample data: %v refreshed=%d buildings=%d", err, f.repo.refreshed, len(f.repo.sampleIns))
 	}
-	empty := NewService(newFakeRepo(), newMemStore())
-	seeded, err := empty.EnsureSampleData(context.Background())
-	if !seeded || err != nil {
-		t.Fatalf("empty db not seeded: %v", err)
-	}
-	if a, b := sampleCategories()[0].ID, sampleCategories()[0].ID; a != b {
+	if a, b := sampleBuildings()[0].Floors[0].Rooms[0].ID, sampleBuildings()[0].Floors[0].Rooms[0].ID; a != b {
 		t.Fatal("sample ids must be stable")
 	}
 }
 
-func TestSampleDataCR008(t *testing.T) {
-	for _, c := range sampleCategories() {
-		if priorityRank(c.DefaultPriority) < 0 {
-			t.Fatalf("%s: default %q", c.Name, c.DefaultPriority)
-		}
-		for _, s := range c.Symptoms {
-			if priorityRank(s.Priority) < 0 {
-				t.Fatalf("%s/%s: priority %q", c.Name, s.Name, s.Priority)
+// CR-014: every sample floor has rooms with valid area types and exactly one common area, named
+// like the migration's; one floor has more than 9 rooms so S03 shows the picker.
+func TestSampleRooms(t *testing.T) {
+	areas := map[string]bool{AreaMeetingRoom: true, AreaRestroom: true, AreaOffice: true, AreaPantry: true, AreaCommon: true, AreaParking: true, AreaOther: true}
+	picker := false
+	for _, b := range sampleBuildings() {
+		for _, fl := range b.Floors {
+			common, names := 0, map[string]bool{}
+			for _, rm := range fl.Rooms {
+				if !areas[rm.AreaType] || names[strings.ToLower(rm.Name)] {
+					t.Fatalf("%s %s: bad or duplicate room %+v", b.Name, fl.Name, rm)
+				}
+				names[strings.ToLower(rm.Name)] = true
+				if rm.AreaType == AreaCommon {
+					common++
+					if rm.Name != "พื้นที่ส่วนกลางชั้น "+fl.Name {
+						t.Fatalf("common area name %q", rm.Name)
+					}
+				}
 			}
+			if common != 1 {
+				t.Fatalf("%s %s: %d common areas", b.Name, fl.Name, common)
+			}
+			picker = picker || len(fl.Rooms) > 9
 		}
 	}
+	if !picker {
+		t.Fatal("no sample floor has more than 9 rooms")
+	}
+}
+
+func TestSampleBuildingRenames(t *testing.T) {
 	b, rn := sampleBuildings(), sampleBuildingRenames()
 	if b[0].Name != "อาคารฝั่ง Office" || rn[0].ID != b[0].ID || rn[0].From != "อาคารหลัก" {
 		t.Fatalf("renamed building keeps its id: %+v %+v", b[0], rn[0])

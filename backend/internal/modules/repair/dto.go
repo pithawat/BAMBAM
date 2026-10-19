@@ -34,6 +34,8 @@ type CategoryDTO struct {
 	Name            string       `json:"name"`
 	Icon            string       `json:"icon"`
 	DefaultPriority string       `json:"defaultPriority"`
+	IsOther         bool         `json:"isOther"`   // CR-014
+	AreaTypes       []string     `json:"areaTypes"` // CR-014
 	Symptoms        []SymptomDTO `json:"symptoms"`
 }
 
@@ -48,6 +50,7 @@ type SymptomDTO struct {
 type RecentPlaceDTO struct {
 	Building       RefDTO    `json:"building"`
 	Floor          RefDTO    `json:"floor"`
+	Room           RefDTO    `json:"room"` // CR-014
 	LocationDetail *string   `json:"locationDetail"`
 	LastReportedAt time.Time `json:"lastReportedAt"`
 }
@@ -57,6 +60,13 @@ type FloorDTO struct {
 	ID    uuid.UUID `json:"id"`
 	Name  string    `json:"name"`
 	Level int32     `json:"level"`
+	Rooms []RoomDTO `json:"rooms"` // CR-014
+}
+
+type RoomDTO struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	AreaType string    `json:"areaType"`
 }
 
 type BuildingDTO struct {
@@ -71,6 +81,7 @@ type CreateTicketRequest struct {
 	SymptomIDs     []string        `json:"symptomIds"`
 	BuildingID     string          `json:"buildingId"`
 	FloorID        string          `json:"floorId"`
+	RoomID         string          `json:"roomId"` // CR-014
 	LocationDetail string          `json:"locationDetail"`
 	Details        string          `json:"details"`
 	CategoryOther  string          `json:"categoryOther"` // CR-008; a `priority` field from old clients is ignored
@@ -94,6 +105,7 @@ type TicketSummaryDTO struct {
 	SymptomOther           *string       `json:"symptomOther"`
 	Building               RefDTO        `json:"building"`
 	Floor                  RefDTO        `json:"floor"`
+	Room                   *RefDTO       `json:"room"` // CR-014; null on older tickets
 	LocationDetail         *string       `json:"locationDetail"`
 	ThumbURL               *string       `json:"thumbUrl"`
 	Reporter               PersonRefDTO  `json:"reporter"`
@@ -239,7 +251,10 @@ func toCategoryDTOs(cats []Category) []CategoryDTO {
 		for _, s := range c.Symptoms {
 			syms = append(syms, SymptomDTO(s))
 		}
-		out = append(out, CategoryDTO{ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, Symptoms: syms})
+		out = append(out, CategoryDTO{
+			ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, IsOther: c.IsOther,
+			AreaTypes: nonNil(c.AreaTypes), Symptoms: syms,
+		})
 	}
 	return out
 }
@@ -247,7 +262,10 @@ func toCategoryDTOs(cats []Category) []CategoryDTO {
 func toRecentPlaceDTOs(list []RecentPlace) []RecentPlaceDTO {
 	out := make([]RecentPlaceDTO, 0, len(list))
 	for _, p := range list {
-		out = append(out, RecentPlaceDTO{Building: RefDTO(p.Building), Floor: RefDTO(p.Floor), LocationDetail: p.LocationDetail, LastReportedAt: p.LastReportedAt.UTC()})
+		out = append(out, RecentPlaceDTO{
+			Building: RefDTO(p.Building), Floor: RefDTO(p.Floor), Room: RefDTO(p.Room),
+			LocationDetail: p.LocationDetail, LastReportedAt: p.LastReportedAt.UTC(),
+		})
 	}
 	return out
 }
@@ -257,7 +275,11 @@ func toBuildingDTOs(blds []Building) []BuildingDTO {
 	for _, b := range blds {
 		floors := make([]FloorDTO, 0, len(b.Floors))
 		for _, f := range b.Floors {
-			floors = append(floors, FloorDTO(f))
+			rooms := make([]RoomDTO, 0, len(f.Rooms))
+			for _, rm := range f.Rooms {
+				rooms = append(rooms, RoomDTO(rm))
+			}
+			floors = append(floors, FloorDTO{ID: f.ID, Name: f.Name, Level: f.Level, Rooms: rooms})
 		}
 		out = append(out, BuildingDTO{ID: b.ID, Name: b.Name, Floors: floors})
 	}
@@ -313,6 +335,10 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 	if s.Category != nil {
 		c := RefDTO(*s.Category)
 		d.Category = &c
+	}
+	if s.Room != nil {
+		r := RefDTO(*s.Room)
+		d.Room = &r
 	}
 	if s.Contractor != nil {
 		c := RefDTO(*s.Contractor)

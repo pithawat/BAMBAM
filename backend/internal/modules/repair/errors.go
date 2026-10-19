@@ -9,7 +9,7 @@ var (
 	ErrPhotoNotAttachable    = apperr.New(apperr.KindBusinessRule, "PHOTO_NOT_FOUND", "photo unknown, expired or not the caller's")
 	ErrPhotoTypeNotAllowed   = apperr.New(apperr.KindInvalid, "PHOTO_TYPE_NOT_ALLOWED", "only image files are allowed")
 	ErrPhotoTooLarge         = apperr.New(apperr.KindInvalid, "PHOTO_TOO_LARGE", "photo exceeds the size limit")
-	ErrMasterDataChanged     = apperr.New(apperr.KindBusinessRule, "MASTER_DATA_CHANGED", "category, symptom or floor inactive or mismatched")
+	ErrMasterDataChanged     = apperr.New(apperr.KindBusinessRule, "MASTER_DATA_CHANGED", "category, symptom, floor or room inactive or mismatched")
 	ErrTeamHandledNotAllowed = apperr.New(apperr.KindForbidden, "TEAM_HANDLED_NOT_ALLOWED", "team handled tickets are not available to this user")
 
 	ErrNotTechnician        = apperr.New(apperr.KindForbidden, "NOT_TECHNICIAN", "only the technician can do this")

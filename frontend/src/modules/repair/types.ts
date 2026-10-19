@@ -1,4 +1,4 @@
-// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–2 endpoints, CR-005, CR-008).
+// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–2 endpoints, CR-005, CR-008, CR-014).
 // Field names are fixed by the contract — change only through a CR.
 
 import type { Ref } from "@/lib/platform/types";
@@ -23,7 +23,7 @@ export type Priority = (typeof PRIORITIES)[number];
 
 /**
  * How the priority was set (CR-008): `symptom` (most urgent picked symptom) · `category` (only a typed
- * symptom → the category default) · `default` (category "อื่นๆ" → medium) · `admin` (#20) ·
+ * symptom → the category default) · `default` (typed category "อื่นๆ" before CR-014 → medium) · `admin` (#20) ·
  * `reporter` (tickets created before CR-008).
  */
 export type PrioritySource = "symptom" | "category" | "default" | "admin" | "reporter";
@@ -68,8 +68,9 @@ export type TicketSummary = {
   closedReason: ClosedReason | null;
   priority: Priority;
   prioritySource: PrioritySource;
-  /** `null` when the reporter typed the category ("อื่นๆ", CR-008) → `categoryOther`. */
+  /** `null` only on tickets from CR-008 to CR-014 where the reporter typed the category → `categoryOther`. */
   category: Ref | null;
+  /** CR-014: the optional typed name under the "อื่น ๆ" category (shown `อื่น ๆ · {categoryOther}`). */
   categoryOther: string | null;
   /** Title = symptom names, then `symptomOther`, joined with " · " (_common.md §3). */
   symptoms: Ref[];
@@ -78,6 +79,9 @@ export type TicketSummary = {
   building: Ref;
   /** `floor.name` is the display name ("5"); render `{building} ชั้น {floor}`. */
   floor: Ref;
+  /** CR-014: the picked room; `null` on tickets created before CR-014. */
+  room: Ref | null;
+  /** The optional extra spot (CR-014); the free-text place on older tickets. */
   locationDetail: string | null;
   thumbUrl: string | null;
   reporter: PersonRef;
@@ -155,6 +159,10 @@ export type TicketDetail = TicketSummary & {
 
 export type Symptom = Ref & { priority: Priority };
 
+/** Room area types (CR-014). */
+export const AREA_TYPES = ["meeting_room", "restroom", "office", "pantry", "common_area", "parking", "other"] as const;
+export type AreaType = (typeof AREA_TYPES)[number];
+
 export type Category = {
   id: string;
   name: string;
@@ -162,12 +170,20 @@ export type Category = {
   icon: string;
   /** Used when the reporter only types a symptom (CR-008). */
   defaultPriority: Priority;
+  /** CR-014: the one "อื่น ๆ" category (listed last); only it accepts `categoryOther`. */
+  isOther: boolean;
+  /** CR-014: area types where its problems usually happen — S03 lists those rooms first (a hint, never a filter). */
+  areaTypes: AreaType[];
   symptoms: Symptom[];
 };
 
 // ---- #2 GET /repair/buildings ----
 
-export type Floor = { id: string; name: string; level: number };
+/** A place on a floor (CR-014, `platform.rooms`). */
+export type Room = { id: string; name: string; areaType: AreaType };
+
+/** `rooms`: active rooms by sort order; every floor has `พื้นที่ส่วนกลางชั้น {n}` (CR-014). */
+export type Floor = { id: string; name: string; level: number; rooms: Room[] };
 
 /** Floors ordered by `level`, bottom first. */
 export type Building = { id: string; name: string; floors: Floor[] };
@@ -175,16 +191,18 @@ export type Building = { id: string; name: string; floors: Floor[] };
 // ---- #5 POST /repair/tickets ----
 
 /**
- * CR-008: no `priority` — the server sets it. Send `categoryId` or `categoryOther` (then no
- * `symptomIds` and a `symptomOther`); with `categoryId`: ≥ 1 symptom or `symptomOther`.
+ * CR-008: no `priority` — the server sets it. CR-014: `categoryId` always; `categoryOther` only with
+ * the `isOther` category; ≥ 1 symptom or `symptomOther`; `roomId` an active room of `floorId`.
  */
 export type CreateTicketRequest = {
-  categoryId?: string;
+  categoryId: string;
   categoryOther?: string;
   symptomIds: string[];
   symptomOther?: string;
   buildingId: string;
   floorId: string;
+  roomId: string;
+  /** The optional extra spot (≤ 100). */
   locationDetail?: string;
   details?: string;
   photoIds: string[];
@@ -204,7 +222,7 @@ export type TicketListQuery = {
   status?: TicketStatus[];
   step?: TicketStep[];
   closedReason?: ClosedReason;
-  /** Ticket number or location text. */
+  /** Ticket number, room name (CR-014) or location text. */
   q?: string;
   /** RFC 3339 */
   createdFrom?: string;
@@ -245,8 +263,8 @@ export type AssessRequest = { expectedDoneOn: string; workBy: WorkBy; contractor
 
 // ---- #28 GET /repair/me/recent-places (CR-008) ----
 
-/** "ที่เคยแจ้ง" on S03: max 3, newest first, never preselected. */
-export type RecentPlace = { building: Ref; floor: Ref; locationDetail: string | null; lastReportedAt: string };
+/** "ที่เคยแจ้ง" on S03: max 3 distinct rooms, newest first, never preselected (CR-014: + room). */
+export type RecentPlace = { building: Ref; floor: Ref; room: Ref; locationDetail: string | null; lastReportedAt: string };
 
 /** `contractorRating` is required for a contractor job that has no rating yet. */
 export type ResolveRequest = {
@@ -331,4 +349,4 @@ export type RepairErrorCode =
   | "NETWORK";
 
 /** Field codes in `VALIDATION_FAILED.fields`. */
-export type FieldCode = "REQUIRED" | "TOO_LONG" | "MIN_ITEMS" | "MAX_ITEMS" | "INVALID" | "PAST";
+export type FieldCode = "REQUIRED" | "TOO_LONG" | "MIN_ITEMS" | "MAX_ITEMS" | "INVALID" | "PAST" | "NOT_ALLOWED";

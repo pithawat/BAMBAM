@@ -1,6 +1,6 @@
 # ตั้งค่าระบบ (Superadmin) — Build plan
 
-Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · repair CR-014 applied 2026-10-19 (Stage 4 / 5 notes)
 
 <!-- Written by Claude in /stage-plan settings (2026-10-16). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -145,6 +145,7 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 
 **Scope**
 - Flows: F26 · Screens: S20, S21 · Endpoints: #13–#31, P8; repair CR-007 part B (buildings from platform, S12 contract note)
+- (repair CR-014) `platform.rooms` (+ `area_type`) and the per-floor `พื้นที่ส่วนกลางชั้น {n}` rooms already exist from repair Stage 2M: this stage's migration only moves buildings / floors and adds `updated_by_id`; S21 rooms get a required **ประเภทพื้นที่** select; the common-area room cannot be deleted / deactivated; a new floor gets its common-area room automatically; room `inUse` counts tickets (`repair.tickets.room_id`)
 
 **Backend (Claude)**
 - [ ] Migration `…_platform_locations.sql`: `ALTER TABLE repair.buildings SET SCHEMA platform`, same for `floors` (FKs from `repair.tickets` keep working); add `updated_by_id`, `sort_order` where missing; `platform.rooms` (floor_id, name, sort_order, is_active, updated_by_id); floor plan columns on `platform.floors` (`plan_path`, `plan_file_name`, `plan_size`, `plan_updated_at`, `plan_updated_by_id`); unique (building_id, lower(name)) for floors, (floor_id, lower(name)) for rooms; Down moves them back
@@ -176,6 +177,7 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 
 **Scope**
 - Flows: F27, F28 · Screens: S22, S23 · Endpoints: #32–#45; repair CR-007 part C (#14 re-activates an inactive type + audit)
+- (repair CR-014) S22: category default priority + every symptom priority **required** on create, editable for every category; category `ประเภทพื้นที่ที่มักเกิด` (multi, optional); the `isOther` category cannot be deleted / deactivated / un-flagged; initial data = the CR-014 master
 
 **Backend (Claude)**
 - [ ] Repair `SettingsAdmin` implementation: categories / symptoms CRUD + order (+ `updated_by_id` columns migration), contractor types admin (count, created by, technician flag), usage (`inUse`)

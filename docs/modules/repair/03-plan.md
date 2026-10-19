@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — Build plan
 
-Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18)
+Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19)
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -17,6 +17,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 1 | พนักงานแจ้งซ่อมพร้อมรูปได้จริง ได้เลขงาน (สถานะ "กำลังดำเนินการ · รอช่างประเมิน") และเปิดดูงานของตัวเองได้ — API จริง (CR-005) | F02 (happy path), F06 | S03, S05, S06, S07 (view) | built, rework CR-005 done — waiting acceptance |
 | 2 | ช่างเห็นทุกงาน ประเมิน (วันคาดเสร็จ) บันทึกผล + ผู้ดำเนินการ + คะแนนช่างภายนอก; ผู้แจ้งให้ดาว (บังคับ) หรือส่งกลับ; ปิดเองเมื่อครบ 3 วัน — วงจรหลักครบ (CR-005) | F21, F07, F24 (technician) | S09, S17, S10, S08, S07 actions, S18 | built — waiting acceptance (no tests, CR-005) |
 | 2R | **CR-008 rework:** ระบบกำหนดความเร่งด่วนจากอาการ + "อื่นๆ" · หน้าตาใหม่ทั้งแอป (design-system CR-008) · S03 แบบทีละขั้น + ตรวจสอบก่อนส่ง + ที่เคยแจ้ง + ร่าง · S05 · S07 หน้าติดตามแนวตั้ง + การ์ดสิ่งที่ต้องทำ + พิมพ์รายงาน · S08 ให้คะแนนไม่ตั้งค่าไว้ก่อน · S17 ปุ่มวัน + เหตุผลที่เลื่อน · S10 เป็น sheet — ตรวจรับพร้อม Stage 1–2 | F02, F06, F07, F21 | S03, S05, S06, S07, S08, S09, S10, S17, shell | in progress |
+| 2M | **CR-014 rework:** หมวดงาน / อาการจริงตามเอกสาร (เก็บใน DB) · ฟอร์ม 3 ขั้น กรอบเท่ากันทุกขั้น · ห้องหรือจุดที่เกิดบังคับ เลือกจากรายการห้อง ผูกกับหมวด | F02, F06 | S03, location line on S05 / S06 / S07 / S09 | done (2026-10-19, `repair-stage-2M`) |
 | 3 | Admin เห็นทุกงาน ปรับความเร่งด่วน ปิดงานได้; ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | pending |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over) | pending |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ | F13-B | S16, S03 (QR banner) | pending |
@@ -203,6 +204,46 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 
 ---
 
+## Stage 2M — CR-014 rework (real category master, 3-step equal frames, required room) (CR-014)
+
+Status: done — accepted 2026-10-19, tag `repair-stage-2M`
+
+**Scope**
+- Flows: F02 (3 steps; BR-F02-1 CR-014 part, BR-F02-6 master, BR-F02-7 rooms), F06 (location line with room), F03 data only (room id stored for Stage 4)
+- Screens: S03 (`changes/CR-014/form-steps.html`, S03 spec CR-014 block) · location line with room on S05, S06, S07, S09, print
+- Endpoints: #1 (+ `isOther`, `areaTypes`), #2 (+ rooms per floor), #5 (`roomId` required, `categoryOther` only with `isOther`), #6 / #8 objects (+ `room`; `q` also searches room name), #28 (+ room)
+- Out of this stage: admin screens for rooms (settings Stage 4) and categories / symptoms / area types / priorities (settings Stage 5); duplicate by room (Stage 4); QR room prefill (Stage 5); S27 rooms (Stage 7)
+
+**Backend (Claude)**
+- [x] Migration `…_repair_cr014.sql`: `platform.rooms` (id, floor_id → floors, name, area_type CHECK, sort_order, is_active, created / updated, unique (floor_id, lower(name))) — the table settings Stage 4 planned (D-048), with `area_type` added; `repair.categories.is_other` (unique partial index where true); `repair.category_area_types` (category_id, area_type, PK both); `repair.tickets.room_id` nullable FK + index; Down reverses (drops `room_id` data)
+- [x] Data migration (every environment): upsert the 7 categories / symptoms of `attachments/REPAIR-CATEGORY-SYMPTOM-MASTER.md` with stable ids, icons, sort order, CR-014 priorities and area types; `อื่น ๆ` `is_other = true`; deactivate every other category (sample ones), never delete; one `พื้นที่ส่วนกลางชั้น {n}` room (`common_area`) per active floor
+- [x] Note: `repair.buildings` / `floors` still live in `repair` until settings Stage 4 moves them; `platform.rooms.floor_id` FK follows the `SET SCHEMA` move (ids kept)
+- [x] Dev / UAT sample (`seed.go`, D-032): sample rooms with area types per floor (ห้องประชุม, ห้องน้ำชาย / หญิง, Pantry, สำนักงาน) — SAMPLE ONLY until the owner's room list
+- [x] #1 `isOther`, `areaTypes`; #2 rooms per floor (floors without an active room are skipped)
+- [x] Create: `categoryId` always required, `categoryOther` only with `isOther` (`NOT_ALLOWED`), `roomId` required and active on `floorId` (`MASTER_DATA_CHANGED`); priority rule unchanged
+- [x] Ticket objects + list / detail / print queries carry `room`; #6 `q` matches room name; #28 distinct by room
+- [x] Tests: create rules (room missing / other floor / inactive, `categoryOther` on a normal category, `อื่น ๆ` with symptoms), priority with the new symptoms, master migration idempotent (repository integration test), #2 rooms shape
+
+**Frontend (Claude)**
+- [x] types / api / mocks: `isOther`, `areaTypes`, rooms, `room` on tickets; mocks use the real master + sample rooms
+- [x] S03: 3 steps in one 880px frame with fixed body height (desktop), ปัญหาที่พบ without the client "อื่นๆ" card, สถานที่ with room groups / picker (> 9) + จุดเพิ่มเติม + ที่เคยแจ้ง button, รูปภาพและส่ง two columns; validation, draft (room id), skeleton
+- [x] Location line helper used by S05 / S06 / S07 / S09 / print: `ชั้น {n} · {room}` (+ จุดเพิ่มเติม), old tickets unchanged
+
+**Acceptance criteria**
+- [x] AC1: S03 shows exactly the 7 categories and their symptoms from the attachment (no `อื่นๆ` symptom rows; `อาการอื่นๆ` check box instead); changing category clears symptoms and typed text
+- [x] AC2: `อื่น ๆ` + `ใช้งานไม่ได้` + typed `ลิฟต์` creates a ticket with category อื่น ๆ, `categoryOther = ลิฟต์`, priority ปกติ; มีกลิ่นไหม้/ประกายไฟ → ฉุกเฉิน
+- [x] AC3: ถัดไป on สถานที่ without a room shows `เลือกห้องหรือจุดที่เกิด`; rooms matching the category are listed first; the API rejects a missing room, a room of another floor and an inactive room
+- [x] AC4: On desktop (1280 / 1440px) the frame width and height, progress strip and footer are identical on all 3 steps and no step leaves more than ~25% of the frame empty (sample data); phone 375px has no horizontal scroll
+- [x] AC5: ตรวจสอบก่อนส่ง shows ปัญหา · ความเร่งด่วน · สถานที่ with room, each แก้ไข returns to its step; draft restore and ที่เคยแจ้ง fill the room
+- [x] AC6: Old tickets (no room, `category: null`) still render on S06 / S07 / print
+- [x] AC7: `go vet`, `go test ./...`, `golangci-lint`, `tsc`, `eslint`, `next build` pass
+
+**Demo script**
+1. Employee (1440px): แจ้งซ่อม → ห้องประชุมและโสตทัศนูปกรณ์ → จอไม่แสดงผล/ไม่ติด → ถัดไป → อาคารฝั่ง Office ชั้น 5 → ห้องประชุมขึ้นก่อน → ห้องประชุม 5B + `ฝั่งหน้าต่าง` → ถัดไป → 1 photo + รายละเอียด → ยืนยันส่งแจ้งซ่อม → S05 → S07 shows `ชั้น 5 · ห้องประชุม 5B · ฝั่งหน้าต่าง`
+2. Same at 375px with อื่น ๆ + typed `ลิฟต์`; try ถัดไป without a room
+
+---
+
 ## Stage 3 — Admin งานทั้งหมดและการจัดการ (CR-005: no queue reorder)
 
 **Scope**
@@ -234,7 +275,7 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 - Out of this stage: notifications to subscribers (Stage 7)
 
 **Backend (Claude)**
-- [ ] Duplicate query (same category + floor + room / spot, open statuses, BR-F03-1 CR-009) with an index; #5 refuses a match → 409 `DUPLICATE_FOUND` / `OWN_TICKET_AWAITING_RATING` (CR-009)
+- [ ] Duplicate query (same category + floor + room / spot, open statuses, BR-F03-1 CR-009; by `room_id` + old-ticket fallback, CR-014) with an index; #5 refuses a match → 409 `DUPLICATE_FOUND` / `OWN_TICKET_AWAITING_RATING` (CR-009)
 - [ ] Follow: subscriber row + `subscribed` event with note/photos; reporter/subscriber → `ALREADY_FOLLOWING`
 - [ ] Team handled: leads only (BR-F04-1), note + ≥ 1 photo (BR-F04-2), created `closed` / `team_handled`, event `team_handled`
 - [ ] Hand over: only `team_handled` (BR-F05-1), recording lead or admin (BR-F05-2), same ticket back to `in_progress` awaiting assessment (BR-F05-3, CR-005), event `handed_over`
@@ -275,7 +316,7 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 - Out of this stage: F13-A (printing QR labels) — phase 1 labels are generated outside the app from the URL format in the contract (D-024)
 
 **Backend (Claude)**
-- [ ] Migration `assets` (code unique case-insensitive, category, building, floor, location detail) + dev seed (`AC-05-012` …); ticket keeps `asset_code`
+- [ ] Migration `assets` (code unique case-insensitive, category, building, floor, location detail) + dev seed (`AC-05-012` …); ticket keeps `asset_code` · (CR-014) assets carry `room_id`; #25 returns `room` and S03 prefills it
 - [ ] Endpoint 25; tests
 
 **Frontend contract (Claude)**
@@ -347,6 +388,7 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 - Screens: S12 (3D, selection, list view, mobile list + sheet)
 - Endpoint: 27; S12 floor list uses #6
 - Before starting: user confirms floor count / names / rear building (D-010 open question). Rendering = SVG isometric as in the mockup (D-025; no 3D library)
+- (CR-014) S27 rooms come from `platform.rooms` and tickets' `room_id`
 
 **Backend (Claude)**
 - [ ] Endpoint 27 (aggregate query, index on floor + status); tests
@@ -415,6 +457,8 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 
 ## Open questions
 
-- Real seed files (categories, the technician's account, buildings / floors, assets) — needed by Stage 8 at the latest; sample data until then
+- Real seed files (categories, the technician's account, buildings / floors, assets) — needed by Stage 8 at the latest; sample data until then · categories / symptoms arrived 2026-10-19 (CR-014)
+- (CR-014) Real room list per floor (name + area type) — who supplies it? Sample rooms (seed.go, dev/UAT) until then
+- ~~(CR-014) ลานจอด / ไม้กั้น has no building / floor~~ — answered 2026-10-19: building `พื้นที่ภายนอกอาคาร` → floor / room `ลานจอดรถ` (D-075); real zones still open
 - Deploy target for UAT / production (affects `PHOTO_STORAGE_DIR` volume and backups)
 - Floor count / names / rear building for S12 — needed before Stage 7

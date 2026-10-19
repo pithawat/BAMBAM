@@ -18,7 +18,7 @@ import { getTicketCounts, getTickets } from "../api";
 import { errorCode } from "../errors";
 import type { TicketCounts, TicketCountsQuery, TicketSort, TicketStatus, TicketSummary } from "../types";
 import { autoCloseText } from "./ticket-progress";
-import { CLOSED_LABELS, dayLabel, listDate, STEP, stepLabel, ticketHref, ticketTitle } from "./ticket-presentation";
+import { CLOSED_LABELS, dayLabel, listDate, placeLine, STEP, stepLabel, ticketHref, ticketTitle } from "./ticket-presentation";
 import { TicketLink } from "./ticket-navigation";
 
 // S06 ติดตามงานซ่อม (CR-011): heading with the white leopard, a review banner when the reporter has work to check,
@@ -316,7 +316,7 @@ function Badge({ ticket }: { ticket: TicketSummary }) {
 function Place({ ticket }: { ticket: TicketSummary }) {
   return <>
     <span className="block truncate text-sm">{ticket.building.name}</span>
-    <span className="block truncate text-[13px] text-muted-foreground">ชั้น {ticket.floor.name}{ticket.locationDetail ? ` · ${ticket.locationDetail}` : ""}</span>
+    <span className="block truncate text-[13px] text-muted-foreground">{placeLine(ticket)}</span>
   </>;
 }
 

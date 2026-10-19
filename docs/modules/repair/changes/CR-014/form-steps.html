@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CR-014 Wizard Frames</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+/* CR-014 design preview — equal wizard frames. Tokens copied from frontend/src/app/globals.css (default theme). */
+:root {
+  --background: #F5F7FA; --foreground: #172033; --card: #FFFFFF; --primary: #2741FA; --secondary: #EFF2FF;
+  --secondary-foreground: #1B31D6; --muted: #F1F3F7; --muted-foreground: #5B6676; --border: #E5E8EF; --input: #D0D6E2;
+  --success: #0B7A5E; --attention: #B93D0A; --priority-high: #B93815; --svc-repair: #F97316; --radius: 12px;
+  --frame-w: 880px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: Anuphan, system-ui, sans-serif; font-size: 15px; line-height: 1.55; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.page { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; overflow-x: clip; }
+.lead { color: var(--muted-foreground); margin: 0 0 20px; max-width: 760px; }
+.option { margin-top: 28px; }
+.option > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 10px; }
+.option h2 { font-size: 18px; margin: 0; }
+.tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.tag.bad { background: #FDECEA; color: #B42318; }
+.tag.good { background: #E7F5F0; color: var(--success); }
+.option > header p { margin: 0; color: var(--muted-foreground); font-size: 14px; }
+
+/* thumbnails: each frame rendered at real width, scaled down */
+.strip { display: grid; align-items: start; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+.thumb { background: transparent; border: 0; padding: 0; text-align: left; cursor: zoom-in; font: inherit; color: inherit; }
+.thumb .viewport { position: relative; overflow: hidden; border-radius: 10px; outline: 1px solid var(--border); background: var(--background); }
+.thumb .scaler { transform-origin: top left; width: var(--frame-w); }
+.thumb .cap { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-top: 6px; }
+.fill { font-weight: 600; font-variant-numeric: tabular-nums; }
+.fill.low { color: #B42318; } .fill.ok { color: var(--success); }
+.thumb:focus-visible .viewport { outline: 2px solid var(--primary); }
+
+/* the frame (same for every step) */
+.frame { width: var(--frame-w); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+.frame .top { padding: 18px 24px 12px; border-bottom: 1px solid var(--border); }
+.frame .count { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted-foreground); }
+.segs { display: flex; gap: 6px; margin-top: 8px; }
+.segs span { flex: 1; font-size: 12px; color: var(--muted-foreground); }
+.segs span::before { content: ""; display: block; height: 4px; border-radius: 4px; background: var(--border); margin-bottom: 4px; }
+.segs span.done::before, .segs span.on::before { background: var(--primary); }
+.segs span.on { color: var(--foreground); font-weight: 600; }
+.frame .body { flex: none; padding: 20px 24px; position: relative; }
+.frame .content { display: flex; flex-direction: column; gap: 18px; }
+.frame .foot { display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--border); background: #FBFCFD; }
+.frame .foot .note { flex: 1; font-size: 13px; color: var(--muted-foreground); }
+.btn { height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--input); background: var(--card); font: inherit; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; min-width: 180px; justify-content: center; }
+.empty-zone { position: absolute; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(135deg, transparent 0 10px, rgba(180,35,24,.07) 10px 20px); border-top: 1px dashed rgba(180,35,24,.45); pointer-events: none; }
+.empty-zone span { position: absolute; right: 12px; top: 6px; font-size: 12px; color: #B42318; font-weight: 600; }
+
+/* form parts */
+.h { font-size: 19px; font-weight: 700; margin: 0; }
+.sub { font-size: 13px; color: var(--muted-foreground); margin: 2px 0 0; }
+.label { font-weight: 600; font-size: 14px; margin: 0 0 8px; }
+.label em { color: #B42318; font-style: normal; }
+.label small { font-weight: 400; color: var(--muted-foreground); margin-left: 6px; }
+.grid { display: grid; gap: 8px; }
+.c2 { grid-template-columns: repeat(2, 1fr); } .c3 { grid-template-columns: repeat(3, 1fr); } .c4 { grid-template-columns: repeat(4, 1fr); }
+.card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; min-height: 56px; font-size: 14px; background: var(--card); }
+.card.sel { border-color: var(--primary); background: var(--secondary); box-shadow: inset 0 0 0 1px var(--primary); }
+.ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: #FFF1E7; color: var(--svc-repair); flex: none; }
+.ic svg { width: 18px; height: 18px; }
+.card.sel .ic { background: #fff; }
+.check { border: 1px solid var(--border); border-radius: 8px; min-height: 42px; padding: 8px 12px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.check i { width: 18px; height: 18px; border: 1.5px solid var(--input); border-radius: 5px; flex: none; display: grid; place-items: center; }
+.check.on { border-color: rgba(39,65,250,.4); background: rgba(239,242,255,.6); }
+.check.on i { background: var(--primary); border-color: var(--primary); color: #fff; }
+.check.on i svg { width: 13px; height: 13px; }
+.prio { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--muted); font-size: 13px; }
+.prio b { color: var(--priority-high); }
+.link { color: var(--primary); font-weight: 600; font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
+.pill { min-width: 46px; height: 40px; border: 1px solid var(--border); border-radius: 8px; display: grid; place-items: center; font-size: 14px; }
+.pill.sel { border-color: var(--primary); background: var(--secondary); color: var(--secondary-foreground); font-weight: 600; box-shadow: inset 0 0 0 1px var(--primary); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.room { border: 1px solid var(--border); border-radius: 8px; min-height: 44px; padding: 6px 12px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.room.sel { border-color: var(--primary); background: var(--secondary); box-shadow: inset 0 0 0 1px var(--primary); font-weight: 600; }
+.room small { color: var(--muted-foreground); margin-left: auto; font-size: 12px; }
+.grouplabel { font-size: 12px; color: var(--muted-foreground); margin: 0 0 6px; }
+.input { height: 44px; border: 1px solid var(--input); border-radius: 8px; padding: 0 12px; display: flex; align-items: center; color: var(--muted-foreground); font-size: 14px; }
+.recent { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted-foreground); padding: 8px 12px; border: 1px dashed var(--input); border-radius: 8px; }
+.drop { border: 2px dashed var(--input); border-radius: 10px; min-height: 104px; display: flex; align-items: center; gap: 14px; padding: 14px 18px; }
+.drop .ic { width: 44px; height: 44px; background: var(--secondary); color: var(--primary); }
+.shots { display: flex; gap: 8px; }
+.shot { width: 84px; height: 84px; border-radius: 8px; background: linear-gradient(135deg, #cfd7e6, #9fb0cc); position: relative; }
+.shot.add { background: var(--muted); border: 1px dashed var(--input); display: grid; place-items: center; color: var(--muted-foreground); }
+.tips { font-size: 13px; color: var(--muted-foreground); display: grid; gap: 4px; }
+.sum { border: 1px solid var(--border); border-radius: 10px; }
+.sum > div { display: grid; grid-template-columns: 120px 1fr auto; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 14px; }
+.sum > div:first-child { border-top: 0; }
+.sum dt { color: var(--muted-foreground); }
+.sum dd { margin: 0; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+
+/* zoom dialog */
+dialog { border: 0; padding: 0; background: transparent; max-width: calc(100vw - 32px); }
+dialog::backdrop { background: rgba(23,32,51,.55); }
+dialog .wrap { overflow: auto; max-height: calc(100vh - 32px); }
+dialog .close { position: sticky; top: 0; float: right; margin: 8px; z-index: 2; }
+
+@media (max-width: 640px) { .strip { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>CR-014 · กรอบฟอร์มแจ้งซ่อมเท่ากันทุกขั้นตอน</h1>
+  <p class="lead">ทุกกรอบกว้าง 880px และสูงเท่ากับขั้นที่ยาวที่สุด ตัวเลขใต้กรอบคือพื้นที่ที่เนื้อหาใช้จริง แถบลายแดงคือพื้นที่ว่าง แตะกรอบเพื่อดูขนาดจริง ข้อมูลในหน้านี้เป็นตัวอย่าง</p>
+
+  <section class="option" data-option="current">
+    <header><h2>แบบปัจจุบัน · 4 ขั้น</h2><span class="tag bad">มีที่ว่างมาก</span>
+      <p>ปัญหาที่พบ → สถานที่ → รูปภาพ → ตรวจสอบก่อนส่ง</p></header>
+    <div class="strip"></div>
+  </section>
+
+  <section class="option" data-option="proposed">
+    <header><h2>แบบเสนอ · 3 ขั้น</h2><span class="tag good">แนะนำ</span>
+      <p>ปัญหาที่พบ → สถานที่ → รูปภาพและส่ง (แนบรูป เล่ารายละเอียดเพิ่ม และตรวจสอบก่อนส่ง อยู่ในกรอบเดียวกัน)</p></header>
+    <div class="strip"></div>
+  </section>
+</main>
+
+<dialog id="zoom"><div class="wrap"><button class="btn close" type="button" onclick="this.closest('dialog').close()">ปิด</button><div class="slot"></div></div></dialog>
+
+<template id="t-problem">
+  <div class="content">
+    <div><p class="h">ปัญหาที่พบ</p><p class="sub">เลือก 1 หมวด แล้วเลือกอาการที่เห็น</p></div>
+    <div>
+      <p class="label">เลือกหมวดที่ตรงกับปัญหา <em>*</em></p>
+      <div class="grid c4">
+        <div class="card"><span class="ic"><i data-lucide="zap"></i></span>ไฟฟ้าและแสงสว่าง</div>
+        <div class="card sel"><span class="ic"><i data-lucide="snowflake"></i></span>ระบบปรับอากาศ</div>
+        <div class="card"><span class="ic"><i data-lucide="droplets"></i></span>ประปาและสุขาภิบาล</div>
+        <div class="card"><span class="ic"><i data-lucide="presentation"></i></span>ห้องประชุมและโสตทัศนูปกรณ์</div>
+        <div class="card"><span class="ic"><i data-lucide="building-2"></i></span>อาคารและพื้นที่ส่วนกลาง</div>
+        <div class="card"><span class="ic"><i data-lucide="square-parking"></i></span>ลานจอด / ไม้กั้น</div>
+        <div class="card"><span class="ic"><i data-lucide="ellipsis"></i></span>อื่น ๆ</div>
+      </div>
+    </div>
+    <div>
+      <p class="label">อาการที่พบ <em>*</em><small>เลือกได้มากกว่า 1 ข้อ</small></p>
+      <div class="grid c3">
+        <div class="check on"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></i>แอร์ไม่เย็น</div>
+        <div class="check on"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></i>น้ำหยด/รั่วซึม</div>
+        <div class="check"><i></i>มีเสียงดัง</div>
+        <div class="check"><i></i>มีกลิ่น</div>
+        <div class="check"><i></i>เปิดไม่ติด</div>
+        <div class="check"><i></i>รีโมทเสีย</div>
+        <div class="check"><i></i>อาการอื่นๆ</div>
+      </div>
+    </div>
+    <div class="prio"><i data-lucide="gauge"></i><span>ความเร่งด่วนของงานนี้: <b>สูง</b> · ระบบกำหนดจากอาการ “น้ำหยด/รั่วซึม” คุณไม่ต้องเลือกระดับเอง</span></div>
+    <span class="link"><i data-lucide="plus"></i>เล่ารายละเอียดเพิ่ม (ไม่บังคับ)</span>
+  </div>
+</template>
+
+<template id="t-location">
+  <div class="content">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div style="flex:1"><p class="h">ปัญหาเกิดขึ้นที่ไหน</p><p class="sub">เลือกอาคาร ชั้น และห้อง</p></div>
+      <span class="recent"><i data-lucide="history"></i>ที่เคยแจ้ง<i data-lucide="chevron-down"></i></span>
+    </div>
+    <div class="split">
+      <div>
+        <p class="label">เลือกอาคาร <em>*</em></p>
+        <div class="grid c2">
+          <div class="card sel"><span class="ic"><i data-lucide="building"></i></span>อาคารฝั่ง Office</div>
+          <div class="card"><span class="ic"><i data-lucide="factory"></i></span>อาคาร Office โรงงานบางซ่อน</div>
+        </div>
+      </div>
+      <div>
+        <p class="label">เลือกชั้น <em>*</em></p>
+        <div class="row"><span class="pill">1</span><span class="pill">2</span><span class="pill">3</span><span class="pill">4</span><span class="pill sel">5</span><span class="pill">6</span><span class="pill">7</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="label">ห้องหรือจุดที่เกิด <em>*</em></p>
+      <p class="grouplabel">ห้องที่ตรงกับปัญหา (ระบบปรับอากาศ)</p>
+      <div class="grid c3" style="margin-bottom:10px">
+        <div class="room sel"><i data-lucide="door-open"></i>ห้องประชุม 5B<small>ห้องประชุม</small></div>
+        <div class="room"><i data-lucide="door-open"></i>ห้องประชุม 5A<small>ห้องประชุม</small></div>
+        <div class="room"><i data-lucide="door-open"></i>สำนักงาน HR<small>สำนักงาน</small></div>
+      </div>
+      <p class="grouplabel">ห้องอื่นบนชั้นนี้</p>
+      <div class="grid c3">
+        <div class="room"><i data-lucide="door-open"></i>ห้องน้ำชาย</div>
+        <div class="room"><i data-lucide="door-open"></i>ห้องน้ำหญิง</div>
+        <div class="room"><i data-lucide="door-open"></i>Pantry</div>
+        <div class="room"><i data-lucide="door-open"></i>พื้นที่ส่วนกลางชั้น 5</div>
+      </div>
+    </div>
+    <div>
+      <p class="label">บอกจุดเพิ่มเติม <small>ไม่บังคับ</small></p>
+      <div class="input">เช่น ฝั่งหน้าต่าง เครื่องที่ 2</div>
+    </div>
+  </div>
+</template>
+
+<template id="t-photos">
+  <div class="content">
+    <div><p class="h">รูปภาพ</p><p class="sub">อย่างน้อย 1 รูป สูงสุด 5 รูป</p></div>
+    <div class="drop"><span class="ic"><i data-lucide="image-plus"></i></span><div><b>ลากรูปมาวาง หรือคลิกเพื่อเลือก</b><div class="sub">JPG PNG HEIC ไม่เกิน 10 MB</div></div></div>
+    <div><p class="label">รูปที่แนบแล้ว 2/5</p><div class="shots"><span class="shot"></span><span class="shot"></span></div></div>
+  </div>
+</template>
+
+<template id="t-review">
+  <div class="content">
+    <div><p class="h">ตรวจสอบก่อนส่ง</p><p class="sub">แตะ แก้ไข เพื่อกลับไปขั้นนั้น</p></div>
+    <dl class="sum" style="margin:0">
+      <div><dt>ปัญหา</dt><dd><b>ระบบปรับอากาศ</b> · แอร์ไม่เย็น · น้ำหยด/รั่วซึม</dd><span class="link">แก้ไข</span></div>
+      <div><dt>รายละเอียด</dt><dd>—</dd><span class="link">แก้ไข</span></div>
+      <div><dt>สถานที่</dt><dd>อาคารฝั่ง Office · ชั้น 5 · ห้องประชุม 5B</dd><span class="link">แก้ไข</span></div>
+      <div><dt>รูปแนบ (2)</dt><dd><div class="shots"><span class="shot" style="width:56px;height:56px"></span><span class="shot" style="width:56px;height:56px"></span></div></dd><span class="link">แก้ไข</span></div>
+    </dl>
+  </div>
+</template>
+
+<template id="t-photos-review">
+  <div class="content">
+    <div><p class="h">รูปภาพและตรวจสอบก่อนส่ง</p><p class="sub">แนบรูปอย่างน้อย 1 รูป เล่าเพิ่มได้ถ้าต้องการ แล้วตรวจข้อมูลก่อนกดส่ง</p></div>
+    <div class="split" style="grid-template-columns: minmax(0,1.15fr) minmax(0,1fr)">
+      <div class="content" style="gap:12px">
+        <p class="label" style="margin:0">รูปภาพ <em>*</em><small>สูงสุด 5 รูป</small></p>
+        <div class="drop"><span class="ic"><i data-lucide="image-plus"></i></span><div><b>ลากรูปมาวาง หรือคลิกเพื่อเลือก</b><div class="sub">JPG PNG HEIC ไม่เกิน 10 MB</div></div></div>
+        <div class="shots"><span class="shot"></span><span class="shot"></span><span class="shot add"><i data-lucide="plus"></i></span></div>
+        <div class="tips"><b style="color:var(--foreground)">ถ่ายให้เห็นปัญหาชัดเจน</b><span>มุมใกล้: ให้เห็นอาการ · มุมกว้าง: ให้เห็นตำแหน่ง</span></div>
+      </div>
+      <div class="content" style="gap:12px">
+        <p class="label" style="margin:0">เล่ารายละเอียดเพิ่ม <small>ไม่บังคับ</small></p>
+        <div class="input" style="height:92px;align-items:flex-start;padding-top:10px">เช่น เริ่มเป็นตั้งแต่เมื่อไร เป็นตลอดหรือเป็นๆ หายๆ</div>
+        <p class="label" style="margin:6px 0 0">ตรวจสอบก่อนส่ง</p>
+        <dl class="sum" style="margin:0">
+          <div style="grid-template-columns:84px 1fr auto"><dt>ปัญหา</dt><dd><b>ระบบปรับอากาศ</b><br>แอร์ไม่เย็น · น้ำหยด/รั่วซึม</dd><span class="link">แก้ไข</span></div>
+          <div style="grid-template-columns:84px 1fr auto"><dt>ความเร่งด่วน</dt><dd>สูง (จากอาการ)</dd><span></span></div>
+          <div style="grid-template-columns:84px 1fr auto"><dt>สถานที่</dt><dd>อาคารฝั่ง Office · ชั้น 5<br>ห้องประชุม 5B</dd><span class="link">แก้ไข</span></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+const OPTIONS = {
+  current: [
+    { key: "problem", label: "ปัญหาที่พบ" }, { key: "location", label: "สถานที่" },
+    { key: "photos", label: "รูปภาพ" }, { key: "review", label: "ตรวจสอบก่อนส่ง" },
+  ],
+  proposed: [
+    { key: "problem", label: "ปัญหาที่พบ", lean: true }, { key: "location", label: "สถานที่" },
+    { key: "photos-review", label: "รูปภาพและส่ง" },
+  ],
+};
+
+function buildFrame(steps, i) {
+  const s = steps[i], last = i === steps.length - 1;
+  const frame = document.createElement("div");
+  frame.className = "frame";
+  frame.innerHTML = `
+    <div class="top">
+      <div class="count"><span>ขั้นตอน ${i + 1} จาก ${steps.length}</span><span>${last ? "ขั้นสุดท้าย" : `เหลืออีก ${steps.length - i - 1} ขั้นตอน`}</span></div>
+      <div class="segs">${steps.map((x, j) => `<span class="${j < i ? "done" : j === i ? "on" : ""}">${x.label}</span>`).join("")}</div>
+    </div>
+    <div class="body"></div>
+    <div class="foot">
+      <button class="btn" type="button" ${i === 0 ? "disabled" : ""}>ย้อนกลับ</button>
+      <span class="note">ข้อมูลที่กรอกไว้จะอยู่เมื่อย้อนกลับ</span>
+      <button class="btn primary" type="button">${last ? "ยืนยันส่งแจ้งซ่อม" : "ถัดไป"}</button>
+    </div>`;
+  const content = document.getElementById("t-" + s.key).content.cloneNode(true);
+  if (s.lean) content.querySelector(".content > .link:last-child")?.remove(); // details move to the last step
+  frame.querySelector(".body").append(content);
+  return frame;
+}
+
+function render() {
+  for (const [name, steps] of Object.entries(OPTIONS)) {
+    const strip = document.querySelector(`[data-option="${name}"] .strip`);
+    strip.innerHTML = "";
+    const frames = steps.map((_, i) => buildFrame(steps, i));
+    frames.forEach((frame, i) => {
+      // a div, not a <button>: button layout rules change how the frame inside measures
+      const btn = document.createElement("div");
+      btn.className = "thumb"; btn.tabIndex = 0; btn.setAttribute("role", "button");
+      btn.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoom(frame); } });
+      btn.setAttribute("aria-label", `ดูขั้นที่ ${i + 1} ขนาดจริง`);
+      btn.innerHTML = `<div class="viewport"><div class="scaler"></div></div><div class="cap"><span>${i + 1}. ${steps[i].label}</span><span class="fill"></span></div>`;
+      btn.querySelector(".scaler").append(frame);
+      btn.addEventListener("click", () => zoom(frame));
+      strip.append(btn);
+    });
+    lucide.createIcons();
+    // equal height = tallest step; re-measured whenever a step's content changes size (late fonts / icons)
+    const measure = () => {
+      const natural = frames.map((f) => f.querySelector(".content").offsetHeight);
+      const bodyH = Math.max(...natural) + 40; // body padding 20 top + 20 bottom
+      frames.forEach((f, i) => {
+        const body = f.querySelector(".body");
+        body.style.height = bodyH + "px";
+        body.querySelector(".empty-zone")?.remove();
+        const used = (natural[i] + 40) / bodyH, gap = bodyH - natural[i] - 40;
+        if (gap > 24) {
+          const z = document.createElement("div");
+          z.className = "empty-zone"; z.style.height = gap + "px";
+          z.innerHTML = `<span>ว่าง ${Math.round((1 - used) * 100)}%</span>`;
+          body.append(z);
+        }
+        const cap = strip.children[i].querySelector(".fill");
+        cap.textContent = `ใช้พื้นที่ ${Math.round(used * 100)}%`;
+        cap.className = "fill " + (used < 0.75 ? "low" : "ok");
+      });
+      scale(strip);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    frames.forEach((f) => ro.observe(f.querySelector(".content")));
+  }
+}
+
+function scale(strip) {
+  for (const t of strip.children) {
+    const vp = t.querySelector(".viewport"), sc = t.querySelector(".scaler"), frame = sc.firstElementChild;
+    const k = vp.clientWidth / 880;
+    sc.style.transform = `scale(${k})`;
+    vp.style.height = frame.offsetHeight * k + "px";
+  }
+}
+
+function zoom(frame) {
+  const d = document.getElementById("zoom"), slot = d.querySelector(".slot");
+  slot.innerHTML = ""; slot.append(frame.cloneNode(true));
+  d.showModal();
+}
+
+// measure only after Anuphan is in use, otherwise the fallback font gives short heights
+Promise.all([document.fonts.load("400 15px Anuphan"), document.fonts.load("600 15px Anuphan"), document.fonts.load("700 19px Anuphan")])
+  .then(() => document.fonts.ready).then(render);
+addEventListener("resize", () => document.querySelectorAll(".strip").forEach(scale));
+</script>
+</body>
+</html>

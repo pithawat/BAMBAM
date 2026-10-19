@@ -3,6 +3,7 @@ package repair
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,7 @@ type pgFixture struct {
 	png      []byte
 	svc      *Service
 	cat      Category
+	other    Category // the "อื่น ๆ" category (CR-014)
 	building Building
 }
 
@@ -37,18 +39,18 @@ func newPgFixture(t *testing.T) *pgFixture {
 	}
 	t.Cleanup(pool.Close)
 	svc := NewService(NewRepository(pool), newMemStore())
-	if _, err := svc.EnsureSampleData(ctx); err != nil {
+	if err := svc.EnsureSampleData(ctx); err != nil {
 		t.Fatal(err)
 	}
 	cats, err := svc.Categories(ctx)
-	if err != nil || len(cats) == 0 {
+	if err != nil || len(cats) < 2 || !cats[len(cats)-1].IsOther {
 		t.Fatalf("categories: %v", err)
 	}
 	blds, err := svc.Buildings(ctx)
-	if err != nil || len(blds) == 0 || len(blds[0].Floors) == 0 {
+	if err != nil || len(blds) == 0 || len(blds[0].Floors) == 0 || len(blds[0].Floors[0].Rooms) == 0 {
 		t.Fatalf("buildings: %v", err)
 	}
-	return &pgFixture{pool: pool, png: pngBytes(t, 32, 32), svc: svc, cat: cats[0], building: blds[0]}
+	return &pgFixture{pool: pool, png: pngBytes(t, 32, 32), svc: svc, cat: cats[0], other: cats[len(cats)-1], building: blds[0]}
 }
 
 // user inserts a throwaway platform user; its tickets and photos are removed after the test.
@@ -81,7 +83,8 @@ func (p *pgFixture) create(v Viewer, location string) (TicketDetail, error) {
 	return p.createWith(v, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID}, LocationDetail: location})
 }
 
-// createWith fills the place and a fresh photo; the caller sets category, symptoms and location.
+// createWith fills the place (first room of the first floor unless set) and a fresh photo; the
+// caller sets category, symptoms and the extra spot.
 func (p *pgFixture) createWith(v Viewer, in CreateTicketInput) (TicketDetail, error) {
 	ctx := context.Background()
 	photo, err := p.svc.UploadPhoto(ctx, v, p.png)
@@ -90,6 +93,9 @@ func (p *pgFixture) createWith(v Viewer, in CreateTicketInput) (TicketDetail, er
 	}
 	floor := p.building.Floors[0]
 	in.BuildingID, in.FloorID, in.PhotoIDs = &p.building.ID, &floor.ID, []uuid.UUID{photo}
+	if in.RoomID == nil {
+		in.RoomID = &floor.Rooms[0].ID
+	}
 	return p.svc.CreateTicket(ctx, v, in)
 }
 
@@ -191,7 +197,7 @@ func TestPgListCountsAndVisibility(t *testing.T) {
 
 }
 
-// CR-008: priority comes from the symptoms, the category default or the "อื่นๆ" default.
+// CR-008 / CR-014: priority comes from the symptoms or the category default; "อื่น ๆ" is a DB category.
 func TestPgPriorityAndOther(t *testing.T) {
 	p := newPgFixture(t)
 	ctx := context.Background()
@@ -221,20 +227,136 @@ func TestPgPriorityAndOther(t *testing.T) {
 		t.Fatalf("typed symptom: %s/%s other=%v", typed.Priority, typed.PrioritySource, typed.SymptomOther)
 	}
 
-	other, err := p.createWith(reporter, CreateTicketInput{CategoryOther: "ลิฟต์", SymptomOther: "ค้างระหว่างชั้น"})
+	// AC2: อื่น ๆ + ใช้งานไม่ได้ + typed ลิฟต์ → category อื่น ๆ, categoryOther ลิฟต์, priority ปกติ.
+	other, err := p.createWith(reporter, CreateTicketInput{
+		CategoryID: &p.other.ID, SymptomIDs: []uuid.UUID{p.other.Symptoms[0].ID}, CategoryOther: "ลิฟต์", LocationDetail: "ฝั่งหน้าต่าง",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if other.Category != nil || other.CategoryOther == nil || *other.CategoryOther != "ลิฟต์" ||
-		other.Priority != PriorityMedium || other.PrioritySource != PrioritySourceDefault || len(other.Symptoms) != 0 {
-		t.Fatalf("typed category: %+v", other.TicketSummary)
+	if other.Category == nil || other.Category.ID != p.other.ID || other.CategoryOther == nil || *other.CategoryOther != "ลิฟต์" ||
+		other.Priority != PriorityMedium || len(other.Symptoms) != 1 || other.Room == nil {
+		t.Fatalf("อื่น ๆ category: %+v", other.TicketSummary)
 	}
-	if _, err := p.svc.Ticket(ctx, reporter, other.ID); err != nil {
-		t.Fatalf("open typed-category ticket: %v", err)
+	if _, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "x", CategoryOther: "ลิฟต์"}); code(err) != "VALIDATION_FAILED" {
+		t.Fatalf("typed name on a normal category: %v", err)
 	}
 
+	// #28: one room → one place, with the room and the newest extra spot.
 	places, err := p.svc.RecentPlaces(ctx, reporter)
-	if err != nil || len(places) != 1 || places[0].Building.ID != p.building.ID {
+	if err != nil || len(places) != 1 || places[0].Building.ID != p.building.ID || places[0].Room.ID != p.building.Floors[0].Rooms[0].ID ||
+		places[0].LocationDetail == nil || *places[0].LocationDetail != "ฝั่งหน้าต่าง" {
 		t.Fatalf("recent places: %+v err=%v", places, err)
+	}
+
+	// #6 q matches the room name.
+	q := escapeLike(p.building.Floors[0].Rooms[0].Name)
+	if _, total, err := p.svc.Tickets(ctx, reporter, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 20}); err != nil || total != 3 {
+		t.Fatalf("search by room: total=%d err=%v", total, err)
+	}
+}
+
+// CR-014 BR-F02-7: the room must be active and on the picked floor.
+func TestPgRoomRules(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	reporter := p.user(t, users.RoleEmployee)
+	if len(p.building.Floors) < 2 {
+		t.Skip("needs two floors")
+	}
+	wrong := p.building.Floors[1].Rooms[0].ID
+	if _, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "x", RoomID: &wrong}); code(err) != "MASTER_DATA_CHANGED" {
+		t.Fatalf("room of another floor: %v", err)
+	}
+
+	var inactive uuid.UUID
+	if err := p.pool.QueryRow(ctx,
+		`INSERT INTO platform.rooms (floor_id, name, area_type, is_active) VALUES ($1, $2, 'other', false) RETURNING id`,
+		p.building.Floors[0].ID, "ปิดใช้งาน-"+uuid.NewString()[:6]).Scan(&inactive); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = p.pool.Exec(context.Background(), `DELETE FROM platform.rooms WHERE id = $1`, inactive) })
+	if _, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "x", RoomID: &inactive}); code(err) != "MASTER_DATA_CHANGED" {
+		t.Fatalf("inactive room: %v", err)
+	}
+}
+
+// CR-014: #1 is the attachment's master (7 categories, อื่น ๆ last) and #2 lists rooms per floor with
+// one common area; re-running the master data part of the migration changes nothing.
+func TestPgMasterData(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+
+	check := func() {
+		cats, err := p.svc.Categories(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"ไฟฟ้าและแสงสว่าง", "ระบบปรับอากาศ", "ประปาและสุขาภิบาล", "ห้องประชุมและโสตทัศนูปกรณ์", "อาคารและพื้นที่ส่วนกลาง", "ลานจอด / ไม้กั้น", "อื่น ๆ"}
+		symptoms := 0
+		if len(cats) != len(want) {
+			t.Fatalf("got %d categories, want %d", len(cats), len(want))
+		}
+		for i, c := range cats {
+			symptoms += len(c.Symptoms)
+			if c.Name != want[i] || c.IsOther != (i == 6) {
+				t.Fatalf("category %d = %s other=%v", i, c.Name, c.IsOther)
+			}
+			for _, s := range c.Symptoms {
+				if strings.HasPrefix(s.Name, "อื่นๆ") {
+					t.Fatalf("%s has an อื่นๆ symptom row", c.Name)
+				}
+			}
+		}
+		if symptoms != 38 || len(cats[5].AreaTypes) != 1 || cats[5].AreaTypes[0] != AreaParking || len(cats[6].AreaTypes) != 0 {
+			t.Fatalf("symptoms=%d parking areas=%v other areas=%v", symptoms, cats[5].AreaTypes, cats[6].AreaTypes)
+		}
+	}
+	check()
+
+	up, err := os.ReadFile(filepath.Join("..", "..", "..", "db", "migrations", "20261019000001_repair_cr014.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(up)
+	start, end := strings.Index(body, "-- ---- master data"), strings.Index(body, "-- +goose Down")
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var before, after int
+	countSQL := `SELECT (SELECT count(*) FROM repair.categories) + (SELECT count(*) FROM repair.symptoms) + (SELECT count(*) FROM platform.rooms)`
+	if err := tx.QueryRow(ctx, countSQL).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, body[start:end]); err != nil {
+		t.Fatalf("re-run master data: %v", err)
+	}
+	if err := tx.QueryRow(ctx, countSQL).Scan(&after); err != nil || before != after {
+		t.Fatalf("re-run added rows: %d → %d (%v)", before, after, err)
+	}
+
+	blds, err := p.svc.Buildings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parking := false
+	for _, b := range blds {
+		for _, f := range b.Floors {
+			common := 0
+			for _, rm := range f.Rooms {
+				if rm.AreaType == AreaCommon {
+					common++
+				}
+				parking = parking || rm.AreaType == AreaParking
+			}
+			if len(f.Rooms) == 0 || (b.Name != "พื้นที่ภายนอกอาคาร" && common != 1) {
+				t.Fatalf("%s ชั้น %s: rooms=%d common=%d", b.Name, f.Name, len(f.Rooms), common)
+			}
+		}
+	}
+	if !parking {
+		t.Fatal("no parking room")
 	}
 }

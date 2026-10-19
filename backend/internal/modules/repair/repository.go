@@ -40,13 +40,24 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 	if err != nil {
 		return nil, err
 	}
+	areas, err := r.q.ListCategoryAreaTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
 	byCat := map[uuid.UUID][]Symptom{}
 	for _, s := range syms {
 		byCat[s.CategoryID] = append(byCat[s.CategoryID], Symptom{ID: s.ID, Name: s.Name, Priority: s.Priority})
 	}
+	areasBy := map[uuid.UUID][]string{}
+	for _, a := range areas {
+		areasBy[a.CategoryID] = append(areasBy[a.CategoryID], a.AreaType)
+	}
 	out := make([]Category, 0, len(cats))
 	for _, c := range cats {
-		out = append(out, Category{ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, Symptoms: nonNil(byCat[c.ID])})
+		out = append(out, Category{
+			ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, IsOther: c.IsOther,
+			AreaTypes: nonNil(areasBy[c.ID]), Symptoms: nonNil(byCat[c.ID]),
+		})
 	}
 	return out, nil
 }
@@ -60,9 +71,21 @@ func (r *PgRepository) ListBuildings(ctx context.Context) ([]Building, error) {
 	if err != nil {
 		return nil, err
 	}
+	rooms, err := r.q.ListActiveRooms(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byFloor := map[uuid.UUID][]Room{}
+	for _, rm := range rooms {
+		byFloor[rm.FloorID] = append(byFloor[rm.FloorID], Room{ID: rm.ID, Name: rm.Name, AreaType: rm.AreaType})
+	}
 	byBld := map[uuid.UUID][]Floor{}
 	for _, f := range floors {
-		byBld[f.BuildingID] = append(byBld[f.BuildingID], Floor{ID: f.ID, Name: f.Name, Level: f.Level})
+		// CR-014: a floor without an active room cannot be reported on, so it is not offered.
+		if len(byFloor[f.ID]) == 0 {
+			continue
+		}
+		byBld[f.BuildingID] = append(byBld[f.BuildingID], Floor{ID: f.ID, Name: f.Name, Level: f.Level, Rooms: byFloor[f.ID]})
 	}
 	out := make([]Building, 0, len(blds))
 	for _, b := range blds {
@@ -71,30 +94,23 @@ func (r *PgRepository) ListBuildings(ctx context.Context) ([]Building, error) {
 	return out, nil
 }
 
-func (r *PgRepository) CountCategories(ctx context.Context) (int64, error) {
-	return r.q.CountCategories(ctx)
-}
-
-func (r *PgRepository) InsertMasterData(ctx context.Context, cats []Category, buildings []Building) error {
+func (r *PgRepository) InsertSampleLocations(ctx context.Context, buildings []Building) error {
 	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := repairdb.New(tx)
-		for i, c := range cats {
-			if err := q.InsertCategory(ctx, repairdb.InsertCategoryParams{ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: priorityOr(c.DefaultPriority), SortOrder: int32(i)}); err != nil { // #nosec G115 -- small list
-				return err
-			}
-			for j, s := range c.Symptoms {
-				if err := q.InsertSymptom(ctx, repairdb.InsertSymptomParams{ID: s.ID, CategoryID: c.ID, Name: s.Name, Priority: priorityOr(s.Priority), SortOrder: int32(j)}); err != nil { // #nosec G115 -- small list
-					return err
-				}
-			}
-		}
 		for i, b := range buildings {
-			if err := q.InsertBuilding(ctx, repairdb.InsertBuildingParams{ID: b.ID, Name: b.Name, SortOrder: int32(i)}); err != nil { // #nosec G115 -- small list
+			if err := q.InsertSampleBuilding(ctx, repairdb.InsertSampleBuildingParams{ID: b.ID, Name: b.Name, SortOrder: int32(i)}); err != nil { // #nosec G115 -- small list
 				return err
 			}
 			for _, f := range b.Floors {
-				if err := q.InsertFloor(ctx, repairdb.InsertFloorParams{ID: f.ID, BuildingID: b.ID, Name: f.Name, Level: f.Level}); err != nil {
+				if err := q.InsertSampleFloor(ctx, repairdb.InsertSampleFloorParams{ID: f.ID, BuildingID: b.ID, Name: f.Name, Level: f.Level}); err != nil {
 					return err
+				}
+				for k, rm := range f.Rooms {
+					if err := q.InsertSampleRoom(ctx, repairdb.InsertSampleRoomParams{
+						ID: rm.ID, FloorID: f.ID, Name: rm.Name, AreaType: rm.AreaType, SortOrder: roomSortOrder(rm, k),
+					}); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -102,23 +118,17 @@ func (r *PgRepository) InsertMasterData(ctx context.Context, cats []Category, bu
 	})
 }
 
-func (r *PgRepository) RefreshSampleData(ctx context.Context, cats []Category, renames []SampleRename) error {
+// roomSortOrder keeps the common area last, as the migration does (sort order 1000).
+func roomSortOrder(rm Room, i int) int32 {
+	if rm.AreaType == AreaCommon {
+		return 1000
+	}
+	return int32(i + 1) // #nosec G115 -- small list
+}
+
+func (r *PgRepository) RefreshSampleData(ctx context.Context, renames []SampleRename) error {
 	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := repairdb.New(tx)
-		for _, c := range cats {
-			if c.DefaultPriority != "" && c.DefaultPriority != PriorityMedium {
-				if err := q.SetSampleCategoryDefault(ctx, repairdb.SetSampleCategoryDefaultParams{ID: c.ID, DefaultPriority: c.DefaultPriority}); err != nil {
-					return err
-				}
-			}
-			for _, s := range c.Symptoms {
-				if s.Priority != "" && s.Priority != PriorityMedium {
-					if err := q.SetSampleSymptomPriority(ctx, repairdb.SetSampleSymptomPriorityParams{ID: s.ID, Priority: s.Priority}); err != nil {
-						return err
-					}
-				}
-			}
-		}
 		for _, rn := range renames {
 			if err := q.RenameSampleBuilding(ctx, repairdb.RenameSampleBuildingParams{ID: rn.ID, OldName: rn.From, NewName: rn.To}); err != nil {
 				return err
@@ -135,20 +145,16 @@ func (r *PgRepository) ListRecentPlaces(ctx context.Context, reporterID uuid.UUI
 	}
 	out := make([]RecentPlace, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, RecentPlace{
+		p := RecentPlace{
 			Building: Ref{ID: row.BuildingID, Name: row.BuildingName}, Floor: Ref{ID: row.FloorID, Name: row.FloorName},
-			LocationDetail: row.LocationDetail, LastReportedAt: row.LastReportedAt,
-		})
+			Room: Ref{Name: row.RoomName}, LocationDetail: row.LocationDetail, LastReportedAt: row.LastReportedAt,
+		}
+		if row.RoomID != nil {
+			p.Room.ID = *row.RoomID
+		}
+		out = append(out, p)
 	}
 	return out, nil
-}
-
-// priorityOr keeps inserts valid when a sample row has no priority.
-func priorityOr(p string) string {
-	if priorityRank(p) < 0 {
-		return PriorityMedium
-	}
-	return p
 }
 
 // ---- photos ----
@@ -214,6 +220,7 @@ func (r *PgRepository) GetTicket(ctx context.Context, id, viewerID uuid.UUID) (T
 			Category:       ref(row.CategoryID, row.CategoryName), CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
+			Room:             ref(row.RoomID, row.RoomName),
 			LocationDetail:   row.LocationDetail,
 			Reporter:         Person{ID: row.ReporterID, Name: row.ReporterName, Department: row.ReporterDepartment},
 			Technician:       person(row.HolderID, row.HolderName, row.HolderDepartment),
@@ -336,6 +343,7 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 			Symptoms:         nonNil(symsBy[row.ID]),
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
+			Room:             ref(row.RoomID, row.RoomName),
 			LocationDetail:   row.LocationDetail,
 			Reporter:         Person{ID: row.ReporterID, Name: row.ReporterName, Department: row.ReporterDepartment},
 			Technician:       person(row.HolderID, row.HolderName, row.HolderDepartment),
@@ -538,12 +546,12 @@ type pgTxRepository struct {
 	q *repairdb.Queries
 }
 
-func (r *pgTxRepository) LockActiveCategory(ctx context.Context, id uuid.UUID) (string, bool, error) {
-	def, err := r.q.LockActiveCategory(ctx, id)
+func (r *pgTxRepository) LockActiveCategory(ctx context.Context, id uuid.UUID) (ActiveCategory, bool, error) {
+	row, err := r.q.LockActiveCategory(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", false, nil
+		return ActiveCategory{}, false, nil
 	}
-	return def, err == nil, err
+	return ActiveCategory{DefaultPriority: row.DefaultPriority, IsOther: row.IsOther}, err == nil, err
 }
 
 func (r *pgTxRepository) ActiveSymptomPriorities(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error) {
@@ -552,6 +560,10 @@ func (r *pgTxRepository) ActiveSymptomPriorities(ctx context.Context, categoryID
 
 func (r *pgTxRepository) ActiveFloorInBuilding(ctx context.Context, floorID, buildingID uuid.UUID) (bool, error) {
 	return r.q.ActiveFloorInBuilding(ctx, repairdb.ActiveFloorInBuildingParams{FloorID: floorID, BuildingID: buildingID})
+}
+
+func (r *pgTxRepository) ActiveRoomOnFloor(ctx context.Context, roomID, floorID uuid.UUID) (bool, error) {
+	return r.q.ActiveRoomOnFloor(ctx, repairdb.ActiveRoomOnFloorParams{RoomID: roomID, FloorID: floorID})
 }
 
 func (r *pgTxRepository) LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error) {
@@ -574,8 +586,8 @@ func (r *pgTxRepository) NextTicketCounter(ctx context.Context, year int) (int64
 func (r *pgTxRepository) InsertTicket(ctx context.Context, t NewTicket) error {
 	if err := r.q.InsertTicket(ctx, repairdb.InsertTicketParams{
 		ID: t.ID, TicketNo: t.TicketNo, Priority: t.Priority, PrioritySource: t.PrioritySource,
-		CategoryID: t.CategoryID, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther, BuildingID: t.BuildingID,
-		FloorID: t.FloorID, LocationDetail: t.LocationDetail, Details: t.Details, AssetCode: t.AssetCode,
+		CategoryID: &t.CategoryID, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther, BuildingID: t.BuildingID,
+		FloorID: t.FloorID, RoomID: &t.RoomID, LocationDetail: t.LocationDetail, Details: t.Details, AssetCode: t.AssetCode,
 		ReporterID: t.ReporterID,
 	}); err != nil {
 		return err

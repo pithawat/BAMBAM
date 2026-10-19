@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — API contract
 
-Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16
+Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16 · CR-014 applied 2026-10-19
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Single source for backend DTOs and frontend types.ts.
      Conventions (envelope, errors, dates, pagination): docs/shared/architecture.md
@@ -22,8 +22,8 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | P1 | GET | `/api/v1/me` | current user, role (platform) | all | 0 |
 | P2 | GET | `/api/v1/dev/demo-users` | demo user per role for the role switcher (platform, dev/UAT only) | all | 0 |
 | P3 | POST | `/api/v1/dev/role-switch` | switch session to a demo user (platform, dev/UAT only) | all | 0 |
-| 1 | GET | `/api/v1/repair/categories` | categories with symptoms + priorities (S03, CR-008) | all | 1 |
-| 2 | GET | `/api/v1/repair/buildings` | buildings with floors (S03, S09, S11, S12) | all | 1 |
+| 1 | GET | `/api/v1/repair/categories` | categories with symptoms + priorities (S03, CR-008) + `isOther`, `areaTypes` (CR-014) | all | 1 (CR-014: 2M) |
+| 2 | GET | `/api/v1/repair/buildings` | buildings with floors (S03, S09, S11, S12) + rooms per floor (CR-014) | all | 1 (CR-014: 2M) |
 | 3 | POST | `/api/v1/repair/photos` | upload one photo (S03, S08, S10, S04) | all | 1 |
 | 4 | GET | `/api/v1/repair/photos/{id}` | photo file (`?size=thumb\|full`) | all (who can see the ticket / the uploader) | 1 |
 | 5 | POST | `/api/v1/repair/tickets` | create ticket → `in_progress`, waiting for assessment (CR-005); priority set by the system (CR-008) | all (team handled: leads) | 1 (team: 4) |
@@ -43,7 +43,7 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | 19 | GET | `/api/v1/repair/contractors/{id}/jobs` | job history with scores (S18) | technician, admin, executive | 2 |
 | 20 | PATCH | `/api/v1/repair/tickets/{id}/priority` | change priority | admin | 3 |
 | 21 | POST | `/api/v1/repair/tickets/{id}/close` | admin closes any open ticket | admin | 3 |
-| 22 | GET | `/api/v1/repair/tickets/duplicates` | open tickets on the same floor + category (S04) | all | 4 |
+| 22 | GET | `/api/v1/repair/tickets/duplicates` | open tickets on the same floor + category + room (S04, CR-014) | all | 4 |
 | 23 | POST | `/api/v1/repair/tickets/{id}/follow` | follow an existing case with note + photos | all | 4 |
 | 24 | POST | `/api/v1/repair/tickets/{id}/handover` | team-handled ticket → back to the technician (`in_progress`, CR-005) | lead who recorded it, admin | 4 |
 | 25 | GET | `/api/v1/repair/assets/{code}` | asset lookup for QR / manual code | all | 5 |
@@ -53,7 +53,7 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | P6 | POST | `/api/v1/notifications/{id}/read` | mark one read (platform) | all | 6 |
 | P7 | POST | `/api/v1/notifications/read-all` | mark all read (platform) | all | 6 |
 | 27 | GET | `/api/v1/repair/admin/overview` | S27 ภาพรวมองค์กร: KPIs, floors with open counts + highest priority, rooms, attention list, 7-day trend (CR-008; shape fixed in Stage 7) | admin, executive | 7 |
-| 28 | GET | `/api/v1/repair/me/recent-places` | the caller's last 3 distinct places (building · floor · location detail) for "ที่เคยแจ้ง" (S03, CR-008) | all | 2R |
+| 28 | GET | `/api/v1/repair/me/recent-places` | the caller's last 3 distinct places (building · floor · room · location detail) for "ที่เคยแจ้ง" (S03, CR-008, CR-014) | all | 2R (CR-014: 2M) |
 
 S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,resolved`).
 
@@ -94,7 +94,8 @@ S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,res
   "prioritySource": "symptom",
   "building": { "id": "b1…", "name": "อาคารหลัก" },
   "floor": { "id": "f5…", "name": "5" },
-  "locationDetail": "ห้องประชุม 5B",
+  "room": { "id": "r5b…", "name": "ห้องประชุม 5B" },
+  "locationDetail": "ฝั่งหน้าต่าง",
   "thumbUrl": "/api/v1/repair/photos/c7e4…?size=thumb",
   "reporter": { "id": "a3d9…", "name": "วรรณา สุขประเสริฐ", "department": "ฝ่ายบัญชี" },
   "technician": { "id": "d2e8…", "name": "ธนากร พึ่งบุญ", "department": "ฝ่ายอาคารสถานที่" },
@@ -120,6 +121,8 @@ S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,res
 - `priority`: `critical` · `high` · `medium` · `low`.
 - `prioritySource` (CR-008): `symptom` (highest priority of the picked symptoms) · `category` (only "อื่นๆ" symptom → the category's default) · `default` (category "อื่นๆ" → `medium`) · `admin` (changed by #20) · `reporter` (tickets created before CR-008).
 - `category` is `null` and `categoryOther` holds the typed category when the reporter picked "อื่นๆ" (CR-008); `symptomOther` = the typed symptom (with or without listed symptoms). Titles join the symptom names, then `symptomOther`.
+- (CR-014) New tickets always have `category`; `categoryOther` is the optional typed name under the `isOther` category (shown as `อื่น ๆ · {categoryOther}`). `category: null` remains only on tickets created before CR-014.
+- (CR-014) `room`: the picked room (`Ref`); `null` only on tickets created before CR-014. `locationDetail` is now the optional extra spot (`บอกจุดเพิ่มเติม`). Location line: `{building} ชั้น {floor} · {room}` (+ ` · {locationDetail}` when set); old tickets keep `ชั้น {floor} · {locationDetail}`.
 - `viewerRelation`: `reporter` · `subscriber` · `technician` (any technician, CR-005) · `none` (admin / executive viewing).
 - `floor.name` is the display name of the floor ("5"); the FE renders `{building} ชั้น {floor}`.
 - `technician`: who assessed / resolved it (`null` before the assessment).
@@ -198,20 +201,23 @@ Request `{ "role": "technician" }` → 200 `{ "data": <P1 me> }` and a new sessi
 ```json
 { "data": [
   { "id": "6f1c2a90-…", "name": "ระบบปรับอากาศ", "icon": "snowflake",
-    "defaultPriority": "medium",
+    "defaultPriority": "medium", "isOther": false, "areaTypes": ["meeting_room", "office"],
     "symptoms": [ { "id": "11a0…", "name": "แอร์ไม่เย็น", "priority": "medium" }, { "id": "11a1…", "name": "มีน้ำหยด", "priority": "high" }, { "id": "11a2…", "name": "มีเสียงดัง", "priority": "medium" } ] }
 ] }
 ```
 `icon` = lucide icon name (FE falls back to `wrench`). Only active categories/symptoms. `defaultPriority` and symptom `priority` (CR-008) are set by the admin in settings S22; the FE shows them next to each symptom and explains the resulting priority.
+(CR-014) `isOther`: exactly one category (`อื่น ๆ`) is `true`; only it accepts `categoryOther` in #5; listed last. `areaTypes`: room area types where this category's problems usually happen — S03 lists matching rooms first (a hint, never a filter). Area types: `meeting_room` · `restroom` · `office` · `pantry` · `common_area` · `parking` · `other`. The master is loaded from `attachments/REPAIR-CATEGORY-SYMPTOM-MASTER.md` by migration; the list items `อื่นๆ` / `อื่นๆ โปรดระบุ` are not symptom rows (they are `symptomOther`).
 
 ### 2. GET /api/v1/repair/buildings
 ```json
 { "data": [
-  { "id": "b1…", "name": "อาคารหลัก", "floors": [ { "id": "f1…", "name": "1", "level": 1 }, { "id": "f5…", "name": "5", "level": 5 } ] },
+  { "id": "b1…", "name": "อาคารหลัก", "floors": [ { "id": "f1…", "name": "1", "level": 1, "rooms": [] },
+    { "id": "f5…", "name": "5", "level": 5, "rooms": [ { "id": "r5b…", "name": "ห้องประชุม 5B", "areaType": "meeting_room" }, { "id": "r5c…", "name": "พื้นที่ส่วนกลางชั้น 5", "areaType": "common_area" } ] } ] },
   { "id": "b2…", "name": "อาคารด้านหลัง", "floors": [ { "id": "f8…", "name": "1", "level": 1 }, { "id": "f9…", "name": "2", "level": 2 } ] }
 ] }
 ```
 Floors ordered by `level` (bottom first). S12 builds the model from this list.
+(CR-014) `rooms`: active rooms of the floor (`platform.rooms`), ordered by `sort_order`; every floor has a `common_area` room `พื้นที่ส่วนกลางชั้น {floor}`. A floor with no active room is not offered in S03.
 
 ### 3. POST /api/v1/repair/photos
 `multipart/form-data`, field `file`. Image types only (`image/jpeg`, `image/png`, `image/webp`, `image/heic`); max 10 MB (D-022). The FE resizes before upload (long edge 1920px, JPEG).
@@ -233,7 +239,8 @@ Request (normal):
   "symptomIds": ["11a0…", "11a1…"],
   "buildingId": "b1…",
   "floorId": "f5…",
-  "locationDetail": "ห้องประชุม 5B ฝั่งหน้าต่าง",
+  "roomId": "r5b…",
+  "locationDetail": "ฝั่งหน้าต่าง",
   "details": "น้ำหยดใส่โต๊ะประชุม เริ่มตั้งแต่เช้า",
   "categoryOther": null,
   "symptomOther": null,
@@ -246,12 +253,14 @@ Team handled (Stage 5, leads only, BR-F04-1/2): `"teamHandled": { "note": "เ�
 
 Rules (CR-008): **no `priority` in the request** — the server sets it (highest symptom priority → category default when only `symptomOther` → `medium` for category "อื่นๆ") and stores `prioritySource`. Required: `categoryId` **or** `categoryOther` (1–100, then `symptomIds` must be empty and `symptomOther` is required); with `categoryId`: ≥ 1 symptom of that category **or** `symptomOther` (1–100); building, floor of that building, 1–5 photos. A `priority` field sent by an old client is ignored. `locationDetail` ≤ 100, `details` ≤ 500, `teamHandled.note` ≤ 500 and 1–5 photos. Ticket number per BR-F02-4/5. New ticket goes after same-priority tickets in its category queue (BR-F02-3, BR-F22-2). The duplicate check is a separate call (#22) made by the FE before this one.
 
+(CR-014) Replaces the category part of the rules above: `categoryId` is **always required** (an active category); `categoryOther` (optional, 1–100) is allowed only with the `isOther` category; ≥ 1 symptom of that category **or** `symptomOther` for every category, including `อื่น ๆ`. **`roomId` required**: an active room of `floorId`, else `MASTER_DATA_CHANGED`. `locationDetail` (optional ≤ 100) is the extra spot. Priority: highest symptom priority → the category default when only `symptomOther` (`อื่น ๆ` default `medium`).
+
 Response 201 `{ "data": <TicketDetail> }`.
 
 | Status | code | When | Thai message |
 |---|---|---|---|
-| 400 | `VALIDATION_FAILED` | fields: `categoryId` REQUIRED (no `categoryOther` either) · `categoryOther` TOO_LONG · `symptomIds` MIN_ITEMS (no `symptomOther` either) · `symptomOther` REQUIRED (category "อื่นๆ") / TOO_LONG · `buildingId` REQUIRED · `floorId` REQUIRED · `locationDetail` TOO_LONG · `photoIds` MIN_ITEMS/MAX_ITEMS · `details` TOO_LONG · `teamHandled.note` REQUIRED/TOO_LONG · `teamHandled.photoIds` MIN_ITEMS (CR-008) | per field, S03 Validation |
-| 422 | `MASTER_DATA_CHANGED` | category/symptom/floor inactive or mismatched | ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่ |
+| 400 | `VALIDATION_FAILED` | fields: `categoryId` REQUIRED (no `categoryOther` either) · `categoryOther` TOO_LONG · `symptomIds` MIN_ITEMS (no `symptomOther` either) · `symptomOther` REQUIRED (category "อื่นๆ") / TOO_LONG · `buildingId` REQUIRED · `floorId` REQUIRED · `roomId` REQUIRED (CR-014) · `categoryOther` NOT_ALLOWED (not the `isOther` category, CR-014) · `locationDetail` TOO_LONG · `photoIds` MIN_ITEMS/MAX_ITEMS · `details` TOO_LONG · `teamHandled.note` REQUIRED/TOO_LONG · `teamHandled.photoIds` MIN_ITEMS (CR-008) | per field, S03 Validation |
+| 422 | `MASTER_DATA_CHANGED` | category/symptom/floor/room (CR-014) inactive or mismatched | ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่ |
 | 422 | `PHOTO_NOT_FOUND` | a photo id is unknown, expired or not the caller's | มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น |
 | 409 | `DUPLICATE_FOUND` | an open ticket matches (BR-F03-1, CR-009, Stage 4); `details.tickets` = the matches | S03 blocking dialog: ติดตามเคสเดิม / ยกเลิกการแจ้ง |
 | 409 | `OWN_TICKET_AWAITING_RATING` | the match is the caller's own ticket waiting for ประเมินตรวจงาน (BR-F03-4, CR-009, Stage 4); `details.ticketId` | คุณแจ้งเรื่องนี้ไว้แล้ว ช่างซ่อมเสร็จแล้ว ไปประเมินตรวจงานที่งานเดิม |
@@ -290,7 +299,7 @@ Response `{ "data": <TicketDetail> }`. Who can see it: reporter, subscribers, th
 ---
 
 ### 28. GET /api/v1/repair/me/recent-places (CR-008, Stage 2R)
-The caller's own reported tickets, newest first, distinct by building + floor + location detail, max 3; only active buildings / floors.
+The caller's own reported tickets, newest first, distinct by building + floor + location detail, max 3; only active buildings / floors. (CR-014) Distinct by building + floor + room; each item adds `"room": { "id", "name" }`; tickets without a room or with an inactive room are skipped.
 ```json
 { "data": [ { "building": { "id": "b1…", "name": "อาคารฝั่ง Office" }, "floor": { "id": "f5…", "name": "5" }, "locationDetail": "ห้องประชุม 5B", "lastReportedAt": "2026-10-14T01:40:00Z" } ] }
 ```
@@ -392,8 +401,8 @@ Request `{ "reason": "ส่งเรื่องเปลี่ยนเคร�
 
 ## Stage 4 — duplicates, follow, team handled, hand over
 
-### 22. GET /api/v1/repair/tickets/duplicates?categoryId=&floorId=&locationDetail=
-Open tickets (`in_progress`, `resolved`) with the same category, floor and room / spot (BR-F03-1, CR-009: trimmed case-insensitive text; an empty spot on either side matches), newest first.
+### 22. GET /api/v1/repair/tickets/duplicates?categoryId=&floorId=&roomId= (CR-014: `roomId` replaces `locationDetail`)
+Open tickets (`in_progress`, `resolved`) with the same category, floor and room / spot (BR-F03-1, CR-009: trimmed case-insensitive text; an empty spot on either side matches), newest first. (CR-014) Match by `roomId`; old tickets without a room match on the same floor only when their `locationDetail` equals the room name (trimmed, case-insensitive).
 ```json
 { "data": [ <TicketSummary + "subscriberCount": 2> ] }
 ```
@@ -426,6 +435,7 @@ Request `{ "reason": "ทีมเช็ดแล้วแต่ยังมี�
   "floor": { "id": "f5…", "name": "5" }, "locationDetail": "ห้องประชุม 5B" } }
 ```
 404 `ASSET_NOT_FOUND` → S03 "ไม่พบอุปกรณ์นี้" / S16 "ไม่พบอุปกรณ์รหัสนี้". Code is matched case-insensitively.
+(CR-014) Assets belong to a room: the response adds `"room": { "id", "name" }` and S03 prefills it; `locationDetail` becomes the optional extra spot. Shape fixed in Stage 5.
 
 **QR content (D-024):** `{FRONTEND_URL}/repair/new?asset={code}`. S16 accepts a QR whose origin equals the current origin and whose path is `/repair/new` with `asset`.
 

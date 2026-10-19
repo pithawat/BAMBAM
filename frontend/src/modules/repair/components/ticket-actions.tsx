@@ -17,7 +17,7 @@ import type { Contractor, TicketDetail, WorkBy } from "../types";
 import { ContractorFormDialog } from "./contractors";
 import { PhotoPicker, type PhotoItem } from "./photo-picker";
 import { RESOLVED_TOAST, ResolveFields } from "./resolve-form";
-import { addDays, dayLabel, RATING_LABELS, shortDate, ticketTitle, todayBangkok } from "./ticket-presentation";
+import { addDays, dayLabel, RATING_LABELS, shortDate, ticketLocation, ticketTitle, todayBangkok } from "./ticket-presentation";
 
 // S07 dialogs (CR-005, CR-008, wording CR-009). The server decides the actions (`allowedActions`); the S07
 // next-action card opens these: technician → เริ่มดำเนินการ / เลื่อนวันเสร็จ (S17), บันทึกผลซ่อม (S10 sheet)
@@ -207,7 +207,7 @@ function ConfirmDialog({ ticket, open, initial, onOpenChange, onDone, onSendBack
     catch (err) { setErrors(handleError(err, () => onOpenChange(false))); }
     finally { setBusy(false); }
   }
-  const place = [ticket.locationDetail || ticket.building.name, `ชั้น ${ticket.floor.name}`].join(" · ");
+  const place = ticketLocation(ticket);
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className={cn(sheetLike, "sm:max-w-120")}>
       <form onSubmit={submit} noValidate>

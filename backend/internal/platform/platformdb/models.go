@@ -22,6 +22,17 @@ type PlatformAuditLog struct {
 	UpdatedAt   time.Time
 }
 
+type PlatformRoom struct {
+	ID        uuid.UUID
+	FloorID   uuid.UUID
+	Name      string
+	AreaType  string
+	SortOrder int32
+	IsActive  bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type PlatformSession struct {
 	ID           uuid.UUID
 	TokenHash    []byte
@@ -75,6 +86,12 @@ type RepairCategory struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DefaultPriority string
+	IsOther         bool
+}
+
+type RepairCategoryAreaType struct {
+	CategoryID uuid.UUID
+	AreaType   string
 }
 
 type RepairContractor struct {
@@ -186,6 +203,7 @@ type RepairTicket struct {
 	CategoryOther           *string
 	SymptomOther            *string
 	PrioritySource          string
+	RoomID                  *uuid.UUID
 }
 
 type RepairTicketCounter struct {

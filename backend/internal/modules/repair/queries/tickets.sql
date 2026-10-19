@@ -6,11 +6,11 @@
 -- name: InsertTicket :exec
 INSERT INTO repair.tickets (
     id, ticket_no, status, priority, priority_source, category_id, category_other, symptom_other,
-    building_id, floor_id, location_detail, details, asset_code, reporter_id
+    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id
 ) VALUES (
     @id, @ticket_no, 'in_progress', @priority, @priority_source, sqlc.narg('category_id')::uuid,
     sqlc.narg('category_other')::text, sqlc.narg('symptom_other')::text,
-    @building_id, @floor_id, @location_detail, @details, @asset_code, @reporter_id
+    @building_id, @floor_id, @room_id, @location_detail, @details, @asset_code, @reporter_id
 );
 
 -- name: InsertTicketSymptoms :exec
@@ -28,6 +28,7 @@ SELECT
     t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
+    t.room_id, rm.name AS room_name,
     t.location_detail, t.details, t.asset_code,
     t.reporter_id, rp.name AS reporter_name, rp.department AS reporter_department,
     t.holder_id, hp.name AS holder_name, hp.department AS holder_department,
@@ -43,6 +44,7 @@ FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.people rb ON rb.id = t.resolved_by_id
@@ -56,6 +58,7 @@ SELECT
     t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
+    t.room_id, rm.name AS room_name,
     t.location_detail,
     t.reporter_id, rp.name AS reporter_name, rp.department AS reporter_department,
     t.holder_id, hp.name AS holder_name, hp.department AS holder_department,
@@ -68,6 +71,7 @@ FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
@@ -84,7 +88,8 @@ WHERE (@scope_all::boolean OR (
         ELSE 'in_repair' END) = ANY(@steps::text[]))
   AND (sqlc.narg('closed_reason')::text IS NULL OR t.closed_reason = sqlc.narg('closed_reason')::text)
   AND (sqlc.narg('q')::text IS NULL OR t.ticket_no ILIKE '%' || sqlc.narg('q')::text || '%'
-       OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%')
+       OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%'
+       OR rm.name ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (sqlc.narg('created_from')::timestamptz IS NULL OR t.created_at >= sqlc.narg('created_from')::timestamptz)
   AND (sqlc.narg('created_to')::timestamptz IS NULL OR t.created_at <= sqlc.narg('created_to')::timestamptz)
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id')::uuid)
@@ -106,6 +111,7 @@ LIMIT @page_limit OFFSET @page_offset;
 
 -- name: CountTickets :one
 SELECT count(*) FROM repair.tickets t
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 WHERE (@scope_all::boolean OR (
         (@relation::text IN ('all', 'reported') AND t.reporter_id = @viewer_id)
      OR (@relation::text IN ('all', 'following') AND EXISTS (
@@ -119,7 +125,8 @@ WHERE (@scope_all::boolean OR (
         ELSE 'in_repair' END) = ANY(@steps::text[]))
   AND (sqlc.narg('closed_reason')::text IS NULL OR t.closed_reason = sqlc.narg('closed_reason')::text)
   AND (sqlc.narg('q')::text IS NULL OR t.ticket_no ILIKE '%' || sqlc.narg('q')::text || '%'
-       OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%')
+       OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%'
+       OR rm.name ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (sqlc.narg('created_from')::timestamptz IS NULL OR t.created_at >= sqlc.narg('created_from')::timestamptz)
   AND (sqlc.narg('created_to')::timestamptz IS NULL OR t.created_at <= sqlc.narg('created_to')::timestamptz)
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id')::uuid)
@@ -136,13 +143,15 @@ SELECT
     count(*) FILTER (WHERE t.status = 'in_progress' AND t.expected_done_on IS NOT NULL) AS in_repair_count,
     count(*) FILTER (WHERE t.status = 'resolved' AND t.reporter_id = @viewer_id) AS awaiting_my_confirmation_count
 FROM repair.tickets t
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 WHERE (@scope_all::boolean OR (
         (@relation::text IN ('all', 'reported') AND t.reporter_id = @viewer_id)
      OR (@relation::text IN ('all', 'following') AND EXISTS (
             SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = @viewer_id))))
   AND (sqlc.narg('closed_reason')::text IS NULL OR t.closed_reason = sqlc.narg('closed_reason')::text)
   AND (sqlc.narg('q')::text IS NULL OR t.ticket_no ILIKE '%' || sqlc.narg('q')::text || '%'
-       OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%')
+       OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%'
+       OR rm.name ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (sqlc.narg('created_from')::timestamptz IS NULL OR t.created_at >= sqlc.narg('created_from')::timestamptz)
   AND (sqlc.narg('created_to')::timestamptz IS NULL OR t.created_at <= sqlc.narg('created_to')::timestamptz)
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id')::uuid)
@@ -226,17 +235,20 @@ INSERT INTO repair.ticket_events (ticket_id, type, created_at)
 SELECT unnest(@ticket_ids::uuid[]), 'auto_closed', @now;
 
 -- name: ListRecentPlaces :many
--- "ที่เคยแจ้ง" (#28, CR-008): the reporter's last 3 distinct places on active buildings / floors.
-SELECT p.building_id, p.building_name, p.floor_id, p.floor_name, p.location_detail, p.last_reported_at
+-- "ที่เคยแจ้ง" (#28, CR-008, CR-014): the reporter's last 3 distinct rooms on active buildings / floors / rooms;
+-- each keeps the extra spot of its newest ticket. Tickets without a room (before CR-014) are skipped.
+SELECT p.building_id, p.building_name, p.floor_id, p.floor_name, p.room_id, p.room_name,
+       p.location_detail, p.last_reported_at
 FROM (
-    SELECT DISTINCT ON (t.building_id, t.floor_id, COALESCE(t.location_detail, ''))
+    SELECT DISTINCT ON (t.building_id, t.floor_id, t.room_id)
         t.building_id, b.name AS building_name, t.floor_id, f.name AS floor_name,
-        t.location_detail, t.created_at AS last_reported_at
+        t.room_id, rm.name AS room_name, t.location_detail, t.created_at AS last_reported_at
     FROM repair.tickets t
     JOIN repair.buildings b ON b.id = t.building_id AND b.is_active
     JOIN repair.floors f ON f.id = t.floor_id AND f.is_active
+    JOIN platform.rooms rm ON rm.id = t.room_id AND rm.is_active AND rm.floor_id = t.floor_id
     WHERE t.reporter_id = @reporter_id
-    ORDER BY t.building_id, t.floor_id, COALESCE(t.location_detail, ''), t.created_at DESC
+    ORDER BY t.building_id, t.floor_id, t.room_id, t.created_at DESC
 ) p
 ORDER BY p.last_reported_at DESC
 LIMIT 3;

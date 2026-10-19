@@ -115,7 +115,9 @@ type Category struct {
 	ID              uuid.UUID
 	Name            string
 	Icon            string
-	DefaultPriority string // used when only "อาการอื่นๆ" is picked (CR-008)
+	DefaultPriority string   // used when only "อาการอื่นๆ" is picked (CR-008)
+	IsOther         bool     // the one "อื่น ๆ" category; only it takes a typed category name (CR-014)
+	AreaTypes       []string // room area types where its problems usually happen (CR-014)
 	Symptoms        []Symptom
 }
 
@@ -130,6 +132,25 @@ type Floor struct {
 	ID    uuid.UUID
 	Name  string
 	Level int32
+	Rooms []Room
+}
+
+// Room areas (CR-014, platform.rooms.area_type).
+const (
+	AreaMeetingRoom = "meeting_room"
+	AreaRestroom    = "restroom"
+	AreaOffice      = "office"
+	AreaPantry      = "pantry"
+	AreaCommon      = "common_area"
+	AreaParking     = "parking"
+	AreaOther       = "other"
+)
+
+// Room is a place on a floor the reporter picks (CR-014).
+type Room struct {
+	ID       uuid.UUID
+	Name     string
+	AreaType string
 }
 
 type Building struct {
@@ -152,13 +173,14 @@ type TicketSummary struct {
 	ClosedReason     *string
 	Priority         string
 	PrioritySource   string
-	Category         *Ref    // nil when the reporter typed "อื่นๆ" (CR-008)
-	CategoryOther    *string // typed category
+	Category         *Ref    // nil only on tickets from CR-008 to CR-014 where the reporter typed "อื่นๆ"
+	CategoryOther    *string // typed category name (under the "อื่น ๆ" category since CR-014)
 	Symptoms         []Ref
 	SymptomOther     *string // typed symptom
 	Building         Ref
 	Floor            Ref
-	LocationDetail   *string
+	Room             *Ref    // nil on tickets created before CR-014
+	LocationDetail   *string // the optional extra spot since CR-014
 	ThumbPhotoID     *uuid.UUID
 	Reporter         Person
 	Technician       *Person
@@ -236,9 +258,10 @@ type CreateTicketInput struct {
 	SymptomIDs     []uuid.UUID
 	BuildingID     *uuid.UUID
 	FloorID        *uuid.UUID
+	RoomID         *uuid.UUID // CR-014: required, an active room of FloorID
 	LocationDetail string
 	Details        string
-	CategoryOther  string // CR-008: typed category ("อื่นๆ"), then CategoryID is nil
+	CategoryOther  string // CR-014: optional typed name, only under the "อื่น ๆ" category
 	SymptomOther   string // CR-008: typed symptom
 	PhotoIDs       []uuid.UUID
 	AssetCode      string
@@ -324,11 +347,12 @@ type NewTicket struct {
 	TicketNo       string
 	Priority       string
 	PrioritySource string
-	CategoryID     *uuid.UUID
+	CategoryID     uuid.UUID
 	CategoryOther  *string
 	SymptomOther   *string
 	BuildingID     uuid.UUID
 	FloorID        uuid.UUID
+	RoomID         uuid.UUID
 	LocationDetail *string
 	Details        *string
 	AssetCode      *string
@@ -337,6 +361,12 @@ type NewTicket struct {
 	PhotoIDs       []uuid.UUID
 	CreatedAt      time.Time
 	CreatedEventID uuid.UUID
+}
+
+// ActiveCategory is what ticket creation reads from a locked, active category.
+type ActiveCategory struct {
+	DefaultPriority string
+	IsOther         bool
 }
 
 // LockedTicket is the row state read under FOR UPDATE before a status change.
@@ -417,10 +447,11 @@ const (
 	PrioritySourceReporter = "reporter" // tickets created before CR-008
 )
 
-// RecentPlace is one "ที่เคยแจ้ง" shortcut (#28, CR-008).
+// RecentPlace is one "ที่เคยแจ้ง" shortcut (#28, CR-008, CR-014).
 type RecentPlace struct {
 	Building       Ref
 	Floor          Ref
+	Room           Ref
 	LocationDetail *string
 	LastReportedAt time.Time
 }

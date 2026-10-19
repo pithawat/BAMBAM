@@ -18,7 +18,7 @@ import type { Photo, TicketDetail, TicketStep } from "../types";
 import { PhotoLightbox } from "./photo-gallery";
 import { useTicketActions } from "./ticket-actions";
 import { ticketReturnHref } from "./ticket-navigation";
-import { categoryName, dateTime, dayLabel, PRIORITY_LABELS, RATING_LABELS, shortDate, STEP, stepLabel, ticketTitle, timeOf, workByText } from "./ticket-presentation";
+import { categoryName, dateTime, dayLabel, placeLine, PRIORITY_LABELS, RATING_LABELS, shortDate, STEP, stepLabel, ticketTitle, timeOf, workByText } from "./ticket-presentation";
 import { storyViewer, ticketStory, type Stage, type Story, type StoryViewer } from "./ticket-story";
 import { TicketFailure, TicketSkeleton } from "./ticket-ui";
 import { usePriorityReason } from "./use-priority-reason";
@@ -296,7 +296,7 @@ function JobInfo({ ticket, viewer, story }: { ticket: TicketDetail; viewer: Stor
       <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><MapPin className="size-5" /></span>
       <div className="min-w-0">
         <h3 className="text-xl leading-7 font-medium wrap-break-word">{ticket.building.name}</h3>
-        <p className="text-sm leading-5.5 text-muted-foreground wrap-break-word">{[`ชั้น ${ticket.floor.name}`, ticket.locationDetail].filter(Boolean).join(" · ")}</p>
+        <p className="text-sm leading-5.5 text-muted-foreground wrap-break-word">{placeLine(ticket)}</p>
       </div>
     </div>
     <dl className="border-t px-4 sm:px-6">
