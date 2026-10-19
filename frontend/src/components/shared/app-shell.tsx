@@ -1,19 +1,15 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-import { AppSidebar } from "./app-sidebar";
-import { BOTTOM_NAV_PATHS, BottomNav } from "./bottom-nav";
+import { AppNavbar } from "./app-navbar";
 import { MeProvider, useMe } from "./me-provider";
-import { RoleSwitchToast } from "./role-switcher";
+import { RoleSwitcher, RoleSwitchToast } from "./role-switcher";
 import { ErrorState } from "./states";
 
 /**
- * App shell for every (app) route (_common.md §1, D-008 adaptive):
- * desktop (≥ lg) = 256px sidebar + content max 1280px; mobile = content max 560px + bottom nav.
+ * App shell for every (app) route (_common.md §1, CR-010): role switcher strip (dev/UAT only) · top navbar ·
+ * content (phone / tablet max 560px, desktop max 1280px). No sidebar and no bottom nav.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -26,8 +22,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function ShellFrame({ children }: { children: ReactNode }) {
   const state = useMe();
-  const pathname = usePathname();
-  const showBottomNav = BOTTOM_NAV_PATHS.includes(pathname);
 
   if (state.status === "loading") return <ShellSkeleton />;
   if (state.status === "error") {
@@ -39,34 +33,41 @@ function ShellFrame({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SidebarProvider className="min-h-svh bg-background">
-      <div className="sticky top-0 hidden h-svh lg:block">
-        <AppSidebar me={state.me} />
-      </div>
-      <main className={cn("min-w-0 flex-1 lg:px-8 lg:pt-4.5 lg:pb-7", showBottomNav && "pb-28")}>
-        <div className="mx-auto w-full max-w-140 lg:max-w-7xl">{children}</div>
+    <div className="min-h-svh bg-background">
+      <RoleSwitcher />
+      <AppNavbar me={state.me} />
+      <main className="min-w-0 pb-6 lg:px-8 lg:pt-5 lg:pb-8 print:p-0">
+        <div className="mx-auto w-full max-w-140 lg:max-w-7xl print:max-w-none">{children}</div>
       </main>
-      {showBottomNav && <BottomNav />}
-    </SidebarProvider>
+    </div>
   );
 }
 
 function ShellSkeleton() {
   return (
-    <div className="flex min-h-svh" aria-busy="true" aria-label="กำลังโหลด">
-      <div className="hidden w-64 flex-col gap-3 bg-card p-5 lg:flex">
-        <Skeleton className="h-7 w-32" />
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-11 w-full rounded-sm" />
-        ))}
-      </div>
-      <div className="mx-auto w-full max-w-140 flex-1 lg:max-w-7xl lg:px-8 lg:pt-5">
-        <Skeleton className="h-40 w-full rounded-none rounded-b-[34px] lg:h-11 lg:w-60 lg:rounded-full" />
-        <div className="space-y-3 px-4 pt-4 lg:px-0">
-          <Skeleton className="h-28 w-full rounded-xl" />
-          <Skeleton className="h-20 w-full rounded-xl" />
-          <Skeleton className="h-20 w-full rounded-xl" />
+    <div className="min-h-svh" aria-busy="true" aria-label="กำลังโหลด">
+      <div className="lg:mt-3 lg:px-8">
+        <div className="mx-auto border-b bg-card lg:max-w-7xl lg:rounded-2xl lg:border">
+          <div className="flex h-15 items-center gap-3 px-4 lg:h-19 lg:px-5">
+            <Skeleton className="h-7 w-24" />
+            <div className="hidden flex-1 gap-2 lg:flex">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-28 rounded-lg" />
+              ))}
+            </div>
+            <Skeleton className="ml-auto size-10 rounded-full" />
+          </div>
+          <div className="grid h-12 grid-cols-3 gap-3 border-t px-4 py-3 lg:hidden">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-full" />
+            ))}
+          </div>
         </div>
+      </div>
+      <div className="mx-auto w-full max-w-140 space-y-3 px-4 pt-5 lg:max-w-7xl lg:px-8">
+        <Skeleton className="h-10 w-60" />
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="h-20 w-full rounded-xl" />
       </div>
     </div>
   );

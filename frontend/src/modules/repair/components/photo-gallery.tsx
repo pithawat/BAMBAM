@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- Authenticated API paths and mock blob URLs require plain images (HANDOFF). */
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -26,10 +26,4 @@ export function PhotoLightbox({ photos, index, onIndexChange }: { photos: Photo[
       {photos.length > 1 && <div className="flex justify-center gap-6 pb-4"><Button variant="glass" size="icon" onClick={() => move(-1)} aria-label="รูปก่อนหน้า"><ChevronLeft /></Button><Button variant="glass" size="icon" onClick={() => move(1)} aria-label="รูปถัดไป"><ChevronRight /></Button></div>}
     </DialogContent>
   </Dialog>;
-}
-
-export function PhotoGallery({ photos, label = "รูปภาพ" }: { photos: Photo[]; label?: string }) {
-  const [index, setIndex] = useState<number | null>(null);
-  if (!photos.length) return null;
-  return <><div className="flex flex-wrap gap-2" aria-label={label}>{photos.map((photo, i) => <button key={photo.id} type="button" className="size-22 overflow-hidden rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" onClick={() => setIndex(i)} aria-label={`${label} ${i + 1} เปิดรูปเต็ม`}><img src={photo.thumbUrl} alt={`${label} ${i + 1}`} className="size-full object-cover" /></button>)}</div><PhotoLightbox photos={photos} index={index} onIndexChange={setIndex} /></>;
 }

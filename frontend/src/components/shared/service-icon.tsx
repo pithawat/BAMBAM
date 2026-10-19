@@ -17,7 +17,7 @@ type ServiceIconProps = {
   className?: string;
 };
 
-/** 52px soft 3D circle in the service color with a white lucide icon (design-system.md). */
+/** 52px rounded square in a soft tint of the service colour (design-system.md, CR-008: no 3D). */
 export function ServiceIcon({ service, disabled, size = "md", className }: ServiceIconProps) {
   const { icon: Icon, color } = SERVICES[service];
   return (
@@ -25,7 +25,7 @@ export function ServiceIcon({ service, disabled, size = "md", className }: Servi
       aria-hidden="true"
       style={{ "--c": color } as CSSProperties}
       className={cn(
-        "ic3d grid shrink-0 place-items-center rounded-full text-white",
+        "ic3d grid shrink-0 place-items-center rounded-xl",
         size === "md" ? "size-13" : "size-10",
         disabled && "opacity-70 saturate-25",
         className,

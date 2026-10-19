@@ -1,6 +1,6 @@
 # ตั้งค่าระบบ (Superadmin) — Build plan
 
-Status: DRAFT
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
 <!-- Written by Claude in /stage-plan settings (2026-10-16). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).

@@ -72,10 +72,10 @@ SELECT EXISTS (SELECT 1 FROM repair.contractors WHERE id = @id AND is_active);
 
 -- name: ListContractorJobs :many
 -- Tickets done by the contractor, newest first (S18 history).
-SELECT t.id, t.ticket_no, t.status, t.category_id, c.name AS category_name,
+SELECT t.id, t.ticket_no, t.status, t.category_id, COALESCE(c.name, t.category_other, '')::text AS category_name,
        t.resolved_at, t.contractor_rating, t.contractor_rating_comment, t.rating
 FROM repair.tickets t
-JOIN repair.categories c ON c.id = t.category_id
+LEFT JOIN repair.categories c ON c.id = t.category_id
 WHERE t.contractor_id = @contractor_id
 ORDER BY t.resolved_at DESC NULLS LAST, t.id
 LIMIT @page_limit OFFSET @page_offset;

@@ -1,5 +1,6 @@
 import { ApiError } from "@/lib/http";
 import { mockMeByRole } from "@/lib/platform/mocks";
+import { ticketPriority } from "./priority";
 import type { Role } from "@/lib/platform/types";
 import type {
   Building,
@@ -7,6 +8,8 @@ import type {
   Photo,
   PersonRef,
   Priority,
+  PrioritySource,
+  RecentPlace,
   Ref,
   TicketCounts,
   TicketCountsQuery,
@@ -94,24 +97,27 @@ const symId = (c: number, s: number) => `11a00000-0000-4000-8000-0000000${c}0${s
 const bldId = (n: number) => `b1000000-0000-4000-8000-00000000000${n}`;
 const floorId = (b: number, level: number) => `f1000000-0000-4000-8000-0000000${b}0${level.toString().padStart(3, "0")}`;
 
-const categoryData: [string, string, string[]][] = [
-  ["ระบบปรับอากาศ", "snowflake", ["แอร์ไม่เย็น", "มีน้ำหยด", "มีเสียงดัง", "มีกลิ่นอับ", "เปิดไม่ติด"]],
-  ["ไฟฟ้าและแสงสว่าง", "lightbulb", ["ไฟไม่ติด", "ไฟกะพริบ", "ปลั๊กไม่มีไฟ", "เบรกเกอร์ตัด"]],
-  ["ประปาและสุขภัณฑ์", "droplets", ["น้ำรั่ว", "ท่อตัน", "ชักโครกกดไม่ลง", "น้ำไม่ไหล"]],
-  ["อาคารและเฟอร์นิเจอร์", "armchair", ["ประตูปิดไม่สนิท", "กระเบื้องแตก", "เก้าอี้ชำรุด", "ฝ้าเพดานรั่ว"]],
-  ["ความสะอาด", "sparkles", ["พื้นเปียก", "ขยะล้น", "มีกลิ่นไม่พึงประสงค์"]],
+// Priorities and category defaults: _common.md CR-008 sample (set by the admin in settings S22 later).
+const categoryData: [string, string, Priority, [string, Priority][]][] = [
+  ["ระบบปรับอากาศ", "snowflake", "medium", [["แอร์ไม่เย็น", "medium"], ["มีน้ำหยด", "high"], ["มีเสียงดัง", "medium"], ["มีกลิ่นอับ", "low"], ["เปิดไม่ติด", "high"]]],
+  ["ไฟฟ้าและแสงสว่าง", "lightbulb", "high", [["ไฟไม่ติด", "medium"], ["ไฟกะพริบ", "low"], ["ปลั๊กไม่มีไฟ", "medium"], ["เบรกเกอร์ตัด", "critical"]]],
+  ["ประปาและสุขภัณฑ์", "droplets", "medium", [["น้ำรั่ว", "high"], ["ท่อตัน", "medium"], ["ชักโครกกดไม่ลง", "medium"], ["น้ำไม่ไหล", "high"]]],
+  ["อาคารและเฟอร์นิเจอร์", "armchair", "low", [["ประตูปิดไม่สนิท", "low"], ["กระเบื้องแตก", "medium"], ["เก้าอี้ชำรุด", "low"], ["ฝ้าเพดานรั่ว", "high"]]],
+  ["ความสะอาด", "sparkles", "medium", [["พื้นเปียก", "high"], ["ขยะล้น", "medium"], ["มีกลิ่นไม่พึงประสงค์", "low"]]],
 ];
 
-export const mockCategories: Category[] = categoryData.map(([name, icon, symptoms], i) => ({
+export const mockCategories: Category[] = categoryData.map(([name, icon, defaultPriority, symptoms], i) => ({
   id: catId(i + 1),
   name,
   icon,
-  symptoms: symptoms.map((s, j) => ({ id: symId(i + 1, j + 1), name: s })),
+  defaultPriority,
+  symptoms: symptoms.map(([s, priority], j) => ({ id: symId(i + 1, j + 1), name: s, priority })),
 }));
 
+// CR-008 names: อาคารหลัก → อาคารฝั่ง Office, อาคารด้านหลัง → อาคาร Office โรงงานบางซ่อน (ids unchanged).
 export const mockBuildings: Building[] = [
-  { name: "อาคารหลัก", floors: 7 },
-  { name: "อาคารด้านหลัง", floors: 2 },
+  { name: "อาคารฝั่ง Office", floors: 7 },
+  { name: "อาคาร Office โรงงานบางซ่อน", floors: 2 },
 ].map((b, i) => ({
   id: bldId(i + 1),
   name: b.name,
@@ -119,7 +125,10 @@ export const mockBuildings: Building[] = [
 }));
 
 const cat = (n: number): Ref => ({ id: mockCategories[n - 1].id, name: mockCategories[n - 1].name });
-const sym = (c: number, ...s: number[]): Ref[] => s.map((n) => mockCategories[c - 1].symptoms[n - 1]);
+const sym = (c: number, ...s: number[]): Ref[] => s.map((n) => {
+  const { id, name } = mockCategories[c - 1].symptoms[n - 1];
+  return { id, name };
+});
 const bld = (n: number): Ref => ({ id: mockBuildings[n - 1].id, name: mockBuildings[n - 1].name });
 const flr = (b: number, level: number): Ref => {
   const f = mockBuildings[b - 1].floors[level - 1];
@@ -177,8 +186,12 @@ type Seed = {
   n: number;
   status: TicketStatus;
   priority: Priority;
+  prioritySource?: PrioritySource;
+  /** 0 = typed category ("อื่นๆ") → `categoryOther`. */
   category: number;
+  categoryOther?: string;
   symptoms: number[];
+  symptomOther?: string;
   building: number;
   floor: number;
   location?: string;
@@ -196,6 +209,8 @@ type Seed = {
   rating?: number;
   ratingComment?: string;
   sendBackCount?: number;
+  /** A later `assessment_changed` (CR-008 reason) that moves the date by `days`. */
+  dateChange?: { ago: number; days: number; reason: string };
   extraEvents?: TimelineEvent[];
   ticketNo?: string;
   contractor?: { id: string; name: string; types: string[]; rating?: number };
@@ -229,7 +244,10 @@ function ev(type: TimelineEvent["type"], actor: PersonRef | null, at: string, ex
 function build(s: Seed): TicketDetail {
   const createdAt = ago(s.createdAgo);
   const assessedAt = s.assessedAgo !== undefined ? ago(s.assessedAgo) : null;
-  const expectedDoneOn = assessedAt ? new Date(new Date(assessedAt).getTime() + 2 * DAY).toISOString().slice(0, 10) : null;
+  const firstDoneOn = assessedAt ? new Date(new Date(assessedAt).getTime() + 2 * DAY).toISOString().slice(0, 10) : null;
+  const expectedDoneOn = firstDoneOn && s.dateChange
+    ? new Date(new Date(firstDoneOn).getTime() + s.dateChange.days * DAY).toISOString().slice(0, 10)
+    : firstDoneOn;
   const resolvedAt = s.resolvedAgo !== undefined ? ago(s.resolvedAgo) : null;
   const closedAt = s.closedAgo !== undefined ? ago(s.closedAgo) : null;
 
@@ -241,7 +259,13 @@ function build(s: Seed): TicketDetail {
       }),
     );
   }
-  if (assessedAt && s.technician) timeline.push(ev("assessed", s.technician, assessedAt, { data: { expectedDoneOn: expectedDoneOn! } }));
+  const workBy = s.contractor ? "contractor" : "in_house";
+  if (assessedAt && s.technician) timeline.push(ev("assessed", s.technician, assessedAt, { data: { expectedDoneOn: firstDoneOn!, workBy } }));
+  if (assessedAt && s.technician && s.dateChange) {
+    timeline.push(ev("assessment_changed", s.technician, ago(s.dateChange.ago), {
+      data: { expectedDoneOn: expectedDoneOn!, workBy, reason: s.dateChange.reason },
+    }));
+  }
   timeline.push(...(s.extraEvents ?? []));
   if (resolvedAt && s.technician) {
     timeline.push(ev("resolved", s.technician, resolvedAt, { note: s.result?.note ?? null, photos: s.result?.photos ?? [], data: { workBy: s.contractor ? "contractor" : "in_house" } }));
@@ -270,8 +294,11 @@ function build(s: Seed): TicketDetail {
     step: stepOf(s.status, !!assessedAt, s.sendBackCount ?? 0),
     closedReason: s.closedReason ?? null,
     priority: s.priority,
-    category: cat(s.category),
-    symptoms: sym(s.category, ...s.symptoms),
+    prioritySource: s.prioritySource ?? (s.categoryOther ? "default" : "symptom"),
+    category: s.category ? cat(s.category) : null,
+    categoryOther: s.categoryOther ?? null,
+    symptoms: s.category ? sym(s.category, ...s.symptoms) : [],
+    symptomOther: s.symptomOther ?? null,
     building: bld(s.building),
     floor: flr(s.building, s.floor),
     locationDetail: s.location ?? null,
@@ -281,7 +308,7 @@ function build(s: Seed): TicketDetail {
     viewerRelation: "none",
     awaitingMyConfirmation: false,
     expectedDoneOn,
-    workBy: resolvedAt ? (s.contractor ? "contractor" : "in_house") : null,
+    workBy: assessedAt ? workBy : null,
     contractor: s.contractor ? { id: s.contractor.id, name: s.contractor.name } : null,
     contractorTypes: s.contractor?.types ?? [],
     autoCloseAt: s.status === "resolved" && s.resolvedAgo !== undefined ? later(3 * DAY - s.resolvedAgo) : null,
@@ -323,9 +350,10 @@ const seeds: Seed[] = [
     photos: [mockPhoto(HUE.ac, "แอร์ห้อง 5B"), mockPhoto(HUE.ac, "น้ำหยดบนโต๊ะ")],
   },
   {
-    n: 149, status: "in_progress", priority: "medium", category: 2, symptoms: [2], building: 1, floor: 3,
+    n: 149, status: "in_progress", priority: "low", category: 2, symptoms: [2], building: 1, floor: 3,
     location: "ทางเดินหน้าลิฟต์", reporter: P.wanna, technician: P.thanakorn,
-    createdAgo: 3 * HOUR, assessedAgo: 40 * 60 * 1000, photos: [mockPhoto(HUE.electric, "ไฟทางเดิน")],
+    createdAgo: DAY + 3 * HOUR, assessedAgo: DAY, dateChange: { ago: 2 * HOUR, days: 1, reason: "รออะไหล่บัลลาสต์" },
+    photos: [mockPhoto(HUE.electric, "ไฟทางเดิน")],
   },
   {
     n: 148, status: "resolved", priority: "high", category: 3, symptoms: [1], building: 1, floor: 2,
@@ -341,14 +369,19 @@ const seeds: Seed[] = [
     reporter: P.kittipat, subscribers: [P.wanna], createdAgo: 2 * HOUR, photos: [mockPhoto(HUE.electric, "ตู้ไฟชั้น 6")],
   },
   {
-    n: 146, status: "resolved", priority: "medium", category: 4, symptoms: [4], building: 1, floor: 4,
+    n: 146, status: "resolved", priority: "high", category: 4, symptoms: [4], building: 1, floor: 4,
     location: "ฝ่ายจัดซื้อ โซน B", reporter: P.kittipat, subscribers: [P.wanna], technician: P.anucha,
     createdAgo: 2 * DAY, assessedAgo: DAY + 6 * HOUR, resolvedAgo: 5 * HOUR,
     photos: [mockPhoto(HUE.building, "ฝ้าเพดาน")],
     result: { note: "อุดรอยรั่วรอบท่อแอร์บนฝ้า เปลี่ยนแผ่นฝ้า 2 แผ่น", photos: [mockPhoto(HUE.result, "ฝ้าใหม่")] },
   },
   {
-    n: 145, status: "in_progress", priority: "low", category: 2, symptoms: [1], building: 2, floor: 1,
+    n: 143, status: "in_progress", priority: "medium", category: 0, categoryOther: "ลิฟต์", symptoms: [],
+    symptomOther: "ลิฟต์ตัวซ้ายค้างระหว่างชั้น 2 กับ 3", building: 1, floor: 2, location: "โถงลิฟต์",
+    reporter: P.wanna, createdAgo: 4 * HOUR, photos: [mockPhoto(HUE.building, "ลิฟต์ตัวซ้าย")],
+  },
+  {
+    n: 145, status: "in_progress", priority: "medium", category: 2, symptoms: [1], building: 2, floor: 1,
     location: "ห้องเก็บเอกสาร", reporter: P.wanna, technician: P.suriya,
     createdAgo: DAY + 2 * HOUR, assessedAgo: 20 * HOUR, photos: [mockPhoto(HUE.electric, "หลอดไฟห้องเอกสาร")],
   },
@@ -361,7 +394,7 @@ const seeds: Seed[] = [
     result: { note: "ล้างท่อน้ำทิ้ง เอาเศษอาหารที่อุดตันออก", photos: [mockPhoto(HUE.result, "ท่อหลังล้าง")] },
   },
   {
-    n: 142, status: "closed", closedReason: "auto_closed", priority: "low", category: 1, symptoms: [3], building: 1, floor: 5,
+    n: 142, status: "closed", closedReason: "auto_closed", priority: "low", prioritySource: "reporter", category: 1, symptoms: [3], building: 1, floor: 5,
     location: "ฝ่ายบัญชี", reporter: P.wanna, technician: P.thanakorn,
     createdAgo: 9 * DAY, assessedAgo: 8 * DAY, resolvedAgo: 8 * DAY - 3 * HOUR, closedAgo: 5 * DAY,
     photos: [mockPhoto(HUE.ac, "แอร์ฝ่ายบัญชี")],
@@ -378,7 +411,7 @@ const seeds: Seed[] = [
     photos: [mockPhoto(HUE.building, "เก้าอี้ขาหัก")],
   },
   {
-    n: 138, status: "closed", closedReason: "confirmed", priority: "high", category: 1, symptoms: [1], building: 1, floor: 3,
+    n: 138, status: "closed", closedReason: "confirmed", priority: "high", prioritySource: "reporter", category: 1, symptoms: [1], building: 1, floor: 3,
     location: "ห้องประชุมใหญ่", reporter: P.wanna, technician: P.thanakorn, sendBackCount: 1,
     createdAgo: 22 * DAY, assessedAgo: 22 * DAY - 2 * HOUR, resolvedAgo: 20 * DAY, closedAgo: 20 * DAY - 4 * HOUR, rating: 4,
     photos: [mockPhoto(HUE.ac, "แอร์ห้องประชุมใหญ่")],
@@ -392,7 +425,7 @@ const seeds: Seed[] = [
     ],
   },
   {
-    n: 135, status: "closed", closedReason: "team_handled", priority: "medium", category: 5, symptoms: [1], building: 1, floor: 1,
+    n: 135, status: "closed", closedReason: "team_handled", priority: "medium", prioritySource: "reporter", category: 5, symptoms: [1], building: 1, floor: 1,
     location: "ล็อบบี้ หน้าลิฟต์", reporter: P.malee, createdAgo: 25 * DAY, closedAgo: 25 * DAY,
     photos: [mockPhoto(HUE.clean, "พื้นล็อบบี้")],
   },
@@ -462,7 +495,20 @@ export function mockTicketDetail(id: string, v: Viewer): TicketDetail {
   const t = store.tickets.find((x) => x.id === id);
   if (!t) throw mockErrors.notFound();
   if (!canView(t, v)) throw mockErrors.forbidden();
-  return decorate(t, v);
+  return withActions(decorate(t, v), v);
+}
+
+/** Same rule as the backend `allowedActions` (rules.go), so S07 shows the right buttons in mock mode. */
+function withActions(t: TicketDetail, v: Viewer): TicketDetail {
+  const allowedActions: TicketDetail["allowedActions"] = [];
+  const blockedActions: TicketDetail["blockedActions"] = {};
+  if (t.status === "in_progress" && v.role === "technician") {
+    allowedActions.push("assess");
+    if (t.expectedDoneOn && t.workBy) allowedActions.push("resolve");
+    else blockedActions.resolve = "ASSESSMENT_REQUIRED";
+  }
+  if (t.status === "resolved" && t.reporter.id === v.id) allowedActions.push("confirm", "send_back");
+  return { ...t, allowedActions, blockedActions };
 }
 
 function matches(t: TicketSummary, q: TicketCountsQuery, v: Viewer): boolean {
@@ -481,7 +527,7 @@ function matches(t: TicketSummary, q: TicketCountsQuery, v: Viewer): boolean {
   }
   if (q.createdFrom && t.createdAt < new Date(q.createdFrom).toISOString()) return false;
   if (q.createdTo && t.createdAt > new Date(q.createdTo).toISOString()) return false;
-  if (q.categoryId && t.category.id !== q.categoryId) return false;
+  if (q.categoryId && t.category?.id !== q.categoryId) return false;
   if (q.buildingId && t.building.id !== q.buildingId) return false;
   if (q.floorId && t.floor.id !== q.floorId) return false;
   if (q.priority && t.priority !== q.priority) return false;
@@ -525,26 +571,43 @@ export function mockRememberPhoto(p: Photo) {
   store.photos.set(p.id, p);
 }
 
+/** #28: the viewer's last 3 distinct places (building · floor · location), newest first. */
+export function mockRecentPlaces(v: Viewer): RecentPlace[] {
+  const seen = new Set<string>();
+  const out: RecentPlace[] = [];
+  for (const t of [...store.tickets].sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
+    if (t.reporter.id !== v.id) continue;
+    const key = `${t.building.id}|${t.floor.id}|${t.locationDetail ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ building: t.building, floor: t.floor, locationDetail: t.locationDetail, lastReportedAt: t.createdAt });
+    if (out.length === 3) break;
+  }
+  return out;
+}
+
 /** Adds a ticket the way the backend would (`in_progress` awaiting assessment, next number, `created` event). */
 export function mockCreateTicket(
   req: {
-    categoryId: string;
+    categoryId?: string;
+    categoryOther?: string;
     symptomIds: string[];
+    symptomOther?: string;
     buildingId: string;
     floorId: string;
     locationDetail?: string;
     details?: string;
-    priority: Priority;
     photoIds: string[];
   },
   reporter: PersonRef,
   v: Viewer,
 ): TicketDetail {
-  const category = mockCategories.find((c) => c.id === req.categoryId);
+  const category = req.categoryId ? mockCategories.find((c) => c.id === req.categoryId) : undefined;
   const building = mockBuildings.find((b) => b.id === req.buildingId);
   const floor = building?.floors.find((f) => f.id === req.floorId);
-  const symptoms = (category?.symptoms ?? []).filter((s) => req.symptomIds.includes(s.id));
-  if (!category || !building || !floor || symptoms.length !== req.symptomIds.length) throw mockErrors.masterChanged();
+  const symptoms = (category?.symptoms ?? []).filter((s) => req.symptomIds.includes(s.id)).map(({ id, name }) => ({ id, name }));
+  if ((req.categoryId && !category) || !building || !floor || symptoms.length !== req.symptomIds.length) throw mockErrors.masterChanged();
+  const { priority, source } = ticketPriority(category, req.symptomIds, !category);
   const photos = req.photoIds.map((id) => store.photos.get(id));
   if (photos.some((p) => !p)) throw new ApiError(422, "PHOTO_NOT_FOUND", "mock: photo not uploaded in this session");
 
@@ -556,9 +619,12 @@ export function mockCreateTicket(
     status: "in_progress",
     step: "awaiting_assessment",
     closedReason: null,
-    priority: req.priority,
-    category: { id: category.id, name: category.name },
+    priority,
+    prioritySource: source,
+    category: category ? { id: category.id, name: category.name } : null,
+    categoryOther: category ? null : req.categoryOther?.trim() || null,
     symptoms,
+    symptomOther: req.symptomOther?.trim() || null,
     building: { id: building.id, name: building.name },
     floor: { id: floor.id, name: floor.name },
     locationDetail: req.locationDetail?.trim() || null,
@@ -591,5 +657,5 @@ export function mockCreateTicket(
   };
   store.tickets.unshift(detail);
   store.subscribers.set(detail.id, []);
-  return decorate(detail, v);
+  return withActions(decorate(detail, v), v);
 }

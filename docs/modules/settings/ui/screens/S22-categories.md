@@ -1,6 +1,6 @@
 # S22 — หมวดงานและอาการ
 
-Status: DRAFT
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
 - **Flows:** F27 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop (see ../../01-users.md)
@@ -8,6 +8,8 @@ Status: DRAFT
 - **Route:** `/settings/categories` (desktop: first category selected) · `/settings/categories/[categoryId]` (mobile: the symptom list page)
 - **Mockup:** none — same two-pane pattern as `../mockups/S20-buildings.html` (left = categories, right = symptoms)
 - **Data:** `listCategories`, `createCategory`, `updateCategory`, `reorderCategories`, `setCategoryActive`, `deleteCategory`, `listSymptoms`, `createSymptom`, `updateSymptom`, `reorderSymptoms`, `setSymptomActive`, `deleteSymptom`
+
+> **CR-008 (repair, approved 2026-10-16):** the category dialog adds `ความเร่งด่วนตั้งต้น *` (ฉุกเฉิน · สูง · ปกติ · ต่ำ, default ปกติ, hint `ใช้เมื่อผู้แจ้งเลือกแค่ อาการอื่นๆ`); the symptom dialog adds `ความเร่งด่วน *` (same options, hint `งานจะได้ระดับสูงสุดของอาการที่เลือก`); symptom rows show the priority badge; categories may show an examples line (`ตัวอย่างที่แสดงในฟอร์ม`, ≤ 60). Contract: category / symptom create + update get `defaultPriority` / `priority`. Built in settings Stage 5.
 
 ## Layout — mobile first
 

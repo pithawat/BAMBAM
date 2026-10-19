@@ -1,6 +1,6 @@
 # S25 — ผู้ใช้
 
-Status: DRAFT
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
 - **Flows:** F15 (see ../../02-flows.md); role history from F30
 - **Persona:** Superadmin on desktop, sometimes mobile for a quick role change (see ../../01-users.md)

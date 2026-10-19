@@ -1,6 +1,16 @@
-# UI handoff — ระบบแจ้งซ่อม — Stages 1–2
+# UI handoff — ระบบแจ้งซ่อม — Stages 1–2 + 2R (CR-008)
 
-Status: BUILT BY CLAUDE — Stages 1–2 (CR-005), real API wired, waiting for user acceptance
+Status: BUILT BY CLAUDE — Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+
+## CR-010 / CR-011 (2026-10-18) — built by Claude
+
+| Area | Files (Claude owns; shared code marked *) |
+|---|---|
+| Shell, navbar, account menu, role switcher strip | *`components/shared/{app-shell,app-navbar,role-switcher,page-header,logout-dialog,service-unavailable,mascot}.tsx`; removed `app-sidebar.tsx`, `bottom-nav.tsx` |
+| Car / room "เร็วๆ นี้" | `app/(app)/{car-booking,room-booking}/page.tsx` |
+| Repair section nav | `app/(app)/repair/layout.tsx`, `modules/repair/components/repair-nav.tsx` |
+| S06 / S07 | `modules/repair/components/{my-tickets,ticket-detail,ticket-story}.tsx` |
+| S07 / S08 CR-012 (2026-10-19) | `modules/repair/components/{ticket-detail,ticket-actions}.tsx` — visual source `output/ticket-detail-redesign/` (no priority row) |
 
 ## CR-005 (2026-10-15) — built by Claude, not by Codex
 
@@ -131,4 +141,12 @@ npm run lint && npm run typecheck
 
 ## Open questions (Codex fills — never guess)
 
+- CR-013 preview revision 2 (2026-10-19): owner requested less blue. Evaluation card now uses warm orange (existing attention colour) for its CTA, top border and icon with a pale warm background. Proposal includes a bounded exception to the blue-action convention; production remains unchanged.
+
+- CR-013 preview ready (2026-10-19): `output/repair-evaluation-preview/index.html`, desktop/mobile captures in the same directory. Responsive and simulated evaluation-entry checks pass. No production edits; awaiting owner's design approval.
+
+- CR-013 PROPOSED (2026-10-19, S): owner reports S07 evaluation looks like a status strip. Proposed prominent blue `ประเมินงานซ่อม` button, explicit awaiting-your-evaluation heading, and labeled optional star shortcut; see `changes/CR-013.md`. Await approval for the bounded ReviewCard correction in `ticket-detail.tsx`; API and S08 submission remain unchanged.
+
+- CR-012 revision 2 PROPOSED (2026-10-18, M): S07 blue timeline (existing type), reference job facts, outcome-first evidence and white evaluation card; S08 rating dialog adds explicit confirmation of a draft score. Review `output/ticket-detail-redesign/index.html` and `changes/CR-012.md`; reconcile the owner's requested priority row with CR-011 before implementation. Production ownership unchanged; S03/S06 outside scope. Preview responsive/gallery/rating/keyboard/focus/role/states/print checks pass; no production API verification claimed.
+- CR-010 revised + CR-011 (2026-10-18): owner requests equal three-service navigation, no navbar mascot, and redesigned S06/S07 using `support ticket1.png`, `support ticket2.png`, `timeline.png`. Review `changes/CR-010.md`, `changes/CR-011.md` and `output/navbar-redesign/{index,repair-my,ticket-detail}.html`; production awaits approval and bounded shared shell/S06/S07 ownership. Existing routes retained; mascot asset stays in `frontend/public/brand` for later approved placement.
 - For Claude (wire): `cacheComponents` keeps visited routes alive with their state — worth a note in `frontend/AGENTS.md` so later screens reset drafts / refresh lists on reveal.

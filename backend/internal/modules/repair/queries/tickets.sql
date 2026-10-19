@@ -5,11 +5,12 @@
 
 -- name: InsertTicket :exec
 INSERT INTO repair.tickets (
-    id, ticket_no, status, priority, category_id, building_id, floor_id,
-    location_detail, details, asset_code, reporter_id
+    id, ticket_no, status, priority, priority_source, category_id, category_other, symptom_other,
+    building_id, floor_id, location_detail, details, asset_code, reporter_id
 ) VALUES (
-    @id, @ticket_no, 'in_progress', @priority, @category_id, @building_id, @floor_id,
-    @location_detail, @details, @asset_code, @reporter_id
+    @id, @ticket_no, 'in_progress', @priority, @priority_source, sqlc.narg('category_id')::uuid,
+    sqlc.narg('category_other')::text, sqlc.narg('symptom_other')::text,
+    @building_id, @floor_id, @location_detail, @details, @asset_code, @reporter_id
 );
 
 -- name: InsertTicketSymptoms :exec
@@ -23,8 +24,8 @@ VALUES (@id, @ticket_id, @type, @actor_id, @note, @data, @created_at);
 
 -- name: GetTicket :one
 SELECT
-    t.id, t.ticket_no, t.status, t.closed_reason, t.priority,
-    t.category_id, c.name AS category_name,
+    t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
+    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.location_detail, t.details, t.asset_code,
@@ -39,7 +40,7 @@ SELECT
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = @viewer_id) AS viewer_subscribed,
     (SELECT count(*) FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id) AS subscriber_count
 FROM repair.tickets t
-JOIN repair.categories c ON c.id = t.category_id
+LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
 JOIN repair.people rp ON rp.id = t.reporter_id
@@ -51,8 +52,8 @@ WHERE t.id = @id;
 -- name: ListTickets :many
 -- Filters are shared with CountTickets and CountTicketsByStatus; keep the WHERE clauses identical.
 SELECT
-    t.id, t.ticket_no, t.status, t.closed_reason, t.priority,
-    t.category_id, c.name AS category_name,
+    t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
+    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.location_detail,
@@ -64,7 +65,7 @@ SELECT
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = @viewer_id) AS viewer_subscribed
 FROM repair.tickets t
-JOIN repair.categories c ON c.id = t.category_id
+LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
 JOIN repair.people rp ON rp.id = t.reporter_id
@@ -223,3 +224,19 @@ RETURNING id;
 -- name: InsertAutoClosedEvents :exec
 INSERT INTO repair.ticket_events (ticket_id, type, created_at)
 SELECT unnest(@ticket_ids::uuid[]), 'auto_closed', @now;
+
+-- name: ListRecentPlaces :many
+-- "ที่เคยแจ้ง" (#28, CR-008): the reporter's last 3 distinct places on active buildings / floors.
+SELECT p.building_id, p.building_name, p.floor_id, p.floor_name, p.location_detail, p.last_reported_at
+FROM (
+    SELECT DISTINCT ON (t.building_id, t.floor_id, COALESCE(t.location_detail, ''))
+        t.building_id, b.name AS building_name, t.floor_id, f.name AS floor_name,
+        t.location_detail, t.created_at AS last_reported_at
+    FROM repair.tickets t
+    JOIN repair.buildings b ON b.id = t.building_id AND b.is_active
+    JOIN repair.floors f ON f.id = t.floor_id AND f.is_active
+    WHERE t.reporter_id = @reporter_id
+    ORDER BY t.building_id, t.floor_id, COALESCE(t.location_detail, ''), t.created_at DESC
+) p
+ORDER BY p.last_reported_at DESC
+LIMIT 3;

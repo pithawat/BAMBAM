@@ -7,6 +7,8 @@ const SOURCES = {
   full: { src: "/brand/mascot-full.webp", width: 640, height: 633 },
   bust: { src: "/brand/mascot-bust.webp", width: 480, height: 480 },
   face: { src: "/brand/mascot-face.webp", width: 320, height: 320 },
+  // White leopard bust (CR-010 asset, master PNG in the same folder); S06 heading only (CR-011).
+  leopard: { src: "/brand/mascot-leopard-bust.webp", width: 320, height: 320 },
 } as const;
 
 export type MascotPose = keyof typeof SOURCES;

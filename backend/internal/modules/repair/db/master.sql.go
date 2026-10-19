@@ -31,21 +31,35 @@ func (q *Queries) ActiveFloorInBuilding(ctx context.Context, arg ActiveFloorInBu
 	return exists, err
 }
 
-const countActiveSymptomsInCategory = `-- name: CountActiveSymptomsInCategory :one
-SELECT count(*) FROM repair.symptoms
+const activeSymptomPriorities = `-- name: ActiveSymptomPriorities :many
+SELECT priority FROM repair.symptoms
 WHERE id = ANY($1::uuid[]) AND category_id = $2 AND is_active
 `
 
-type CountActiveSymptomsInCategoryParams struct {
+type ActiveSymptomPrioritiesParams struct {
 	Ids        []uuid.UUID
 	CategoryID uuid.UUID
 }
 
-func (q *Queries) CountActiveSymptomsInCategory(ctx context.Context, arg CountActiveSymptomsInCategoryParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveSymptomsInCategory, arg.Ids, arg.CategoryID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
+// The priorities of the picked symptoms that are active and belong to the category (CR-008).
+func (q *Queries) ActiveSymptomPriorities(ctx context.Context, arg ActiveSymptomPrioritiesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, activeSymptomPriorities, arg.Ids, arg.CategoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var priority string
+		if err := rows.Scan(&priority); err != nil {
+			return nil, err
+		}
+		items = append(items, priority)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const countCategories = `-- name: CountCategories :one
@@ -92,14 +106,15 @@ func (q *Queries) InsertBuilding(ctx context.Context, arg InsertBuildingParams) 
 }
 
 const insertCategory = `-- name: InsertCategory :exec
-INSERT INTO repair.categories (id, name, icon, sort_order) VALUES ($1, $2, $3, $4)
+INSERT INTO repair.categories (id, name, icon, default_priority, sort_order) VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertCategoryParams struct {
-	ID        uuid.UUID
-	Name      string
-	Icon      string
-	SortOrder int32
+	ID              uuid.UUID
+	Name            string
+	Icon            string
+	DefaultPriority string
+	SortOrder       int32
 }
 
 func (q *Queries) InsertCategory(ctx context.Context, arg InsertCategoryParams) error {
@@ -107,6 +122,7 @@ func (q *Queries) InsertCategory(ctx context.Context, arg InsertCategoryParams) 
 		arg.ID,
 		arg.Name,
 		arg.Icon,
+		arg.DefaultPriority,
 		arg.SortOrder,
 	)
 	return err
@@ -134,13 +150,14 @@ func (q *Queries) InsertFloor(ctx context.Context, arg InsertFloorParams) error 
 }
 
 const insertSymptom = `-- name: InsertSymptom :exec
-INSERT INTO repair.symptoms (id, category_id, name, sort_order) VALUES ($1, $2, $3, $4)
+INSERT INTO repair.symptoms (id, category_id, name, priority, sort_order) VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertSymptomParams struct {
 	ID         uuid.UUID
 	CategoryID uuid.UUID
 	Name       string
+	Priority   string
 	SortOrder  int32
 }
 
@@ -149,6 +166,7 @@ func (q *Queries) InsertSymptom(ctx context.Context, arg InsertSymptomParams) er
 		arg.ID,
 		arg.CategoryID,
 		arg.Name,
+		arg.Priority,
 		arg.SortOrder,
 	)
 	return err
@@ -186,15 +204,16 @@ func (q *Queries) ListActiveBuildings(ctx context.Context) ([]ListActiveBuilding
 }
 
 const listActiveCategories = `-- name: ListActiveCategories :many
-SELECT id, name, icon FROM repair.categories
+SELECT id, name, icon, default_priority FROM repair.categories
 WHERE is_active
 ORDER BY sort_order, name
 `
 
 type ListActiveCategoriesRow struct {
-	ID   uuid.UUID
-	Name string
-	Icon string
+	ID              uuid.UUID
+	Name            string
+	Icon            string
+	DefaultPriority string
 }
 
 func (q *Queries) ListActiveCategories(ctx context.Context) ([]ListActiveCategoriesRow, error) {
@@ -206,7 +225,12 @@ func (q *Queries) ListActiveCategories(ctx context.Context) ([]ListActiveCategor
 	var items []ListActiveCategoriesRow
 	for rows.Next() {
 		var i ListActiveCategoriesRow
-		if err := rows.Scan(&i.ID, &i.Name, &i.Icon); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Icon,
+			&i.DefaultPriority,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -257,7 +281,7 @@ func (q *Queries) ListActiveFloors(ctx context.Context) ([]ListActiveFloorsRow, 
 }
 
 const listActiveSymptoms = `-- name: ListActiveSymptoms :many
-SELECT s.id, s.category_id, s.name FROM repair.symptoms s
+SELECT s.id, s.category_id, s.name, s.priority FROM repair.symptoms s
 JOIN repair.categories c ON c.id = s.category_id
 WHERE s.is_active AND c.is_active
 ORDER BY s.sort_order, s.name
@@ -267,6 +291,7 @@ type ListActiveSymptomsRow struct {
 	ID         uuid.UUID
 	CategoryID uuid.UUID
 	Name       string
+	Priority   string
 }
 
 func (q *Queries) ListActiveSymptoms(ctx context.Context) ([]ListActiveSymptomsRow, error) {
@@ -278,7 +303,12 @@ func (q *Queries) ListActiveSymptoms(ctx context.Context) ([]ListActiveSymptomsR
 	var items []ListActiveSymptomsRow
 	for rows.Next() {
 		var i ListActiveSymptomsRow
-		if err := rows.Scan(&i.ID, &i.CategoryID, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.CategoryID,
+			&i.Name,
+			&i.Priority,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -290,17 +320,17 @@ func (q *Queries) ListActiveSymptoms(ctx context.Context) ([]ListActiveSymptomsR
 }
 
 const lockActiveCategory = `-- name: LockActiveCategory :one
-SELECT id FROM repair.categories
+SELECT default_priority FROM repair.categories
 WHERE id = $1 AND is_active
 FOR NO KEY UPDATE
 `
 
-// Locks the category so it cannot be deactivated while a ticket is created in it.
-func (q *Queries) LockActiveCategory(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+// Locks the category so it cannot be deactivated while a ticket is created in it; returns its default priority (CR-008).
+func (q *Queries) LockActiveCategory(ctx context.Context, id uuid.UUID) (string, error) {
 	row := q.db.QueryRow(ctx, lockActiveCategory, id)
-	var id_2 uuid.UUID
-	err := row.Scan(&id_2)
-	return id_2, err
+	var default_priority string
+	err := row.Scan(&default_priority)
+	return default_priority, err
 }
 
 const nextTicketCounter = `-- name: NextTicketCounter :one
@@ -315,4 +345,50 @@ func (q *Queries) NextTicketCounter(ctx context.Context, year int32) (int64, err
 	var last_no int64
 	err := row.Scan(&last_no)
 	return last_no, err
+}
+
+const renameSampleBuilding = `-- name: RenameSampleBuilding :exec
+UPDATE repair.buildings SET name = $1, updated_at = now() WHERE id = $2 AND name = $3
+`
+
+type RenameSampleBuildingParams struct {
+	NewName string
+	ID      uuid.UUID
+	OldName string
+}
+
+// Sample data refresh (dev / UAT only, D-032, CR-008): applied by id so existing databases keep their ids.
+func (q *Queries) RenameSampleBuilding(ctx context.Context, arg RenameSampleBuildingParams) error {
+	_, err := q.db.Exec(ctx, renameSampleBuilding, arg.NewName, arg.ID, arg.OldName)
+	return err
+}
+
+const setSampleCategoryDefault = `-- name: SetSampleCategoryDefault :exec
+UPDATE repair.categories SET default_priority = $1, updated_at = now()
+WHERE id = $2 AND default_priority = 'medium'
+`
+
+type SetSampleCategoryDefaultParams struct {
+	DefaultPriority string
+	ID              uuid.UUID
+}
+
+func (q *Queries) SetSampleCategoryDefault(ctx context.Context, arg SetSampleCategoryDefaultParams) error {
+	_, err := q.db.Exec(ctx, setSampleCategoryDefault, arg.DefaultPriority, arg.ID)
+	return err
+}
+
+const setSampleSymptomPriority = `-- name: SetSampleSymptomPriority :exec
+UPDATE repair.symptoms SET priority = $1, updated_at = now()
+WHERE id = $2 AND priority = 'medium'
+`
+
+type SetSampleSymptomPriorityParams struct {
+	Priority string
+	ID       uuid.UUID
+}
+
+func (q *Queries) SetSampleSymptomPriority(ctx context.Context, arg SetSampleSymptomPriorityParams) error {
+	_, err := q.db.Exec(ctx, setSampleSymptomPriority, arg.Priority, arg.ID)
+	return err
 }

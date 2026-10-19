@@ -77,17 +77,20 @@ func (p *pgFixture) user(t *testing.T, role string) Viewer {
 }
 
 // create is safe to call from goroutines (no t.Fatal).
-func (p *pgFixture) create(v Viewer, priority, location string) (TicketDetail, error) {
+func (p *pgFixture) create(v Viewer, location string) (TicketDetail, error) {
+	return p.createWith(v, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID}, LocationDetail: location})
+}
+
+// createWith fills the place and a fresh photo; the caller sets category, symptoms and location.
+func (p *pgFixture) createWith(v Viewer, in CreateTicketInput) (TicketDetail, error) {
 	ctx := context.Background()
 	photo, err := p.svc.UploadPhoto(ctx, v, p.png)
 	if err != nil {
 		return TicketDetail{}, err
 	}
 	floor := p.building.Floors[0]
-	return p.svc.CreateTicket(ctx, v, CreateTicketInput{
-		CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID}, BuildingID: &p.building.ID, FloorID: &floor.ID,
-		LocationDetail: location, Priority: priority, PhotoIDs: []uuid.UUID{photo},
-	})
+	in.BuildingID, in.FloorID, in.PhotoIDs = &p.building.ID, &floor.ID, []uuid.UUID{photo}
+	return p.svc.CreateTicket(ctx, v, in)
 }
 
 func TestPgConcurrentCreatesGetDistinctNumbers(t *testing.T) {
@@ -102,7 +105,7 @@ func TestPgConcurrentCreatesGetDistinctNumbers(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			d, err := p.create(reporter, PriorityMedium, "")
+			d, err := p.create(reporter, "")
 			if err != nil {
 				errs <- err
 				return
@@ -139,11 +142,11 @@ func TestPgListCountsAndVisibility(t *testing.T) {
 	admin := p.user(t, users.RoleAdmin)
 
 	marker := "ห้อง-" + uuid.NewString()[:6]
-	high, err := p.create(reporter, PriorityHigh, marker+" A")
+	high, err := p.create(reporter, marker+" A")
 	if err != nil {
 		t.Fatal(err)
 	}
-	critical, err := p.create(reporter, PriorityCritical, marker+" B")
+	critical, err := p.create(reporter, marker+" B")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,4 +189,52 @@ func TestPgListCountsAndVisibility(t *testing.T) {
 		t.Fatal("unrelated lead can open the photo")
 	}
 
+}
+
+// CR-008: priority comes from the symptoms, the category default or the "อื่นๆ" default.
+func TestPgPriorityAndOther(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	reporter := p.user(t, users.RoleEmployee)
+
+	best := p.cat.Symptoms[0]
+	ids := make([]uuid.UUID, 0, len(p.cat.Symptoms))
+	for _, s := range p.cat.Symptoms {
+		ids = append(ids, s.ID)
+		if priorityRank(s.Priority) < priorityRank(best.Priority) {
+			best = s
+		}
+	}
+	all, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: ids})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if all.Priority != best.Priority || all.PrioritySource != PrioritySourceSymptom {
+		t.Fatalf("all symptoms: %s/%s, want %s/symptom", all.Priority, all.PrioritySource, best.Priority)
+	}
+
+	typed, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "มีควันออกมา"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if typed.Priority != p.cat.DefaultPriority || typed.PrioritySource != PrioritySourceCategory || typed.SymptomOther == nil {
+		t.Fatalf("typed symptom: %s/%s other=%v", typed.Priority, typed.PrioritySource, typed.SymptomOther)
+	}
+
+	other, err := p.createWith(reporter, CreateTicketInput{CategoryOther: "ลิฟต์", SymptomOther: "ค้างระหว่างชั้น"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.Category != nil || other.CategoryOther == nil || *other.CategoryOther != "ลิฟต์" ||
+		other.Priority != PriorityMedium || other.PrioritySource != PrioritySourceDefault || len(other.Symptoms) != 0 {
+		t.Fatalf("typed category: %+v", other.TicketSummary)
+	}
+	if _, err := p.svc.Ticket(ctx, reporter, other.ID); err != nil {
+		t.Fatalf("open typed-category ticket: %v", err)
+	}
+
+	places, err := p.svc.RecentPlaces(ctx, reporter)
+	if err != nil || len(places) != 1 || places[0].Building.ID != p.building.ID {
+		t.Fatalf("recent places: %+v err=%v", places, err)
+	}
 }

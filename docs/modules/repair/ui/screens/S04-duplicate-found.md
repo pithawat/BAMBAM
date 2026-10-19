@@ -2,6 +2,12 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-009 (approved 2026-10-18):** match = category + floor + room / spot (BR-F03-1). Actions: `ติดตามเคสเดิม` (others' ticket) · own ticket → `ดูงานของคุณ`; own ticket waiting for ประเมินตรวจงาน → `ไปประเมินตรวจงาน` (blocks a new ticket). The submit-time dialog has `ติดตามเคสเดิม` and `ยกเลิกการแจ้ง` only — `ไม่ใช่เรื่องเดียวกัน ส่งแจ้งใหม่` is removed. Hint: `ถ้าเป็นคนละจุด แก้ห้องหรือจุดที่เกิดในขั้นสถานที่`.
+
+
+> **CR-008 (approved 2026-10-16):** shown **inline** in S03 as soon as category + building + floor are known (สถานที่ and ตรวจสอบ steps): `มีคนแจ้งเรื่องคล้ายกันไว้แล้ว` / own ticket `คุณเคยแจ้งเรื่องนี้ไว้แล้ว`; per case `ติดตามงานนี้แทน`; own ticket waiting for rating → `ส่งกลับให้แก้ในงานเดิม` (S07 `?action=sendback`, BR-F03-4); own other → `ดูงานของคุณ`; `ไม่ใช่เรื่องเดียวกัน แจ้งต่อ` (undo `ดูงานคล้ายกันอีกครั้ง`). This sheet / dialog stays only as the fallback when the user submits while a duplicate is undecided (`ก่อนส่ง: มีงานคล้ายกันที่ยังไม่ปิด`). Mockup: `../../changes/CR-008/style-and-form.html`. Built in Stage 4.
+
+
 - **Flows:** F03 (all), F04 BR-F04-3 (team-handled records also go through it) (see ../../02-flows.md)
 - **Persona:** every role, mostly mobile (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** before a ticket is created, let the reporter follow an open case about the same problem instead of creating a duplicate.

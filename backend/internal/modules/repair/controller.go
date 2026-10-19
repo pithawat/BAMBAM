@@ -124,6 +124,20 @@ func (ctl *Controller) Photo(c *gin.Context) {
 	})
 }
 
+// RecentPlaces handles #28 GET /repair/me/recent-places (CR-008).
+func (ctl *Controller) RecentPlaces(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	list, err := ctl.svc.RecentPlaces(c.Request.Context(), v)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": toRecentPlaceDTOs(list)})
+}
+
 // CreateTicket handles #5 POST /repair/tickets.
 func (ctl *Controller) CreateTicket(c *gin.Context) {
 	v, ok := viewer(c)
@@ -143,7 +157,8 @@ func (ctl *Controller) CreateTicket(c *gin.Context) {
 		FloorID:        parseOptionalID(req.FloorID, "floorId", fields),
 		LocationDetail: req.LocationDetail,
 		Details:        req.Details,
-		Priority:       req.Priority,
+		CategoryOther:  req.CategoryOther,
+		SymptomOther:   req.SymptomOther,
 		PhotoIDs:       parseIDs(req.PhotoIDs, "photoIds", fields),
 		AssetCode:      req.AssetCode,
 		TeamHandled:    len(req.TeamHandled) > 0 && string(req.TeamHandled) != "null",

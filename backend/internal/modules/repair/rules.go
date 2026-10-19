@@ -127,26 +127,38 @@ func validateCreate(in CreateTicketInput) (CreateTicketInput, map[string]string)
 	in.LocationDetail = strings.TrimSpace(in.LocationDetail)
 	in.Details = strings.TrimSpace(in.Details)
 	in.AssetCode = strings.TrimSpace(in.AssetCode)
+	in.CategoryOther = strings.TrimSpace(in.CategoryOther)
+	in.SymptomOther = strings.TrimSpace(in.SymptomOther)
 	in.SymptomIDs = uniqueIDs(in.SymptomIDs)
 	in.PhotoIDs = uniqueIDs(in.PhotoIDs)
 
-	if in.CategoryID == nil {
+	// BR-F02-1 (CR-008): a listed category needs >= 1 symptom or a typed one; a typed category
+	// ("อื่นๆ") has no listed symptoms and needs the typed symptom.
+	switch {
+	case in.CategoryID != nil:
+		in.CategoryOther = ""
+		if len(in.SymptomIDs) == 0 && in.SymptomOther == "" {
+			fields["symptomIds"] = "MIN_ITEMS"
+		}
+	case in.CategoryOther == "":
 		fields["categoryId"] = "REQUIRED"
+	default:
+		in.SymptomIDs = nil
+		if in.SymptomOther == "" {
+			fields["symptomOther"] = "REQUIRED"
+		}
 	}
-	if len(in.SymptomIDs) == 0 {
-		fields["symptomIds"] = "MIN_ITEMS"
+	if utf8.RuneCountInString(in.CategoryOther) > MaxOtherChars {
+		fields["categoryOther"] = "TOO_LONG"
+	}
+	if utf8.RuneCountInString(in.SymptomOther) > MaxOtherChars {
+		fields["symptomOther"] = "TOO_LONG"
 	}
 	if in.BuildingID == nil {
 		fields["buildingId"] = "REQUIRED"
 	}
 	if in.FloorID == nil {
 		fields["floorId"] = "REQUIRED"
-	}
-	switch {
-	case in.Priority == "":
-		fields["priority"] = "REQUIRED"
-	case priorityRank(in.Priority) < 0:
-		fields["priority"] = "INVALID"
 	}
 	checkPhotos(fields, "photoIds", in.PhotoIDs, 1)
 	if utf8.RuneCountInString(in.LocationDetail) > MaxLocationChars {
@@ -159,6 +171,26 @@ func validateCreate(in CreateTicketInput) (CreateTicketInput, map[string]string)
 		fields["assetCode"] = "TOO_LONG"
 	}
 	return in, fields
+}
+
+// ticketPriority applies BR-F02-2 (CR-008): the most urgent picked symptom; with only a typed
+// symptom the category's default; a typed category ("อื่นๆ") starts at medium.
+func ticketPriority(symptomPriorities []string, categoryDefault string, typedCategory bool) (priority, source string) {
+	if typedCategory {
+		return PriorityMedium, PrioritySourceDefault
+	}
+	for _, p := range symptomPriorities {
+		if priorityRank(p) >= 0 && (priority == "" || priorityRank(p) < priorityRank(priority)) {
+			priority = p
+		}
+	}
+	if priority != "" {
+		return priority, PrioritySourceSymptom
+	}
+	if priorityRank(categoryDefault) < 0 {
+		return PriorityMedium, PrioritySourceDefault
+	}
+	return categoryDefault, PrioritySourceCategory
 }
 
 // validateAssess checks BR-F21-2 for endpoint #9. today is the Asia/Bangkok date at 00:00 UTC.
@@ -180,6 +212,9 @@ func validateAssess(in AssessInput, today time.Time) map[string]string {
 		}
 	default:
 		fields["workBy"] = "INVALID"
+	}
+	if utf8.RuneCountInString(strings.TrimSpace(in.Reason)) > MaxReasonChars {
+		fields["reason"] = "TOO_LONG"
 	}
 	return fields
 }

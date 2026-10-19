@@ -21,6 +21,10 @@ type Repository interface {
 	ListBuildings(ctx context.Context) ([]Building, error)
 	CountCategories(ctx context.Context) (int64, error)
 	InsertMasterData(ctx context.Context, cats []Category, buildings []Building) error
+	// RefreshSampleData applies newer sample values by id (dev / UAT only, CR-008): category defaults
+	// and symptom priorities still at `medium`, and building names still at their first sample name.
+	RefreshSampleData(ctx context.Context, cats []Category, renames []SampleRename) error
+	ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]RecentPlace, error)
 
 	InsertPhoto(ctx context.Context, p NewPhoto) error
 	GetPhoto(ctx context.Context, id uuid.UUID) (Photo, error)
@@ -46,8 +50,10 @@ type Repository interface {
 
 // TxRepository is used inside write transactions.
 type TxRepository interface {
-	LockActiveCategory(ctx context.Context, id uuid.UUID) (bool, error)
-	CountActiveSymptoms(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) (int, error)
+	// LockActiveCategory returns the category's default priority (CR-008); ok is false when it is inactive or missing.
+	LockActiveCategory(ctx context.Context, id uuid.UUID) (defaultPriority string, ok bool, err error)
+	// ActiveSymptomPriorities returns the priorities of the given symptoms that are active in the category.
+	ActiveSymptomPriorities(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error)
 	ActiveFloorInBuilding(ctx context.Context, floorID, buildingID uuid.UUID) (bool, error)
 	LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error)
 	TicketNumberFormat(ctx context.Context) (TicketNumberFormat, error)
@@ -94,12 +100,19 @@ func (s *Service) Buildings(ctx context.Context) ([]Building, error) {
 	return s.repo.ListBuildings(ctx)
 }
 
-// EnsureSampleData inserts the sample master data (seed.go) when no category exists yet.
+// EnsureSampleData inserts the sample master data (seed.go) when no category exists yet, and
+// otherwise refreshes the sample values added later (CR-008 priorities and building names).
 // main.go calls it only in dev/UAT (D-032); real seed files replace it.
 func (s *Service) EnsureSampleData(ctx context.Context) (bool, error) {
 	n, err := s.repo.CountCategories(ctx)
-	if err != nil || n > 0 {
+	if err != nil {
 		return false, err
+	}
+	if n > 0 {
+		if err := s.repo.RefreshSampleData(ctx, sampleCategories(), sampleBuildingRenames()); err != nil {
+			return false, fmt.Errorf("refresh sample master data: %w", err)
+		}
+		return false, nil
 	}
 	if err := s.repo.InsertMasterData(ctx, sampleCategories(), sampleBuildings()); err != nil {
 		return false, fmt.Errorf("insert sample master data: %w", err)
@@ -220,29 +233,38 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 
 	now := s.now()
 	t := NewTicket{
-		ID: uuid.New(), Priority: in.Priority,
-		CategoryID: *in.CategoryID, BuildingID: *in.BuildingID, FloorID: *in.FloorID,
+		ID: uuid.New(), CategoryID: in.CategoryID,
+		CategoryOther: optional(in.CategoryOther), SymptomOther: optional(in.SymptomOther),
+		BuildingID: *in.BuildingID, FloorID: *in.FloorID,
 		LocationDetail: optional(in.LocationDetail), Details: optional(in.Details), AssetCode: optional(in.AssetCode),
 		ReporterID: v.ID, SymptomIDs: in.SymptomIDs, PhotoIDs: in.PhotoIDs,
 		CreatedAt: now, CreatedEventID: uuid.New(),
 	}
 
 	err := s.repo.InTx(ctx, func(tx TxRepository) error {
-		ok, err := tx.LockActiveCategory(ctx, t.CategoryID)
-		if err != nil {
-			return err
+		var symptomPriorities []string
+		categoryDefault := ""
+		if t.CategoryID != nil {
+			def, ok, err := tx.LockActiveCategory(ctx, *t.CategoryID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return ErrMasterDataChanged
+			}
+			categoryDefault = def
+			if len(t.SymptomIDs) > 0 {
+				if symptomPriorities, err = tx.ActiveSymptomPriorities(ctx, *t.CategoryID, t.SymptomIDs); err != nil {
+					return err
+				}
+				if len(symptomPriorities) != len(t.SymptomIDs) {
+					return ErrMasterDataChanged
+				}
+			}
 		}
-		if !ok {
-			return ErrMasterDataChanged
-		}
-		n, err := tx.CountActiveSymptoms(ctx, t.CategoryID, t.SymptomIDs)
-		if err != nil {
-			return err
-		}
-		if n != len(t.SymptomIDs) {
-			return ErrMasterDataChanged
-		}
-		if ok, err = tx.ActiveFloorInBuilding(ctx, t.FloorID, t.BuildingID); err != nil {
+		// BR-F02-2 (CR-008): the system sets the priority.
+		t.Priority, t.PrioritySource = ticketPriority(symptomPriorities, categoryDefault, t.CategoryID == nil)
+		if ok, err := tx.ActiveFloorInBuilding(ctx, t.FloorID, t.BuildingID); err != nil {
 			return err
 		} else if !ok {
 			return ErrMasterDataChanged
@@ -283,6 +305,11 @@ func lockPhotos(ctx context.Context, tx TxRepository, uploader uuid.UUID, ids []
 		return ErrPhotoNotAttachable
 	}
 	return nil
+}
+
+// RecentPlaces implements endpoint #28 (CR-008): the caller's last distinct places.
+func (s *Service) RecentPlaces(ctx context.Context, v Viewer) ([]RecentPlace, error) {
+	return s.repo.ListRecentPlaces(ctx, v.ID)
 }
 
 // Ticket implements endpoint #8.
@@ -372,11 +399,16 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 	if in.WorkBy == WorkByInHouse {
 		in.ContractorID = nil
 	}
+	in.Reason = strings.TrimSpace(in.Reason)
 	data := map[string]string{"expectedDoneOn": in.ExpectedDoneOn.Format(time.DateOnly), "workBy": in.WorkBy}
 	err := s.repo.InTx(ctx, func(tx TxRepository) error {
 		t, err := lockOpen(ctx, tx, id, StatusInProgress)
 		if err != nil {
 			return err
+		}
+		// CR-008: the reason is kept only when the assessment changes; the reporter sees it.
+		if t.Assessed && in.Reason != "" {
+			data["reason"] = in.Reason
 		}
 		if in.ContractorID != nil {
 			ok, err := tx.ActiveContractorExists(ctx, *in.ContractorID)

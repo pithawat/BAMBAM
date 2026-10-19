@@ -30,10 +30,26 @@ type PhotoDTO struct {
 
 // #1
 type CategoryDTO struct {
+	ID              uuid.UUID    `json:"id"`
+	Name            string       `json:"name"`
+	Icon            string       `json:"icon"`
+	DefaultPriority string       `json:"defaultPriority"`
+	Symptoms        []SymptomDTO `json:"symptoms"`
+}
+
+// SymptomDTO carries the admin-set priority (CR-008).
+type SymptomDTO struct {
 	ID       uuid.UUID `json:"id"`
 	Name     string    `json:"name"`
-	Icon     string    `json:"icon"`
-	Symptoms []RefDTO  `json:"symptoms"`
+	Priority string    `json:"priority"`
+}
+
+// #28 (CR-008)
+type RecentPlaceDTO struct {
+	Building       RefDTO    `json:"building"`
+	Floor          RefDTO    `json:"floor"`
+	LocationDetail *string   `json:"locationDetail"`
+	LastReportedAt time.Time `json:"lastReportedAt"`
 }
 
 // #2
@@ -57,7 +73,8 @@ type CreateTicketRequest struct {
 	FloorID        string          `json:"floorId"`
 	LocationDetail string          `json:"locationDetail"`
 	Details        string          `json:"details"`
-	Priority       string          `json:"priority"`
+	CategoryOther  string          `json:"categoryOther"` // CR-008; a `priority` field from old clients is ignored
+	SymptomOther   string          `json:"symptomOther"`
 	PhotoIDs       []string        `json:"photoIds"`
 	AssetCode      string          `json:"assetCode"`
 	TeamHandled    json.RawMessage `json:"teamHandled"`
@@ -70,8 +87,11 @@ type TicketSummaryDTO struct {
 	Step                   string        `json:"step"`
 	ClosedReason           *string       `json:"closedReason"`
 	Priority               string        `json:"priority"`
-	Category               RefDTO        `json:"category"`
+	PrioritySource         string        `json:"prioritySource"`
+	Category               *RefDTO       `json:"category"`
+	CategoryOther          *string       `json:"categoryOther"`
 	Symptoms               []RefDTO      `json:"symptoms"`
+	SymptomOther           *string       `json:"symptomOther"`
 	Building               RefDTO        `json:"building"`
 	Floor                  RefDTO        `json:"floor"`
 	LocationDetail         *string       `json:"locationDetail"`
@@ -147,6 +167,7 @@ type AssessRequest struct {
 	ExpectedDoneOn string `json:"expectedDoneOn"`
 	WorkBy         string `json:"workBy"`
 	ContractorID   string `json:"contractorId"`
+	Reason         string `json:"reason"` // CR-008, optional on a change
 }
 
 // #10
@@ -214,7 +235,19 @@ type ContractorJobDTO struct {
 func toCategoryDTOs(cats []Category) []CategoryDTO {
 	out := make([]CategoryDTO, 0, len(cats))
 	for _, c := range cats {
-		out = append(out, CategoryDTO{ID: c.ID, Name: c.Name, Icon: c.Icon, Symptoms: toRefDTOs(c.Symptoms)})
+		syms := make([]SymptomDTO, 0, len(c.Symptoms))
+		for _, s := range c.Symptoms {
+			syms = append(syms, SymptomDTO(s))
+		}
+		out = append(out, CategoryDTO{ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, Symptoms: syms})
+	}
+	return out
+}
+
+func toRecentPlaceDTOs(list []RecentPlace) []RecentPlaceDTO {
+	out := make([]RecentPlaceDTO, 0, len(list))
+	for _, p := range list {
+		out = append(out, RecentPlaceDTO{Building: RefDTO(p.Building), Floor: RefDTO(p.Floor), LocationDetail: p.LocationDetail, LastReportedAt: p.LastReportedAt.UTC()})
 	}
 	return out
 }
@@ -262,7 +295,8 @@ func toPhotoDTOs(ids []uuid.UUID) []PhotoDTO {
 func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 	d := TicketSummaryDTO{
 		ID: s.ID, TicketNo: s.TicketNo, Status: s.Status, Step: s.Step(), ClosedReason: s.ClosedReason, Priority: s.Priority,
-		Category: RefDTO(s.Category), Symptoms: toRefDTOs(s.Symptoms),
+		PrioritySource: s.PrioritySource,
+		CategoryOther:  s.CategoryOther, Symptoms: toRefDTOs(s.Symptoms), SymptomOther: s.SymptomOther,
 		Building: RefDTO(s.Building), Floor: RefDTO(s.Floor), LocationDetail: s.LocationDetail,
 		Reporter:       *toPersonDTO(&s.Reporter),
 		Technician:     toPersonDTO(s.Technician),
@@ -275,6 +309,10 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 	if s.ExpectedDoneOn != nil {
 		day := s.ExpectedDoneOn.Format(time.DateOnly)
 		d.ExpectedDoneOn = &day
+	}
+	if s.Category != nil {
+		c := RefDTO(*s.Category)
+		d.Category = &c
 	}
 	if s.Contractor != nil {
 		c := RefDTO(*s.Contractor)

@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — Build plan
 
-Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15)
+Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18)
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -16,11 +16,12 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 |---|---|---|---|---|
 | 1 | พนักงานแจ้งซ่อมพร้อมรูปได้จริง ได้เลขงาน (สถานะ "กำลังดำเนินการ · รอช่างประเมิน") และเปิดดูงานของตัวเองได้ — API จริง (CR-005) | F02 (happy path), F06 | S03, S05, S06, S07 (view) | built, rework CR-005 done — waiting acceptance |
 | 2 | ช่างเห็นทุกงาน ประเมิน (วันคาดเสร็จ) บันทึกผล + ผู้ดำเนินการ + คะแนนช่างภายนอก; ผู้แจ้งให้ดาว (บังคับ) หรือส่งกลับ; ปิดเองเมื่อครบ 3 วัน — วงจรหลักครบ (CR-005) | F21, F07, F24 (technician) | S09, S17, S10, S08, S07 actions, S18 | built — waiting acceptance (no tests, CR-005) |
+| 2R | **CR-008 rework:** ระบบกำหนดความเร่งด่วนจากอาการ + "อื่นๆ" · หน้าตาใหม่ทั้งแอป (design-system CR-008) · S03 แบบทีละขั้น + ตรวจสอบก่อนส่ง + ที่เคยแจ้ง + ร่าง · S05 · S07 หน้าติดตามแนวตั้ง + การ์ดสิ่งที่ต้องทำ + พิมพ์รายงาน · S08 ให้คะแนนไม่ตั้งค่าไว้ก่อน · S17 ปุ่มวัน + เหตุผลที่เลื่อน · S10 เป็น sheet — ตรวจรับพร้อม Stage 1–2 | F02, F06, F07, F21 | S03, S05, S06, S07, S08, S09, S10, S17, shell | in progress |
 | 3 | Admin เห็นทุกงาน ปรับความเร่งด่วน ปิดงานได้; ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | pending |
-| 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม หัวหน้าทีมบันทึกงานที่ทีมทำเอง และส่งต่อให้ช่างได้ | F03, F04, F05 | S04, S03 (team card), S07 + S11 (hand over) | pending |
+| 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over) | pending |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง | F01 (Home), F19-B | S02, S13, bell | pending |
-| 7 | ภาพรวมอาคาร 3D ให้ Admin / ผู้บริหาร | F23 | S12 | pending |
+| 7 | ภาพรวมองค์กร S27 (แทน S12, CR-008): ตัวเลข ภาพอาคาร isometric ผังชั้นคร่าว สิ่งที่ควรติดตาม แนวโน้ม 7 วัน บริการอื่น (ตัวอย่าง) | F23 | S27 | pending |
 | 8 | ตรวจสิทธิ์ทุก role, edge cases, a11y และความพร้อม UAT | all phase-1 flows | all | pending |
 
 Order rationale: 1→2 is the main loop (report → assess → repair → rate), re-planned by CR-005 (one in-house technician, no queue; contractors). Admin control (3) comes next. 4–5 add entry variants of F02. Notifications (6) come after all events exist. 3D (7) is mockup-first (D-010). 8 hardens everything.
@@ -129,6 +130,79 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 
 ---
 
+## Stage 2R — CR-008 rework (priority from symptoms, new look, S03 wizard, S07 tracking page)
+
+**Scope**
+- Flows: F02 (BR-F02-1 / BR-F02-2 CR-008: priority set by the system, "อื่นๆ"), F06 (S07 layout), F07 (BR-F07-7 rating UI), F21 (BR-F21-8 รับเรื่อง chips + reason)
+- Screens: design-system tokens + shell (sidebar, top bar, bottom nav) · S03 step wizard (ปัญหาที่พบ → สถานที่ → รูปภาพ → ตรวจสอบก่อนส่ง; ที่เคยแจ้ง; local draft) · S05 · S06 copy · S07 (header band, สิ่งที่ต้องทำตอนนี้, timeline with nested events, ข้อมูลงาน, ก่อนซ่อม / หลังซ่อม, print) · S08 · S17 · S10 as a sheet · S09 copy
+- Endpoints: #1 (+ priorities), #5 (no `priority`, + `categoryOther` / `symptomOther`), #6 / #8 objects (+ `categoryOther`, `symptomOther`, `prioritySource`), #9 (+ `reason`), #28 recent places
+- Out of this stage: duplicate card + team step (Stage 4), QR banner (Stage 5), S27 (Stage 7), settings S22 priority fields (settings Stage 5; until then priorities come from the seed / sample data), room chips (settings Stage 4 rooms)
+
+**Backend (Claude)**
+- [x] Migration `20261016000001_repair_cr008`: `symptoms.priority`, `categories.default_priority` (default `medium`), `tickets.category_id` nullable + `category_other`, `symptom_other`, `priority_source` (existing rows `reporter`), check (category or category_other)
+- [x] Dev / UAT sample data (D-032): symptom priorities + category defaults (`_common.md` CR-008), building names อาคารฝั่ง Office / อาคาร Office โรงงานบางซ่อน updated **by id**
+- [x] Create: priority rule (highest symptom → category default → `medium`), "อื่นๆ" validation; old `priority` field ignored
+- [x] Assess: optional `reason` (≤ 100) on a change → event `data.reason`
+- [x] #28 recent places (my tickets, distinct building / floor / location, max 3)
+- [x] Tests: service tests for the priority rule, "อื่นๆ" validation, recent places
+
+**Frontend (Claude)**
+- [x] Tokens, Anuphan only, shell restyle (no gradients)
+- [x] types / api / mocks for the new fields and #28
+- [x] S03 wizard + review + draft · S05 · S06 / S09 copy
+- [x] S07 tracking page + print · S08 rating without default + low-score hint · S17 date chips + reason · S10 sheet
+- [x] CR-009: labels แจ้งงาน → รับเรื่อง → กำลังดำเนินการ → (ส่งกลับให้แก้) → เสร็จ → ประเมินตรวจงาน everywhere (S05, S06, S07, S08, S09, S17); buttons เริ่มดำเนินการ / ประเมินตรวจงาน; S07 = demo-05 layout (`ticket-detail.html` on disk) with the 5-stage timeline
+
+**Acceptance criteria**
+- [ ] AC1: Picking มีน้ำหยด + แอร์ไม่เย็น shows `ความเร่งด่วนของงานนี้: สูง` and the created ticket has priority สูง (`prioritySource = symptom`); category อื่นๆ with typed text creates a ticket with priority ปกติ
+- [ ] AC2: S03 moves step by step; ถัดไป blocks an incomplete step with its message; ตรวจสอบก่อนส่ง shows every value with แก้ไข; reloading the page restores the draft
+- [ ] AC3: A reporter with earlier tickets sees up to 3 ที่เคยแจ้ง places; tapping one fills building / floor / location
+- [ ] AC4: S07 shows the step-coloured header and action card per viewer (reporter, follower, technician), the 4-stage timeline with nested date changes / send backs, and prints on A4
+- [ ] AC5: The rating dialog opens with no score (or the tapped star), 1–2 stars offer ส่งกลับให้แก้แทน
+- [ ] AC6: The technician รับเรื่อง with a date chip; เลื่อนวันเสร็จ with a reason shows the reason to the reporter
+- [ ] AC7: Stage 1–2 acceptance criteria still pass (with the new copy); `go vet`, `go test ./...`, `tsc`, `eslint`, `next build` pass
+
+**Demo script**
+1. Employee (phone 390px): แจ้งซ่อม → ระบบปรับอากาศ → แอร์ไม่เย็น + มีน้ำหยด (see สูง) → ที่เคยแจ้ง → 2 photos → ตรวจสอบก่อนส่ง → ยืนยันส่งแจ้งซ่อม → S05 → ดูงานนี้
+2. Technician: รับเรื่อง (พรุ่งนี้) → เลื่อนวันเสร็จ (อีก 3 วัน, รออะไหล่) → บันทึกผลซ่อม (photo + note)
+3. Employee: S07 shows the reason under ซ่อม → tap 2 stars → ส่งกลับให้แก้แทน → technician resolves again → employee 5 stars → พิมพ์รายงาน
+
+---
+
+## Stage 2N — CR-010 / CR-011 rework (top navbar, S06 groups, S07 summary) (CR-010, CR-011)
+
+**Scope**
+- Flows: entry points only (F06 reading / filtering, F07 evaluation entry, F21 progress); no business rule changes
+- Screens: shell (`_common.md` §1) · S06 · S07 · car / room "เร็วๆ นี้" pages
+- Endpoints: none new — #6 (per-status lists, `sort`), #7 counts, #8 detail
+- Out of this stage: Home redesign (CR-004), notifications page (Stage 6), admin pages (Stage 3 / 7)
+
+**Frontend (Claude)**
+- [x] Navbar + account menu + mobile service row; remove sidebar / bottom nav; role switcher strip; page headers without bell / switcher
+- [x] Repair section nav for technician / admin / executive; `/car-booking`, `/room-booking`
+- [x] S06 groups (no status filter, owner 2026-10-18), review banner, relation tabs, date / sort / search, per-group paging
+- [x] S07 summary + next action + evidence order + timeline header; priority events hidden from reporter / follower
+- [x] Platform e2e updated for the navbar
+- [x] CR-012 (2026-10-19): S07 heading + review card + job info (อาการ, no priority for reporter / follower) + evidence photo sets + blue timeline; S08 rating dialog (CR-012)
+- [x] S06 polish (D-068): two-line rows, closed caption without star, folder-check icon, 5px status tags
+
+**Acceptance criteria**
+- [ ] AC1: No sidebar, no bottom nav; หน้าแรก and the three services reachable at 375 / 768 / 1024 / 1440px; only the current service is marked active
+- [ ] AC2: Technician / admin / executive reach every former sidebar destination through the repair section nav; employees see no extra menu
+- [ ] AC3: Account menu: opens, closes on Escape / outside click / selection, focus returns to the avatar; logout keeps its confirm; role switcher never in production
+- [ ] AC4: S06 shows no status filter; tabs, date, sort, search and reset change every group and its count; groups collapse; a ticket opened from the list returns with the filters kept
+- [ ] AC5: S07 shows number, status, title, location, date, category and relation at the top; reporter sees `ประเมินตรวจงาน` / `ส่งกลับให้แก้` only when `allowedActions` allows; follower sees no buttons; no priority anywhere for them (history included)
+- [ ] AC6: Staff S07 still shows priority, fixer and their actions; print still A4
+- [ ] AC7: `tsc`, `eslint`, `next build` pass
+- [ ] AC8 (CR-012): reporter awaiting rating sees the review card; a star opens S08 with that score, `ประเมินพร้อมความคิดเห็น` opens it empty, only `ยืนยันผลประเมิน` submits; follower sees no stars / buttons; ข้อมูลงาน shows อาการ and no priority for reporter / follower, priority for staff; before / after photos stack on phones; print hides the review card
+
+**Demo script**
+1. Employee (390px, then 1440px): navbar → แจ้งซ่อม → S06 → ที่ฉันติดตาม → collapse a group → open a ticket → back (tab kept) → ไปตรวจงาน → ประเมินตรวจงาน dialog → cancel → account menu → ออกจากระบบ → ยกเลิก
+2. จองรถ → "เร็วๆ นี้" page
+3. Technician: แจ้งซ่อม → งานซ่อม (repair nav) → ticket → พิมพ์งานนี้; admin: repair nav shows งานทั้งหมด · ช่างภายนอก · ภาพรวมอาคาร
+
+---
+
 ## Stage 3 — Admin งานทั้งหมดและการจัดการ (CR-005: no queue reorder)
 
 **Scope**
@@ -160,7 +234,7 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 - Out of this stage: notifications to subscribers (Stage 7)
 
 **Backend (Claude)**
-- [ ] Duplicate query (same category + floor, open statuses, BR-F03-1) with an index
+- [ ] Duplicate query (same category + floor + room / spot, open statuses, BR-F03-1 CR-009) with an index; #5 refuses a match → 409 `DUPLICATE_FOUND` / `OWN_TICKET_AWAITING_RATING` (CR-009)
 - [ ] Follow: subscriber row + `subscribed` event with note/photos; reporter/subscriber → `ALREADY_FOLLOWING`
 - [ ] Team handled: leads only (BR-F04-1), note + ≥ 1 photo (BR-F04-2), created `closed` / `team_handled`, event `team_handled`
 - [ ] Hand over: only `team_handled` (BR-F05-1), recording lead or admin (BR-F05-2), same ticket back to `in_progress` awaiting assessment (BR-F05-3, CR-005), event `handed_over`
@@ -172,7 +246,7 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 
 **Frontend UI (Codex)**
 - [ ] S04 sheet / dialog (follow, own case, already following, closed meanwhile)
-- [ ] S03 team card for leads; S05 team variant
+- [ ] S03 mode switch `เรียกช่าง | ทีมแก้เองแล้ว` at the top for leads (CR-009); S03 duplicate card + blocking submit dialog (ติดตามเคสเดิม / ยกเลิกการแจ้ง only); S05 team variant
 - [ ] S07 hand-over action; S11 closed-tab button + "เฉพาะงานทีมทำเอง" toggle
 
 **Wiring + e2e (Claude)**

@@ -2,6 +2,9 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-008 (approved 2026-10-16):** opened as a sheet from the S07 action card (`บันทึกผลซ่อม` / `บันทึกผลการแก้ไข`); the `/repair/tickets/[id]/resolve` page stays for direct links. Layout: `ก่อนซ่อม · จากผู้แจ้ง` photo, then `หลังซ่อม *` camera tile `ถ่ายรูปหลังซ่อม` (thumbs + `ถ่ายเพิ่ม` afterwards) · hint `ถ่ายมุมเดียวกับรูปก่อนซ่อม ผู้แจ้งจะเทียบได้ทันที` · `ทำอะไรไป *` · contractor stars for contractor jobs · `ส่งผลการซ่อม`. Mockup: `../../changes/CR-008/ticket-detail.html`.
+
+
 > **CR-005 / CR-006 (2026-10-15):** page `/repair/tickets/[id]/resolve` (`resolve-form.tsx`). The summary card shows the expected date and the ผู้ดำเนินการ chosen in the assessment (S17); no choice here (CR-006). Fields: สิ่งที่ทำ* (≤ 500), รูปหลังซ่อม* (1–5). **Contractor job only:** **คะแนนช่างภายนอก*** stars (hint "เห็นเฉพาะช่าง Admin และผู้บริหาร"; if a score already exists from an earlier resolve it is optional and replaces the old one), ความเห็นต่อช่างภายนอก. Errors: กรุณาบอกสิ่งที่ทำ · แนบรูปหลังซ่อมอย่างน้อย 1 รูป · ให้คะแนนช่างภายนอก. Not allowed / not assessed → forbidden state with the reason. Success → toast "บันทึกผลซ่อมแล้ว ผู้แจ้งจะได้รับแจ้งให้ประเมิน" and back to S07.
 
 

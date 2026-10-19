@@ -2,15 +2,17 @@ import { cn } from "@/lib/utils";
 
 export type Priority = "critical" | "high" | "medium" | "low";
 
-// Labels from _common.md §2; colors from design-system.md (ปกติ / ต่ำ = muted).
-const PRIORITY: Record<Priority, { label: string; bars: number; color: string }> = {
-  critical: { label: "ฉุกเฉิน", bars: 3, color: "text-destructive" },
-  high: { label: "สูง", bars: 3, color: "text-priority-high" },
-  medium: { label: "ปกติ", bars: 2, color: "text-muted-foreground" },
-  low: { label: "ต่ำ", bars: 1, color: "text-muted-foreground" },
+// Labels from _common.md §2; colours from design-system.md (CR-008 priority tokens).
+const PRIORITY: Record<Priority, { label: string; bars: number; color: string; badge: string }> = {
+  critical: { label: "ฉุกเฉิน", bars: 3, color: "text-priority-critical", badge: "bg-priority-critical/10 text-priority-critical" },
+  high: { label: "สูง", bars: 3, color: "text-priority-high", badge: "bg-priority-high/10 text-priority-high" },
+  medium: { label: "ปกติ", bars: 2, color: "text-priority-medium", badge: "bg-priority-medium/10 text-priority-medium" },
+  low: { label: "ต่ำ", bars: 1, color: "text-priority-low", badge: "bg-priority-low/10 text-priority-low" },
 };
 
-/** Three bars + text. Color is never the only signal. */
+export const PRIORITY_LABEL = (p: Priority) => PRIORITY[p].label;
+
+/** Three bars + text (lists). Colour is never the only signal. */
 export function PriorityIndicator({ priority, className }: { priority: Priority; className?: string }) {
   const p = PRIORITY[priority];
   return (
@@ -23,6 +25,17 @@ export function PriorityIndicator({ priority, className }: { priority: Priority;
           />
         ))}
       </span>
+      {p.label}
+    </span>
+  );
+}
+
+/** Pill badge with a dot + label (S03 explanation, S05, S07 facts — design-system.md "Priority"). */
+export function PriorityBadge({ priority, className }: { priority: Priority; className?: string }) {
+  const p = PRIORITY[priority];
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[13.5px] font-semibold whitespace-nowrap", p.badge, className)}>
+      <span aria-hidden className="size-1.5 rounded-full bg-current" />
       {p.label}
     </span>
   );

@@ -23,7 +23,10 @@ import (
 
 type fakeRepo struct {
 	cats      map[uuid.UUID]bool               // id → active
+	catDef    map[uuid.UUID]string             // category → default priority
 	symptoms  map[uuid.UUID]uuid.UUID          // symptom → category
+	symPrio   map[uuid.UUID]string             // symptom → priority
+	recent    []RecentPlace                    // #28 result
 	floors    map[uuid.UUID]uuid.UUID          // floor → building
 	photos    map[uuid.UUID]*Photo             // all photos
 	photoAt   map[uuid.UUID]time.Time          // created at
@@ -34,11 +37,13 @@ type fakeRepo struct {
 	subs      map[uuid.UUID]map[uuid.UUID]bool // ticket → subscribers
 	inserted  []NewTicket
 	masterIns int
+	refreshed int
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		cats: map[uuid.UUID]bool{}, symptoms: map[uuid.UUID]uuid.UUID{}, floors: map[uuid.UUID]uuid.UUID{},
+		cats: map[uuid.UUID]bool{}, catDef: map[uuid.UUID]string{}, symptoms: map[uuid.UUID]uuid.UUID{},
+		symPrio: map[uuid.UUID]string{}, floors: map[uuid.UUID]uuid.UUID{},
 		photos: map[uuid.UUID]*Photo{}, photoAt: map[uuid.UUID]time.Time{},
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
@@ -55,6 +60,13 @@ func (f *fakeRepo) InsertMasterData(_ context.Context, cats []Category, _ []Buil
 		f.cats[c.ID] = true
 	}
 	return nil
+}
+func (f *fakeRepo) RefreshSampleData(context.Context, []Category, []SampleRename) error {
+	f.refreshed++
+	return nil
+}
+func (f *fakeRepo) ListRecentPlaces(context.Context, uuid.UUID) ([]RecentPlace, error) {
+	return f.recent, nil
 }
 
 func (f *fakeRepo) InsertPhoto(_ context.Context, p NewPhoto) error {
@@ -181,18 +193,21 @@ func (f *fakeRepo) InTx(ctx context.Context, fn func(tx TxRepository) error) err
 	return nil
 }
 
-func (f *fakeRepo) LockActiveCategory(_ context.Context, id uuid.UUID) (bool, error) {
-	return f.cats[id], nil
+func (f *fakeRepo) LockActiveCategory(_ context.Context, id uuid.UUID) (string, bool, error) {
+	if !f.cats[id] {
+		return "", false, nil
+	}
+	return f.catDef[id], true, nil
 }
 
-func (f *fakeRepo) CountActiveSymptoms(_ context.Context, categoryID uuid.UUID, ids []uuid.UUID) (int, error) {
-	n := 0
+func (f *fakeRepo) ActiveSymptomPriorities(_ context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error) {
+	var out []string
 	for _, id := range ids {
 		if c, ok := f.symptoms[id]; ok && c == categoryID {
-			n++
+			out = append(out, f.symPrio[id])
 		}
 	}
-	return n, nil
+	return out, nil
 }
 
 func (f *fakeRepo) ActiveFloorInBuilding(_ context.Context, floorID, buildingID uuid.UUID) (bool, error) {
@@ -226,10 +241,15 @@ func (f *fakeRepo) InsertTicket(_ context.Context, t NewTicket) error {
 		f.photos[pid].TicketID = &tid
 	}
 	reporter := t.ReporterID
+	var cat *Ref
+	if t.CategoryID != nil {
+		cat = &Ref{ID: *t.CategoryID}
+	}
 	f.tickets[t.ID] = &TicketDetail{
 		TicketSummary: TicketSummary{
-			ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority,
-			Category: Ref{ID: t.CategoryID}, Reporter: Person{ID: t.ReporterID}, CreatedAt: t.CreatedAt, UpdatedAt: t.CreatedAt,
+			ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority, PrioritySource: t.PrioritySource,
+			Category: cat, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther,
+			Reporter: Person{ID: t.ReporterID}, CreatedAt: t.CreatedAt, UpdatedAt: t.CreatedAt,
 		},
 		Photos:   t.PhotoIDs,
 		Timeline: []TimelineEvent{{ID: t.CreatedEventID, Type: EventCreated, Actor: &Person{ID: reporter}, At: t.CreatedAt}},
@@ -292,8 +312,11 @@ func newFixture(t *testing.T) *fixture {
 		reporter: Viewer{ID: uuid.New(), Role: users.RoleEmployee},
 	}
 	f.repo.cats[f.cat] = true
+	f.repo.catDef[f.cat] = PriorityLow
 	f.repo.symptoms[f.sym1] = f.cat
+	f.repo.symPrio[f.sym1] = PriorityMedium
 	f.repo.symptoms[f.sym2] = f.cat
+	f.repo.symPrio[f.sym2] = PriorityHigh
 	f.repo.floors[f.floor] = f.building
 	f.svc = NewService(f.repo, f.store)
 	f.svc.now = func() time.Time { return f.now }
@@ -324,7 +347,7 @@ func (f *fixture) upload(t *testing.T, v Viewer) uuid.UUID {
 func (f *fixture) input(photos ...uuid.UUID) CreateTicketInput {
 	return CreateTicketInput{
 		CategoryID: &f.cat, SymptomIDs: []uuid.UUID{f.sym1, f.sym2}, BuildingID: &f.building, FloorID: &f.floor,
-		LocationDetail: " ห้องประชุม 5B ", Details: "น้ำหยดใส่โต๊ะประชุม", Priority: PriorityHigh, PhotoIDs: photos,
+		LocationDetail: " ห้องประชุม 5B ", Details: "น้ำหยดใส่โต๊ะประชุม", PhotoIDs: photos,
 	}
 }
 
@@ -361,8 +384,11 @@ func TestValidateCreate(t *testing.T) {
 		{"symptoms", func(in *CreateTicketInput) { in.SymptomIDs = nil }, "symptomIds", "MIN_ITEMS"},
 		{"building", func(in *CreateTicketInput) { in.BuildingID = nil }, "buildingId", "REQUIRED"},
 		{"floor", func(in *CreateTicketInput) { in.FloorID = nil }, "floorId", "REQUIRED"},
-		{"priority", func(in *CreateTicketInput) { in.Priority = "" }, "priority", "REQUIRED"},
-		{"priority value", func(in *CreateTicketInput) { in.Priority = "urgent" }, "priority", "INVALID"},
+		{"typed category without symptom", func(in *CreateTicketInput) { in.CategoryID, in.CategoryOther = nil, "ลิฟต์" }, "symptomOther", "REQUIRED"},
+		{"category other too long", func(in *CreateTicketInput) {
+			in.CategoryID, in.CategoryOther, in.SymptomOther = nil, strings.Repeat("ก", 101), "ค้าง"
+		}, "categoryOther", "TOO_LONG"},
+		{"symptom other too long", func(in *CreateTicketInput) { in.SymptomOther = strings.Repeat("ก", 101) }, "symptomOther", "TOO_LONG"},
 		{"no photo", func(in *CreateTicketInput) { in.PhotoIDs = nil }, "photoIds", "MIN_ITEMS"},
 		{"six photos", func(in *CreateTicketInput) {
 			in.PhotoIDs = []uuid.UUID{uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()}
@@ -391,8 +417,88 @@ func TestValidateCreate(t *testing.T) {
 	}
 
 	_, err := f.svc.CreateTicket(context.Background(), f.reporter, CreateTicketInput{})
-	if e, ok := apperr.As(err); !ok || e.Code != "VALIDATION_FAILED" || len(e.Fields) != 6 {
+	if e, ok := apperr.As(err); !ok || e.Code != "VALIDATION_FAILED" || len(e.Fields) != 4 {
 		t.Fatalf("empty form: %v", err)
+	}
+
+	// CR-008: a typed symptom is enough; a typed category drops listed symptoms; a listed
+	// category wins over a typed one.
+	in = full
+	in.SymptomIDs, in.SymptomOther = nil, " มีควัน "
+	if out, fields = validateCreate(in); len(fields) != 0 || out.SymptomOther != "มีควัน" {
+		t.Fatalf("typed symptom only: %v %q", fields, out.SymptomOther)
+	}
+	in = full
+	in.CategoryID, in.CategoryOther, in.SymptomOther = nil, "ลิฟต์", "ค้าง"
+	if out, fields = validateCreate(in); len(fields) != 0 || out.SymptomIDs != nil {
+		t.Fatalf("typed category: %v %v", fields, out.SymptomIDs)
+	}
+	in = full
+	in.CategoryOther = "ลิฟต์"
+	if out, _ = validateCreate(in); out.CategoryOther != "" {
+		t.Fatalf("listed category kept typed name %q", out.CategoryOther)
+	}
+}
+
+// ---- BR-F02-2 (CR-008): the system sets the priority ----
+
+func TestTicketPriority(t *testing.T) {
+	cases := []struct {
+		name         string
+		syms         []string
+		def          string
+		typed        bool
+		want, source string
+	}{
+		{"most urgent symptom", []string{PriorityLow, PriorityCritical, PriorityMedium}, PriorityLow, false, PriorityCritical, PrioritySourceSymptom},
+		{"one symptom", []string{PriorityHigh}, PriorityLow, false, PriorityHigh, PrioritySourceSymptom},
+		{"typed symptom only", nil, PriorityHigh, false, PriorityHigh, PrioritySourceCategory},
+		{"no category default", nil, "", false, PriorityMedium, PrioritySourceDefault},
+		{"typed category", []string{PriorityCritical}, PriorityHigh, true, PriorityMedium, PrioritySourceDefault},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p, src := ticketPriority(tc.syms, tc.def, tc.typed)
+			if p != tc.want || src != tc.source {
+				t.Fatalf("got %s/%s, want %s/%s", p, src, tc.want, tc.source)
+			}
+		})
+	}
+}
+
+func TestCreateTicketSetsPriority(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	d := f.create(t) // sym1 medium + sym2 high
+	if d.Priority != PriorityHigh || d.PrioritySource != PrioritySourceSymptom {
+		t.Fatalf("symptoms: %s/%s", d.Priority, d.PrioritySource)
+	}
+
+	in := f.input(f.upload(t, f.reporter))
+	in.SymptomIDs, in.SymptomOther = nil, "มีควัน"
+	d, err := f.svc.CreateTicket(ctx, f.reporter, in)
+	if err != nil || d.Priority != PriorityLow || d.PrioritySource != PrioritySourceCategory || *d.SymptomOther != "มีควัน" {
+		t.Fatalf("typed symptom: %s/%s err=%v", d.Priority, d.PrioritySource, err)
+	}
+
+	in = f.input(f.upload(t, f.reporter))
+	in.CategoryID, in.CategoryOther, in.SymptomOther = nil, "ลิฟต์", "ค้างระหว่างชั้น"
+	d, err = f.svc.CreateTicket(ctx, f.reporter, in)
+	if err != nil || d.Category != nil || *d.CategoryOther != "ลิฟต์" || d.Priority != PriorityMedium || d.PrioritySource != PrioritySourceDefault {
+		t.Fatalf("typed category: %+v err=%v", d.TicketSummary, err)
+	}
+	if ins := f.repo.inserted[len(f.repo.inserted)-1]; ins.CategoryID != nil || len(ins.SymptomIDs) != 0 {
+		t.Fatalf("typed category inserted %v %v", ins.CategoryID, ins.SymptomIDs)
+	}
+}
+
+func TestRecentPlaces(t *testing.T) {
+	f := newFixture(t)
+	f.repo.recent = []RecentPlace{{Building: Ref{ID: f.building}, Floor: Ref{ID: f.floor}}}
+	got, err := f.svc.RecentPlaces(context.Background(), f.reporter)
+	if err != nil || len(got) != 1 || got[0].Floor.ID != f.floor {
+		t.Fatalf("recent places: %v %v", got, err)
 	}
 }
 
@@ -720,8 +826,8 @@ func TestPurgeUnattachedPhotos(t *testing.T) {
 
 func TestEnsureSampleDataOnlyWhenEmpty(t *testing.T) {
 	f := newFixture(t) // has one category already
-	if seeded, err := f.svc.EnsureSampleData(context.Background()); seeded || err != nil {
-		t.Fatalf("seeded into non-empty db: %v %v", seeded, err)
+	if seeded, err := f.svc.EnsureSampleData(context.Background()); seeded || err != nil || f.repo.refreshed != 1 {
+		t.Fatalf("seeded into non-empty db: %v %v refreshed=%d", seeded, err, f.repo.refreshed)
 	}
 	empty := NewService(newFakeRepo(), newMemStore())
 	seeded, err := empty.EnsureSampleData(context.Background())
@@ -730,5 +836,22 @@ func TestEnsureSampleDataOnlyWhenEmpty(t *testing.T) {
 	}
 	if a, b := sampleCategories()[0].ID, sampleCategories()[0].ID; a != b {
 		t.Fatal("sample ids must be stable")
+	}
+}
+
+func TestSampleDataCR008(t *testing.T) {
+	for _, c := range sampleCategories() {
+		if priorityRank(c.DefaultPriority) < 0 {
+			t.Fatalf("%s: default %q", c.Name, c.DefaultPriority)
+		}
+		for _, s := range c.Symptoms {
+			if priorityRank(s.Priority) < 0 {
+				t.Fatalf("%s/%s: priority %q", c.Name, s.Name, s.Priority)
+			}
+		}
+	}
+	b, rn := sampleBuildings(), sampleBuildingRenames()
+	if b[0].Name != "อาคารฝั่ง Office" || rn[0].ID != b[0].ID || rn[0].From != "อาคารหลัก" {
+		t.Fatalf("renamed building keeps its id: %+v %+v", b[0], rn[0])
 	}
 }

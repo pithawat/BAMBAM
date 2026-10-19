@@ -2,10 +2,24 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-009 (approved 2026-10-18):** wording — ขั้นตอน (CR-009): แจ้งงาน → **รับเรื่อง** (ทันทีที่ส่ง, `awaiting_assessment`) → **กำลังดำเนินการ** (`in_repair`) → **ส่งกลับให้แก้** (`reworking`, เฉพาะเมื่อถูกส่งกลับ) → **เสร็จ · รอประเมินตรวจงาน** (`awaiting_rating`; ผู้แจ้งเห็น `รอคุณประเมินตรวจงาน`) → **ปิดงานแล้ว** (`closed`). ปุ่มช่าง `เริ่มดำเนินการ` (กำหนดวันเสร็จ + ใครซ่อม) · ปุ่มผู้แจ้ง `ประเมินตรวจงาน` (ดาว 1–5). Supersedes the CR-008 wording line below (D-060).
+
+
+> **CR-008 (approved 2026-10-16):** visual style = `docs/shared/design-system.md` (rewritten by CR-008: demo.css look, Anuphan only, no gradient headers). Sample buildings renamed (ids unchanged): อาคารหลัก → **อาคารฝั่ง Office** (7 floors) · อาคารด้านหลัง → **อาคาร Office โรงงานบางซ่อน** (2 floors). Sample symptom priorities — ระบบปรับอากาศ: แอร์ไม่เย็น ปกติ · มีน้ำหยด สูง · มีเสียงดัง ปกติ · มีกลิ่นอับ ต่ำ · เปิดไม่ติด สูง · ไฟฟ้าและแสงสว่าง (default สูง): ไฟไม่ติด ปกติ · ไฟกะพริบ ต่ำ · ปลั๊กไม่มีไฟ ปกติ · เบรกเกอร์ตัด ฉุกเฉิน · ประปาและสุขภัณฑ์: น้ำรั่ว สูง · ท่อตัน ปกติ · ชักโครกกดไม่ลง ปกติ · น้ำไม่ไหล สูง · อาคารและเฟอร์นิเจอร์ (default ต่ำ): ประตูปิดไม่สนิท ต่ำ · กระเบื้องแตก ปกติ · เก้าอี้ชำรุด ต่ำ · ฝ้าเพดานรั่ว สูง · ความสะอาด: พื้นเปียก สูง · ขยะล้น ปกติ · มีกลิ่นไม่พึงประสงค์ ต่ำ (other defaults ปกติ). Wording: technician "รับเรื่อง", reporter "ให้คะแนน", "ช่างของบริษัท".
+
+
 <!-- Written by Claude in /ui-spec (2026-10-14). Every screen spec (S01–S16) refers to this file.
      Rules here apply to all screens unless a spec says otherwise. Tokens and components: docs/shared/design-system.md -->
 
 ## 1. App shell per role
+
+> **CR-010 (approved 2026-10-18) — replaces the bottom nav, the sidebar, the desktop top bar utilities and the role switcher placement below (D-064).**
+> - **Top navbar (`AppNavbar`, every role, every page):** BAMBAM logo (→ `/`) · หน้าแรก · แจ้งซ่อม · จองรถ · จองห้องประชุม (same size, icon and padding; only the current one is active) · bell (→ `/notifications`) · account (avatar; desktop adds name + role label) → menu `โปรไฟล์` (`/profile`) · `ออกจากระบบ` (S14 confirm). No repair CTA, no mascot. Desktop (≥ `lg`): floating white bar, sticky 12px from the top, max 1280px. Phone / tablet: brand row + a full-width row of the three services; scrolls away so page sticky bars (back bar, form actions) keep the top / bottom edge. (CR-010)
+> - **Service links:** แจ้งซ่อม → `/repair/my` (technician `/repair/work`), active on every `/repair/*` route · จองรถ → `/car-booking` · จองห้องประชุม → `/room-booking`; both show "เร็วๆ นี้" pages (no booking form) until their modules exist. (CR-010)
+> - **Repair section nav (`RepairNav`):** on the repair list pages, for roles with staff tools only — technician: ติดตามงานซ่อม · งานซ่อม · ช่างภายนอก; admin / executive: ติดตามงานซ่อม · งานทั้งหมด · ช่างภายนอก · ภาพรวมอาคาร (same links as the old sidebar). Employees and leads reach แจ้งซ่อมใหม่ from S06. (CR-010)
+> - **No bottom nav, no sidebar.** The สแกน shortcut returns with Stage 5 inside the repair screens. (CR-010)
+> - **Role switcher (dev / UAT only):** one 28px amber strip above the navbar on every width: `{ENV} · กำลังดูในบทบาท: {role} · เปลี่ยน` (sheet on phones, popover on desktop). (CR-010)
+> - **Page headers:** keep the mobile header variants below, but none of them carries the bell or the role switcher any more; desktop shows the H1 title (+ search / action). (CR-010)
 
 Layouts switch at `lg` (1024px) — mobile app layout below, desktop web layout from it (D-008).
 

@@ -15,10 +15,10 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   MASTER_DATA_CHANGED: "ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่",
   TEAM_HANDLED_NOT_ALLOWED: "คุณไม่มีสิทธิ์ทำรายการนี้",
   NOT_TECHNICIAN: "เฉพาะช่างเท่านั้นที่ทำรายการนี้ได้",
-  NOT_REPORTER: "เฉพาะผู้แจ้งเท่านั้นที่ประเมินงานได้",
+  NOT_REPORTER: "เฉพาะผู้แจ้งเท่านั้นที่ประเมินตรวจงานได้",
   TICKET_CLOSED: "งานนี้ปิดไปแล้ว",
   INVALID_STATE: "งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว",
-  ASSESSMENT_REQUIRED: "ประเมินงาน (วันที่คาดว่าจะเสร็จ และผู้ดำเนินการ) ก่อนบันทึกผล",
+  ASSESSMENT_REQUIRED: "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และใครซ่อม) ก่อนบันทึกผล",
   CONTRACTOR_NOT_FOUND: "ไม่พบช่างภายนอกนี้ หรือถูกปิดใช้งานแล้ว",
   CONTRACTOR_TYPE_NOT_FOUND: "ประเภทช่างบางรายการไม่มีในระบบแล้ว เลือกใหม่อีกครั้ง",
   ALREADY_FOLLOWING: "คุณติดตามเคสนี้อยู่แล้ว",
@@ -49,10 +49,12 @@ export function errorCode(err: unknown): RepairErrorCode | undefined {
 
 // ---- field errors (VALIDATION_FAILED) ----
 
-/** S03 "Validation": `field` + `FieldCode` → message. */
+/** S03 "Validation" (CR-008): `field` + `FieldCode` → message. */
 const createTicketFieldMessages: Record<string, Partial<Record<FieldCode, string>>> = {
   categoryId: { REQUIRED: "กรุณาเลือกหมวดงาน", INVALID: "กรุณาเลือกหมวดงาน" },
-  symptomIds: { MIN_ITEMS: "เลือกอาการอย่างน้อย 1 ข้อ", INVALID: "เลือกอาการอย่างน้อย 1 ข้อ" },
+  categoryOther: { REQUIRED: "ระบุหมวดงาน", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
+  symptomIds: { MIN_ITEMS: "เลือกอาการอย่างน้อย 1 ข้อ หรือระบุอาการอื่นๆ", INVALID: "เลือกอาการอย่างน้อย 1 ข้อ" },
+  symptomOther: { REQUIRED: "ระบุอาการที่พบ", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
   buildingId: { REQUIRED: "กรุณาเลือกอาคาร", INVALID: "กรุณาเลือกอาคาร" },
   floorId: { REQUIRED: "กรุณาเลือกชั้น", INVALID: "กรุณาเลือกชั้น" },
   locationDetail: { TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
@@ -62,7 +64,6 @@ const createTicketFieldMessages: Record<string, Partial<Record<FieldCode, string
     INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น",
   },
   details: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
-  priority: { REQUIRED: "กรุณาเลือกความเร่งด่วน", INVALID: "กรุณาเลือกความเร่งด่วน" },
   "teamHandled.note": { REQUIRED: "กรุณาบอกสิ่งที่ทีมทำ", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
   "teamHandled.photoIds": { MIN_ITEMS: "แนบรูปหลังทำอย่างน้อย 1 รูป" },
 };
@@ -90,11 +91,12 @@ export function fieldErrors(err: unknown, map: FieldMessages): Record<string, st
   return out;
 }
 
-/** S17 assess. */
+/** S17 รับเรื่อง / เลื่อนวันเสร็จ. */
 export const assessFieldMessages: FieldMessages = {
   expectedDoneOn: { REQUIRED: "เลือกวันที่คาดว่าจะเสร็จ", INVALID: "เลือกวันที่คาดว่าจะเสร็จ", PAST: "เลือกวันนี้หรือหลังจากนี้" },
-  workBy: { REQUIRED: "เลือกผู้ดำเนินการ", INVALID: "เลือกผู้ดำเนินการ" },
+  workBy: { REQUIRED: "เลือกใครซ่อม", INVALID: "เลือกใครซ่อม" },
   contractorId: { REQUIRED: "เลือกช่างภายนอก", INVALID: "เลือกช่างภายนอก" },
+  reason: { TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
 };
 
 /** S10 resolve. */
@@ -107,7 +109,7 @@ export const resolveFieldMessages: FieldMessages = {
 
 /** S08 confirm + send back. */
 export const reviewFieldMessages: FieldMessages = {
-  rating: { REQUIRED: "กรุณาให้คะแนน", INVALID: "กรุณาให้คะแนน" },
+  rating: { REQUIRED: "เลือกคะแนน 1–5 ดาวก่อน", INVALID: "เลือกคะแนน 1–5 ดาวก่อน" },
   comment: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
   reason: { REQUIRED: "กรุณาบอกสิ่งที่ยังไม่เรียบร้อย", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
   photoIds: { MAX_ITEMS: "แนบได้สูงสุด 5 รูป", INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" },

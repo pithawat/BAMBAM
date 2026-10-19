@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getBuildings, getTicketCounts, getTickets } from "../api";
 import type { Building, TicketCounts, TicketStep, TicketSummary } from "../types";
-import { dayLabel, listDate, ticketHref, ticketLocation, ticketTitle, todayBangkok } from "./ticket-presentation";
+import { categoryName, dayLabel, listDate, ticketHref, ticketLocation, ticketTitle, todayBangkok } from "./ticket-presentation";
 import { TicketProgressMini, TicketThumb } from "./ticket-progress";
 import { TicketLink } from "./ticket-navigation";
 
@@ -26,9 +26,9 @@ import { TicketLink } from "./ticket-navigation";
 
 type Tab = "assess" | "repair" | "rating";
 const TABS: Record<Tab, { label: string; steps: TicketStep[]; count: (c: TicketCounts) => number; empty: string }> = {
-  assess: { label: "รอประเมิน", steps: ["awaiting_assessment"], count: (c) => c.awaitingAssessment, empty: "ไม่มีงานรอประเมิน" },
-  repair: { label: "กำลังซ่อม", steps: ["in_repair", "reworking"], count: (c) => c.inRepair, empty: "ไม่มีงานที่กำลังซ่อม" },
-  rating: { label: "รอผู้แจ้งประเมิน", steps: ["awaiting_rating"], count: (c) => c.resolved, empty: "ไม่มีงานที่รอผู้แจ้งประเมิน" },
+  assess: { label: "รับเรื่อง", steps: ["awaiting_assessment"], count: (c) => c.awaitingAssessment, empty: "ไม่มีงานที่รอเริ่มดำเนินการ" },
+  repair: { label: "กำลังดำเนินการ", steps: ["in_repair", "reworking"], count: (c) => c.inRepair, empty: "ไม่มีงานที่กำลังดำเนินการ" },
+  rating: { label: "รอประเมินตรวจงาน", steps: ["awaiting_rating"], count: (c) => c.resolved, empty: "ไม่มีงานที่รอผู้แจ้งประเมินตรวจงาน" },
 };
 const PAGE_SIZE = 20;
 
@@ -110,7 +110,7 @@ function WorkRow({ ticket }: { ticket: TicketSummary }) {
     <TicketThumb ticket={ticket} />
     <div className="min-w-0 flex-1 space-y-1">
       <div className="flex items-center gap-2"><h3 className="min-w-0 flex-1 truncate font-sans text-base font-semibold">{ticketTitle(ticket)}</h3><PriorityIndicator priority={ticket.priority} /></div>
-      <p className="truncate text-xs leading-5 text-muted-foreground">{ticket.category.name} · {ticketLocation(ticket)}</p>
+      <p className="truncate text-xs leading-5 text-muted-foreground">{categoryName(ticket)} · {ticketLocation(ticket)}</p>
       <p className="text-xs text-muted-foreground">{ticket.ticketNo} · {ticket.reporter.name} · แจ้ง {listDate(ticket.createdAt)}</p>
       <TicketProgressMini ticket={ticket} />
       {ticket.expectedDoneOn && ticket.status === "in_progress" && <p className={cn("inline-flex items-center gap-1 text-xs font-medium", late ? "text-destructive" : "text-status-in-progress")}>

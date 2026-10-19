@@ -1,6 +1,6 @@
 # S23 — ประเภทผู้รับเหมา
 
-Status: DRAFT
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
 - **Flows:** F28 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop (see ../../01-users.md)

@@ -38,16 +38,31 @@ test.describe("signed out", () => {
 test.describe("employee session", () => {
   test.use({ storageState: auth("employee") });
 
-  test("sees the app shell with their name", async ({ page, isMobile }) => {
+  test("sees the top navbar with three equal services and their account (CR-010)", async ({ page }) => {
     await page.goto("/");
-    if (isMobile) {
-      await expect(page.getByRole("navigation", { name: "เมนูหลัก" })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "สวัสดี คุณวรรณา" })).toBeVisible();
-    } else {
-      await expect(page.getByRole("link", { name: /^ติดตามงาน/ }).filter({ visible: true }).first()).toBeVisible();
-      await expect(page.getByText("วรรณา สุขประเสริฐ").filter({ visible: true }).first()).toBeVisible();
-      await expect(page.getByText("เร็วๆ นี้").filter({ visible: true }).first()).toBeVisible();
-    }
+    const nav = page.getByRole("navigation", { name: "บริการหลัก" }).filter({ visible: true });
+    for (const service of ["แจ้งซ่อม", "จองรถ", "จองห้องประชุม"]) await expect(nav.getByRole("link", { name: service })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "สวัสดี คุณวรรณา" }).filter({ visible: true }).first()).toBeVisible();
+    const account = page.getByRole("button", { name: /เมนูบัญชี วรรณา สุขประเสริฐ/ });
+    await account.click();
+    await expect(page.getByRole("menuitem", { name: "โปรไฟล์" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(account).toBeFocused();
+  });
+
+  test("car booking opens the not-yet-open page", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "บริการหลัก" }).filter({ visible: true }).getByRole("link", { name: "จองรถ" }).click();
+    await expect(page).toHaveURL(/\/car-booking$/);
+    await expect(page.getByText("บริการนี้กำลังเตรียมเปิดให้ใช้งาน")).toBeVisible();
+  });
+
+  test("logout from the account menu asks to confirm", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /เมนูบัญชี/ }).click();
+    await page.getByRole("menuitem", { name: "ออกจากระบบ" }).click();
+    await expect(page.getByRole("alertdialog", { name: "ออกจากระบบ?" })).toBeVisible();
+    await page.getByRole("button", { name: "ยกเลิก" }).click();
   });
 
   test("profile shows SSO data, role and the demo-user note", async ({ page }) => {
@@ -64,7 +79,7 @@ test.describe("role switcher", () => {
 
   test("switching to technician reloads Home as the technician demo user", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: /ดูในบทบาท: พนักงานทั่วไป/ }).click();
+    await page.getByRole("button", { name: /กำลังดูในบทบาท: พนักงานทั่วไป/ }).click();
     await page.getByRole("radio", { name: /ช่างเทคนิค/ }).click();
     await page.getByRole("button", { name: "สลับบทบาท" }).click();
     await expect(page.getByText("กำลังดูในบทบาท ช่างเทคนิค")).toBeVisible();
@@ -77,10 +92,10 @@ test.describe("role switcher", () => {
 test.describe("admin session", () => {
   test.use({ storageState: auth("admin") });
 
-  test("desktop sidebar shows the admin repair menu", async ({ page, isMobile }) => {
-    test.skip(isMobile, "sidebar is desktop only");
-    await page.goto("/");
-    await expect(page.getByText("จัดการงานซ่อม")).toBeVisible();
-    await expect(page.getByRole("link", { name: "ภาพรวมอาคาร" })).toBeVisible();
+  test("repair section nav shows the admin repair menu (CR-010)", async ({ page }) => {
+    await page.goto("/repair/my");
+    const nav = page.getByRole("navigation", { name: "เมนูงานซ่อม" });
+    await expect(nav.getByRole("link", { name: "งานทั้งหมด" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "ภาพรวมอาคาร" })).toBeAttached();
   });
 });

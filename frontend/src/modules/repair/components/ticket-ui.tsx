@@ -3,19 +3,13 @@
 import Link from "next/link";
 import { Copy, Star } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState, ForbiddenState } from "@/components/shared/states";
 import { cn } from "@/lib/utils";
 import { errorCode, GENERIC_ERROR } from "../errors";
-import type { TicketStep } from "../types";
-import { RATING_LABELS, STEP } from "./ticket-presentation";
-
-export function TicketStatusBadge({ step }: { step: TicketStep }) {
-  return <Badge className={cn("max-w-full gap-1.5 whitespace-normal border-0 px-2.5 py-1 text-xs", STEP[step].color)}><span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />{STEP[step].label}</Badge>;
-}
+import { RATING_LABELS } from "./ticket-presentation";
 
 export function CopyTicketNumber({ value, large = false }: { value: string; large?: boolean }) {
   async function copy() {

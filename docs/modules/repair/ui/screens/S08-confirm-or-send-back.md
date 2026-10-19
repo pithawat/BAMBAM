@@ -1,6 +1,14 @@
 # S08 — ตรวจรับ / ส่งกลับให้แก้
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · rating dialog refined by CR-012 (approved 2026-10-19)
+
+> **CR-012 (approved 2026-10-19, D-067) — rating dialog:** title `ประเมินงานซ่อม` · context box (wrench, ticket title, `{จุดที่เกิด or อาคาร} · ชั้น {n} · ซ่อมเสร็จ {date}`) · `คุณพอใจกับงานซ่อมครั้งนี้แค่ไหน?` / `เลือกคะแนนที่ตรงกับประสบการณ์ของคุณ` · five star options with their number (radio group, arrows / Home / End), empty unless opened from a star on S07 · feedback `{n} / 5 · {label}` or `ยังไม่ได้เลือกคะแนน` · 1–2 stars keep the send-back hint · `มีอะไรอยากบอกเราเพิ่มเติม?` `ไม่บังคับ` · `เมื่อยืนยันผลประเมิน งานนี้จะถูกปิด` · full-width primary `ยืนยันผลประเมิน →`, disabled until a score is picked. Picking a star never submits. Toast unchanged. Send-back dialog unchanged.
+
+> **CR-009 (approved 2026-10-18):** title `ประเมินตรวจงาน` · `งานซ่อมเรียบร้อยดีไหม เลือกคะแนน 1–5 ดาว แล้วงานนี้จะปิด` · button `ประเมินและปิดงาน` · toast `ขอบคุณที่ประเมินตรวจงาน งานนี้ปิดแล้ว`. Stars still empty by default; 1–2 stars → send-back hint.
+
+
+> **CR-008 (approved 2026-10-16):** title `งานซ่อมเรียบร้อยดีไหม` · `เลือกคะแนน 1–5 ดาว แล้วงานนี้จะปิด` · stars start **empty** (or at the star tapped on S07) · label `{n} ดาว · {ต้องปรับปรุง…ยอดเยี่ยม}` · 1–2 stars → warning `ยังไม่เรียบร้อยใช่ไหม? ถ้ายังมีปัญหา ส่งกลับให้แก้แทนได้ ช่างจะกลับมาแก้ในงานเดิม` + link `ส่งกลับให้แก้แทน` · no score → `เลือกคะแนน 1–5 ดาวก่อน` · button `ให้คะแนนและปิดงาน`. Send back: `ส่งกลับให้ช่างแก้ไข` · `ยังพบปัญหาอะไร *`. Mockup: `../../changes/CR-008/ticket-detail.html`.
+
 
 > **CR-005 (2026-10-15):** "ตรวจรับ" → **"ประเมินงาน"**: stars 1–5 are **required** ("กรุณาให้คะแนน"), comment optional ≤ 500; buttons "ไว้ทีหลัง" / "ส่งคะแนน". Send back: reason required ("กรุณาบอกสิ่งที่ยังไม่เรียบร้อย"), photos 0–5, button "ส่งกลับให้แก้" (destructive); after it the ticket moves on to "แก้ไขตามที่ส่งกลับ" (no reserved job). Both are dialogs from the S07 action bar (bottom sheet look on mobile).
 

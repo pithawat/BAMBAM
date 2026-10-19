@@ -67,13 +67,14 @@ type RepairBuilding struct {
 }
 
 type RepairCategory struct {
-	ID        uuid.UUID
-	Name      string
-	Icon      string
-	SortOrder int32
-	IsActive  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID              uuid.UUID
+	Name            string
+	Icon            string
+	SortOrder       int32
+	IsActive        bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DefaultPriority string
 }
 
 type RepairContractor struct {
@@ -149,6 +150,7 @@ type RepairSymptom struct {
 	IsActive   bool
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	Priority   string
 }
 
 type RepairTicket struct {
@@ -157,7 +159,7 @@ type RepairTicket struct {
 	Status                  string
 	ClosedReason            *string
 	Priority                string
-	CategoryID              uuid.UUID
+	CategoryID              *uuid.UUID
 	BuildingID              uuid.UUID
 	FloorID                 uuid.UUID
 	LocationDetail          *string
@@ -181,6 +183,9 @@ type RepairTicket struct {
 	ContractorID            *uuid.UUID
 	ContractorRating        *int16
 	ContractorRatingComment *string
+	CategoryOther           *string
+	SymptomOther            *string
+	PrioritySource          string
 }
 
 type RepairTicketCounter struct {

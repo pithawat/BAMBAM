@@ -15,10 +15,10 @@
 
 | Key | Name (TH) | Purpose | Main users | Phase | Stage | Status |
 |---|---|---|---|---|---|---|
-| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 1 of 9 | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stage 1 in progress |
+| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 1–2 of 8 | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stages 1–2 built, waiting acceptance; CR-008 (L) proposed 2026-10-16 |
 | `car_booking` | ระบบจองรถ | จองรถส่วนกลาง | ✏️ | – | – | brief needed |
 | `room_booking` | ระบบจองห้องประชุม | จองห้องประชุม | ✏️ | – | – | brief needed |
-| `settings` | ตั้งค่าระบบ (Superadmin) | ตั้งค่า master ผังอาคาร role / สิทธิ์ และผู้ใช้ ใช้ร่วมทั้ง 3 ระบบ | `super_admin` | P4 | 0 of 6 | flows approved 2026-10-16; UI spec + plan + CR-007 drafted, waiting for approval |
+| `settings` | ตั้งค่าระบบ (Superadmin) | ตั้งค่า master ผังอาคาร role / สิทธิ์ และผู้ใช้ ใช้ร่วมทั้ง 3 ระบบ | `super_admin` | P5 | 0 of 6 | screens + plan + CR-007 approved 2026-10-16; Stage 1 next |
 
 Cross-module dependencies: ผู้ใช้และ role อยู่ที่ `platform` ใช้ร่วมกันทั้ง 3 ระบบ (D-003, D-004); role / สิทธิ์ / ผู้ใช้ และ master (อาคาร ชั้น ห้อง หมวดงาน ประเภทผู้รับเหมา) ตั้งค่าในโมดูล `settings` (D-043–D-047). หน้าแรก (Home) รวมบริการทั้ง 3 ระบบ
 

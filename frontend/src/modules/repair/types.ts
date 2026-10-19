@@ -1,4 +1,4 @@
-// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–2 endpoints, CR-005).
+// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–2 endpoints, CR-005, CR-008).
 // Field names are fixed by the contract — change only through a CR.
 
 import type { Ref } from "@/lib/platform/types";
@@ -20,6 +20,13 @@ export type ClosedReason = (typeof CLOSED_REASONS)[number];
 /** Most urgent first (BR-F21-1). */
 export const PRIORITIES = ["critical", "high", "medium", "low"] as const;
 export type Priority = (typeof PRIORITIES)[number];
+
+/**
+ * How the priority was set (CR-008): `symptom` (most urgent picked symptom) · `category` (only a typed
+ * symptom → the category default) · `default` (category "อื่นๆ" → medium) · `admin` (#20) ·
+ * `reporter` (tickets created before CR-008).
+ */
+export type PrioritySource = "symptom" | "category" | "default" | "admin" | "reporter";
 
 /** Who did the work, recorded when the technician resolves the ticket. */
 export type WorkBy = "in_house" | "contractor";
@@ -60,9 +67,14 @@ export type TicketSummary = {
   step: TicketStep;
   closedReason: ClosedReason | null;
   priority: Priority;
-  category: Ref;
-  /** Title = symptom names joined with " · " (_common.md §3). */
+  prioritySource: PrioritySource;
+  /** `null` when the reporter typed the category ("อื่นๆ", CR-008) → `categoryOther`. */
+  category: Ref | null;
+  categoryOther: string | null;
+  /** Title = symptom names, then `symptomOther`, joined with " · " (_common.md §3). */
   symptoms: Ref[];
+  /** The typed symptom ("อาการอื่นๆ", CR-008). */
+  symptomOther: string | null;
   building: Ref;
   /** `floor.name` is the display name ("5"); render `{building} ชั้น {floor}`. */
   floor: Ref;
@@ -109,6 +121,8 @@ export type TimelineEventData = {
   workBy?: WorkBy;
   from?: Priority;
   to?: Priority;
+  /** `assessment_changed`: why the date moved, shown to the reporter (CR-008). */
+  reason?: string;
 };
 
 export type TimelineEvent = {
@@ -139,12 +153,16 @@ export type TicketDetail = TicketSummary & {
 
 // ---- #1 GET /repair/categories ----
 
+export type Symptom = Ref & { priority: Priority };
+
 export type Category = {
   id: string;
   name: string;
   /** lucide icon name (kebab-case); fall back to `wrench`. */
   icon: string;
-  symptoms: Ref[];
+  /** Used when the reporter only types a symptom (CR-008). */
+  defaultPriority: Priority;
+  symptoms: Symptom[];
 };
 
 // ---- #2 GET /repair/buildings ----
@@ -156,14 +174,19 @@ export type Building = { id: string; name: string; floors: Floor[] };
 
 // ---- #5 POST /repair/tickets ----
 
+/**
+ * CR-008: no `priority` — the server sets it. Send `categoryId` or `categoryOther` (then no
+ * `symptomIds` and a `symptomOther`); with `categoryId`: ≥ 1 symptom or `symptomOther`.
+ */
 export type CreateTicketRequest = {
-  categoryId: string;
+  categoryId?: string;
+  categoryOther?: string;
   symptomIds: string[];
+  symptomOther?: string;
   buildingId: string;
   floorId: string;
   locationDetail?: string;
   details?: string;
-  priority: Priority;
   photoIds: string[];
   /** Filled from QR (Stage 5). */
   assetCode?: string;
@@ -217,8 +240,13 @@ export type TicketCounts = {
 
 // ---- #9–#12 ticket actions ----
 
-/** The assessment (CR-006): expected finish date + who does the work. */
-export type AssessRequest = { expectedDoneOn: string; workBy: WorkBy; contractorId?: string };
+/** The assessment (CR-006): expected finish date + who does the work; `reason` only on a change (CR-008, ≤ 100). */
+export type AssessRequest = { expectedDoneOn: string; workBy: WorkBy; contractorId?: string; reason?: string };
+
+// ---- #28 GET /repair/me/recent-places (CR-008) ----
+
+/** "ที่เคยแจ้ง" on S03: max 3, newest first, never preselected. */
+export type RecentPlace = { building: Ref; floor: Ref; locationDetail: string | null; lastReportedAt: string };
 
 /** `contractorRating` is required for a contractor job that has no rating yet. */
 export type ResolveRequest = {
@@ -268,6 +296,7 @@ export type ContractorJob = {
   ticketId: string;
   ticketNo: string;
   status: TicketStatus;
+  /** The typed name (no id) for an "อื่นๆ" ticket. */
   category: Ref;
   resolvedAt: string | null;
   contractorRating: number | null;

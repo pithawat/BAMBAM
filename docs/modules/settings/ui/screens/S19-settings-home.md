@@ -1,6 +1,6 @@
 # S19 — ตั้งค่าระบบ (หน้ารวม)
 
-Status: DRAFT
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
 - **Flows:** F25 step 3 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop; on mobile from โปรไฟล์ (see ../../01-users.md)

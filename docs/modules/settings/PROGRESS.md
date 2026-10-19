@@ -2,7 +2,7 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P3 + P4 drafted (waiting for approval)   **Stage:** 0 of 6   **Updated:** 2026-10-16
+**Phase:** P5 Build (ready)   **Stage:** 0 of 6   **Updated:** 2026-10-16
 
 ## Now
 
@@ -10,13 +10,12 @@
 - P3 drafted: `ui/screens/_common.md`, S19–S26 specs, mockups `S24-roles-permissions.html` (matrix after the user's sample `attachments/matrix-permission-reference.png`), `S20-buildings.html` (S20 + S21), `S25-users.html`; `ui/HANDOFF.md` with stages
 - P4 drafted: `04-api-contract.md` (45 endpoints + P1–P3 changes, P8), `03-plan.md` (6 stages), decisions D-048–D-051
 - Repair `changes/CR-007.md` PROPOSED (M): permission checks, shared buildings, contractor type re-activate, S12 floor plan
-- **Waiting for:** user approval of screens + plan + CR-007 (one review); no code written
+- **APPROVED 2026-10-16** (user: approve screens and plan, restyle to the new style in `web ui style/`): specs, `_common.md`, `03-plan.md`, `04-api-contract.md`, repair CR-007; D-048–D-051 final
+- New style = repair CR-008 (PROPOSED); each settings stage restyles its mockup when prepared. S22 gains symptom priority + category default priority once CR-008 is approved (settings Stage 5)
 
 ## Next
 
-1. User reviews the mockups (open the 3 HTML files) and `03-plan.md`; approves or asks for changes
-2. On approval: `Status: APPROVED` on specs, `_common.md`, `03-plan.md`, `04-api-contract.md`, CR-007; D-048–D-051 drop "pending"; PROJECT row → P5
-3. Then `/build-stage settings 1 prepare` in a fresh session (Stage 1 = roles as data + permission checks + S19)
+1. `/build-stage settings 1 prepare` in a fresh session (Stage 1 = roles as data + permission checks + S19; S19 built in the CR-008 style if CR-008 is approved by then)
 
 ## Done (current stage)
 
@@ -33,4 +32,4 @@
 ## Stage log
 
 - P1 discovery drafted 2026-10-15 · approved 2026-10-16
-- P3 UI spec + P4 plan drafted 2026-10-16
+- P3 UI spec + P4 plan drafted 2026-10-16 · approved 2026-10-16 (+CR-007, D-052)

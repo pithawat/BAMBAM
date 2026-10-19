@@ -8,6 +8,7 @@ import {
   mockCreateTicket,
   mockErrors,
   mockListTickets,
+  mockRecentPlaces,
   mockRememberPhoto,
   mockScenario,
   mockTicketCounts,
@@ -25,6 +26,7 @@ import type {
   ContractorRequest,
   CreateTicketRequest,
   Photo,
+  RecentPlace,
   Ref,
   ResolveRequest,
   SendBackRequest,
@@ -57,6 +59,14 @@ export async function getCategories(): Promise<Category[]> {
 export async function getBuildings(): Promise<Building[]> {
   if (env.useMocks) return mock(() => mockBuildings, { read: true, needsData: false });
   return http.get<Building[]>(`${BASE}/buildings`);
+}
+
+// ---- #28 recent places (CR-008) ----
+
+/** S03 "ที่เคยแจ้ง": the caller's last 3 distinct places; empty for a first-time reporter. */
+export async function getRecentPlaces(): Promise<RecentPlace[]> {
+  if (env.useMocks) return mock(() => mockRecentPlaces(mockViewer()), { read: true });
+  return http.get<RecentPlace[]>(`${BASE}/me/recent-places`);
 }
 
 // ---- #3 photo upload ----
@@ -152,7 +162,7 @@ export async function getTicket(id: string): Promise<TicketDetail> {
 
 const ticketPath = (id: string) => `${BASE}/tickets/${encodeURIComponent(id)}`;
 
-/** S17: technician sets / changes the expected finish date. */
+/** S17: technician รับเรื่อง (sets the expected finish date) or changes it with an optional reason. */
 export function assessTicket(id: string, req: AssessRequest): Promise<TicketDetail> {
   return http.post<TicketDetail>(`${ticketPath(id)}/assess`, req);
 }
@@ -162,7 +172,7 @@ export function resolveTicket(id: string, req: ResolveRequest): Promise<TicketDe
   return http.post<TicketDetail>(`${ticketPath(id)}/resolve`, req);
 }
 
-/** S08: reporter rates 1–5 (required) → closed. */
+/** S08: reporter ประเมินตรวจงาน 1–5 (required) → closed. */
 export function confirmTicket(id: string, req: ConfirmRequest): Promise<TicketDetail> {
   return http.post<TicketDetail>(`${ticketPath(id)}/confirm`, req);
 }
@@ -250,6 +260,7 @@ async function mockFail<T>(err: ApiError): Promise<T> {
 
 /** `empty` scenario: lists become empty, counts zero; a detail stays (S05 after a create). */
 function emptyLike(v: unknown): unknown {
+  if (Array.isArray(v)) return [];
   if (v && typeof v === "object" && "items" in v && "meta" in v) {
     const page = v as TicketPage;
     return { items: [], meta: { ...page.meta, total: 0 } };

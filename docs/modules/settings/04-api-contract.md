@@ -1,6 +1,6 @@
 # ตั้งค่าระบบ (Superadmin) — API contract
 
-Status: DRAFT
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
 <!-- Written by Claude in /stage-plan settings (2026-10-16). Single source for backend DTOs and frontend
      modules/settings/types.ts. Conventions (envelope, errors, dates, pagination): docs/shared/architecture.md

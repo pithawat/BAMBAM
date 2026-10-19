@@ -2,6 +2,12 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-009 (approved 2026-10-18):** tabs `รับเรื่อง` (`awaiting_assessment`) · `กำลังดำเนินการ` (`in_repair`, `reworking` — row badge `ส่งกลับให้แก้`) · `รอประเมินตรวจงาน` (`awaiting_rating`).
+
+
+> **CR-008 (approved 2026-10-16):** restyle to the new tokens; copy `รอประเมิน` → `รอช่างรับเรื่อง`, `รอผู้แจ้งประเมิน` → `รอผู้แจ้งให้คะแนน`, `ประเมินงาน` → `รับเรื่อง`. A "วันนี้" list is a later proposal (CR-008 open question 12).
+
+
 > **CR-005 (2026-10-15) — replaces this spec.** S09 is now **งานซ่อม** at `/repair/work` (`technician-work.tsx`): the one technician sees every open ticket, most urgent first then oldest. Header action "ช่างภายนอก" → S18. Segmented tabs with counts: **รอประเมิน** (`step=awaiting_assessment`) · **กำลังซ่อม** (`in_repair,reworking`) · **รอผู้แจ้งประเมิน** (`awaiting_rating`); FilterPill อาคาร ("ทุกอาคาร"). Row: thumb, title + priority, category · location, ticketNo · reporter · แจ้ง {time}, mini tracker, "คาดว่าเสร็จ {d MMM}" or red "เลยกำหนด". Paging "โหลดเพิ่ม" (20). Empty per tab; filter-empty "ไม่มีงานในอาคารนี้" + ดูทุกอาคาร. No claim, no one-job rule, no reserved card, no categories state. Mobile bottom nav: the technician's 2nd slot is "งานซ่อม".
 
 

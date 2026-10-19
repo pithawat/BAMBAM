@@ -201,10 +201,10 @@ func (q *Queries) InsertContractorTypeLinks(ctx context.Context, arg InsertContr
 }
 
 const listContractorJobs = `-- name: ListContractorJobs :many
-SELECT t.id, t.ticket_no, t.status, t.category_id, c.name AS category_name,
+SELECT t.id, t.ticket_no, t.status, t.category_id, COALESCE(c.name, t.category_other, '')::text AS category_name,
        t.resolved_at, t.contractor_rating, t.contractor_rating_comment, t.rating
 FROM repair.tickets t
-JOIN repair.categories c ON c.id = t.category_id
+LEFT JOIN repair.categories c ON c.id = t.category_id
 WHERE t.contractor_id = $1
 ORDER BY t.resolved_at DESC NULLS LAST, t.id
 LIMIT $3 OFFSET $2
@@ -220,7 +220,7 @@ type ListContractorJobsRow struct {
 	ID                      uuid.UUID
 	TicketNo                string
 	Status                  string
-	CategoryID              uuid.UUID
+	CategoryID              *uuid.UUID
 	CategoryName            string
 	ResolvedAt              *time.Time
 	ContractorRating        *int16

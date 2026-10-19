@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { ChevronRight, QrCode, Wrench } from "lucide-react";
-import { BellButton } from "@/components/shared/bell-button";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { PageHeader } from "@/components/shared/page-header";
-import { RoleSwitcher } from "@/components/shared/role-switcher";
 import { SERVICES, ServiceIcon, SoonChip, type Service } from "@/components/shared/service-icon";
 import { Button } from "@/components/ui/button";
 import { formatLongDate } from "@/lib/format";
@@ -14,6 +12,7 @@ import { initials } from "@/lib/platform/roles";
 
 // S02 Home — Stage 0 placeholder (D-023): greeting, the option-a CTA card and
 // the services only. Role widgets, "ติดตามงานซ่อม" and the bell count come in repair Stage 7.
+// Bell, account and role switcher are in the navbar (CR-010).
 
 const SERVICE_LIST: { service: Service; href?: string; hint: string }[] = [
   { service: "repair", href: "/repair/new", hint: "แจ้งปัญหาในอาคาร" },
@@ -30,13 +29,10 @@ export default function HomePage() {
     <>
       {/* mobile */}
       <div className="lg:hidden">
-        <header className="relative overflow-hidden rounded-b-[34px] bg-brand px-4 pt-3 pb-36 text-white">
+        <header className="relative overflow-hidden rounded-b-[34px] bg-brand px-4 pt-5 pb-36 text-white">
           <span aria-hidden className="pointer-events-none absolute -top-18 -right-28 size-68 rounded-full bg-white/15" />
           <span aria-hidden className="pointer-events-none absolute -bottom-24 -left-20 size-50 rounded-full bg-white/10" />
-          <div className="relative">
-            <RoleSwitcher variant="pill" />
-          </div>
-          <div className="relative mt-3 flex items-center gap-3">
+          <div className="relative flex items-center gap-3">
             <span className="grid size-11 shrink-0 place-items-center rounded-full border-2 border-white/65 bg-white/20 font-heading text-[15px] font-semibold">
               {initials(me.name)}
             </span>
@@ -47,7 +43,6 @@ export default function HomePage() {
                 {today}
               </p>
             </div>
-            <BellButton onGradient />
           </div>
         </header>
 

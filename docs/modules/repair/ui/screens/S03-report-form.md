@@ -2,6 +2,19 @@
 
 Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14)
 
+> **CR-009 (approved 2026-10-18):** leads choose `เรียกช่าง | ทีมแก้เองแล้ว` at the top as soon as the form opens (others never see it; team steps per BR-F04). Duplicate card in สถานที่ once category + floor + spot are known; on submit a match opens a blocking dialog with only `ติดตามเคสเดิม` / `ยกเลิกการแจ้ง`; the reporter's own ticket waiting for ประเมินตรวจงาน → `ไปที่งานของคุณ` (no new ticket). Built in Stage 4. ที่เคยแจ้ง, QR banner and draft restore stay.
+
+
+> **CR-008 (approved 2026-10-16) — replaces the layout, steps and priority parts of this spec.** Visual source of truth: `../../changes/CR-008/style-and-form.html` (+ `form-wizard.css` / `form-wizard.js`), design demo 06.
+> - **Step wizard on every size:** progress strip (`ขั้นตอน {n} จาก {m}` · `เหลืออีก {k} ขั้นตอน` + labelled segments; past steps clickable, future steps disabled) → **1 ปัญหาที่พบ → 2 สถานที่ → 3 รูปภาพ → (leads in team mode) งานที่ทีมทำ → ตรวจสอบก่อนส่ง**. Sticky footer: `ย้อนกลับ` · `ข้อมูลที่กรอกไว้จะอยู่เมื่อย้อนกลับ` · `ถัดไป` (last step `ยืนยันส่งแจ้งซ่อม` / `ยืนยันบันทึกงานทีม`). `ถัดไป` validates only the current step; the final button re-checks every step and opens the first invalid one. Desktop content max 1040px (720px on สถานที่ / ตรวจสอบ).
+> - **ปัญหาที่พบ:** `เลือกหมวดที่ตรงกับปัญหา *` (1 หมวด) — category cards (icon, name, examples line e.g. `แอร์ · เครื่องปรับอากาศ`, radio; 3 columns desktop, 2 mobile; last card `อื่นๆ` → `ระบุหมวดงาน *` + `อาการที่พบ *` text fields ≤ 100). Symptoms appear after a category: check boxes `อาการที่พบ * เลือกได้มากกว่า 1 ข้อ` + `อาการอื่นๆ` (→ `ระบุอาการอื่นๆ *`). **No priority question:** a read-only explanation `ความเร่งด่วนของงานนี้: {ระดับ}` / `ระบบกำหนดจากอาการ “{อาการ}” คุณไม่ต้องเลือกระดับเอง` (BR-F02-2). `+ เล่ารายละเอียดเพิ่ม (ไม่บังคับ)` opens รายละเอียด (≤ 500).
+> - **ปัญหาเกิดขึ้นที่ไหน:** `เลือกอาคาร *` (building cards with icon + radio) · `เลือกชั้น *` (buttons `ชั้น 1 …`; hint `เลือกอาคารเพื่อดูชั้นที่แจ้งได้`) · `ห้องหรือจุดที่เกิด (ไม่บังคับ)` text + room chips of that floor once settings rooms exist (settings Stage 4) · collapsed `ที่เคยแจ้ง แตะเพื่อเติมอาคาร ชั้น และห้องให้` (#28, max 3, never preselected) · duplicate card (Stage 4).
+> - **รูปภาพ:** phone: `ถ่ายรูป` (camera capture) + `เลือกจากคลังรูป`; desktop: drop zone. Beside / below: tips panel `ถ่ายให้เห็นปัญหาชัดเจน` (มุมใกล้: ให้เห็นอาการ · มุมกว้าง: ให้เห็นตำแหน่ง) that turns into `รูปที่แนบแล้ว {n}/5` thumbnails.
+> - **ตรวจสอบก่อนส่ง:** report card (category icon + name, title from the symptoms) with rows รายละเอียด · สถานที่ (+ อุปกรณ์ from QR) · `รูปแนบ ({n})` thumbnails · (team) งานที่ทีมทำ — each with `แก้ไข` back to that step. Never hidden.
+> - **Draft:** kept in the browser per employee code; on reload a notice `กู้ข้อมูลที่กรอกค้างไว้เมื่อ {HH:mm} น. แล้ว` + `เริ่มใหม่`; cleared on submit / logout / ล้างแบบฟอร์ม.
+> - QR banner (Stage 5, phones), team mode `ให้ช่างซ่อม | ทีมแก้เองแล้ว` (Stage 4), duplicate card + fallback dialog (Stage 4) follow the mockup when their stage is built.
+
+
 - **Flows:** F02 (all steps), F04 (team handled option), F13-B (prefill from QR) (see ../../02-flows.md)
 - **Persona:** every role, mobile first (employee standing at the broken thing); desktop usable (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** report a problem with category, symptoms, place, photos and urgency in under a minute — or, for team leads, record a job the team already fixed.

@@ -76,6 +76,8 @@ const (
 
 	MaxPhotos         = 5
 	MaxLocationChars  = 100
+	MaxOtherChars     = 100 // typed "อื่นๆ" category / symptom (CR-008)
+	MaxReasonChars    = 100 // reason for moving the expected date (CR-008)
 	MaxDetailsChars   = 500
 	MaxAssetCodeLen   = 50
 	MaxNoteChars      = 500
@@ -110,10 +112,18 @@ type Person struct {
 }
 
 type Category struct {
+	ID              uuid.UUID
+	Name            string
+	Icon            string
+	DefaultPriority string // used when only "อาการอื่นๆ" is picked (CR-008)
+	Symptoms        []Symptom
+}
+
+// Symptom carries the priority the admin set for it (CR-008, settings S22).
+type Symptom struct {
 	ID       uuid.UUID
 	Name     string
-	Icon     string
-	Symptoms []Ref
+	Priority string
 }
 
 type Floor struct {
@@ -141,8 +151,11 @@ type TicketSummary struct {
 	Status           string
 	ClosedReason     *string
 	Priority         string
-	Category         Ref
+	PrioritySource   string
+	Category         *Ref    // nil when the reporter typed "อื่นๆ" (CR-008)
+	CategoryOther    *string // typed category
 	Symptoms         []Ref
+	SymptomOther     *string // typed symptom
 	Building         Ref
 	Floor            Ref
 	LocationDetail   *string
@@ -225,7 +238,8 @@ type CreateTicketInput struct {
 	FloorID        *uuid.UUID
 	LocationDetail string
 	Details        string
-	Priority       string
+	CategoryOther  string // CR-008: typed category ("อื่นๆ"), then CategoryID is nil
+	SymptomOther   string // CR-008: typed symptom
 	PhotoIDs       []uuid.UUID
 	AssetCode      string
 	TeamHandled    bool
@@ -236,6 +250,7 @@ type AssessInput struct {
 	ExpectedDoneOn *time.Time // date only
 	WorkBy         string
 	ContractorID   *uuid.UUID
+	Reason         string // optional, kept on a change and shown to the reporter (CR-008)
 }
 
 // ResolveInput is endpoint #10 after parsing. Who did the work was set by the assessment;
@@ -308,7 +323,10 @@ type NewTicket struct {
 	ID             uuid.UUID
 	TicketNo       string
 	Priority       string
-	CategoryID     uuid.UUID
+	PrioritySource string
+	CategoryID     *uuid.UUID
+	CategoryOther  *string
+	SymptomOther   *string
 	BuildingID     uuid.UUID
 	FloorID        uuid.UUID
 	LocationDetail *string
@@ -388,4 +406,21 @@ type ContractorJob struct {
 	ContractorRating        *int16
 	ContractorRatingComment *string
 	ReporterRating          *int16
+}
+
+// Priority sources (CR-008).
+const (
+	PrioritySourceSymptom  = "symptom"
+	PrioritySourceCategory = "category"
+	PrioritySourceDefault  = "default"
+	PrioritySourceAdmin    = "admin"
+	PrioritySourceReporter = "reporter" // tickets created before CR-008
+)
+
+// RecentPlace is one "ที่เคยแจ้ง" shortcut (#28, CR-008).
+type RecentPlace struct {
+	Building       Ref
+	Floor          Ref
+	LocationDetail *string
+	LastReportedAt time.Time
 }

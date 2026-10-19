@@ -40,13 +40,13 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	byCat := map[uuid.UUID][]Ref{}
+	byCat := map[uuid.UUID][]Symptom{}
 	for _, s := range syms {
-		byCat[s.CategoryID] = append(byCat[s.CategoryID], Ref{ID: s.ID, Name: s.Name})
+		byCat[s.CategoryID] = append(byCat[s.CategoryID], Symptom{ID: s.ID, Name: s.Name, Priority: s.Priority})
 	}
 	out := make([]Category, 0, len(cats))
 	for _, c := range cats {
-		out = append(out, Category{ID: c.ID, Name: c.Name, Icon: c.Icon, Symptoms: nonNil(byCat[c.ID])})
+		out = append(out, Category{ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, Symptoms: nonNil(byCat[c.ID])})
 	}
 	return out, nil
 }
@@ -79,11 +79,11 @@ func (r *PgRepository) InsertMasterData(ctx context.Context, cats []Category, bu
 	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := repairdb.New(tx)
 		for i, c := range cats {
-			if err := q.InsertCategory(ctx, repairdb.InsertCategoryParams{ID: c.ID, Name: c.Name, Icon: c.Icon, SortOrder: int32(i)}); err != nil { // #nosec G115 -- small list
+			if err := q.InsertCategory(ctx, repairdb.InsertCategoryParams{ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: priorityOr(c.DefaultPriority), SortOrder: int32(i)}); err != nil { // #nosec G115 -- small list
 				return err
 			}
 			for j, s := range c.Symptoms {
-				if err := q.InsertSymptom(ctx, repairdb.InsertSymptomParams{ID: s.ID, CategoryID: c.ID, Name: s.Name, SortOrder: int32(j)}); err != nil { // #nosec G115 -- small list
+				if err := q.InsertSymptom(ctx, repairdb.InsertSymptomParams{ID: s.ID, CategoryID: c.ID, Name: s.Name, Priority: priorityOr(s.Priority), SortOrder: int32(j)}); err != nil { // #nosec G115 -- small list
 					return err
 				}
 			}
@@ -100,6 +100,55 @@ func (r *PgRepository) InsertMasterData(ctx context.Context, cats []Category, bu
 		}
 		return nil
 	})
+}
+
+func (r *PgRepository) RefreshSampleData(ctx context.Context, cats []Category, renames []SampleRename) error {
+	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := repairdb.New(tx)
+		for _, c := range cats {
+			if c.DefaultPriority != "" && c.DefaultPriority != PriorityMedium {
+				if err := q.SetSampleCategoryDefault(ctx, repairdb.SetSampleCategoryDefaultParams{ID: c.ID, DefaultPriority: c.DefaultPriority}); err != nil {
+					return err
+				}
+			}
+			for _, s := range c.Symptoms {
+				if s.Priority != "" && s.Priority != PriorityMedium {
+					if err := q.SetSampleSymptomPriority(ctx, repairdb.SetSampleSymptomPriorityParams{ID: s.ID, Priority: s.Priority}); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		for _, rn := range renames {
+			if err := q.RenameSampleBuilding(ctx, repairdb.RenameSampleBuildingParams{ID: rn.ID, OldName: rn.From, NewName: rn.To}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *PgRepository) ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]RecentPlace, error) {
+	rows, err := r.q.ListRecentPlaces(ctx, reporterID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RecentPlace, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, RecentPlace{
+			Building: Ref{ID: row.BuildingID, Name: row.BuildingName}, Floor: Ref{ID: row.FloorID, Name: row.FloorName},
+			LocationDetail: row.LocationDetail, LastReportedAt: row.LastReportedAt,
+		})
+	}
+	return out, nil
+}
+
+// priorityOr keeps inserts valid when a sample row has no priority.
+func priorityOr(p string) string {
+	if priorityRank(p) < 0 {
+		return PriorityMedium
+	}
+	return p
 }
 
 // ---- photos ----
@@ -161,7 +210,8 @@ func (r *PgRepository) GetTicket(ctx context.Context, id, viewerID uuid.UUID) (T
 	d := TicketDetail{
 		TicketSummary: TicketSummary{
 			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason, Priority: row.Priority,
-			Category:         Ref{ID: row.CategoryID, Name: row.CategoryName},
+			PrioritySource: row.PrioritySource,
+			Category:       ref(row.CategoryID, row.CategoryName), CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
 			LocationDetail:   row.LocationDetail,
@@ -281,7 +331,8 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 	for _, row := range rows {
 		s := TicketSummary{
 			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason, Priority: row.Priority,
-			Category:         Ref{ID: row.CategoryID, Name: row.CategoryName},
+			PrioritySource: row.PrioritySource,
+			Category:       ref(row.CategoryID, row.CategoryName), CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
 			Symptoms:         nonNil(symsBy[row.ID]),
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
@@ -458,7 +509,7 @@ func (r *PgRepository) ListContractorJobs(ctx context.Context, id uuid.UUID, pag
 	out := make([]ContractorJob, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, ContractorJob{
-			TicketID: row.ID, TicketNo: row.TicketNo, Status: row.Status, Category: Ref{ID: row.CategoryID, Name: row.CategoryName},
+			TicketID: row.ID, TicketNo: row.TicketNo, Status: row.Status, Category: categoryRef(row.CategoryID, row.CategoryName),
 			ResolvedAt: row.ResolvedAt, ContractorRating: row.ContractorRating, ContractorRatingComment: row.ContractorRatingComment,
 			ReporterRating: row.Rating,
 		})
@@ -487,17 +538,16 @@ type pgTxRepository struct {
 	q *repairdb.Queries
 }
 
-func (r *pgTxRepository) LockActiveCategory(ctx context.Context, id uuid.UUID) (bool, error) {
-	_, err := r.q.LockActiveCategory(ctx, id)
+func (r *pgTxRepository) LockActiveCategory(ctx context.Context, id uuid.UUID) (string, bool, error) {
+	def, err := r.q.LockActiveCategory(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
+		return "", false, nil
 	}
-	return err == nil, err
+	return def, err == nil, err
 }
 
-func (r *pgTxRepository) CountActiveSymptoms(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) (int, error) {
-	n, err := r.q.CountActiveSymptomsInCategory(ctx, repairdb.CountActiveSymptomsInCategoryParams{Ids: ids, CategoryID: categoryID})
-	return int(n), err
+func (r *pgTxRepository) ActiveSymptomPriorities(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error) {
+	return r.q.ActiveSymptomPriorities(ctx, repairdb.ActiveSymptomPrioritiesParams{Ids: ids, CategoryID: categoryID})
 }
 
 func (r *pgTxRepository) ActiveFloorInBuilding(ctx context.Context, floorID, buildingID uuid.UUID) (bool, error) {
@@ -523,7 +573,8 @@ func (r *pgTxRepository) NextTicketCounter(ctx context.Context, year int) (int64
 
 func (r *pgTxRepository) InsertTicket(ctx context.Context, t NewTicket) error {
 	if err := r.q.InsertTicket(ctx, repairdb.InsertTicketParams{
-		ID: t.ID, TicketNo: t.TicketNo, Priority: t.Priority, CategoryID: t.CategoryID, BuildingID: t.BuildingID,
+		ID: t.ID, TicketNo: t.TicketNo, Priority: t.Priority, PrioritySource: t.PrioritySource,
+		CategoryID: t.CategoryID, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther, BuildingID: t.BuildingID,
 		FloorID: t.FloorID, LocationDetail: t.LocationDetail, Details: t.Details, AssetCode: t.AssetCode,
 		ReporterID: t.ReporterID,
 	}); err != nil {
@@ -669,4 +720,12 @@ func nonNil[T any](s []T) []T {
 		return []T{}
 	}
 	return s
+}
+
+// categoryRef is the category of a contractor job: the listed category, or the typed "อื่นๆ" name (CR-008).
+func categoryRef(id *uuid.UUID, name string) Ref {
+	if id == nil {
+		return Ref{Name: name}
+	}
+	return Ref{ID: *id, Name: name}
 }

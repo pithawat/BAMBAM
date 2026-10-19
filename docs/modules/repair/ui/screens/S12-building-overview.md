@@ -2,6 +2,9 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-008 (approved 2026-10-16): replaced by S27 ภาพรวมองค์กร** — mockup `../../changes/CR-008/dashboard.html`; the S27 spec is written when Stage 7 is prepared.
+
+
 - **Flows:** F23 (all steps), D-010 (mockup first; details later from the user) (see ../../02-flows.md)
 - **Persona:** admin and executive on desktop (both read-only here — nothing to edit) (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** see at a glance which floor has open tickets and how urgent they are, then drill into that floor's tickets.

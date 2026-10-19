@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, Eye, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,6 +13,7 @@ import { ROLE_LABELS } from "@/lib/platform/roles";
 import { ROLES, type DemoUser, type Role } from "@/lib/platform/types";
 import { cn } from "@/lib/utils";
 import { useMe } from "./me-provider";
+import { useIsDesktop } from "./use-media-query";
 
 // S15 — dev/UAT role switcher (D-005). Not rendered unless NEXT_PUBLIC_ROLE_SWITCHER=true,
 // and the backend route does not exist in production.
@@ -20,10 +21,13 @@ import { useMe } from "./me-provider";
 const TOAST_KEY = "bambam.roleSwitchToast";
 const PICKER_HINT = "โหมดทดสอบ ใช้ผู้ใช้ตัวอย่าง ไม่เปลี่ยนสิทธิ์ของบัญชีจริง";
 
-type Variant = "pill" | "strip" | "desktop";
-
-export function RoleSwitcher({ variant, className }: { variant: Variant; className?: string }) {
+/**
+ * Amber strip above the navbar (CR-010, every width): `DEV · กำลังดูในบทบาท: {role} · เปลี่ยน`.
+ * Phone / tablet open a bottom sheet, desktop a popover.
+ */
+export function RoleSwitcher({ className }: { className?: string }) {
   const meState = useMe();
+  const desktop = useIsDesktop();
   const [open, setOpen] = useState(false);
   if (!env.roleSwitcher || meState.status !== "ready") return null;
 
@@ -31,60 +35,30 @@ export function RoleSwitcher({ variant, className }: { variant: Variant; classNa
   const envLabel = me.environment ?? (env.useMocks ? "DEV" : null);
   if (!envLabel) return null; // production API → never show
 
-  const roleLabel = ROLE_LABELS[me.role];
+  const trigger = (
+    <button
+      type="button"
+      className={cn(
+        "flex min-h-7 w-full items-center justify-center gap-1 bg-warning/10 px-4 text-xs font-medium text-warning outline-none focus-visible:ring-3 focus-visible:ring-ring/30 print:hidden",
+        className,
+      )}
+    >
+      <span className="font-bold tracking-wide">{envLabel}</span> · กำลังดูในบทบาท: {ROLE_LABELS[me.role]} ·{" "}
+      <span className="underline underline-offset-2">เปลี่ยน</span>
+    </button>
+  );
   const picker = (inSheet: boolean) => <RolePicker current={me.role} inSheet={inSheet} onDone={() => setOpen(false)} />;
 
-  if (variant === "desktop") {
+  if (desktop) {
     return (
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-11 items-center gap-1.5 rounded-full border border-dashed border-warning/50 bg-warning/10 pr-3.5 pl-2.5 text-xs font-medium text-warning",
-              className,
-            )}
-          >
-            <EnvChip label={envLabel} />
-            <Eye className="size-3.5" aria-hidden />
-            ดูในบทบาท: {roleLabel}
-            <ChevronDown className="size-3.5" aria-hidden />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-90 rounded-xl p-4">
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent align="center" className="w-90 rounded-xl p-4">
           {picker(false)}
         </PopoverContent>
       </Popover>
     );
   }
-
-  const trigger =
-    variant === "pill" ? (
-      <button
-        type="button"
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full bg-white/20 py-1.5 pr-2.5 pl-2 text-xs font-medium text-white backdrop-blur-sm",
-          className,
-        )}
-      >
-        <EnvChip label={envLabel} />
-        <Eye className="size-3.5" aria-hidden />
-        ดูในบทบาท: {roleLabel}
-        <ChevronDown className="size-3.5" aria-hidden />
-      </button>
-    ) : (
-      <button
-        type="button"
-        className={cn(
-          "flex h-7 w-full items-center justify-center gap-1 bg-warning/10 text-xs font-medium text-warning",
-          className,
-        )}
-      >
-        <span className="font-bold tracking-wide">{envLabel}</span> · กำลังดูในบทบาท: {roleLabel} ·{" "}
-        <span className="underline underline-offset-2">เปลี่ยน</span>
-      </button>
-    );
-
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
@@ -92,14 +66,6 @@ export function RoleSwitcher({ variant, className }: { variant: Variant; classNa
         {picker(true)}
       </SheetContent>
     </Sheet>
-  );
-}
-
-function EnvChip({ label }: { label: string }) {
-  return (
-    <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-[10.5px] font-bold tracking-wider text-warning">
-      {label}
-    </span>
   );
 }
 

@@ -266,8 +266,8 @@ func (q *Queries) FirstReportPhotos(ctx context.Context, ticketIds []uuid.UUID) 
 
 const getTicket = `-- name: GetTicket :one
 SELECT
-    t.id, t.ticket_no, t.status, t.closed_reason, t.priority,
-    t.category_id, c.name AS category_name,
+    t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
+    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.location_detail, t.details, t.asset_code,
@@ -282,7 +282,7 @@ SELECT
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1) AS viewer_subscribed,
     (SELECT count(*) FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id) AS subscriber_count
 FROM repair.tickets t
-JOIN repair.categories c ON c.id = t.category_id
+LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
 JOIN repair.people rp ON rp.id = t.reporter_id
@@ -303,8 +303,11 @@ type GetTicketRow struct {
 	Status                  string
 	ClosedReason            *string
 	Priority                string
-	CategoryID              uuid.UUID
-	CategoryName            string
+	PrioritySource          string
+	CategoryID              *uuid.UUID
+	CategoryName            *string
+	CategoryOther           *string
+	SymptomOther            *string
 	BuildingID              uuid.UUID
 	BuildingName            string
 	FloorID                 uuid.UUID
@@ -350,8 +353,11 @@ func (q *Queries) GetTicket(ctx context.Context, arg GetTicketParams) (GetTicket
 		&i.Status,
 		&i.ClosedReason,
 		&i.Priority,
+		&i.PrioritySource,
 		&i.CategoryID,
 		&i.CategoryName,
+		&i.CategoryOther,
+		&i.SymptomOther,
 		&i.BuildingID,
 		&i.BuildingName,
 		&i.FloorID,
@@ -434,11 +440,12 @@ func (q *Queries) InsertAutoClosedEvents(ctx context.Context, arg InsertAutoClos
 const insertTicket = `-- name: InsertTicket :exec
 
 INSERT INTO repair.tickets (
-    id, ticket_no, status, priority, category_id, building_id, floor_id,
-    location_detail, details, asset_code, reporter_id
+    id, ticket_no, status, priority, priority_source, category_id, category_other, symptom_other,
+    building_id, floor_id, location_detail, details, asset_code, reporter_id
 ) VALUES (
-    $1, $2, 'in_progress', $3, $4, $5, $6,
-    $7, $8, $9, $10
+    $1, $2, 'in_progress', $3, $4, $5::uuid,
+    $6::text, $7::text,
+    $8, $9, $10, $11, $12, $13
 )
 `
 
@@ -446,7 +453,10 @@ type InsertTicketParams struct {
 	ID             uuid.UUID
 	TicketNo       string
 	Priority       string
-	CategoryID     uuid.UUID
+	PrioritySource string
+	CategoryID     *uuid.UUID
+	CategoryOther  *string
+	SymptomOther   *string
 	BuildingID     uuid.UUID
 	FloorID        uuid.UUID
 	LocationDetail *string
@@ -466,7 +476,10 @@ func (q *Queries) InsertTicket(ctx context.Context, arg InsertTicketParams) erro
 		arg.ID,
 		arg.TicketNo,
 		arg.Priority,
+		arg.PrioritySource,
 		arg.CategoryID,
+		arg.CategoryOther,
+		arg.SymptomOther,
 		arg.BuildingID,
 		arg.FloorID,
 		arg.LocationDetail,
@@ -519,6 +532,59 @@ type InsertTicketSymptomsParams struct {
 func (q *Queries) InsertTicketSymptoms(ctx context.Context, arg InsertTicketSymptomsParams) error {
 	_, err := q.db.Exec(ctx, insertTicketSymptoms, arg.TicketID, arg.SymptomIds)
 	return err
+}
+
+const listRecentPlaces = `-- name: ListRecentPlaces :many
+SELECT p.building_id, p.building_name, p.floor_id, p.floor_name, p.location_detail, p.last_reported_at
+FROM (
+    SELECT DISTINCT ON (t.building_id, t.floor_id, COALESCE(t.location_detail, ''))
+        t.building_id, b.name AS building_name, t.floor_id, f.name AS floor_name,
+        t.location_detail, t.created_at AS last_reported_at
+    FROM repair.tickets t
+    JOIN repair.buildings b ON b.id = t.building_id AND b.is_active
+    JOIN repair.floors f ON f.id = t.floor_id AND f.is_active
+    WHERE t.reporter_id = $1
+    ORDER BY t.building_id, t.floor_id, COALESCE(t.location_detail, ''), t.created_at DESC
+) p
+ORDER BY p.last_reported_at DESC
+LIMIT 3
+`
+
+type ListRecentPlacesRow struct {
+	BuildingID     uuid.UUID
+	BuildingName   string
+	FloorID        uuid.UUID
+	FloorName      string
+	LocationDetail *string
+	LastReportedAt time.Time
+}
+
+// "ที่เคยแจ้ง" (#28, CR-008): the reporter's last 3 distinct places on active buildings / floors.
+func (q *Queries) ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]ListRecentPlacesRow, error) {
+	rows, err := q.db.Query(ctx, listRecentPlaces, reporterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecentPlacesRow
+	for rows.Next() {
+		var i ListRecentPlacesRow
+		if err := rows.Scan(
+			&i.BuildingID,
+			&i.BuildingName,
+			&i.FloorID,
+			&i.FloorName,
+			&i.LocationDetail,
+			&i.LastReportedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listSymptomsForTickets = `-- name: ListSymptomsForTickets :many
@@ -605,8 +671,8 @@ func (q *Queries) ListTicketEvents(ctx context.Context, ticketID uuid.UUID) ([]L
 
 const listTickets = `-- name: ListTickets :many
 SELECT
-    t.id, t.ticket_no, t.status, t.closed_reason, t.priority,
-    t.category_id, c.name AS category_name,
+    t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
+    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.location_detail,
@@ -618,7 +684,7 @@ SELECT
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1) AS viewer_subscribed
 FROM repair.tickets t
-JOIN repair.categories c ON c.id = t.category_id
+LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
 JOIN repair.people rp ON rp.id = t.reporter_id
@@ -684,8 +750,11 @@ type ListTicketsRow struct {
 	Status             string
 	ClosedReason       *string
 	Priority           string
-	CategoryID         uuid.UUID
-	CategoryName       string
+	PrioritySource     string
+	CategoryID         *uuid.UUID
+	CategoryName       *string
+	CategoryOther      *string
+	SymptomOther       *string
 	BuildingID         uuid.UUID
 	BuildingName       string
 	FloorID            uuid.UUID
@@ -746,8 +815,11 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Lis
 			&i.Status,
 			&i.ClosedReason,
 			&i.Priority,
+			&i.PrioritySource,
 			&i.CategoryID,
 			&i.CategoryName,
+			&i.CategoryOther,
+			&i.SymptomOther,
 			&i.BuildingID,
 			&i.BuildingName,
 			&i.FloorID,

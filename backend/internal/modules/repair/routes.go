@@ -6,6 +6,7 @@ import "github.com/gin-gonic/gin"
 func RegisterRoutes(rg *gin.RouterGroup, c *Controller) {
 	rg.GET("/categories", c.Categories)
 	rg.GET("/buildings", c.Buildings)
+	rg.GET("/me/recent-places", c.RecentPlaces)
 	rg.POST("/photos", c.UploadPhoto)
 	rg.GET("/photos/:id", c.Photo)
 	rg.POST("/tickets", c.CreateTicket)

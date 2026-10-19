@@ -1,6 +1,6 @@
 # Common UI rules — ตั้งค่าระบบ (Superadmin)
 
-Status: DRAFT
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
 <!-- Written by Claude in /ui-spec settings (2026-10-16). Every screen spec (S19–S26) refers to this file.
      Shell, labels, dates and shared state copy from ../../../repair/ui/screens/_common.md still apply unless this file says otherwise.

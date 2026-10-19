@@ -2,76 +2,77 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Bookmark, ChevronLeft, ChevronRight, CircleCheck, Clock, Loader2, MapPin, Search, SlidersHorizontal, Star } from "lucide-react";
-import { PageHeader } from "@/components/shared/page-header";
-import { PriorityIndicator } from "@/components/shared/priority-indicator";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Bell, ChevronDown, ChevronRight, CircleCheck, Clock, FolderCheck, Info, List, ListFilter, Loader2, Plus, RotateCcw, Search, Star, UserRound, Wrench,
+  type LucideIcon,
+} from "lucide-react";
+import { Mascot } from "@/components/shared/mascot";
 import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
 import { FilterPill } from "@/components/shared/filter-pill";
-import { SegmentedControl } from "@/components/shared/segmented-control";
-import { useIsDesktop } from "@/components/shared/use-media-query";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getTicketCounts, getTickets } from "../api";
 import { errorCode } from "../errors";
-import type { TicketCounts, TicketCountsQuery, TicketStatus, TicketSummary } from "../types";
-import { PhotoGallery } from "./photo-gallery";
-import { Timeline } from "./timeline";
-import { autoCloseText, TicketProgress, TicketProgressMini, TicketThumb } from "./ticket-progress";
-import { CLOSED_LABELS, listDate, shortDate, ticketHref, ticketLocation, ticketTitle } from "./ticket-presentation";
-import { CopyTicketNumber, TicketFailure, TicketStatusBadge } from "./ticket-ui";
+import type { TicketCounts, TicketCountsQuery, TicketSort, TicketStatus, TicketSummary } from "../types";
+import { autoCloseText } from "./ticket-progress";
+import { CLOSED_LABELS, dayLabel, listDate, STEP, stepLabel, ticketHref, ticketTitle } from "./ticket-presentation";
 import { TicketLink } from "./ticket-navigation";
-import { useTicket } from "./use-ticket";
 
-// S06 ติดตามงานซ่อม (CR-003) — status groups + desktop list / preview panes (CR-002).
+// S06 ติดตามงานซ่อม (CR-011): heading with the white leopard, a review banner when the reporter has work to check,
+// relation tabs, date / sort / search, then the tickets grouped by status (รอประเมินตรวจงาน · กำลังดำเนินการ ·
+// ปิดงานแล้ว), each group collapsible and paged on its own. No status filter (owner, 2026-10-18). Priority,
+// contractor and other staff-side fields are left out on purpose.
 
 const RANGES = [
-  { value: "all", label: "ทั้งหมด", short: "ทั้งหมด" },
-  { value: "7", label: "7 วันล่าสุด", short: "7 วัน" },
-  { value: "30", label: "30 วันล่าสุด", short: "30 วัน" },
-  { value: "90", label: "90 วันล่าสุด", short: "90 วัน" },
+  { value: "all", label: "ทั้งหมด" },
+  { value: "7", label: "7 วันล่าสุด" },
+  { value: "30", label: "30 วันล่าสุด" },
+  { value: "90", label: "90 วันล่าสุด" },
 ];
-const SCOPES = [{ value: "all", label: "ทั้งหมด" }, { value: "reported", label: "ที่ฉันแจ้ง" }, { value: "following", label: "ที่ฉันติดตาม" }];
+const SORTS: { value: string; label: string; sort?: TicketSort }[] = [
+  { value: "updated", label: "อัปเดตล่าสุดก่อน" },
+  { value: "newest", label: "แจ้งล่าสุดก่อน", sort: "createdAt:desc" },
+  { value: "oldest", label: "แจ้งเก่าสุดก่อน", sort: "createdAt:asc" },
+];
+const RELATIONS: { value: string; label: string; icon: LucideIcon }[] = [
+  { value: "all", label: "ทั้งหมด", icon: List },
+  { value: "reported", label: "ที่ฉันแจ้ง", icon: UserRound },
+  { value: "following", label: "ที่ฉันติดตาม", icon: Bell },
+];
 const PAGE_SIZE = 20;
-// A refresh refetches every "โหลดเพิ่ม" page in one request; the API caps pageSize at 100.
-const MAX_REFRESH_PAGES = 5;
-const CLOSED_PREVIEW = 3;
 
-type Group = "resolved" | "open" | "closed";
-const GROUPS: Record<Group, { title: string; status: TicketStatus[] }> = {
-  resolved: { title: "รอประเมิน", status: ["resolved"] },
-  open: { title: "กำลังดำเนินการ", status: ["in_progress"] },
-  closed: { title: "ปิดแล้ว", status: ["closed"] },
-};
+type Group = { status: TicketStatus; title: string; hint: string; icon: LucideIcon; tone: string; count: (c: TicketCounts) => number };
+const GROUPS: Group[] = [
+  { status: "resolved", title: "รอประเมินตรวจงาน", hint: "ผู้แจ้งตรวจผลซ่อมก่อนปิดงาน", icon: Star, tone: "bg-attention/10 text-attention", count: (c) => c.resolved },
+  { status: "in_progress", title: "กำลังดำเนินการ", hint: "งานที่รับเรื่องแล้วและอยู่ระหว่างซ่อม", icon: Wrench, tone: "bg-secondary text-secondary-foreground", count: (c) => c.inProgress },
+  { status: "closed", title: "ปิดงานแล้ว", hint: "เก็บไว้ดูประวัติการซ่อม", icon: FolderCheck, tone: "bg-success/10 text-success", count: (c) => c.closed },
+];
+
 type Change = (values: Record<string, string | null>, replace?: boolean) => void;
-type Filters = { q: string; range: string; scope: string };
-type GroupData = { items: TicketSummary[]; total: number };
-type Board = { revision: number; counts?: TicketCounts; groups?: Partial<Record<Group, GroupData>>; error?: unknown };
+type Filters = { q: string; range: string; scope: string; sort: string };
 
-const firstName = (name: string) => name.split(" ")[0];
+const pick = (list: { value: string }[], value: string | null) => (list.some((o) => o.value === value) ? value! : list[0].value);
 function uniqueById(tickets: TicketSummary[]) { const seen = new Set<string>(); return tickets.filter((t) => !seen.has(t.id) && seen.add(t.id)); }
-function buildQuery({ q, range, scope }: Filters): TicketCountsQuery {
+function baseQuery({ q, range, scope }: Filters): TicketCountsQuery {
   // createdFrom per request so a page kept open (or kept alive by cacheComponents) does not drift.
   return { scope: "mine", q: q || undefined, relation: scope as "all" | "reported" | "following", createdFrom: range === "all" ? undefined : new Date(Date.now() - Number(range) * 86_400_000).toISOString() };
 }
+const sortOf = (filters: Filters) => SORTS.find((s) => s.value === filters.sort)?.sort;
 
 export function MyTicketsScreen() {
   const params = useSearchParams();
   const q = (params.get("q") ?? "").slice(0, 50);
-  const range = RANGES.some((r) => r.value === params.get("range")) ? params.get("range")! : "all";
-  const scope = SCOPES.some((s) => s.value === params.get("scope")) ? params.get("scope")! : "all";
-  const closedAll = params.get("closed") === "all";
-  const selectedId = params.get("id");
-  const desktop = useIsDesktop();
+  const range = pick(RANGES, params.get("range"));
+  const scope = pick(RELATIONS, params.get("scope"));
+  const sort = pick(SORTS, params.get("sort"));
   const [draft, setDraft] = useState({ query: q, value: q });
   if (draft.query !== q) setDraft({ query: q, value: q });
   const text = draft.query === q ? draft.value : q;
+  // Collapsed groups survive filter changes (the board below remounts per filter set).
+  const [collapsed, setCollapsed] = useState<ReadonlySet<TicketStatus>>(new Set());
   const change: Change = useCallback((values, replace = false) => {
     const url = new URL(window.location.href);
     for (const [key, value] of Object.entries(values)) { if (value === null || value === "") url.searchParams.delete(key); else url.searchParams.set(key, value); }
@@ -84,273 +85,302 @@ export function MyTicketsScreen() {
     const timer = window.setTimeout(() => change({ q: text }, true), 300);
     return () => window.clearTimeout(timer);
   }, [text, q, change]);
-  const search = (mobile: boolean) => <div className={cn("relative min-w-0 flex-1", !mobile && "w-64 flex-none")}><Search className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-muted-foreground" aria-hidden /><Input aria-label="ค้นหาเลขงาน หรือสถานที่" placeholder="ค้นหาเลขงาน หรือสถานที่" maxLength={50} value={text} onChange={(e) => setDraft({ query: q, value: e.target.value })} className={cn("h-11 rounded-full pr-3 pl-10 text-sm", mobile ? "border-0 bg-background" : "bg-card")} /></div>;
-  const scopeControl = <SegmentedControl label="งานที่แสดง" value={scope} options={SCOPES} onValueChange={(v) => change({ scope: v === "all" ? null : v })} />;
-  return <>
-    <PageHeader title="ติดตามงานซ่อม" variant="service" service="repair" subtitle="งานที่คุณแจ้งและติดตาม" search={search(false)} />
-    <div className="relative -mt-12 px-4 lg:hidden"><Card className="gap-2.5 p-3 shadow-float"><div className="flex gap-2">{search(true)}<FilterSheet range={range} change={change} /></div>{scopeControl}</Card></div>
-    <TicketBoard key={`${q}|${range}|${scope}|${closedAll}`} filters={{ q, range, scope }} closedAll={closedAll} desktop={desktop} selectedId={selectedId} change={change}
-      paneControls={<>{scopeControl}<div className="flex items-center gap-2"><FilterPill size="sm" label="ช่วงวันที่" icon={Clock} value={range} defaultValue="all" options={RANGES} onValueChange={(v) => change({ range: v === "all" ? null : v })} /></div></>} />
-  </>;
-}
+  const filters = { q, range, scope, sort };
+  const filtered = q !== "" || range !== "all" || scope !== "all" || sort !== "updated";
+  const reset = () => { setDraft({ query: q, value: "" }); change({ q: null, range: null, scope: null, sort: null }); };
 
-function FilterSheet({ range, change }: { range: string; change: Change }) {
-  const [open, setOpen] = useState(false);
-  const [draftRange, setDraftRange] = useState(range);
-  const active = range !== "all" ? 1 : 0;
-  return <Sheet open={open} onOpenChange={(next) => { if (next) setDraftRange(range); setOpen(next); }}>
-    <SheetTrigger asChild><Button variant="outline" className="h-11 shrink-0 gap-1.5 px-3.5" aria-label={active ? `ตัวกรอง ใช้อยู่ ${active}` : "ตัวกรอง"}><SlidersHorizontal />{active > 0 && <span className="grid size-5 place-items-center rounded-full bg-primary font-heading text-xs text-white">{active}</span>}</Button></SheetTrigger>
-    <SheetContent side="bottom" className="rounded-t-3xl p-5 pb-8"><SheetHeader className="p-0"><SheetTitle>ตัวกรอง</SheetTitle><SheetDescription className="sr-only">ช่วงวันที่แจ้ง</SheetDescription></SheetHeader>
-      <fieldset className="mt-2"><legend className="mb-2 text-sm font-medium">ช่วงวันที่แจ้ง</legend><SegmentedControl label="ช่วงวันที่แจ้ง" value={draftRange} options={RANGES.map((r) => ({ value: r.value, label: r.short }))} onValueChange={setDraftRange} /></fieldset>
-      <SheetFooter className="mt-4 flex-row items-center gap-2 p-0"><Button variant="link" onClick={() => { change({ range: null }); setOpen(false); }}>ล้างตัวกรอง</Button><Button className="flex-1" onClick={() => { change({ range: draftRange === "all" ? null : draftRange }); setOpen(false); }}>ใช้ตัวกรอง</Button></SheetFooter>
-    </SheetContent>
-  </Sheet>;
-}
-
-function useMyTickets(filters: Filters, closedAll: boolean) {
-  const { q, range, scope } = filters;
-  const [revision, setRevision] = useState(0);
-  const [board, setBoard] = useState<Board>();
-  const [moreBusy, setMoreBusy] = useState<Group | null>(null);
-  const [moreError, setMoreError] = useState<Group | null>(null);
-  const alive = useRef(true);
-  // Bumped by every load; a "โหลดเพิ่ม" response from an older load is dropped.
-  const generation = useRef(0);
-  const pages = useRef<Record<Group, number>>({ resolved: 1, open: 1, closed: 1 });
-  const reload = useCallback(() => { setRevision((r) => r + 1); setMoreError(null); }, []);
-  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  // Also re-runs when a hidden route is shown again (cacheComponents), which refreshes the board.
-  useEffect(() => {
-    let active = true;
-    const current = ++generation.current;
-    const keys: Group[] = closedAll ? ["closed"] : ["resolved", "open", "closed"];
-    const size = (g: Group) => g === "closed" && !closedAll ? CLOSED_PREVIEW : PAGE_SIZE * Math.min(pages.current[g], MAX_REFRESH_PAGES);
-    (async () => {
-      try {
-        const base = buildQuery({ q, range, scope });
-        const [counts, ...lists] = await Promise.all([getTicketCounts(base), ...keys.map((g) => getTickets({ ...base, status: GROUPS[g].status, page: 1, pageSize: size(g) }))]);
-        if (!active || current !== generation.current) return;
-        const groups: Partial<Record<Group, GroupData>> = {};
-        keys.forEach((g, i) => {
-          if (g !== "closed" || closedAll) pages.current[g] = Math.min(pages.current[g], MAX_REFRESH_PAGES);
-          groups[g] = { items: uniqueById(lists[i].items), total: lists[i].meta.total };
-        });
-        setBoard({ revision, counts, groups });
-        setMoreError(null);
-      } catch (error: unknown) { if (active) setBoard({ revision, error }); }
-    })();
-    return () => { active = false; };
-  }, [q, range, scope, closedAll, revision]);
-  useEffect(() => { window.addEventListener("focus", reload); return () => window.removeEventListener("focus", reload); }, [reload]);
-  async function more(group: Group) {
-    if (moreBusy || !board?.groups?.[group]) return;
-    setMoreBusy(group); setMoreError(null);
-    const current = generation.current;
-    const page = pages.current[group] + 1;
-    try {
-      const next = await getTickets({ ...buildQuery({ q, range, scope }), status: GROUPS[group].status, page, pageSize: PAGE_SIZE });
-      if (alive.current && current === generation.current) {
-        pages.current[group] = page;
-        setBoard((old) => old?.groups?.[group] ? { ...old, groups: { ...old.groups, [group]: { items: uniqueById([...old.groups[group]!.items, ...next.items]), total: next.meta.total } } } : old);
-      }
-    } catch { if (alive.current) setMoreError(group); }
-    finally { if (alive.current) setMoreBusy(null); }
-  }
-  // Skeleton on the first load and on retry after an error; focus / revisit refreshes keep the list on screen.
-  const loading = !board || (board.revision !== revision && !!board.error);
-  return { board, loading, reload, more, moreBusy, moreError };
-}
-
-function TicketBoard({ filters, closedAll, desktop, selectedId, change, paneControls }: {
-  filters: Filters; closedAll: boolean; desktop: boolean; selectedId: string | null; change: Change; paneControls: ReactNode;
-}) {
-  const { board, loading, reload, more, moreBusy, moreError } = useMyTickets(filters, closedAll);
-  const filtered = filters.q !== "" || filters.range !== "all" || filters.scope !== "all";
-  const counts = board?.counts;
-  const total = counts ? counts.inProgress + counts.resolved + counts.closed : 0;
-  const groups = board?.groups ?? {};
-  const resolved = groups.resolved?.items ?? [];
-  const awaiting = resolved.filter((t) => t.awaitingMyConfirmation);
-  const visible = [...awaiting, ...resolved.filter((t) => !t.awaitingMyConfirmation), ...(groups.open?.items ?? []), ...(groups.closed?.items ?? [])];
-  const previewId = selectedId ?? visible[0]?.id;
-  const select = (id: string) => change({ id }, true);
-  const moreButton = (group: Group) => {
-    const data = groups[group];
-    if (!data || data.items.length >= data.total) return null;
-    return <div className="space-y-2 pt-2">{moreError === group && <ErrorState variant="inline" title="โหลดงานของคุณไม่สำเร็จ" onRetry={() => more(group)} />}
-      <Button variant="outline" className="w-full" disabled={moreBusy === group} onClick={() => more(group)}>{moreBusy === group && <Loader2 className="animate-spin" aria-hidden />}โหลดเพิ่ม</Button></div>;
-  };
-  const noMatch = <Card className="items-center gap-3 px-4 py-8 text-center shadow-card"><h2 className="text-base font-semibold">{filters.q ? `ไม่พบงานที่ตรงกับ "${filters.q}"` : "ไม่พบงานตามตัวกรองนี้"}</h2>
-    <Button variant="outline" onClick={() => change(filters.q ? { q: null } : { range: null, scope: null })}>{filters.q ? "ล้างการค้นหา" : "ล้างตัวกรอง"}</Button></Card>;
-  const failure = board?.error !== undefined && (errorCode(board.error) === "FORBIDDEN" ? <ForbiddenState /> : <ErrorState variant="inline" title="โหลดงานของคุณไม่สำเร็จ" onRetry={reload} />);
-  const empty = !loading && !board?.error && total === 0 && !filtered;
-  const emptyState = <EmptyState title="ยังไม่มีงานที่คุณแจ้ง" hint="เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย หรือสแกน QR ที่ติดบนอุปกรณ์" action={<Button asChild><Link href="/repair/new">แจ้งซ่อม</Link></Button>} />;
-  const closedAllHeader = <Button variant="ghost" className="-ml-2 h-11 px-2" onClick={() => change({ closed: null })}><ChevronLeft />ติดตามงานซ่อม</Button>;
-
-  if (!desktop) {
-    if (empty) return <div className="px-4 pt-4">{emptyState}</div>;
-    return <div className="px-4 pt-2">
-      {loading ? <MobileSkeleton /> : failure ? <div className="pt-3">{failure}</div> : total === 0 ? <div className="pt-3">{noMatch}</div> : closedAll ? <>
-        <div className="pt-2">{closedAllHeader}</div>
-        <GroupSection title={GROUPS.closed.title} count={groups.closed?.total ?? 0}>
-          <Card className="gap-0 divide-y py-0 shadow-card">{groups.closed?.items.map((t) => <ClosedRow key={t.id} ticket={t} />)}</Card>
-          {moreButton("closed")}
-          <p className="pt-2 text-center text-xs text-muted-foreground">แสดง {groups.closed?.items.length ?? 0} จาก {groups.closed?.total ?? 0} งาน</p>
-        </GroupSection>
-      </> : <>
-        {resolved.length > 0 && <GroupSection title={GROUPS.resolved.title} count={groups.resolved!.total} hot={awaiting.length > 0}>
-          <div className="space-y-2.5">{awaiting.map((t) => <AwaitingCard key={t.id} ticket={t} />)}
-            {resolved.length > awaiting.length && <Card className="gap-0 divide-y py-0 shadow-card">{resolved.filter((t) => !t.awaitingMyConfirmation).map((t) => <TicketRow key={t.id} ticket={t} />)}</Card>}</div>
-          {moreButton("resolved")}
-        </GroupSection>}
-        {(groups.open?.items.length ?? 0) > 0 && <GroupSection title={GROUPS.open.title} count={groups.open!.total}>
-          <Card className="gap-0 divide-y py-0 shadow-card">{groups.open!.items.map((t) => <TicketRow key={t.id} ticket={t} />)}</Card>
-          {moreButton("open")}
-        </GroupSection>}
-        {(groups.closed?.items.length ?? 0) > 0 && <GroupSection title={GROUPS.closed.title} count={groups.closed!.total}
-          action={groups.closed!.total > CLOSED_PREVIEW && <Button variant="link" className="ml-auto h-11 px-1" onClick={() => change({ closed: "all" })}>ดูทั้งหมด<ChevronRight /></Button>}>
-          <Card className="gap-0 divide-y py-0 shadow-card">{groups.closed!.items.map((t) => <ClosedRow key={t.id} ticket={t} />)}</Card>
-        </GroupSection>}
-      </>}
-    </div>;
-  }
-
-  if (empty) return emptyState;
-  const row = (t: TicketSummary) => <PaneRow key={t.id} ticket={t} selected={t.id === previewId} onSelect={() => select(t.id)} />;
-  return <div className="flex items-start gap-4.5">
-    <section aria-label="รายการงาน" className="w-98 shrink-0 overflow-hidden rounded-xl bg-card shadow-card">
-      <div className="space-y-2.5 border-b p-3.5">{paneControls}{!loading && !failure && <p className="text-right text-xs text-muted-foreground">{total} งาน</p>}</div>
-      {loading ? <div className="space-y-2 p-3.5" aria-busy="true" aria-label="กำลังโหลดงานซ่อม">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-16 w-full rounded-sm" />)}</div>
-        : failure ? <div className="p-3.5">{failure}</div> : total === 0 ? <div className="p-3.5">{noMatch}</div> : <div className="pb-2">
-          {closedAll ? <>
-            <div className="px-2 pt-2">{closedAllHeader}</div>
-            <PaneGroup title={GROUPS.closed.title} count={groups.closed?.total ?? 0}>{groups.closed?.items.map(row)}</PaneGroup>
-            <div className="px-3.5">{moreButton("closed")}<p className="pt-2 text-center text-xs text-muted-foreground">แสดง {groups.closed?.items.length ?? 0} จาก {groups.closed?.total ?? 0} งาน</p></div>
-          </> : <>
-            {resolved.length > 0 && <PaneGroup title={GROUPS.resolved.title} count={groups.resolved!.total} hot={awaiting.length > 0}>{[...awaiting, ...resolved.filter((t) => !t.awaitingMyConfirmation)].map(row)}</PaneGroup>}
-            {resolved.length > 0 && <div className="px-3.5">{moreButton("resolved")}</div>}
-            {(groups.open?.items.length ?? 0) > 0 && <><PaneGroup title={GROUPS.open.title} count={groups.open!.total}>{groups.open!.items.map(row)}</PaneGroup><div className="px-3.5">{moreButton("open")}</div></>}
-            {(groups.closed?.items.length ?? 0) > 0 && <PaneGroup title={GROUPS.closed.title} count={groups.closed!.total}>{groups.closed!.items.map(row)}</PaneGroup>}
-            {(groups.closed?.total ?? 0) > CLOSED_PREVIEW && <Button variant="link" className="h-11 w-full" onClick={() => change({ closed: "all" })}>ดูงานที่ปิดแล้วทั้งหมด</Button>}
-          </>}
-        </div>}
-    </section>
-    <div className="sticky top-5 max-h-dvh min-w-0 flex-1 overflow-y-auto pb-8">
-      {loading ? <PreviewSkeleton /> : previewId ? <TicketPreview key={previewId} id={previewId} /> : !failure && total > 0 && <Card className="items-center p-10 text-sm text-muted-foreground shadow-card">เลือกงานทางซ้ายเพื่อดูรายละเอียด</Card>}
+  const toolbar = <>
+    <div className="flex items-end justify-between gap-3 border-b px-4 lg:px-6">
+      <div role="group" aria-label="งานที่แสดง" className="-mb-px flex min-w-0 gap-1 overflow-x-auto">
+        {RELATIONS.map((r) => <button key={r.value} type="button" aria-pressed={scope === r.value} onClick={() => change({ scope: r.value === "all" ? null : r.value })}
+          className={cn("flex min-h-12 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30 sm:px-3",
+            scope === r.value ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+          <r.icon className="size-4" aria-hidden />{r.label}
+        </button>)}
+      </div>
     </div>
+    <div className="flex flex-wrap items-center gap-2 px-4 pt-4 lg:px-6">
+      <div className="relative min-w-0 basis-full sm:flex-1 sm:basis-64">
+        <Search className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-muted-foreground" aria-hidden />
+        <Input type="search" aria-label="ค้นหาเลขงาน หรือสถานที่" placeholder="ค้นหาเลขงาน หรือสถานที่" maxLength={50} value={text}
+          onChange={(e) => setDraft({ query: q, value: e.target.value })} className="h-11 rounded-lg bg-card pr-3 pl-10 text-sm" />
+      </div>
+      <FilterPill label="วันที่แจ้ง" icon={Clock} value={range} defaultValue="all" options={RANGES} onValueChange={(v) => change({ range: v === "all" ? null : v })} />
+      <FilterPill label="เรียง" icon={ListFilter} value={sort} defaultValue="updated" options={SORTS} onValueChange={(v) => change({ sort: v === "updated" ? null : v })} />
+      {filtered && <Button type="button" variant="ghost" className="h-11 px-3 text-muted-foreground" onClick={reset}><RotateCcw aria-hidden />ล้างตัวกรอง</Button>}
+    </div>
+    <p className="flex items-start gap-1.5 px-4 pt-3 text-[13px] leading-5 text-muted-foreground lg:px-6"><Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />งานที่รอคุณประเมินแสดงก่อน · กดชื่อเรื่องหรือปุ่มท้ายแถวเพื่อดูรายละเอียด</p>
+  </>;
+
+  return <div className="px-4 pt-4 pb-8 lg:px-0 lg:pt-2">
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
+        <Mascot pose="leopard" size={56} className="shrink-0" priority />
+        <div className="min-w-0">
+          <h1 className="text-2xl leading-9 font-semibold lg:text-[28px] lg:leading-10">ติดตามงานซ่อม</h1>
+          <p className="text-sm text-muted-foreground">งานที่คุณแจ้งและติดตาม · ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ</p>
+        </div>
+      </div>
+      <Button asChild className="h-11 max-sm:w-full"><Link href="/repair/new"><Plus aria-hidden />แจ้งซ่อมใหม่</Link></Button>
+    </header>
+    <Board key={`${q}|${range}|${scope}|${sort}`} filters={filters} filtered={filtered} onReset={reset} toolbar={toolbar}
+      collapsed={collapsed} onToggle={(s) => setCollapsed((old) => { const next = new Set(old); if (!next.delete(s)) next.add(s); return next; })} />
   </div>;
 }
 
-function GroupSection({ title, count, hot = false, action, children }: { title: string; count: number; hot?: boolean; action?: ReactNode; children: ReactNode }) {
-  const id = useId();
-  return <section aria-labelledby={id} className="pt-3">
-    <div className="flex min-h-11 items-center gap-2 px-0.5"><h2 id={id} className="font-heading text-base font-semibold">{title}</h2><CountChip count={count} hot={hot} />{action}</div>
-    {children}
+// ---- data: counts + one paged list per group ----
+
+type GroupData = { items: TicketSummary[]; total: number; pages: number; more: "idle" | "busy" | "error" };
+type Data = { revision: number; counts?: TicketCounts; groups?: Record<TicketStatus, GroupData>; error?: unknown };
+
+function useBoard(filters: Filters) {
+  const [revision, setRevision] = useState(0);
+  const [data, setData] = useState<Data>();
+  const pages = useRef<Record<TicketStatus, number>>({ resolved: 1, in_progress: 1, closed: 1 });
+  const generation = useRef(0);
+  const reload = useCallback(() => setRevision((r) => r + 1), []);
+  const { q, range, scope, sort } = filters;
+  // Also re-runs when a hidden route is shown again (cacheComponents), which refreshes the lists.
+  useEffect(() => {
+    let active = true;
+    const current = ++generation.current;
+    const f = { q, range, scope, sort };
+    const base = baseQuery(f);
+    (async () => {
+      try {
+        // A refresh refetches every loaded page of a group in one request (the API caps pageSize at 100).
+        const [counts, ...lists] = await Promise.all([
+          getTicketCounts(base),
+          ...GROUPS.map((g) => getTickets({ ...base, status: [g.status], sort: sortOf(f), page: 1, pageSize: Math.min(PAGE_SIZE * pages.current[g.status], 100) })),
+        ]);
+        if (!active || current !== generation.current) return;
+        const groups = Object.fromEntries(GROUPS.map((g, i) => [g.status, { items: uniqueById(lists[i].items), total: lists[i].meta.total, pages: pages.current[g.status], more: "idle" }])) as Record<TicketStatus, GroupData>;
+        setData({ revision, counts, groups });
+      } catch (error: unknown) { if (active) setData({ revision, error }); }
+    })();
+    return () => { active = false; };
+  }, [q, range, scope, sort, revision]);
+  useEffect(() => { window.addEventListener("focus", reload); return () => window.removeEventListener("focus", reload); }, [reload]);
+
+  const setGroup = (status: TicketStatus, patch: (g: GroupData) => GroupData) =>
+    setData((old) => old?.groups ? { ...old, groups: { ...old.groups, [status]: patch(old.groups[status]) } } : old);
+  async function loadMore(status: TicketStatus) {
+    const group = data?.groups?.[status];
+    if (!group || group.more === "busy") return;
+    setGroup(status, (g) => ({ ...g, more: "busy" }));
+    const current = generation.current;
+    try {
+      const next = await getTickets({ ...baseQuery(filters), status: [status], sort: sortOf(filters), page: pages.current[status] + 1, pageSize: PAGE_SIZE });
+      if (current !== generation.current) return;
+      pages.current[status] += 1;
+      setGroup(status, (g) => ({ items: uniqueById([...g.items, ...next.items]), total: next.meta.total, pages: pages.current[status], more: "idle" }));
+    } catch { setGroup(status, (g) => ({ ...g, more: "error" })); }
+  }
+  // Skeleton on the first load and on retry after an error; focus refreshes keep the lists on screen.
+  const loading = !data || (data.revision !== revision && !!data.error);
+  return { data, loading, reload, loadMore };
+}
+
+type BoardProps = {
+  filters: Filters; filtered: boolean; onReset: () => void; toolbar: ReactNode;
+  collapsed: ReadonlySet<TicketStatus>; onToggle: (s: TicketStatus) => void;
+};
+
+function Board({ filters, filtered, onReset, toolbar, collapsed, onToggle }: BoardProps) {
+  const { data, loading, reload, loadMore } = useBoard(filters);
+  const counts = data?.counts;
+  const groups = data?.groups;
+  const total = counts ? counts.inProgress + counts.resolved + counts.closed : 0;
+  const failure = !loading && data?.error !== undefined
+    && (errorCode(data.error) === "FORBIDDEN" ? <ForbiddenState /> : <ErrorState variant="inline" title="โหลดงานของคุณไม่สำเร็จ" onRetry={reload} />);
+  const ready = !loading && !failure && counts && groups;
+
+  if (ready && total === 0 && !filtered) {
+    return <div className="mt-5"><EmptyState title="ยังไม่มีงานที่คุณแจ้ง" hint="เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย หรือสแกน QR ที่ติดบนอุปกรณ์"
+      action={<Button asChild><Link href="/repair/new">แจ้งซ่อม</Link></Button>} /></div>;
+  }
+
+  // The reporter's own tickets awaiting the rating come first in the resolved group (BR-F06-2).
+  const review = ready ? groups.resolved.items.find((t) => t.awaitingMyConfirmation) : undefined;
+  const awaiting = counts?.awaitingMyConfirmation ?? 0;
+  const shown = GROUPS.filter((g) => counts && g.count(counts) > 0);
+
+  return <>
+    {review && awaiting > 0 && <TicketLink href={ticketHref(review.id)}
+      className="group mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-attention/30 bg-card px-4 py-3.5 shadow-card outline-none hover:border-attention/50 focus-visible:ring-3 focus-visible:ring-ring/30 sm:px-5">
+      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-lg bg-attention/10 text-attention"><CircleCheck className="size-5" /></span>
+      <span className="min-w-0 flex-1 basis-56">
+        <b className="block text-[15px] leading-6 font-semibold">ซ่อมเสร็จแล้ว · มี {awaiting} งานรอคุณตรวจ</b>
+        <span className="block text-sm text-muted-foreground">ตรวจผลการซ่อมและให้คะแนน เพื่อปิดงานที่คุณแจ้ง</span>
+      </span>
+      <span className="inline-flex h-10 items-center gap-1 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">ไปตรวจงาน<ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden /></span>
+    </TicketLink>}
+
+    <section aria-label="รายการงานซ่อม" className="mt-5 overflow-hidden rounded-xl border bg-card shadow-card">
+      {toolbar}
+      <div className="space-y-4 px-4 pt-4 pb-5 lg:px-6" aria-busy={loading}>
+        <p role="status" className="sr-only">{ready ? `พบ ${total} งาน` : ""}</p>
+        {loading ? <ListSkeleton /> : failure ? failure : ready && total === 0
+          ? <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-base font-semibold">{filters.q ? `ไม่พบงานที่ตรงกับ "${filters.q}"` : "ไม่พบงานตามตัวกรองนี้"}</p>
+            <p className="text-sm text-muted-foreground">ลองเปลี่ยนคำค้นหรือช่วงวันที่</p>
+            <Button variant="outline" onClick={onReset}>ล้างตัวกรอง</Button>
+          </div>
+          : ready && <>
+            {shown.map((g) => <TicketGroup key={g.status} group={g} count={g.count(counts)} data={groups[g.status]}
+              open={!collapsed.has(g.status)} onToggle={() => onToggle(g.status)} onMore={() => loadMore(g.status)} />)}
+            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+              <span>ทั้งหมด {total} งาน ใน {shown.length} กลุ่ม</span>
+              {counts.resolved > 0 && <span>งานรอคุณประเมินแสดงก่อนในกลุ่ม</span>}
+            </div>
+          </>}
+      </div>
+    </section>
+  </>;
+}
+
+function TicketGroup({ group: g, count, data, open, onToggle, onMore }: { group: Group; count: number; data: GroupData; open: boolean; onToggle: () => void; onMore: () => void }) {
+  const id = `group-${g.status}`;
+  return <section aria-labelledby={`${id}-title`} className="overflow-hidden rounded-lg border">
+    <h2 id={`${id}-title`} className="bg-muted/40">
+      <button type="button" aria-expanded={open} aria-controls={id} onClick={onToggle}
+        className="flex min-h-14 w-full items-center gap-2.5 px-3 py-2 text-left outline-none hover:bg-muted/70 focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset sm:px-4">
+        <ChevronDown aria-hidden className={cn("size-4 shrink-0 text-muted-foreground transition-transform", !open && "-rotate-90")} />
+        <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-lg", g.tone)}><g.icon className="size-4" /></span>
+        <span className="text-base font-semibold">{g.title}</span>
+        <span className="rounded-full border bg-card px-2 text-xs leading-5 font-medium text-muted-foreground">{count} งาน</span>
+        <span className="ml-auto hidden text-[13px] font-normal text-muted-foreground md:block">{g.hint}</span>
+      </button>
+    </h2>
+    <div id={id} hidden={!open} className="border-t">
+      {/* Desktop: table · phone / tablet: one card per ticket. */}
+      <table className="hidden w-full table-fixed border-collapse text-left lg:table">
+        <caption className="sr-only">{g.title}</caption>
+        <thead className="text-[13px] text-muted-foreground">
+          <tr className="border-b">
+            <th scope="col" className="w-7/25 px-4 py-2.5 font-medium">เรื่องที่แจ้ง</th>
+            <th scope="col" className="w-1/5 px-3 py-2.5 font-medium">สถานที่</th>
+            <th scope="col" className="w-11/50 px-3 py-2.5 font-medium">สถานะล่าสุด</th>
+            <th scope="col" className="w-3/20 px-3 py-2.5 font-medium">กำหนด / อัปเดต</th>
+            <th scope="col" className="w-3/20 px-4 py-2.5 text-right font-medium">รายละเอียด</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">{data.items.map((t) => <Row key={t.id} ticket={t} />)}</tbody>
+      </table>
+      <ul className="divide-y lg:hidden">{data.items.map((t) => <Card key={t.id} ticket={t} />)}</ul>
+      {(data.items.length < data.total || data.more === "error") && <div className="space-y-2 border-t px-4 py-3 text-center">
+        {data.more === "error" && <ErrorState variant="inline" title="โหลดงานเพิ่มไม่สำเร็จ" onRetry={onMore} />}
+        {data.items.length < data.total && <Button variant="outline" className="h-11 w-full sm:w-auto sm:px-8" disabled={data.more === "busy"} onClick={onMore}>
+          {data.more === "busy" && <Loader2 className="animate-spin" aria-hidden />}โหลดเพิ่ม</Button>}
+        <p className="text-xs text-muted-foreground">แสดง {data.items.length} จาก {data.total} งาน</p>
+      </div>}
+    </div>
   </section>;
 }
 
-function CountChip({ count, hot }: { count: number; hot?: boolean }) {
-  return <span className={cn("min-w-6 rounded-full px-1.5 text-center font-heading text-xs leading-6 font-semibold", hot ? "bg-status-resolved text-white" : "bg-card ring-1 ring-border")}>{count}</span>;
+// ---- one ticket ----
+
+/** Second line under the status: what the viewer is waiting for at this step. */
+function statusCaption(ticket: TicketSummary): ReactNode {
+  switch (ticket.step) {
+    case "awaiting_assessment": return "รอช่างกำหนดวันเสร็จ";
+    case "in_repair": return "ช่างกำลังดำเนินการ";
+    case "reworking": return "ช่างแก้ไขตามที่ส่งกลับ";
+    case "awaiting_rating": return ticket.awaitingMyConfirmation ? (ticket.autoCloseAt ? autoCloseText(ticket.autoCloseAt) : "ตรวจผลซ่อมและให้คะแนน") : "รอผู้แจ้งประเมินตรวจงาน";
+    default:
+      // How it closed; the score itself lives on S07 (owner, 2026-10-19).
+      if (ticket.closedReason === "confirmed" && ticket.rating) {
+        return <>{CLOSED_LABELS.confirmed} · <span className="font-medium text-foreground tabular-nums">{ticket.rating}/5</span></>;
+      }
+      return ticket.closedReason ? CLOSED_LABELS[ticket.closedReason] : "";
+  }
 }
 
-function AwaitingCard({ ticket }: { ticket: TicketSummary }) {
-  const resolvedBy = [ticket.technician ? `ช่าง${firstName(ticket.technician.name)}บันทึกผล` : "ช่างบันทึกผล", ticket.resolvedAt && listDate(ticket.resolvedAt)].filter(Boolean).join(" ");
-  return <Card className="gap-0 border border-status-resolved/20 bg-status-resolved/5 p-3.5 shadow-card ring-0">
-    <div className="flex gap-3"><TicketThumb ticket={ticket} />
-      <div className="min-w-0 flex-1"><TicketLink href={ticketHref(ticket.id)} className="rounded-sm text-base leading-snug font-semibold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">{ticketTitle(ticket)}</TicketLink>
-        <p className="truncate text-xs leading-5 text-muted-foreground">{ticketLocation(ticket)}</p>
-        <p className="text-xs leading-5 text-muted-foreground">{ticket.ticketNo} · {resolvedBy}</p></div></div>
-    {ticket.autoCloseAt && <p className="mt-2.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning"><Clock className="size-3.5 shrink-0" aria-hidden />{autoCloseText(ticket.autoCloseAt)}</p>}
-    <div className="mt-3 flex gap-2"><Button asChild variant="outline" className="h-11 flex-1 px-3"><TicketLink href={`${ticketHref(ticket.id)}?action=sendback`}>ส่งกลับให้แก้</TicketLink></Button>
-      <Button asChild className="h-11 flex-1 px-3"><TicketLink href={`${ticketHref(ticket.id)}?action=confirm`}><Star aria-hidden />ประเมินงาน</TicketLink></Button></div>
-  </Card>;
+/** The date the viewer cares about at this step. A send back keeps the old date on the ticket, so it is not shown here. */
+function dueText(ticket: TicketSummary): { label: string; value: string; muted: boolean } {
+  switch (ticket.step) {
+    case "awaiting_assessment": return { label: "คาดว่าจะเสร็จ", value: "รอช่างกำหนด", muted: true };
+    case "in_repair": return ticket.expectedDoneOn ? { label: "คาดว่าจะเสร็จ", value: dayLabel(ticket.expectedDoneOn, true), muted: false } : { label: "คาดว่าจะเสร็จ", value: "—", muted: true };
+    case "reworking": return { label: "คาดว่าจะเสร็จ", value: "ดูวันใหม่ในรายละเอียด", muted: true };
+    default: return ticket.resolvedAt ? { label: "ผลซ่อม", value: "ซ่อมเสร็จแล้ว", muted: false } : { label: "สถานะ", value: "ปิดงานแล้ว", muted: false };
+  }
 }
 
-function FollowTag() {
-  return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Bookmark className="size-3.5" aria-hidden />คุณติดตามเคสนี้</span>;
+function Badge({ ticket }: { ticket: TicketSummary }) {
+  const mine = ticket.awaitingMyConfirmation;
+  return <span className={cn("inline-flex max-w-full items-center gap-1.5 rounded-[5px] px-2 py-px text-xs leading-5 font-semibold", mine ? "bg-attention/10 text-attention" : STEP[ticket.step].color)}>
+    <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" /><span className="truncate">{stepLabel(ticket)}</span>
+  </span>;
 }
 
-function TicketRow({ ticket }: { ticket: TicketSummary }) {
-  return <TicketLink href={ticketHref(ticket.id)} aria-label={ticketTitle(ticket)} className="flex min-h-16 items-start gap-3 px-3.5 py-3.5 outline-none hover:bg-muted/50 focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-    <TicketThumb ticket={ticket} />
-    <div className="min-w-0 flex-1"><h3 className="truncate font-sans text-base font-semibold">{ticketTitle(ticket)}</h3><p className="truncate text-xs leading-5 text-muted-foreground">{ticketLocation(ticket)}</p>
-      <TicketProgressMini ticket={ticket} className="mt-2" />{ticket.viewerRelation === "subscriber" && <div className="mt-1.5"><FollowTag /></div>}</div>
-    <ChevronRight className="mt-5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-  </TicketLink>;
+function Place({ ticket }: { ticket: TicketSummary }) {
+  return <>
+    <span className="block truncate text-sm">{ticket.building.name}</span>
+    <span className="block truncate text-[13px] text-muted-foreground">ชั้น {ticket.floor.name}{ticket.locationDetail ? ` · ${ticket.locationDetail}` : ""}</span>
+  </>;
 }
 
-function closedCaption(ticket: TicketSummary) {
-  const date = listDate(ticket.closedAt ?? ticket.updatedAt);
-  if (ticket.closedReason === "confirmed" && ticket.rating) return <span className="inline-flex items-center gap-1"><span className="inline-flex items-center gap-0.5 font-semibold text-warning" aria-label={`${ticket.rating} ดาว`}><Star className="size-3 fill-current" aria-hidden />{ticket.rating}</span>· {date}</span>;
-  return `${ticket.closedReason ? CLOSED_LABELS[ticket.closedReason] : ""} · ${date}`;
-}
-
-function ClosedRow({ ticket }: { ticket: TicketSummary }) {
-  return <TicketLink href={ticketHref(ticket.id)} aria-label={ticketTitle(ticket)} className="flex min-h-13 items-center gap-2.5 px-3.5 py-2.5 outline-none hover:bg-muted/50 focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-    <span className="grid size-7.5 shrink-0 place-items-center rounded-full bg-status-closed/10 text-status-closed"><CircleCheck className="size-4" aria-hidden /></span>
-    <span className="min-w-0 flex-1 truncate text-sm font-medium">{ticketTitle(ticket)}</span>
-    <span className="shrink-0 text-xs text-muted-foreground">{closedCaption(ticket)}</span>
-  </TicketLink>;
-}
-
-function MobileSkeleton() {
-  return <div className="space-y-3 pt-4" aria-busy="true" aria-label="กำลังโหลดงานซ่อม"><Skeleton className="h-6 w-32" /><Skeleton className="h-40 w-full rounded-xl" />{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}</div>;
-}
-
-function PaneGroup({ title, count, hot = false, children }: { title: string; count: number; hot?: boolean; children: ReactNode }) {
-  const id = useId();
-  return <section aria-labelledby={id}><div className="flex items-center gap-2 px-4 pt-3.5 pb-1.5"><h2 id={id} className="font-heading text-sm font-semibold">{title}</h2><CountChip count={count} hot={hot} /></div><div className="divide-y">{children}</div></section>;
-}
-
-function PaneRow({ ticket, selected, onSelect }: { ticket: TicketSummary; selected: boolean; onSelect: () => void }) {
-  const awaiting = ticket.awaitingMyConfirmation;
-  const closed = ticket.status === "closed";
-  return <button type="button" onClick={onSelect} aria-current={selected || undefined} aria-label={ticketTitle(ticket)}
-    className={cn("flex w-full items-start gap-3 border-l-3 px-3.5 py-3 text-left outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-      selected ? (awaiting ? "border-status-resolved bg-status-resolved/10" : "border-primary bg-secondary/70") : awaiting ? "border-transparent bg-status-resolved/5" : "border-transparent")}>
-    {closed ? <span className="grid size-7.5 shrink-0 place-items-center rounded-full bg-status-closed/10 text-status-closed"><CircleCheck className="size-4" aria-hidden /></span> : <TicketThumb ticket={ticket} size="sm" />}
-    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{ticketTitle(ticket)}</span>
-      {closed ? <span className="block text-xs text-muted-foreground">{closedCaption(ticket)}</span> : <>
-        <span className="block truncate text-xs leading-5 text-muted-foreground">{ticketLocation(ticket)}</span>
-        <TicketProgressMini ticket={ticket} className="mt-1.5" />{ticket.viewerRelation === "subscriber" && <span className="mt-1 block"><FollowTag /></span>}</>}
-    </span>
-  </button>;
-}
-
-function PreviewSkeleton() {
-  return <Card className="gap-4 p-5 shadow-card" aria-busy="true" aria-label="กำลังโหลด"><Skeleton className="h-5 w-40" /><Skeleton className="h-7 w-2/3" /><Skeleton className="h-24 w-full rounded-lg" /><div className="grid grid-cols-2 gap-3"><Skeleton className="h-40 rounded-lg" /><Skeleton className="h-40 rounded-lg" /></div></Card>;
-}
-
-function Box({ title, action, children, className }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
-  return <div className={cn("space-y-2 rounded-lg border p-4", className)}>{title && <div className="flex items-center gap-2"><h3 className="flex-1 font-heading text-sm font-semibold">{title}</h3>{action}</div>}{children}</div>;
-}
-
-function TicketPreview({ id }: { id: string }) {
-  const { ticket, loading, error, reload } = useTicket(id);
-  if (loading) return <PreviewSkeleton />;
-  if (error || !ticket) return <Card className="shadow-card"><TicketFailure error={error} onRetry={reload} /></Card>;
+/** `dense`: desktop table rows (pointer input), so the row is not held open by a 44px touch target. */
+function OpenLink({ ticket, className, dense }: { ticket: TicketSummary; className?: string; dense?: boolean }) {
   const href = ticketHref(ticket.id);
-  return <Card className="gap-4 p-5 shadow-card ring-0">
-    <div className="flex flex-wrap items-center gap-2"><CopyTicketNumber value={ticket.ticketNo} /><span className="flex-1" />
-      {ticket.awaitingMyConfirmation ? <Badge className="border-0 bg-status-resolved text-white">รอคุณประเมิน</Badge> : <TicketStatusBadge step={ticket.step} />}
-      {ticket.viewerRelation === "subscriber" && <Badge variant="secondary"><Bookmark aria-hidden className="size-3.5" />คุณติดตามเคสนี้</Badge>}
-      <Button asChild variant="ghost" size="sm"><TicketLink href={href}>เปิดหน้าเต็ม<ChevronRight /></TicketLink></Button></div>
-    <div><h2 className="break-words font-heading text-xl font-semibold">{ticketTitle(ticket)}</h2>
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"><span>{ticket.category.name}</span><PriorityIndicator priority={ticket.priority} />
-        <span className="inline-flex items-start gap-1.5"><MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />{ticketLocation(ticket)}</span></div>
-      {ticket.closedReason && <p className="mt-1 text-xs text-muted-foreground">{CLOSED_LABELS[ticket.closedReason]}</p>}</div>
-    <Box><TicketProgress ticket={ticket} />
-      {ticket.awaitingMyConfirmation && <div className="flex flex-wrap items-center gap-2.5 border-t pt-3.5">
-        {ticket.autoCloseAt && <p className="inline-flex min-w-0 flex-1 items-center gap-1.5 rounded-sm bg-warning/10 px-3 py-2 text-xs font-semibold text-warning"><Clock className="size-3.5 shrink-0" aria-hidden />ประเมินภายใน {shortDate(ticket.autoCloseAt)} ไม่เช่นนั้นระบบปิดงานให้อัตโนมัติ</p>}
-        <Button asChild variant="outline" size="sm"><TicketLink href={`${href}?action=sendback`}>ส่งกลับให้แก้</TicketLink></Button>
-        <Button asChild size="sm"><TicketLink href={`${href}?action=confirm`}><Star aria-hidden />ประเมินงาน</TicketLink></Button></div>}
-    </Box>
-    <div className={cn("grid gap-4", ticket.result && "xl:grid-cols-2")}>
-      <Box title="รายละเอียดจากผู้แจ้ง"><p className="whitespace-pre-wrap break-words text-sm leading-6">{ticket.details || "ไม่มีรายละเอียดเพิ่มเติม"}</p><PhotoGallery photos={ticket.photos} />
-        <p className="text-xs text-muted-foreground">แจ้งโดย {ticket.reporter.name} · {formatDateTime(ticket.createdAt)}</p></Box>
-      {ticket.result && <Box title="ผลการซ่อม"><p className="whitespace-pre-wrap break-words text-sm leading-6">{ticket.result.note}</p><PhotoGallery photos={ticket.result.photos} label="รูปหลังซ่อม" />
-        <p className="text-xs text-muted-foreground">{[ticket.result.photos.length > 0 && "รูปหลังซ่อม", ticket.result.by && `ช่าง${ticket.result.by.name}`, ticket.result.at && formatDateTime(ticket.result.at)].filter(Boolean).join(" · ")}</p></Box>}
+  if (ticket.awaitingMyConfirmation) {
+    return <Button asChild className={cn(dense ? "h-9" : "h-10", className)}>
+      <TicketLink href={href} aria-label={`ตรวจงาน ${ticket.ticketNo}`}>ตรวจงาน<ChevronRight aria-hidden /></TicketLink>
+    </Button>;
+  }
+  return <TicketLink href={href} aria-label={`ดูงาน ${ticket.ticketNo}`}
+    className={cn("inline-flex items-center gap-1 rounded-sm px-2 text-sm font-semibold text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30", dense ? "min-h-9" : "min-h-11", className)}>
+    ดูงาน<ChevronRight className="size-4" aria-hidden />
+  </TicketLink>;
+}
+
+/** Desktop rows keep the title to one line (full text on hover) so every row is two lines tall. */
+function Title({ ticket, compact }: { ticket: TicketSummary; compact?: boolean }) {
+  const title = ticketTitle(ticket);
+  return <>
+    <TicketLink href={ticketHref(ticket.id)} title={compact ? title : undefined}
+      className={cn("block text-[15px] leading-6 font-semibold outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/30", compact ? "truncate" : "line-clamp-2")}>{title}</TicketLink>
+    <span className="block truncate text-xs leading-5 text-muted-foreground"><span className="tracking-wide">{ticket.ticketNo}</span>{ticket.viewerRelation === "subscriber" && " · คุณติดตามงานนี้"}</span>
+  </>;
+}
+
+function Row({ ticket }: { ticket: TicketSummary }) {
+  const due = dueText(ticket);
+  const caption = ticket.step === "awaiting_rating" && ticket.awaitingMyConfirmation && ticket.autoCloseAt ? autoCloseText(ticket.autoCloseAt) : undefined;
+  return <tr className={cn("align-middle transition-colors hover:bg-muted/40", ticket.awaitingMyConfirmation && "bg-attention/4")}>
+    <td className={cn("px-4 py-2.5", ticket.awaitingMyConfirmation && "border-l-3 border-l-attention")}><Title ticket={ticket} compact /></td>
+    <td className="px-3 py-2.5"><Place ticket={ticket} /></td>
+    <td className="px-3 py-2.5"><Badge ticket={ticket} /><span title={caption} className="mt-0.5 block truncate text-xs leading-5 text-muted-foreground">{statusCaption(ticket)}</span></td>
+    <td className="px-3 py-2.5">
+      <span className={cn("block truncate text-sm leading-5", due.muted ? "text-muted-foreground" : "font-medium")}>{due.value}</span>
+      <time dateTime={ticket.updatedAt} className="block text-xs leading-5 text-muted-foreground">อัปเดต {listDate(ticket.updatedAt)}</time>
+    </td>
+    <td className="px-4 py-2 text-right"><OpenLink ticket={ticket} dense /></td>
+  </tr>;
+}
+
+function Card({ ticket }: { ticket: TicketSummary }) {
+  const due = dueText(ticket);
+  return <li className={cn("space-y-2.5 px-4 py-4", ticket.awaitingMyConfirmation && "border-l-3 border-l-attention bg-attention/4")}>
+    <div><Title ticket={ticket} /></div>
+    <div><Place ticket={ticket} /></div>
+    <div><Badge ticket={ticket} /><span className="mt-1 block text-xs leading-5 text-muted-foreground">{statusCaption(ticket)}</span></div>
+    <div className="flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <span className="block text-xs text-muted-foreground">{due.label}</span>
+        <span className={cn("block text-sm", due.muted ? "text-muted-foreground" : "font-semibold")}>{due.value}</span>
+        <time dateTime={ticket.updatedAt} className="block text-xs leading-5 text-muted-foreground">อัปเดต {listDate(ticket.updatedAt)}</time>
+      </div>
+      <OpenLink ticket={ticket} className="shrink-0" />
     </div>
-    <Box title="ความคืบหน้าล่าสุด" action={<Button asChild variant="link" size="sm" className="h-auto px-0"><TicketLink href={href}>ดูทั้งหมด</TicketLink></Button>}><Timeline events={ticket.timeline.slice(0, 3)} /></Box>
-  </Card>;
+  </li>;
+}
+
+function ListSkeleton() {
+  return <div aria-label="กำลังโหลดงานซ่อม" className="space-y-4">
+    {[0, 1].map((g) => <div key={g} className="overflow-hidden rounded-lg border">
+      <div className="flex items-center gap-2.5 bg-muted/40 px-4 py-3"><Skeleton className="size-8 rounded-lg" /><Skeleton className="h-4 w-36" /></div>
+      {[0, 1, 2].map((i) => <div key={i} className="flex items-center gap-4 border-t px-4 py-3"><div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/2" /><Skeleton className="h-3 w-1/3" /></div><Skeleton className="hidden h-5 w-28 rounded-[5px] sm:block" /></div>)}
+    </div>)}
+  </div>;
 }
