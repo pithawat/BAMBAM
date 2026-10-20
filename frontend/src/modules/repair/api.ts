@@ -5,26 +5,40 @@ import { mockMeByRole } from "@/lib/platform/mocks";
 import {
   mockBuildings,
   mockCategories,
+  mockCloseTicket,
+  mockCreateAsset,
   mockCreateTicket,
+  mockDeactivateAsset,
   mockErrors,
+  mockFloorPlan,
+  mockGetAssetTypes,
   mockListTickets,
+  mockOverview,
   mockRecentPlaces,
   mockRememberPhoto,
   mockScenario,
+  mockSuggestAssetCode,
   mockTicketCounts,
   mockTicketDetail,
+  mockUpdateAsset,
 } from "./mocks";
 import type {
   AssessRequest,
+  Asset,
+  AssetType,
   Building,
   Category,
+  CloseRequest,
   ConfirmRequest,
   Contractor,
   ContractorJobPage,
   ContractorPage,
   ContractorQuery,
   ContractorRequest,
+  CreateAssetRequest,
   CreateTicketRequest,
+  FloorPlan,
+  Overview,
   Photo,
   RecentPlace,
   Ref,
@@ -35,6 +49,7 @@ import type {
   TicketDetail,
   TicketListQuery,
   TicketPage,
+  UpdateAssetRequest,
 } from "./types";
 
 // Repair API client — endpoint numbers from docs/modules/repair/04-api-contract.md.
@@ -134,7 +149,7 @@ export async function createTicket(req: CreateTicketRequest): Promise<TicketDeta
 
 // ---- #6, #7 lists ----
 
-/** S06 (scope=mine); S09 technician work list (scope=all, step filter, sort=priority:asc). */
+/** S06 (scope=mine); S09 / S11 work lists (scope=all, step filter, sort=createdAt:asc — CR-015). */
 export async function getTickets(query: TicketListQuery = {}): Promise<TicketPage> {
   if (env.useMocks) return mock(() => mockListTickets(query, mockViewer()), { read: true });
   const res = await http.list<TicketPage["items"][number]>(`${BASE}/tickets${toQuery(query)}`);
@@ -182,6 +197,17 @@ export function sendBackTicket(id: string, req: SendBackRequest): Promise<Ticket
   return http.post<TicketDetail>(`${ticketPath(id)}/send-back`, req);
 }
 
+// ---- #21 admin close (Stage 3, F08-B) ----
+
+/** S07 / S11: admin closes any open ticket with a reason → `closed` / `admin_closed`. 409 `TICKET_CLOSED` when already closed. */
+export async function closeTicket(id: string, req: CloseRequest): Promise<TicketDetail> {
+  if (env.useMocks) {
+    if (mockScenario() === "error") return mockFail(mockErrors.network());
+    return mock(() => mockCloseTicket(id, req.reason, mockViewer()), { delayMs: 500 });
+  }
+  return http.post<TicketDetail>(`${ticketPath(id)}/close`, req);
+}
+
 // ---- #13–#19 contractors (F24) ----
 
 export function getContractorTypes(): Promise<Ref[]> {
@@ -213,6 +239,59 @@ export function updateContractor(id: string, req: ContractorRequest): Promise<Co
 export async function getContractorJobs(id: string, page = 1, pageSize = 20): Promise<ContractorJobPage> {
   const res = await http.list<ContractorJobPage["items"][number]>(`${BASE}/contractors/${encodeURIComponent(id)}/jobs${toQuery({ page, pageSize })}`);
   return { items: res.data, meta: res.meta ?? { page, pageSize, total: res.data.length } };
+}
+// ---- Stage 3D (CR-016): S29 dashboard, floor plans, equipment ----
+
+/** #27 S29: key numbers, buildings → floors with open counts, attention list. 403 for roles other than admin / executive. */
+export async function getOverview(): Promise<Overview> {
+  if (env.useMocks) return mock(() => mockOverview(mockViewer()), { read: true });
+  return http.get<Overview>(`${BASE}/admin/overview`);
+}
+
+/** #29 equipment types for the palette and the add dialog. */
+export async function getAssetTypes(): Promise<AssetType[]> {
+  if (env.useMocks) return mock(() => mockGetAssetTypes(mockViewer()), { read: true, needsData: false });
+  return http.get<AssetType[]>(`${BASE}/asset-types`);
+}
+
+/** #30 one floor: plan size, rooms with outlines + open counts, active equipment. 404 `FLOOR_NOT_FOUND`. */
+export async function getFloorPlan(floorId: string): Promise<FloorPlan> {
+  if (env.useMocks) return mock(() => mockFloorPlan(floorId, mockViewer()), { read: true, needsData: false });
+  return http.get<FloorPlan>(`${BASE}/floors/${encodeURIComponent(floorId)}/plan`);
+}
+
+/** #31 admin adds equipment. 409 `ASSET_CODE_TAKEN` · 422 `POINT_OUTSIDE_ROOM` / `MASTER_DATA_CHANGED` · 400 fields (assetFieldMessages). */
+export async function createAsset(req: CreateAssetRequest): Promise<Asset> {
+  if (env.useMocks) {
+    if (mockScenario() === "error") return mockFail(mockErrors.network());
+    return mock(() => mockCreateAsset(req, mockViewer()), { delayMs: 400 });
+  }
+  return http.post<Asset>(`${BASE}/assets`, req);
+}
+
+/** #32 admin edits / moves equipment (same errors as #31, plus 404 `ASSET_NOT_FOUND`). */
+export async function updateAsset(id: string, req: UpdateAssetRequest): Promise<Asset> {
+  if (env.useMocks) {
+    if (mockScenario() === "error") return mockFail(mockErrors.network());
+    return mock(() => mockUpdateAsset(id, req, mockViewer()), { delayMs: 400 });
+  }
+  return http.put<Asset>(`${BASE}/assets/${encodeURIComponent(id)}`, req);
+}
+
+/** #33 admin removes equipment = deactivate (the code stays taken). 404 `ASSET_NOT_FOUND`. */
+export async function deactivateAsset(id: string): Promise<void> {
+  if (env.useMocks) {
+    if (mockScenario() === "error") return mockFail(mockErrors.network());
+    return mock(() => mockDeactivateAsset(id, mockViewer()), { delayMs: 400 });
+  }
+  await http.post<void>(`${BASE}/assets/${encodeURIComponent(id)}/deactivate`);
+}
+
+/** #34 next free code for the add dialog (`AC-1-003`); the user may type any free code. */
+export async function suggestAssetCode(assetTypeId: string, floorId: string): Promise<string> {
+  if (env.useMocks) return mock(() => mockSuggestAssetCode(assetTypeId, floorId, mockViewer()), { delayMs: 150 });
+  const res = await http.get<{ code: string }>(`${BASE}/assets/suggest-code${toQuery({ assetTypeId, floorId })}`);
+  return res.code;
 }
 
 // ---- helpers ----

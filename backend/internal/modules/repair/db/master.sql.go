@@ -99,69 +99,6 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 	return i, err
 }
 
-const insertSampleBuilding = `-- name: InsertSampleBuilding :exec
-INSERT INTO repair.buildings (id, name, sort_order) VALUES ($1, $2, $3)
-ON CONFLICT DO NOTHING
-`
-
-type InsertSampleBuildingParams struct {
-	ID        uuid.UUID
-	Name      string
-	SortOrder int32
-}
-
-// Sample locations (dev / UAT only, D-032): inserted by id, existing rows are left as they are.
-func (q *Queries) InsertSampleBuilding(ctx context.Context, arg InsertSampleBuildingParams) error {
-	_, err := q.db.Exec(ctx, insertSampleBuilding, arg.ID, arg.Name, arg.SortOrder)
-	return err
-}
-
-const insertSampleFloor = `-- name: InsertSampleFloor :exec
-INSERT INTO repair.floors (id, building_id, name, level) VALUES ($1, $2, $3, $4)
-ON CONFLICT DO NOTHING
-`
-
-type InsertSampleFloorParams struct {
-	ID         uuid.UUID
-	BuildingID uuid.UUID
-	Name       string
-	Level      int32
-}
-
-func (q *Queries) InsertSampleFloor(ctx context.Context, arg InsertSampleFloorParams) error {
-	_, err := q.db.Exec(ctx, insertSampleFloor,
-		arg.ID,
-		arg.BuildingID,
-		arg.Name,
-		arg.Level,
-	)
-	return err
-}
-
-const insertSampleRoom = `-- name: InsertSampleRoom :exec
-INSERT INTO platform.rooms (id, floor_id, name, area_type, sort_order) VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT DO NOTHING
-`
-
-type InsertSampleRoomParams struct {
-	ID        uuid.UUID
-	FloorID   uuid.UUID
-	Name      string
-	AreaType  string
-	SortOrder int32
-}
-
-func (q *Queries) InsertSampleRoom(ctx context.Context, arg InsertSampleRoomParams) error {
-	_, err := q.db.Exec(ctx, insertSampleRoom,
-		arg.ID,
-		arg.FloorID,
-		arg.Name,
-		arg.AreaType,
-		arg.SortOrder,
-	)
-	return err
-}
-
 const listActiveBuildings = `-- name: ListActiveBuildings :many
 SELECT id, name FROM repair.buildings
 WHERE is_active
@@ -408,20 +345,4 @@ func (q *Queries) NextTicketCounter(ctx context.Context, year int32) (int64, err
 	var last_no int64
 	err := row.Scan(&last_no)
 	return last_no, err
-}
-
-const renameSampleBuilding = `-- name: RenameSampleBuilding :exec
-UPDATE repair.buildings SET name = $1, updated_at = now() WHERE id = $2 AND name = $3
-`
-
-type RenameSampleBuildingParams struct {
-	NewName string
-	ID      uuid.UUID
-	OldName string
-}
-
-// Sample data refresh (dev / UAT only, D-032, CR-008): applied by id so existing databases keep their ids.
-func (q *Queries) RenameSampleBuilding(ctx context.Context, arg RenameSampleBuildingParams) error {
-	_, err := q.db.Exec(ctx, renameSampleBuilding, arg.NewName, arg.ID, arg.OldName)
-	return err
 }

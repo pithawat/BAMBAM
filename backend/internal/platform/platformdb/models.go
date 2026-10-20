@@ -11,6 +11,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type PlatformAsset struct {
+	ID          uuid.UUID
+	Code        string
+	Name        string
+	AssetTypeID uuid.UUID
+	RoomID      uuid.UUID
+	PosX        pgtype.Numeric
+	PosZ        pgtype.Numeric
+	RotationDeg int16
+	IsActive    bool
+	CreatedBy   *uuid.UUID
+	UpdatedBy   *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type PlatformAssetType struct {
+	ID         uuid.UUID
+	Key        string
+	Name       string
+	CodePrefix string
+	Icon       string
+	Mount      string
+	SortOrder  int32
+	IsActive   bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
 type PlatformAuditLog struct {
 	ID          uuid.UUID
 	ActorUserID *uuid.UUID
@@ -22,6 +51,14 @@ type PlatformAuditLog struct {
 	UpdatedAt   time.Time
 }
 
+type PlatformFloorPlan struct {
+	FloorID   uuid.UUID
+	WidthM    pgtype.Numeric
+	DepthM    pgtype.Numeric
+	ModelFile *string
+	UpdatedAt time.Time
+}
+
 type PlatformRoom struct {
 	ID        uuid.UUID
 	FloorID   uuid.UUID
@@ -31,6 +68,7 @@ type PlatformRoom struct {
 	IsActive  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	PlanShape []byte
 }
 
 type PlatformSession struct {
@@ -66,6 +104,11 @@ type PlatformUserRole struct {
 	Role         string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type RepairAssetTypeCategory struct {
+	AssetTypeID uuid.UUID
+	CategoryID  uuid.UUID
 }
 
 type RepairBuilding struct {
@@ -204,6 +247,7 @@ type RepairTicket struct {
 	SymptomOther            *string
 	PrioritySource          string
 	RoomID                  *uuid.UUID
+	AssetID                 *uuid.UUID
 }
 
 type RepairTicketCounter struct {

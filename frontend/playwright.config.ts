@@ -5,7 +5,9 @@ import { defineConfig, devices } from "@playwright/test";
 // Real RMC SSO cannot be automated: e2e/global-setup.ts creates a demo-user
 // session through `go run ./cmd/devsession` (dev/UAT only, no HTTP backdoor).
 
-const PORT = 3000;
+// E2E_PORT / E2E_API_URL point the run at another local stack (defaults: 3000 / 8080).
+const PORT = Number(process.env.E2E_PORT ?? 3000);
+const API_URL = (process.env.E2E_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -21,14 +23,22 @@ export default defineConfig({
     timezoneId: "Asia/Bangkok",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
+    {
+      name: "desktop",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 800 },
+        // software WebGL for the S29 3D card (CR-016) in headless Chrome
+        launchOptions: { args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
+      },
+    },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: [
     {
       command: "go run ./cmd/api",
       cwd: "../backend",
-      url: "http://localhost:8080/api/v1/health",
+      url: `${API_URL}/api/v1/health`,
       env: { APP_ENV: "development" },
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

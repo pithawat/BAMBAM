@@ -236,7 +236,7 @@ func (ctl *Controller) Ticket(c *gin.Context) {
 // maxPage keeps OFFSET bounded.
 const maxPage = 10_000
 
-var listSorts = map[string]bool{"updatedAt:desc": true, "createdAt:desc": true, "createdAt:asc": true, "closedAt:desc": true, "priority:asc": true}
+var listSorts = map[string]bool{"updatedAt:desc": true, "createdAt:desc": true, "createdAt:asc": true, "closedAt:desc": true}
 
 // parseFilter reads the #6 / #7 query. withStatus=false for #7 (counts ignore `status`).
 func parseFilter(c *gin.Context, withStatus bool) (TicketFilter, error) {

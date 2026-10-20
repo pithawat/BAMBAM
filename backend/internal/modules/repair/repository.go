@@ -94,50 +94,6 @@ func (r *PgRepository) ListBuildings(ctx context.Context) ([]Building, error) {
 	return out, nil
 }
 
-func (r *PgRepository) InsertSampleLocations(ctx context.Context, buildings []Building) error {
-	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
-		q := repairdb.New(tx)
-		for i, b := range buildings {
-			if err := q.InsertSampleBuilding(ctx, repairdb.InsertSampleBuildingParams{ID: b.ID, Name: b.Name, SortOrder: int32(i)}); err != nil { // #nosec G115 -- small list
-				return err
-			}
-			for _, f := range b.Floors {
-				if err := q.InsertSampleFloor(ctx, repairdb.InsertSampleFloorParams{ID: f.ID, BuildingID: b.ID, Name: f.Name, Level: f.Level}); err != nil {
-					return err
-				}
-				for k, rm := range f.Rooms {
-					if err := q.InsertSampleRoom(ctx, repairdb.InsertSampleRoomParams{
-						ID: rm.ID, FloorID: f.ID, Name: rm.Name, AreaType: rm.AreaType, SortOrder: roomSortOrder(rm, k),
-					}); err != nil {
-						return err
-					}
-				}
-			}
-		}
-		return nil
-	})
-}
-
-// roomSortOrder keeps the common area last, as the migration does (sort order 1000).
-func roomSortOrder(rm Room, i int) int32 {
-	if rm.AreaType == AreaCommon {
-		return 1000
-	}
-	return int32(i + 1) // #nosec G115 -- small list
-}
-
-func (r *PgRepository) RefreshSampleData(ctx context.Context, renames []SampleRename) error {
-	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
-		q := repairdb.New(tx)
-		for _, rn := range renames {
-			if err := q.RenameSampleBuilding(ctx, repairdb.RenameSampleBuildingParams{ID: rn.ID, OldName: rn.From, NewName: rn.To}); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
 func (r *PgRepository) ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]RecentPlace, error) {
 	rows, err := r.q.ListRecentPlaces(ctx, reporterID)
 	if err != nil {
@@ -646,6 +602,10 @@ func (r *pgTxRepository) ResolveTicket(ctx context.Context, id, technicianID uui
 
 func (r *pgTxRepository) ConfirmTicket(ctx context.Context, id uuid.UUID, rating int16, comment *string, now time.Time) error {
 	return r.q.ConfirmTicket(ctx, repairdb.ConfirmTicketParams{ID: id, Rating: &rating, RatingComment: comment, Now: &now})
+}
+
+func (r *pgTxRepository) AdminCloseTicket(ctx context.Context, id uuid.UUID, now time.Time) error {
+	return r.q.AdminCloseTicket(ctx, repairdb.AdminCloseTicketParams{ID: id, Now: &now})
 }
 
 func (r *pgTxRepository) SendBackTicket(ctx context.Context, id uuid.UUID, now time.Time) error {

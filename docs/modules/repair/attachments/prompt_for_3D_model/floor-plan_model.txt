@@ -1,0 +1,30 @@
+Lightweight 3D cutaway floor plan for a web dashboard (Three.js, GLB),
+built from the attached CAD drawing.
+
+FLOOR DATA
+- Building [อาคาร 1], floor [1], size [32 m x 15 m],
+  grid [8 x 4 m] by [6 + 3 + 6 m]. Origin = plan top-left, x right,
+  z down (front/entrance at bottom), meters.
+- Zones (copy names, areas and colours from the drawing):
+  [Data and Digitization 72 m² blue, Marketing 72 m² green, small room 12 m²
+  green, HR 17.40 / 20.80 / 48 m² orange, common area 237.80 m²]
+
+GEOMETRY RULES
+- Floor = one flat plane. Walls = extruded footprint of the wall lines, cut
+  at 1.2 m height, with door gaps. Columns = simple boxes on the grid.
+- Do NOT model furniture. Bake desks, chairs, toilets, stairs and zone colours
+  into the floor texture as a top-down render with soft shadows/AO.
+- Budget ≤ 2,500 triangles for the whole floor.
+
+TEXTURE / MATERIAL
+- One floor texture 2048 x 1024 (matches 32:15 ratio), KTX2/WebP,
+  baked lighting included. Walls use one plain material with dark top cap
+  (vertex colour, no texture). Exactly 2 materials.
+
+STRUCTURE FOR THE APP
+- Objects: Floor_Base, Walls. Pivot at plan centre, Y-up, meters.
+- Also output a JSON list of zones { name, area, x, z, w, d } in the same
+  coordinates, so the app can place labels and repair pins.
+
+EXPORT
+- GLB with meshopt/Draco, ≤ 600 KB per floor. Load floors only when opened.

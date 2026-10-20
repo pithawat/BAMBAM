@@ -1,4 +1,4 @@
-// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–2 endpoints, CR-005, CR-008, CR-014).
+// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–3D endpoints, CR-005, CR-008, CR-014, CR-016).
 // Field names are fixed by the contract — change only through a CR.
 
 import type { Ref } from "@/lib/platform/types";
@@ -23,10 +23,10 @@ export type Priority = (typeof PRIORITIES)[number];
 
 /**
  * How the priority was set (CR-008): `symptom` (most urgent picked symptom) · `category` (only a typed
- * symptom → the category default) · `default` (typed category "อื่นๆ" before CR-014 → medium) · `admin` (#20) ·
- * `reporter` (tickets created before CR-008).
+ * symptom → the category default) · `default` (typed category "อื่นๆ" before CR-014 → medium) ·
+ * `reporter` (tickets created before CR-008). CR-015: priority is never changed after creation (no `admin`).
  */
-export type PrioritySource = "symptom" | "category" | "default" | "admin" | "reporter";
+export type PrioritySource = "symptom" | "category" | "default" | "reporter";
 
 /** Who did the work, recorded when the technician resolves the ticket. */
 export type WorkBy = "in_house" | "contractor";
@@ -34,7 +34,8 @@ export type WorkBy = "in_house" | "contractor";
 /** How the viewer relates to the ticket. `none` = admin / executive viewing. */
 export type ViewerRelation = "reporter" | "subscriber" | "technician" | "none";
 
-export type TicketAction = "assess" | "resolve" | "confirm" | "send_back" | "handover" | "close" | "change_priority";
+/** `close` = admin (#21, Stage 3); `handover` comes in Stage 4. CR-015: no `change_priority`. */
+export type TicketAction = "assess" | "resolve" | "confirm" | "send_back" | "handover" | "close";
 
 export type BlockedReason = "ASSESSMENT_REQUIRED";
 
@@ -50,6 +51,7 @@ export type TimelineEventType =
   | "team_handled"
   | "handed_over"
   | "admin_closed"
+  /** CR-015: no longer written; kept so old rows stay readable. */
   | "priority_changed";
 
 // ---- shared objects ----
@@ -214,7 +216,8 @@ export type CreateTicketRequest = {
 
 // ---- #6 GET /repair/tickets, #7 GET /repair/tickets/counts ----
 
-export type TicketSort = "updatedAt:desc" | "createdAt:desc" | "createdAt:asc" | "closedAt:desc" | "priority:asc";
+/** CR-015: no priority ordering — work lists use `createdAt:asc` (oldest report first). */
+export type TicketSort = "updatedAt:desc" | "createdAt:desc" | "createdAt:asc" | "closedAt:desc";
 
 export type TicketListQuery = {
   /** `all`: technician, admin, executive. */
@@ -278,6 +281,11 @@ export type ConfirmRequest = { rating: number; comment?: string };
 
 export type SendBackRequest = { reason: string; photoIds: string[] };
 
+// ---- #21 POST /repair/tickets/{id}/close (admin, F08-B) ----
+
+/** `reason` 1–500 characters (REQUIRED → กรุณาใส่เหตุผล). */
+export type CloseRequest = { reason: string };
+
 // ---- #13–#19 contractors (F24) ----
 
 export type Contractor = {
@@ -324,6 +332,112 @@ export type ContractorJob = {
 
 export type ContractorJobPage = { items: ContractorJob[]; meta: { page: number; pageSize: number; total: number } };
 
+// ---- Stage 3D (CR-016): S29 dashboard #27, floor plans #30, equipment #29 / #31–#34 ----
+
+/** #27 counts. Same step rules as S11 (BR-F23-1): `inRepair` includes `reworking`; `overdue` = in progress past `expectedDoneOn`. */
+export type OverviewCounts = {
+  open: number;
+  awaitingAssessment: number;
+  inRepair: number;
+  reworking: number;
+  awaitingRating: number;
+  overdue: number;
+  reportedToday: number;
+  closedToday: number;
+  closedLast7Days: number;
+  /** Average reporter rating of tickets closed in the last 7 days (one decimal); null without ratings. */
+  ratingAvgLast7Days: number | null;
+  /** Oldest ticket still waiting for assessment (S29 "เก่าสุด {n} วัน"). */
+  oldestAwaitingAssessmentAt: string | null;
+  /** Soonest auto close among tickets awaiting rating (S29 "ปิดอัตโนมัติเร็วสุด…"). */
+  nextAutoCloseAt: string | null;
+};
+
+/** Open tickets per step on a floor (S11 rules; `inRepair` includes reworking, CR-017). */
+export type StepCounts = { awaitingAssessment: number; inRepair: number; awaitingRating: number };
+
+/** `highestPriority` = information only (CR-015), null when `openCount` is 0; `steps` colour the model (CR-017). */
+export type OverviewFloor = {
+  id: string; name: string; level: number; openCount: number; highestPriority: Priority | null; steps: StepCounts;
+  /** Open ฉุกเฉิน tickets — the emergency marker on the model (CR-018). */
+  criticalCount: number;
+};
+
+/**
+ * `hasModel`: the building has floor plans → 3D (only อาคาร 1 in CR-016); others show the floor list.
+ * `widthM` / `depthM`: footprint of the model (largest floor plan, CR-017); null without a plan.
+ */
+export type OverviewBuilding = { id: string; name: string; hasModel: boolean; widthM: number | null; depthM: number | null; floors: OverviewFloor[] };
+
+export type Overview = {
+  counts: OverviewCounts;
+  buildings: OverviewBuilding[];
+  /** ≤ 5: overdue first, then reworking, then critical / high, oldest first. */
+  attention: TicketSummary[];
+};
+
+/** Known equipment type keys (the 3D icon); the master may add more — fall back to a generic icon. */
+export const ASSET_TYPE_KEYS = ["aircon", "microphone", "speaker", "tv"] as const;
+export type AssetTypeKey = (typeof ASSET_TYPE_KEYS)[number];
+
+export type AssetMount = "floor" | "wall" | "ceiling";
+
+/** #29 item. `icon` = lucide icon name. */
+export type AssetType = { id: string; key: string; name: string; codePrefix: string; icon: string; mount: AssetMount };
+
+/** A point on a floor plan in metres: origin = plan top-left, x right, z down (front / entrance at z = depth). */
+export type PlanPoint = [x: number, z: number];
+/** Room outline, closed polygon (last point joins the first). */
+export type PlanShape = PlanPoint[];
+
+/** `x` / `z` null = in the room but not placed on the plan yet. `openTickets` = open tickets with this asset. */
+export type Asset = {
+  id: string;
+  code: string;
+  name: string;
+  type: { id: string; key: string; name: string };
+  room: Ref;
+  x: number | null;
+  z: number | null;
+  rotationDeg: number;
+  openTickets: number;
+};
+
+/** `shape` null when the floor has no plan. The `common_area` room is the rest of the floor (rooms inside it, like ห้องน้ำ, win hit tests). */
+export type PlanRoom = {
+  id: string;
+  name: string;
+  areaType: AreaType;
+  shape: PlanShape | null;
+  openCount: number;
+  highestPriority: Priority | null;
+};
+
+/** #30. `widthM` / `depthM` null = no plan for this floor (show the list instead). */
+export type FloorPlan = {
+  floor: { id: string; name: string; level: number };
+  building: Ref;
+  widthM: number | null;
+  depthM: number | null;
+  modelUrl: string | null;
+  rooms: PlanRoom[];
+  assets: Asset[];
+};
+
+/** #31 body. Omit `x` / `z` (or send null) to add without a point (F31 step 5). */
+export type CreateAssetRequest = {
+  assetTypeId: string;
+  code: string;
+  name: string;
+  roomId: string;
+  x?: number | null;
+  z?: number | null;
+  rotationDeg?: number;
+};
+
+/** #32 body: edit or move (the type never changes; omitted `rotationDeg` keeps the current one). */
+export type UpdateAssetRequest = Omit<CreateAssetRequest, "assetTypeId">;
+
 // ---- errors (04-api-contract.md "Error codes") ----
 
 export type RepairErrorCode =
@@ -346,6 +460,9 @@ export type RepairErrorCode =
   | "ALREADY_FOLLOWING"
   | "NOT_TEAM_HANDLED"
   | "ASSET_NOT_FOUND"
+  | "ASSET_CODE_TAKEN"
+  | "POINT_OUTSIDE_ROOM"
+  | "FLOOR_NOT_FOUND"
   | "NETWORK";
 
 /** Field codes in `VALIDATION_FAILED.fields`. */

@@ -13,6 +13,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adminCloseTicket = `-- name: AdminCloseTicket :exec
+UPDATE repair.tickets
+SET status = 'closed', closed_reason = 'admin_closed', closed_at = $1, auto_close_at = NULL, updated_at = $1
+WHERE id = $2
+`
+
+type AdminCloseTicketParams struct {
+	Now *time.Time
+	ID  uuid.UUID
+}
+
+// F08-B: admin closes an open ticket from any status (BR-F08B-1).
+func (q *Queries) AdminCloseTicket(ctx context.Context, arg AdminCloseTicketParams) error {
+	_, err := q.db.Exec(ctx, adminCloseTicket, arg.Now, arg.ID)
+	return err
+}
+
 const assessTicket = `-- name: AssessTicket :exec
 UPDATE repair.tickets
 SET expected_done_on = $1, holder_id = $2,
@@ -735,10 +752,6 @@ WHERE ($2::boolean OR (
 ORDER BY
     -- BR-F06-2: resolved tickets awaiting the viewer's rating first
     ($14::boolean AND t.status = 'resolved' AND t.reporter_id = $1) DESC,
-    -- technician work list (BR-F21-1): most urgent, then oldest
-    CASE WHEN $15::text = 'priority:asc' THEN
-        CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END END ASC,
-    CASE WHEN $15::text = 'priority:asc' THEN t.created_at END ASC,
     CASE WHEN $15::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
     CASE WHEN $15::text = 'createdAt:desc' THEN t.created_at END DESC,
     CASE WHEN $15::text = 'createdAt:asc' THEN t.created_at END ASC,

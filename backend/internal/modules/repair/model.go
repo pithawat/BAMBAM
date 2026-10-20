@@ -4,6 +4,7 @@
 package repair
 
 import (
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -69,6 +70,7 @@ const (
 	EventResolved          = "resolved"
 	EventSentBack          = "sent_back"
 	EventConfirmed         = "confirmed"
+	EventAdminClosed       = "admin_closed"
 
 	PhotoKindReport   = "report"
 	PhotoKindResult   = "result"
@@ -97,6 +99,7 @@ const (
 	ActionResolve  = "resolve"
 	ActionConfirm  = "confirm"
 	ActionSendBack = "send_back"
+	ActionClose    = "close"
 )
 
 // Ref is { id, name } as used across the API contract.
@@ -455,3 +458,152 @@ type RecentPlace struct {
 	LocationDetail *string
 	LastReportedAt time.Time
 }
+
+// ---- CR-016: dashboard (#27), floor plans (#30), equipment (#29, #31–#34) ----
+
+// PriorityCounts: open tickets per priority (pins on the building and the floor plan).
+type PriorityCounts struct {
+	Critical, High, Medium, Low int64
+}
+
+func (p PriorityCounts) Total() int64 { return p.Critical + p.High + p.Medium + p.Low }
+
+// Highest is the most urgent priority with an open ticket; nil when there is none (information only, CR-015).
+func (p PriorityCounts) Highest() *string {
+	for i, n := range []int64{p.Critical, p.High, p.Medium, p.Low} {
+		if n > 0 {
+			return &Priorities[i]
+		}
+	}
+	return nil
+}
+
+type OverviewCounts struct {
+	Open, AwaitingAssessment, InRepair, Reworking, AwaitingRating, Overdue int64
+	ReportedToday, ClosedToday, ClosedLast7Days                            int64
+	RatedLast7Days, RatingSumLast7Days                                     int64
+	OldestAwaitingAssessmentAt, NextAutoCloseAt                            *time.Time
+}
+
+// RatingAvgLast7Days: average reporter rating of tickets closed in the last 7 days; nil without ratings.
+func (c OverviewCounts) RatingAvgLast7Days() *float64 {
+	if c.RatedLast7Days == 0 {
+		return nil
+	}
+	avg := math.Round(float64(c.RatingSumLast7Days)/float64(c.RatedLast7Days)*10) / 10
+	return &avg
+}
+
+// StepCounts: open tickets per step (S11 tabs; InRepair includes reworking, CR-017).
+type StepCounts struct {
+	AwaitingAssessment, InRepair, AwaitingRating int64
+}
+
+type OverviewFloor struct {
+	ID, BuildingID uuid.UUID
+	Name           string
+	Level          int32
+	Open           PriorityCounts
+	Steps          StepCounts
+}
+
+type OverviewBuilding struct {
+	ID       uuid.UUID
+	Name     string
+	HasModel bool
+	// Footprint of the model in metres (largest floor plan); nil without a plan (CR-017).
+	WidthM, DepthM *float64
+	Floors         []OverviewFloor
+}
+
+type Overview struct {
+	Counts    OverviewCounts
+	Buildings []OverviewBuilding
+	Attention []TicketSummary
+}
+
+type AssetType struct {
+	ID                          uuid.UUID
+	Key, Name, CodePrefix, Icon string
+	Mount                       string
+}
+
+type AssetTypeRef struct {
+	ID        uuid.UUID
+	Key, Name string
+}
+
+// Shape is a room outline on its floor plan: [[x, z], …] in metres (origin top-left, x right, z down).
+type Shape [][2]float64
+
+type Asset struct {
+	ID          uuid.UUID
+	Code, Name  string
+	Type        AssetTypeRef
+	Room        Ref
+	X, Z        *float64 // nil = in the room, not placed on the plan yet
+	RotationDeg int16
+	OpenTickets int64
+}
+
+type PlanRoom struct {
+	ID       uuid.UUID
+	Name     string
+	AreaType string
+	Shape    Shape // nil when the room has no outline
+	Open     PriorityCounts
+}
+
+type FloorPlan struct {
+	Floor          Floor
+	Building       Ref
+	WidthM, DepthM *float64 // nil when the floor has no plan
+	ModelFile      *string
+	Rooms          []PlanRoom
+	Assets         []Asset
+}
+
+// AssetInput is the body of #31 / #32 (AssetTypeID is ignored on #32: the type never changes).
+type AssetInput struct {
+	AssetTypeID uuid.UUID
+	Code, Name  string
+	RoomID      uuid.UUID
+	X, Z        *float64
+	RotationDeg *int
+}
+
+// PlacementRoom is the target room of an add / move with its floor's plan size.
+type PlacementRoom struct {
+	ID, FloorID    uuid.UUID
+	Shape          Shape
+	HasPlan        bool
+	WidthM, DepthM float64
+}
+
+type RoomShape struct {
+	ID    uuid.UUID
+	Shape Shape
+}
+
+type LockedAsset struct {
+	ID, AssetTypeID, RoomID uuid.UUID
+	Code, Name              string
+	X, Z                    *float64
+	RotationDeg             int16
+	IsActive                bool
+}
+
+// Audit actions for platform.audit_log (BR-F31-5).
+const (
+	AuditAssetCreated     = "asset.created"
+	AuditAssetUpdated     = "asset.updated"
+	AuditAssetDeactivated = "asset.deactivated"
+)
+
+// Asset limits (BR-F31-1).
+const (
+	MaxAssetCodeChars = 50
+	MaxAssetNameChars = 100
+	// AttentionLimit: rows in the S29 "งานที่ควรติดตาม" list (#27).
+	AttentionLimit = 5
+)

@@ -1,0 +1,1632 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>แผนผังงานซ่อมอาคาร</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: operations console — photoreal 3D viewport on the left, building / floor / work-order panel on the right; stacks on phones */
+:root{
+  --bg:#E8ECEF; --surface:#FFFFFF; --surface-2:#F2F5F7; --fg:#15202A; --muted:#5A6874; --line:#D2D9DF;
+  --accent:#1B78BC; --accent-soft:#E2EFF9;
+  --pending:#D33139; --progress:#C76A00; --done:#2B8A3E;
+  --pending-soft:#FBE3E4; --progress-soft:#FCEBD5; --done-soft:#E0F2E4;
+  --shadow:0 2px 10px rgba(21,32,42,.14);
+  --font-display:"Bai Jamjuree","IBM Plex Sans Thai",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E151B; --surface:#151F27; --surface-2:#1B2731; --fg:#E5ECF1; --muted:#93A2AF; --line:#27353F;
+    --accent:#58A9E4; --accent-soft:#16324A;
+    --pending:#FF6B70; --progress:#FFA94D; --done:#5FD07A;
+    --pending-soft:#3A1C20; --progress-soft:#3A2814; --done-soft:#17321F;
+    --shadow:0 2px 12px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E151B; --surface:#151F27; --surface-2:#1B2731; --fg:#E5ECF1; --muted:#93A2AF; --line:#27353F;
+  --accent:#58A9E4; --accent-soft:#16324A;
+  --pending:#FF6B70; --progress:#FFA94D; --done:#5FD07A;
+  --pending-soft:#3A1C20; --progress-soft:#3A2814; --done-soft:#17321F;
+  --shadow:0 2px 12px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--font-body); font-size:14px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:14px;
+}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{height:100%;max-width:1560px;margin:0 auto;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
+.top h1{margin:0;font:700 22px/1.2 var(--font-display);text-wrap:balance}
+.top p{margin:2px 0 0;color:var(--muted);font-size:13px;max-width:72ch}
+.sample{font:500 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:4px 8px}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:12px;min-height:0}
+.viewport{position:relative;min-height:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#cfdbe4}
+.viewport canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.fade{position:absolute;inset:0;background:#dfe5e9;opacity:0;pointer-events:none;transition:opacity .22s ease}
+.fade.on{opacity:1}
+
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;will-change:transform}
+.badge{pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:7px;padding:4px 10px 4px 8px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font:500 12px var(--font-body)}
+.badge b{font:600 12px var(--font-mono)}
+.badge .dot{width:9px;height:9px;border-radius:50%;background:currentColor;animation:blink 1.2s ease-in-out infinite}
+.badge.pending{color:var(--pending)} .badge.in_progress{color:var(--progress)} .badge.ok{color:var(--done)}
+.badge.ok .dot{animation:none}
+.badge span{color:var(--fg)}
+.badge.bld{padding:6px 12px 6px 10px;font-size:12.5px}
+.badge.bld strong{font:700 13px var(--font-display)}
+@keyframes blink{50%{opacity:.25}}
+.zone-lbl{display:flex;flex-direction:column;align-items:center;padding:3px 9px;border-radius:6px;
+  background:rgba(255,255,255,.86);color:#15202A;font:600 12px/1.3 var(--font-display);text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.zone-lbl small{font:400 11px var(--font-mono);color:#56626c}
+.core-lbl{font:500 10.5px var(--font-mono);letter-spacing:.06em;color:#2f3940;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 3px #fff}
+.dim-lbl{font:500 11px var(--font-mono);color:#B3261E;text-shadow:0 0 3px #fff}
+.pin-lbl{font:500 10.5px var(--font-mono);padding:1px 6px;border-radius:4px;background:#fff;border:1px solid #cfd6dc;color:#15202A}
+.pin-lbl.sel{background:#15202A;color:#fff;border-color:#15202A}
+
+.tip{position:absolute;left:0;top:0;pointer-events:none;z-index:3;max-width:240px;padding:7px 10px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:12.5px;line-height:1.4}
+.tip strong{display:block;font-weight:600}
+.tip em{font-style:normal;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+.vp-top{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;pointer-events:none;z-index:2}
+.vp-top > *{pointer-events:auto}
+.seg{display:flex;flex-wrap:wrap;gap:2px;padding:3px;border-radius:9px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.seg button{border:0;background:transparent;padding:5px 11px;border-radius:6px;cursor:pointer;font:600 12.5px var(--font-display);color:var(--muted)}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--surface)}
+.crumb{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font:600 13px var(--font-display)}
+.crumb span{color:var(--muted);font-weight:500}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:500;font-size:13px;box-shadow:var(--shadow)}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.hud{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;padding:5px 6px 5px 10px;border-radius:9px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
+  font:500 11.5px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.hud b{color:var(--fg);font-weight:500}
+.hud button{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:3px 9px;font:500 11.5px var(--font-body);cursor:pointer}
+.hud button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.vp-bottom{position:absolute;left:12px;right:12px;bottom:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px;flex-wrap:wrap;pointer-events:none}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:6px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-size:12px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.hint{font-size:12px;color:var(--muted);padding:4px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line)}
+
+.panel{min-height:0;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:18px}
+.panel h2{margin:0;font:700 19px/1.25 var(--font-display)}
+.panel .sub{margin:2px 0 0;color:var(--muted);font-size:12.5px;font-family:var(--font-mono)}
+.linkback{align-self:flex-start;border:0;background:none;padding:0;color:var(--accent);cursor:pointer;font-size:13px;font-weight:500}
+.eyebrow{margin:0 0 8px;font:600 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.counts{display:flex;gap:6px;flex-wrap:wrap}
+.count{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:500}
+.count b{font:600 13.5px var(--font-mono);font-variant-numeric:tabular-nums}
+.count.pending{background:var(--pending-soft);color:var(--pending)}
+.count.in_progress{background:var(--progress-soft);color:var(--progress)}
+.count.done{background:var(--done-soft);color:var(--done)}
+
+.bcards{display:flex;flex-direction:column;gap:8px}
+.bcard{display:grid;grid-template-columns:minmax(0,1fr) 24px;gap:6px 14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;text-align:left}
+.bcard:hover,.bcard.hover{background:var(--surface-2)}
+.bcard .t{font:700 15px/1.3 var(--font-display)}
+.bcard .t small{font:500 11px var(--font-body);color:var(--muted);margin-left:6px}
+.bcard .m{font:400 11.5px var(--font-mono);color:var(--muted)}
+.bcard .counts .count{padding:2px 8px;font-size:11.5px}
+.stack{grid-row:1 / span 3;grid-column:2;display:flex;flex-direction:column-reverse;gap:2px;align-self:center}
+.stack i{display:block;height:6px;border-radius:2px;background:var(--line)}
+.stack i.pending{background:var(--pending)} .stack i.in_progress{background:var(--progress)}
+
+.floors{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.floor-row{display:grid;grid-template-columns:48px minmax(0,1fr) auto 14px;align-items:center;gap:10px;padding:9px 12px;border:0;border-top:1px solid var(--line);background:var(--surface);text-align:left;cursor:pointer}
+.floor-row:first-child{border-top:0}
+.floor-row:hover,.floor-row.hover{background:var(--surface-2)}
+.floor-no{font:600 19px/1 var(--font-mono);font-variant-numeric:tabular-nums;display:flex;flex-direction:column;gap:3px}
+.floor-no small{font:500 10px var(--font-body);color:var(--muted)}
+.floor-meta{min-width:0;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chev{color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.chip.pending{background:var(--pending-soft);color:var(--pending)}
+.chip.in_progress{background:var(--progress-soft);color:var(--progress)}
+.chip.done{background:var(--done-soft);color:var(--done)}
+.chip.ok{background:var(--surface-2);color:var(--muted)}
+.chip.live::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;animation:blink 1.2s ease-in-out infinite}
+
+.jobs{display:flex;flex-direction:column;gap:6px}
+.job{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--surface);text-align:left;cursor:pointer}
+.job:hover{background:var(--surface-2)}
+.job.sel{border-color:var(--accent);background:var(--accent-soft)}
+.job .name{font-weight:600;font-size:13.5px;min-width:0}
+.job .issue{grid-column:1 / -1;color:var(--muted);font-size:12.5px}
+.job .id{grid-column:1 / -1;font:400 11px var(--font-mono);color:var(--muted)}
+.detail{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surface-2)}
+.detail h3{margin:0 0 10px;font:700 15px/1.35 var(--font-display)}
+.detail dl{margin:0;display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:6px 14px;font-size:13px}
+.detail dt{color:var(--muted)}
+.detail dd{margin:0;min-width:0}
+.detail .mono{font-family:var(--font-mono);font-size:12px}
+.notice{margin:0;padding:10px 12px;border-radius:8px;background:var(--surface-2);color:var(--muted);font-size:12.5px}
+.empty{margin:0;color:var(--muted);font-size:13px}
+.foot{margin-top:auto;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.foot code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+
+@media (max-width:900px){
+  html,body{height:auto}
+  .app{height:auto}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .viewport{height:64vh;min-height:400px}
+  .panel{overflow:visible}
+  .hud{margin-left:0}
+}
+@media (prefers-reduced-motion: reduce){
+  .badge .dot,.chip.live::before{animation:none}
+  .fade{transition:none}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>แผนผังงานซ่อมอาคาร</h1>
+      <p>อาคาร 1 สร้างตามรูปถ่ายและแปลนจริง ส่วนอาคาร 2 และ 3 เป็นอาคารสมมติไว้ทดสอบการแสดงผลหลายตึกพร้อมกัน</p>
+    </div>
+    <span class="sample">ข้อมูลงานซ่อมเป็นตัวอย่าง</span>
+  </header>
+
+  <div class="main">
+    <section class="viewport" id="viewport" aria-label="โมเดล 3 มิติของอาคาร">
+      <div class="labels" id="labels"></div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="vp-top">
+        <div class="seg" id="seg" role="group" aria-label="เลือกอาคาร"></div>
+        <button class="btn" id="backBtn" type="button" hidden>← กลับไปที่ตัวอาคาร</button>
+        <div class="crumb" id="crumb" hidden></div>
+        <div class="hud" id="hud">
+          <span><b id="fps">–</b> fps</span>
+          <span><b id="calls">–</b> draw calls</span>
+          <span><b id="tris">–</b> tris</span>
+          <button type="button" id="qualityBtn" aria-pressed="true">คุณภาพสูง</button>
+        </div>
+      </div>
+      <div class="vp-bottom">
+        <div class="legend">
+          <span><i style="background:var(--pending)"></i>รอดำเนินการ</span>
+          <span><i style="background:var(--progress)"></i>กำลังซ่อม</span>
+          <span><i style="background:var(--done)"></i>ซ่อมเสร็จ</span>
+        </div>
+        <div class="hint" id="hint"></div>
+      </div>
+      <div class="fade" id="fade"></div>
+    </section>
+
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* =====================================================================
+   1) DATA — อาคาร แปลน และงานซ่อม (ต่อกับระบบจริงผ่าน window.facility)
+   พิกัดแปลน: เมตร จากมุมซ้ายบนของแปลน (x ไปขวา, z ลงล่าง, ขอบล่าง = ด้านหน้าอาคาร)
+   ===================================================================== */
+const BUILDINGS = [
+  {
+    id: 'B1', name: 'อาคาร 1', floors: 6, width: 32, depth: 15, floorHeight: 3.5, overhang: 1.2,
+    style: 'balcony', entrance: 'main', roofSign: true, cladding: 0xf1efe8, frame: 0x3a4047,
+    pos: [0, 0, 0], rot: 0, rows: [6, 3, 6], bay: 4,
+    core: [
+      { label: 'ห้องน้ำ', x: 12.6, z: 0.4, w: 3.6, d: 5.2, floor: 'tile' },
+      { label: 'บันได',  x: 16.6, z: 0.4, w: 3.4, d: 4.8, stairs: true },
+      { label: 'A.H.U.', x: 20.4, z: 0.4, w: 3.2, d: 2.6 },
+      { label: 'ลิฟต์',   x: 30.2, z: 6.3, w: 1.8, d: 2.4, lift: true },
+    ],
+    plans: {
+      1: {
+        commonArea: 237.8, entrance: { x: 14, w: 6 }, reception: { x: 14.6, z: 10.4, w: 4.4, d: 0.8 },
+        zones: [
+          { name: 'Data and Digitization', area: 72,   x: 0,  z: 0, w: 12, d: 6,    color: 0x7c9cd6 },
+          { name: 'ห้องย่อย',              area: 12,   x: 0,  z: 6, w: 4,  d: 3,    color: 0x8fc57a },
+          { name: 'Marketing · ทีมพี่สุ้ง', area: 72,   x: 0,  z: 9, w: 12, d: 6,    color: 0x8fc57a },
+          { name: 'HR',                    area: 17.4, x: 24, z: 0, w: 4,  d: 4.35, color: 0xf2a65a },
+          { name: 'HR',                    area: 20.8, x: 28, z: 0, w: 4,  d: 5.2,  color: 0xf2a65a },
+          { name: 'HR',                    area: 48,   x: 24, z: 9, w: 8,  d: 6,    color: 0xf2a65a },
+        ],
+      },
+    },
+  },
+  {
+    id: 'B2', name: 'อาคาร 2', example: true, floors: 8, width: 24, depth: 16, floorHeight: 3.6, overhang: 0,
+    style: 'curtain', fins: 1.5, cladding: 0xc8cdd1, frame: 0x8d969e,
+    pos: [-47, 0, -8], rot: 0, rows: [6.5, 3, 6.5], bay: 4,
+    core: [
+      { label: 'ห้องน้ำ', x: 8.2,  z: 0.4, w: 3.2, d: 5.6, floor: 'tile' },
+      { label: 'บันได',  x: 11.6, z: 0.4, w: 3.0, d: 5.6, stairs: true },
+      { label: 'ลิฟต์',   x: 14.8, z: 0.4, w: 2.4, d: 2.8, lift: true },
+    ],
+    plans: {
+      7: {
+        commonArea: 134.4,
+        zones: [
+          { name: 'ห้องประชุมใหญ่', area: 52,   x: 0,    z: 0,   w: 8,   d: 6.5, color: 0xb59ad8 },
+          { name: 'IT',            area: 41.6, x: 17.6, z: 0,   w: 6.4, d: 6.5, color: 0x7c9cd6 },
+          { name: 'Finance',       area: 78,   x: 0,    z: 9.5, w: 12,  d: 6.5, color: 0x8fc57a },
+          { name: 'Legal',         area: 78,   x: 12,   z: 9.5, w: 12,  d: 6.5, color: 0xf2a65a },
+        ],
+      },
+    },
+  },
+  {
+    id: 'B3', name: 'อาคาร 3', example: true, floors: 3, width: 40, depth: 20, floorHeight: 4.5, overhang: 0.6,
+    style: 'curtain', fins: 0, cladding: 0xdcd2bf, frame: 0x4a4f54,
+    pos: [52, 0, -14], rot: -0.2, rows: [8, 4, 8], bay: 5,
+    core: [
+      { label: 'ห้องน้ำ', x: 16,   z: 0.4, w: 4,   d: 6, floor: 'tile' },
+      { label: 'บันได',  x: 20.4, z: 0.4, w: 3.4, d: 6, stairs: true },
+      { label: 'ลิฟต์',   x: 24.2, z: 0.4, w: 2.4, d: 3, lift: true },
+    ],
+    plans: {},
+  },
+];
+
+const STATUS = {
+  pending:     { label: 'รอดำเนินการ', color: 0xff3b30, rank: 2 },
+  in_progress: { label: 'กำลังซ่อม',   color: 0xff9f0a, rank: 1 },
+  done:        { label: 'ซ่อมเสร็จ',   color: 0x34c759, rank: 0 },
+};
+
+let JOBS = [
+  { id: 'WO-6910-014', building: 'B1', floor: 1, x: 4.5,  z: 2.4,  status: 'in_progress', equipment: 'แอร์ FCU-1-02',             issue: 'น้ำแอร์หยดลงโต๊ะทำงาน',  tech: 'สมชาย ร.',  updated: '19 ต.ค. 2569 · 10:40' },
+  { id: 'WO-6910-017', building: 'B1', floor: 1, x: 7.5,  z: 12.2, status: 'pending',     equipment: 'โคมไฟ LED แถว C',           issue: 'หลอดกระพริบ 3 ดวง',       tech: '—',         updated: '19 ต.ค. 2569 · 11:05' },
+  { id: 'WO-6910-020', building: 'B1', floor: 1, x: 14.4, z: 3.0,  status: 'pending',     equipment: 'ก๊อกอ่างล้างมือ ห้องน้ำชาย', issue: 'น้ำรั่วซึมใต้อ่าง',       tech: '—',         updated: '19 ต.ค. 2569 · 12:15' },
+  { id: 'WO-6910-009', building: 'B1', floor: 1, x: 27.6, z: 12.6, status: 'done',        equipment: 'เครื่องสแกนบัตรประตู HR',     issue: 'อ่านบัตรไม่ติด',          tech: 'วิชัย ก.',  updated: '18 ต.ค. 2569 · 16:30' },
+  { id: 'WO-6910-011', building: 'B1', floor: 3, x: 21.8, z: 1.6,  status: 'in_progress', equipment: 'เครื่องส่งลมเย็น AHU-3',      issue: 'ลมเย็นไม่ออกฝั่งตะวันออก', tech: 'สมชาย ร.',  updated: '19 ต.ค. 2569 · 09:10' },
+  { id: 'WO-6910-019', building: 'B1', floor: 3, x: 26.0, z: 10.5, status: 'pending',     equipment: 'เต้ารับไฟฟ้าผนัง P3-07',      issue: 'ไฟไม่เข้า',                tech: '—',         updated: '19 ต.ค. 2569 · 11:48' },
+  { id: 'WO-6910-015', building: 'B1', floor: 5, x: 18.2, z: 5.6,  status: 'in_progress', equipment: 'ประตูหนีไฟ FD-5-01',          issue: 'ปิดไม่สนิท โช้คอัพเสื่อม',  tech: 'วิชัย ก.',  updated: '19 ต.ค. 2569 · 08:55' },
+  { id: 'WO-6910-022', building: 'B2', floor: 7, x: 16.0, z: 1.6,  status: 'pending',     equipment: 'ลิฟต์โดยสาร L2',            issue: 'ประตูลิฟต์เปิดค้าง',      tech: '—',         updated: '19 ต.ค. 2569 · 12:40' },
+  { id: 'WO-6910-018', building: 'B2', floor: 7, x: 4.0,  z: 3.0,  status: 'in_progress', equipment: 'จอประชุม 86 นิ้ว',          issue: 'ไม่มีสัญญาณ HDMI',        tech: 'อนันต์ ส.', updated: '19 ต.ค. 2569 · 10:02' },
+  { id: 'WO-6910-012', building: 'B2', floor: 2, x: 20.0, z: 12.0, status: 'in_progress', equipment: 'แอร์ VRV-2-05',            issue: 'มีเสียงดังผิดปกติ',       tech: 'สมชาย ร.',  updated: '19 ต.ค. 2569 · 09:30' },
+  { id: 'WO-6910-021', building: 'B3', floor: 1, x: 6.0,  z: 16.0, status: 'pending',     equipment: 'ปั๊มน้ำดี P-01',             issue: 'แรงดันน้ำตก',             tech: '—',         updated: '19 ต.ค. 2569 · 12:20' },
+  { id: 'WO-6910-004', building: 'B3', floor: 3, x: 30.0, z: 4.0,  status: 'done',        equipment: 'ไฟฉุกเฉิน EL-3-02',          issue: 'แบตเตอรี่เสื่อม',          tech: 'วิชัย ก.',  updated: '16 ต.ค. 2569 · 15:10' },
+];
+
+/* =====================================================================
+   2) RENDERER, POST-PROCESSING, SCENES
+   ===================================================================== */
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const vp = document.getElementById('viewport');
+const labelsEl = document.getElementById('labels');
+const tipEl = document.getElementById('tip');
+const panel = document.getElementById('panel');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;     // shadows are static: re-rendered only when something moves
+renderer.info.autoReset = false;
+vp.prepend(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(34, 1, 1, 900);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+const buildingScene = new THREE.Scene();
+const planScene = new THREE.Scene();
+
+// GTAO ambient occlusion — skip helper objects that are not real surfaces
+class AOPass extends GTAOPass {
+  overrideVisibility() {
+    super.overrideVisibility();
+    this.scene.traverse(o => { if (o.userData.noAO) o.visible = false; });
+  }
+  renderOverride(renderer, mat, rt, cc, ca) {
+    const bgd = this.scene.background;
+    this.scene.background = null;
+    super.renderOverride(renderer, mat, rt, cc, ca);
+    this.scene.background = bgd;
+  }
+}
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: 4 }));
+const renderPass = new RenderPass(buildingScene, camera);
+const aoPass = new AOPass(buildingScene, camera, 2, 2);
+aoPass.blendIntensity = 0.95;
+aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 16 });
+composer.addPass(renderPass);
+composer.addPass(aoPass);
+composer.addPass(new OutputPass());
+
+const quality = { high: innerWidth > 900 };
+
+/* ---------- helpers ---------- */
+function canvasTex(w, h, draw, srgb = true) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+function rng(seed) { let s = seed % 2147483647 || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+function noise(g, w, h, amp, rnd = Math.random) {
+  const img = g.getImageData(0, 0, w, h), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const n = (rnd() - 0.5) * amp; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  g.putImageData(img, 0, 0);
+}
+// box geometry with its bottom at y
+function bg(w, h, d, x, y, z) { return new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z); }
+// world-scaled box-projected UVs so textures keep real size on long and short pieces
+function worldUV(geo, s = 0.25) {
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    if (ax >= ay && ax >= az) uv.setXY(i, p.getZ(i) * s, p.getY(i) * s);
+    else if (ay >= az) uv.setXY(i, p.getX(i) * s, p.getZ(i) * s);
+    else uv.setXY(i, p.getX(i) * s, p.getY(i) * s);
+  }
+  return geo;
+}
+function mesh(geo, mat, cast = true, receive = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = cast; m.receiveShadow = receive;
+  return m;
+}
+function merged(list, mat, cast = true, receive = true) { return mesh(mergeGeometries(list), mat, cast, receive); }
+function planeUV(w, h, ru, rv = 1, uOff = 0) {
+  const g = new THREE.PlaneGeometry(w, h);
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ru + uOff, uv.getY(i) * rv);
+  return g;
+}
+const ease = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+
+/* =====================================================================
+   3) PROCEDURAL TEXTURES (no image downloads)
+   ===================================================================== */
+const TEX = {};
+// sky (equirect) — background + image-based lighting for reflections
+TEX.sky = canvasTex(1024, 512, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, '#3f78b5'); gr.addColorStop(0.28, '#7eaedb'); gr.addColorStop(0.46, '#cfdfea');
+  gr.addColorStop(0.5, '#e3e9ea'); gr.addColorStop(0.515, '#a7a99f'); gr.addColorStop(1, '#55574f');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.filter = 'blur(10px)';
+  const r = rng(7);
+  for (let i = 0; i < 26; i++) {
+    g.fillStyle = `rgba(255,255,255,${0.25 + r() * 0.35})`;
+    g.beginPath(); g.ellipse(r() * w, 120 + r() * 110, 40 + r() * 90, 10 + r() * 18, 0, 0, Math.PI * 2); g.fill();
+  }
+  g.filter = 'none';
+  const sun = g.createRadialGradient(w * 0.62, h * 0.2, 0, w * 0.62, h * 0.2, 60);
+  sun.addColorStop(0, 'rgba(255,250,235,1)'); sun.addColorStop(1, 'rgba(255,250,235,0)');
+  g.fillStyle = sun; g.fillRect(0, 0, w, h);
+});
+TEX.sky.mapping = THREE.EquirectangularReflectionMapping;
+
+// weathered concrete — grain, blotches and rain streaks
+TEX.concrete = canvasTex(512, 512, (g, w, h) => {
+  const r = rng(11);
+  g.fillStyle = '#ecebe6'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 70; i++) {
+    const x = r() * w, y = r() * h, rad = 20 + r() * 90;
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, `rgba(${110 + r() * 40},${110 + r() * 35},${100 + r() * 30},${0.05 + r() * 0.06})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  for (let i = 0; i < 90; i++) {
+    const x = r() * w, len = 40 + r() * 260, wd = 1 + r() * 4;
+    const gr = g.createLinearGradient(0, 0, 0, len);
+    gr.addColorStop(0, `rgba(70,72,66,${0.12 + r() * 0.12})`); gr.addColorStop(1, 'rgba(70,72,66,0)');
+    g.fillStyle = gr; g.fillRect(x, 0, wd, len);
+  }
+  noise(g, w, h, 18, r);
+});
+
+// interior seen through tinted glass: back wall, ceiling lights, blinds, furniture
+TEX.interior = canvasTex(1024, 256, (g, w, h) => {
+  const r = rng(23), pw = w / 8;
+  for (let i = 0; i < 8; i++) {
+    const x = i * pw;
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#596064'); gr.addColorStop(0.2, '#3c4245'); gr.addColorStop(1, '#262b2d');
+    g.fillStyle = gr; g.fillRect(x, 0, pw, h);
+    if (r() < 0.7) { g.fillStyle = 'rgba(235,242,236,.85)'; g.fillRect(x + 12, 30, pw - 24, 5); }
+    g.fillStyle = '#1b1f21';
+    for (let k = 0; k < 3; k++) { const fh = 30 + r() * 50; g.fillRect(x + r() * pw * 0.7, h - fh, 20 + r() * 40, fh); }
+    if (r() < 0.45) {
+      const bh = 40 + r() * 150;
+      g.fillStyle = '#c9c7bd'; g.fillRect(x + 2, 0, pw - 4, bh);
+      g.fillStyle = 'rgba(0,0,0,.12)';
+      for (let y = 0; y < bh; y += 5) g.fillRect(x + 2, y, pw - 4, 1);
+    }
+  }
+  g.fillStyle = 'rgba(28,62,74,.42)'; g.fillRect(0, 0, w, h);          // glass tint
+  const rf = g.createLinearGradient(0, 0, w, h);
+  rf.addColorStop(0, 'rgba(255,255,255,.10)'); rf.addColorStop(0.5, 'rgba(255,255,255,0)'); rf.addColorStop(1, 'rgba(255,255,255,.06)');
+  g.fillStyle = rf; g.fillRect(0, 0, w, h);
+});
+
+TEX.asphalt = canvasTex(512, 512, (g, w, h) => {
+  const r = rng(3);
+  g.fillStyle = '#6c6f6d'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2500; i++) { g.fillStyle = r() < 0.5 ? 'rgba(20,20,20,.35)' : 'rgba(170,170,165,.3)'; g.fillRect(r() * w, r() * h, 1.5, 1.5); }
+  for (let i = 0; i < 25; i++) {
+    const x = r() * w, y = r() * h, rad = 30 + r() * 80;
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, 'rgba(30,30,30,.07)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  noise(g, w, h, 14, r);
+});
+TEX.paving = canvasTex(256, 256, (g, w, h) => {
+  const r = rng(5);
+  g.fillStyle = '#c4bfb4'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) { g.fillStyle = `rgba(${150 + r() * 40},${145 + r() * 40},${135 + r() * 35},.35)`; g.fillRect(x * 64 + 1, y * 64 + 1, 62, 62); }
+  g.fillStyle = 'rgba(80,76,70,.55)';
+  for (let i = 0; i <= 4; i++) { g.fillRect(i * 64 - 1, 0, 2, h); g.fillRect(0, i * 64 - 1, w, 2); }
+  noise(g, w, h, 16, r);
+});
+TEX.grass = canvasTex(256, 256, (g, w, h) => {
+  const r = rng(9);
+  g.fillStyle = '#5f8a3f'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(${40 + r() * 70},${90 + r() * 70},${25 + r() * 30},.55)`; g.fillRect(r() * w, r() * h, 1, 2 + r() * 3); }
+  noise(g, w, h, 20, r);
+});
+TEX.leaves = (() => {
+  const t = canvasTex(256, 256, (g, w, h) => {
+    const r = rng(17), cols = ['#2c5224', '#3a6a2c', '#4b7a34', '#5f8c3e', '#6f9a48', '#26461f'];
+    for (let i = 0; i < 900; i++) {
+      const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 118;
+      const x = w / 2 + Math.cos(a) * d, y = h / 2 + Math.sin(a) * d;
+      g.fillStyle = cols[(r() * cols.length) | 0];
+      g.beginPath(); g.ellipse(x, y, 5 + r() * 6, 2.5 + r() * 2.5, r() * Math.PI, 0, Math.PI * 2); g.fill();
+    }
+  });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+})();
+TEX.hedge = canvasTex(256, 256, (g, w, h) => {
+  const r = rng(19);
+  g.fillStyle = '#2f5426'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(${40 + r() * 60},${80 + r() * 70},${30 + r() * 30},.8)`; g.beginPath(); g.ellipse(r() * w, r() * h, 3, 1.6, r() * 3, 0, Math.PI * 2); g.fill(); }
+});
+TEX.poster = canvasTex(256, 160, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, w, h);
+  gr.addColorStop(0, '#125d9e'); gr.addColorStop(1, '#3a9fdc');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,255,255,.22)';
+  g.beginPath(); g.ellipse(w * 0.72, h * 0.95, 120, 70, -0.2, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(18, 20, 112, 11); g.fillRect(18, 38, 74, 7);
+  g.fillStyle = '#dfe8ee'; g.fillRect(150, 52, 84, 62);
+  g.fillStyle = '#9fb3c1'; g.fillRect(156, 92, 72, 16);
+});
+TEX.portrait = canvasTex(64, 96, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, '#8aa6bd'); gr.addColorStop(1, '#4c5d6c');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#e9e2d0';
+  g.beginPath(); g.ellipse(w / 2, h * 0.36, 9, 11, 0, 0, Math.PI * 2); g.fill();
+  g.fillRect(w / 2 - 15, h * 0.5, 30, h * 0.5);
+});
+TEX.curb = canvasTex(64, 8, (g, w, h) => {
+  g.fillStyle = '#e8772a'; g.fillRect(0, 0, w / 2, h);
+  g.fillStyle = '#ecebe5'; g.fillRect(w / 2, 0, w / 2, h);
+});
+TEX.fan = canvasTex(128, 64, (g, w, h) => {
+  g.fillStyle = '#cfd2d0'; g.fillRect(0, 0, w, h);
+  for (const cx of [32, 96]) {
+    g.fillStyle = '#2b2f31'; g.beginPath(); g.arc(cx, 32, 26, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#8b9093'; g.lineWidth = 2;
+    for (let r2 = 8; r2 < 26; r2 += 6) { g.beginPath(); g.arc(cx, 32, r2, 0, Math.PI * 2); g.stroke(); }
+  }
+});
+TEX.tile = canvasTex(256, 256, (g, w, h) => {
+  const r = rng(29);
+  g.fillStyle = '#e4e3de'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) { g.fillStyle = `rgba(${200 + r() * 30},${198 + r() * 30},${190 + r() * 30},.5)`; g.fillRect(x * 64, y * 64, 64, 64); }
+  g.fillStyle = 'rgba(150,148,140,.6)';
+  for (let i = 0; i <= 4; i++) { g.fillRect(i * 64 - 1, 0, 1.5, h); g.fillRect(0, i * 64 - 1, w, 1.5); }
+  noise(g, w, h, 8, r);
+});
+TEX.carpet = canvasTex(256, 256, (g, w, h) => {
+  const r = rng(31);
+  g.fillStyle = '#d6d6d2'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 6000; i++) { const v = 150 + r() * 90; g.fillStyle = `rgba(${v},${v},${v},.35)`; g.fillRect(r() * w, r() * h, 1, 1); }
+  noise(g, w, h, 22, r);
+});
+TEX.wetTile = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#c7d4da'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(110,130,140,.5)';
+  for (let i = 0; i <= 4; i++) { g.fillRect(i * 32 - 1, 0, 1.5, h); g.fillRect(0, i * 32 - 1, w, 1.5); }
+});
+
+function drawSign(g, w, h) {
+  g.fillStyle = '#1d7cc0'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#ffffff'; g.lineWidth = 6; g.strokeRect(8, 8, w - 16, h - 16);
+  g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
+  g.font = '600 62px "Bai Jamjuree", sans-serif';
+  g.textAlign = 'left'; g.fillText('เจาะจงคุณภาพ  เจาะจง', 60, h / 2 + 4);
+  g.textAlign = 'center';
+  g.strokeRect(w * 0.56 - 90, 26, 180, h - 52);
+  g.font = '700 60px "Bai Jamjuree", sans-serif'; g.fillText('CPAC', w * 0.56, h / 2 + 2);
+  g.textAlign = 'right'; g.font = '600 62px "IBM Plex Mono", monospace'; g.fillText('02-555-5555', w - 60, h / 2 + 2);
+}
+const signCanvas = document.createElement('canvas');
+signCanvas.width = 2048; signCanvas.height = 176;
+drawSign(signCanvas.getContext('2d'), 2048, 176);
+TEX.sign = new THREE.CanvasTexture(signCanvas);
+TEX.sign.colorSpace = THREE.SRGBColorSpace;
+TEX.sign.anisotropy = 8;
+Promise.all([
+  document.fonts.load('600 62px "Bai Jamjuree"', 'เจาะจง'),
+  document.fonts.load('600 62px "IBM Plex Mono"', '02'),
+]).then(() => { drawSign(signCanvas.getContext('2d'), 2048, 176); TEX.sign.needsUpdate = true; }).catch(() => {});
+
+/* ---------- environment + lights ---------- */
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envMap = pmrem.fromEquirectangular(TEX.sky).texture;
+buildingScene.background = TEX.sky;
+buildingScene.environment = envMap;
+buildingScene.fog = new THREE.Fog(0xd9e3ea, 220, 650);
+planScene.background = new THREE.Color(0xdfe5e9);
+planScene.environment = envMap;
+
+function addLights(scene, size, mapSize) {
+  scene.add(new THREE.HemisphereLight(0xdde9f5, 0x6d685d, 0.35));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 3.0);
+  sun.position.set(size * 0.75, size * 1.15, size * 0.95);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(mapSize, mapSize);
+  Object.assign(sun.shadow.camera, { left: -size, right: size, top: size, bottom: -size, near: 1, far: size * 4 });
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.04;
+  scene.add(sun);
+  return sun;
+}
+addLights(buildingScene, 92, 2048);
+const planSun = addLights(planScene, 24, 2048);
+
+/* =====================================================================
+   4) BUILDING MODELS (generated from the data above)
+   ===================================================================== */
+const lifts = [];   // every floor/roof entry that can be lifted & faded
+
+function floorMats(b) {
+  return {
+    c:     new THREE.MeshStandardMaterial({ map: TEX.concrete, color: b.cladding, roughness: 0.93, envMapIntensity: 0.55 }),
+    glass: new THREE.MeshStandardMaterial({ map: TEX.interior, roughness: 0.05, metalness: 0.25, envMapIntensity: 1.4 }),
+    metal: new THREE.MeshStandardMaterial({ color: b.frame, metalness: 0.75, roughness: 0.35, envMapIntensity: 0.9 }),
+    light: new THREE.MeshStandardMaterial({ color: 0xd2d5d3, metalness: 0.3, roughness: 0.55, envMapIntensity: 0.7 }),
+  };
+}
+
+function glassBox(W, D, y, h, inset, list, uOff) {
+  list.push(planeUV(W, h, W / 16, 1, uOff).translate(0, y + h / 2, D / 2 + inset));
+  list.push(planeUV(W, h, W / 16, 1, uOff + 0.31).rotateY(Math.PI).translate(0, y + h / 2, -D / 2 - inset));
+  list.push(planeUV(D, h, D / 16, 1, uOff + 0.57).rotateY(Math.PI / 2).translate(W / 2 + inset, y + h / 2, 0));
+  list.push(planeUV(D, h, D / 16, 1, uOff + 0.83).rotateY(-Math.PI / 2).translate(-W / 2 - inset, y + h / 2, 0));
+}
+function mullionGrid(W, D, y, h, step, list, out = 0.05) {
+  const dpt = 0.1;
+  for (let x = -W / 2; x <= W / 2 + 1e-3; x += step) {
+    list.push(bg(0.07, h, dpt, x, y, D / 2 + out), bg(0.07, h, dpt, x, y, -D / 2 - out));
+  }
+  for (let z = -D / 2 + step; z < D / 2 - 1e-3; z += step) {
+    list.push(bg(dpt, h, 0.07, W / 2 + out, y, z), bg(dpt, h, 0.07, -W / 2 - out, y, z));
+  }
+  for (const yy of [y, y + h * 0.68, y + h - 0.06]) {
+    list.push(bg(W, 0.06, dpt, 0, yy, D / 2 + out), bg(W, 0.06, dpt, 0, yy, -D / 2 - out));
+    list.push(bg(dpt, 0.06, D, W / 2 + out, yy, 0), bg(dpt, 0.06, D, -W / 2 - out, yy, 0));
+  }
+}
+
+function makeShell(b, f, y0) {
+  const OH = b.overhang;
+  const geo = new THREE.BoxGeometry(b.width + 2 * OH + 0.5, b.floorHeight - 0.04, b.depth + 2 * OH + 0.5);
+  const shell = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  shell.position.set(0, y0 + b.floorHeight / 2, 0);
+  shell.userData = { bid: b.id, floor: f, noAO: true, noFade: true };
+  shell.renderOrder = 5;
+  shell.visible = false;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  edges.position.copy(shell.position);
+  edges.renderOrder = 6;
+  edges.visible = false;
+  return { shell, edges };
+}
+
+function finishFloor(b, f, y0, g, M, parts) {
+  if (parts.C.length) g.add(merged(parts.C.map(x => worldUV(x)), M.c));
+  if (parts.G.length) g.add(merged(parts.G, M.glass, false, true));
+  if (parts.T.length) g.add(merged(parts.T, M.metal));
+  if (parts.L.length) g.add(merged(parts.L, M.light));
+  const { shell, edges } = makeShell(b, f, y0);
+  g.add(shell, edges);
+  return { b, f, group: g, glowMat: M.c, shell, edges, y0 };
+}
+
+function groundFloor(b) {
+  const { width: W, depth: D, floorHeight: FH } = b;
+  const M = floorMats(b), g = new THREE.Group();
+  const parts = { C: [], G: [], T: [], L: [] };
+  const stone = new THREE.MeshStandardMaterial({ map: TEX.concrete, color: 0x8f918e, roughness: 0.85, envMapIntensity: 0.4 });
+  const P = b.entrance === 'main' ? 0.6 : 0.3;
+  g.add(merged([worldUV(bg(W + 1.0, P, D + 1.0, 0, 0, 0))], stone));
+
+  if (b.entrance === 'main') {
+    // CPAC-style: solid ground floor with posters, recessed entrance, canopy and portrait
+    parts.C.push(bg(W, FH - P, D, 0, P, 0));
+    const bandH = 1.7, bandY = P + 0.6;
+    parts.G.push(planeUV(W - 1, bandH, (W - 1) / 16, 1, 0.2).rotateY(Math.PI).translate(0, bandY + bandH / 2, -D / 2 - 0.02));
+    parts.G.push(planeUV(D - 1, bandH, (D - 1) / 16, 1, 0.5).rotateY(Math.PI / 2).translate(W / 2 + 0.02, bandY + bandH / 2, 0));
+    parts.G.push(planeUV(D - 1, bandH, (D - 1) / 16, 1, 0.7).rotateY(-Math.PI / 2).translate(-W / 2 - 0.02, bandY + bandH / 2, 0));
+    parts.G.push(planeUV(5, 2.5, 5 / 16, 1, 0.1).translate(0, P + 1.25, D / 2 + 0.02));
+    for (const x of [-2.5, -1.25, 0, 1.25, 2.5]) parts.T.push(bg(0.07, 2.5, 0.1, x, P, D / 2 + 0.05));
+    parts.T.push(bg(5.1, 0.08, 0.1, 0, P + 2.46, D / 2 + 0.05));
+    const posterMat = new THREE.MeshStandardMaterial({ map: TEX.poster, roughness: 0.45, envMapIntensity: 0.6 });
+    const posters = [];
+    for (const x of [-14, -10.4, -6.8, 6.8, 10.4, 14]) {
+      posters.push(new THREE.PlaneGeometry(3.3, 2.1).translate(x, P + 1.3, D / 2 + 0.06));
+      parts.T.push(bg(3.42, 0.06, 0.08, x, P + 0.22, D / 2 + 0.04), bg(3.42, 0.06, 0.08, x, P + 2.32, D / 2 + 0.04),
+        bg(0.06, 2.16, 0.08, x - 1.68, P + 0.22, D / 2 + 0.04), bg(0.06, 2.16, 0.08, x + 1.68, P + 0.22, D / 2 + 0.04));
+    }
+    g.add(merged(posters, posterMat, false, true));
+    parts.C.push(bg(7.4, 0.3, 3.6, 0, 2.95, D / 2 + 1.8), bg(0.3, 2.35, 0.3, -3.3, P, D / 2 + 3.3), bg(0.3, 2.35, 0.3, 3.3, P, D / 2 + 3.3));
+    const steps = [];
+    for (let i = 0; i < 4; i++) steps.push(worldUV(bg(7.6, P - i * 0.15, 0.42, 0, 0, D / 2 + 0.71 + i * 0.42)));
+    g.add(merged(steps, stone));
+    const gold = new THREE.MeshStandardMaterial({ color: 0xc9a23a, metalness: 0.9, roughness: 0.28 });
+    g.add(mesh(bg(1.8, 2.4, 0.25, 0, 3.25, D / 2 + 3.2), gold));
+    g.add(mesh(new THREE.PlaneGeometry(1.36, 1.96).translate(0, 4.45, D / 2 + 3.33), new THREE.MeshStandardMaterial({ map: TEX.portrait, roughness: 0.4 }), false, true));
+  } else {
+    // generic glass lobby
+    parts.C.push(bg(W - 0.02, FH - P, D - 0.02, 0, P, 0));
+    const gh = FH - P - 0.5;
+    glassBox(W, D, P, gh, 0.02, parts.G, 0.4);
+    mullionGrid(W, D, P, gh, 2, parts.T, 0.06);
+    parts.C.push(bg(9, 0.28, 3.2, 0, FH - 0.7, D / 2 + 1.6));
+    g.add(merged([worldUV(bg(6, P, 1.2, 0, 0, D / 2 + 1.1))], stone));
+  }
+  return finishFloor(b, 1, 0, g, M, parts);
+}
+
+function balconyFloor(b, f) {
+  const { width: W, depth: D, floorHeight: FH, overhang: OH } = b;
+  const M = floorMats(b), g = new THREE.Group(), parts = { C: [], G: [], T: [], L: [] };
+  const r = rng(f * 131 + 7);
+  const y0 = (f - 1) * FH, ys = 0.35, ph = 1.0, pt = 0.2, yP = y0 + ys;
+  parts.C.push(bg(W + 2 * OH, ys, D + 2 * OH, 0, y0, 0));
+  parts.C.push(
+    bg(W + 2 * OH, ph, pt, 0, yP, D / 2 + OH - pt / 2), bg(W + 2 * OH, ph, pt, 0, yP, -(D / 2 + OH - pt / 2)),
+    bg(pt, ph, D + 2 * OH - 2 * pt, W / 2 + OH - pt / 2, yP, 0), bg(pt, ph, D + 2 * OH - 2 * pt, -(W / 2 + OH - pt / 2), yP, 0));
+  parts.C.push(bg(W + 2 * OH + 0.04, 0.06, pt + 0.06, 0, yP + ph, D / 2 + OH - pt / 2), bg(W + 2 * OH + 0.04, 0.06, pt + 0.06, 0, yP + ph, -(D / 2 + OH - pt / 2)));
+  const finH = FH - ys - ph - 0.06;
+  for (const x of [-(W / 2 + OH - 0.15), -8, 0, 8, W / 2 + OH - 0.15])
+    for (const s of [1, -1]) parts.C.push(bg(0.2, finH, 0.22, x, yP + ph + 0.06, s * (D / 2 + OH - 0.11)));
+  const gh = FH - ys;
+  glassBox(W, D, yP, gh, 0, parts.G, r());
+  mullionGrid(W, D, yP, gh, 2, parts.T);
+  // split AC condensers sitting on the balconies
+  const n = 1 + Math.floor(r() * 3);
+  for (let i = 0; i < n; i++) {
+    const x = -W / 2 + 2 + r() * (W - 4), front = r() < 0.6 ? 1 : -1;
+    parts.L.push(bg(0.86, 0.62, 0.32, x, yP, front * (D / 2 + 0.45)));
+  }
+  return finishFloor(b, f, y0, g, M, parts);
+}
+
+function curtainFloor(b, f) {
+  const { width: W, depth: D, floorHeight: FH, overhang: OH } = b;
+  const M = floorMats(b), g = new THREE.Group(), parts = { C: [], G: [], T: [], L: [] };
+  const r = rng(f * 77 + b.width);
+  const y0 = (f - 1) * FH, ys = 0.3, sp = 0.9;
+  parts.C.push(bg(W + 2 * OH, ys, D + 2 * OH, 0, y0, 0));
+  const t = 0.25, ox = W / 2 + Math.max(OH, 0.12), oz = D / 2 + Math.max(OH, 0.12);
+  parts.C.push(bg(2 * ox, sp, t, 0, y0 + ys, oz - t / 2), bg(2 * ox, sp, t, 0, y0 + ys, -oz + t / 2),
+    bg(t, sp, 2 * oz - 2 * t, ox - t / 2, y0 + ys, 0), bg(t, sp, 2 * oz - 2 * t, -ox + t / 2, y0 + ys, 0));
+  const gy = y0 + ys + sp, gh = FH - ys - sp;
+  glassBox(W, D, gy, gh, 0, parts.G, r());
+  mullionGrid(W, D, gy, gh, b.fins || 2, parts.T);
+  if (b.fins) {
+    for (let x = -W / 2; x <= W / 2 + 1e-3; x += b.fins) parts.T.push(bg(0.08, FH - ys, 0.42, x, y0 + ys, oz + 0.21), bg(0.08, FH - ys, 0.42, x, y0 + ys, -oz - 0.21));
+    for (let z = -D / 2; z <= D / 2 + 1e-3; z += b.fins) parts.T.push(bg(0.42, FH - ys, 0.08, ox + 0.21, y0 + ys, z), bg(0.42, FH - ys, 0.08, -ox - 0.21, y0 + ys, z));
+  }
+  return finishFloor(b, f, y0, g, M, parts);
+}
+
+function roofOf(b) {
+  const { width: W, depth: D, floorHeight: FH, overhang: OH, floors: NF } = b;
+  const M = floorMats(b), g = new THREE.Group();
+  const C = [], T = [], L = [];
+  const yR = NF * FH, top = yR + 0.4;
+  C.push(bg(W + 2 * OH + 0.3, 0.4, D + 2 * OH + 0.3, 0, yR, 0));
+  C.push(bg(Math.min(8, W * 0.3), 2.8, Math.min(5.5, D * 0.35), 0, top, -D * 0.18));
+  const ex = W / 2 + OH, ez = D / 2 + OH;
+  if (b.roofSign) {
+    for (let x = -ex + 0.1; x <= ex; x += 2) T.push(bg(0.06, 1.1, 0.06, x, top, ez - 0.1), bg(0.06, 1.1, 0.06, x, top, -ez + 0.1));
+    for (let z = -ez + 2; z < ez; z += 2) T.push(bg(0.06, 1.1, 0.06, ex - 0.1, top, z), bg(0.06, 1.1, 0.06, -ex + 0.1, top, z));
+    for (const h of [0.55, 1.08]) {
+      T.push(bg(2 * ex, 0.06, 0.06, 0, top + h, ez - 0.1), bg(2 * ex, 0.06, 0.06, 0, top + h, -ez + 0.1));
+      T.push(bg(0.06, 0.06, 2 * ez, ex - 0.1, top + h, 0), bg(0.06, 0.06, 2 * ez, -ex + 0.1, top + h, 0));
+    }
+    for (const x of [-12, -4, 4, 12]) T.push(bg(0.22, 2.2, 0.22, x, top, ez - 0.75));
+    const pots = [];
+    for (let x = -14; x <= 14; x += 4) pots.push(bg(2.4, 0.5, 0.7, x, top, ez - 1.5));
+    C.push(...pots);
+    leafClusters(g, [...Array(8)].map((_, i) => [-14 + i * 4, top + 0.8, ez - 1.5, 0.75, 10]));
+    const blue = new THREE.MeshStandardMaterial({ color: 0x1d7cc0, roughness: 0.45, envMapIntensity: 0.6 });
+    const face = new THREE.MeshStandardMaterial({ map: TEX.sign, roughness: 0.4, envMapIntensity: 0.6 });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(30, 2.6, 0.35), [blue, blue, blue, blue, face, blue]);
+    board.position.set(0, top + 3.5, ez - 0.55);
+    board.castShadow = true;
+    g.add(board);
+  } else {
+    const t = 0.25;
+    C.push(bg(2 * ex + 0.3, 1.1, t, 0, top, ez + 0.15 - t / 2), bg(2 * ex + 0.3, 1.1, t, 0, top, -ez - 0.15 + t / 2),
+      bg(t, 1.1, 2 * ez, ex + 0.15 - t / 2, top, 0), bg(t, 1.1, 2 * ez, -ex - 0.15 + t / 2, top, 0));
+    const fans = [];
+    for (let i = 0; i < 3; i++) {
+      const x = -W / 4 + i * (W / 4);
+      L.push(bg(2.4, 1.5, 1.3, x, top, D * 0.22));
+      fans.push(new THREE.PlaneGeometry(2.3, 1.2).rotateX(-Math.PI / 2).translate(x, top + 1.51, D * 0.22));
+    }
+    g.add(merged(fans, new THREE.MeshStandardMaterial({ map: TEX.fan, roughness: 0.6 }), false, true));
+  }
+  g.add(merged(C.map(x => worldUV(x)), M.c));
+  if (T.length) g.add(merged(T, M.metal));
+  if (L.length) g.add(merged(L, M.light));
+  return { b, f: NF + 1, group: g };
+}
+
+/* ---------- vegetation: alpha-tested leaf cards with rounded normals ---------- */
+const leafMat = new THREE.MeshStandardMaterial({ map: TEX.leaves, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.85, envMapIntensity: 0.4 });
+const leafDepth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: TEX.leaves, alphaTest: 0.5 });
+function leafClusters(parent, list) {   // list of [x, y, z, radius, cards]
+  const geos = [], r = rng(list.length * 13 + 5), e = new THREE.Euler(), mtx = new THREE.Matrix4(), c = new THREE.Vector3(), v = new THREE.Vector3();
+  for (const [x, y, z, rad, n] of list) {
+    c.set(x, y, z);
+    for (let i = 0; i < n; i++) {
+      const p = new THREE.PlaneGeometry(rad * 1.25, rad * 1.25);
+      e.set(r() * Math.PI, r() * Math.PI, r() * Math.PI);
+      p.applyMatrix4(mtx.makeRotationFromEuler(e));
+      const a = r() * Math.PI * 2, u = r() * 2 - 1, d = Math.cbrt(r()) * rad * 0.7, s = Math.sqrt(1 - u * u);
+      p.translate(x + Math.cos(a) * s * d, y + u * d * 0.8, z + Math.sin(a) * s * d);
+      const pos = p.attributes.position, nor = p.attributes.normal;
+      for (let k = 0; k < pos.count; k++) { v.fromBufferAttribute(pos, k).sub(c).normalize(); nor.setXYZ(k, v.x, v.y, v.z); }
+      geos.push(p);
+    }
+  }
+  const m = mesh(mergeGeometries(geos), leafMat);
+  m.customDepthMaterial = leafDepth;
+  m.userData.noAO = true;
+  parent.add(m);
+  return m;
+}
+function trees(parent, list) {   // [x, z, scale]
+  const trunks = [], crowns = [];
+  const bark = new THREE.MeshStandardMaterial({ color: 0x5d5044, roughness: 0.95 });
+  for (const [x, z, s] of list) {
+    trunks.push(new THREE.CylinderGeometry(0.14 * s, 0.24 * s, 3.4 * s, 7).translate(x, 1.7 * s, z));
+    crowns.push([x, 4.4 * s, z, 2.6 * s, 34]);
+    crowns.push([x + 0.9 * s, 3.6 * s, z + 0.4 * s, 1.7 * s, 16]);
+    crowns.push([x - 0.8 * s, 3.8 * s, z - 0.5 * s, 1.8 * s, 16]);
+  }
+  parent.add(merged(trunks, bark));
+  leafClusters(parent, crowns);
+}
+
+/* ---------- site: ground, plaza, parking, cars, trees ---------- */
+function buildSite() {
+  const g = new THREE.Group();
+  const asphalt = TEX.asphalt.clone(); asphalt.needsUpdate = true; asphalt.repeat.set(1, 1);
+  const grassFar = TEX.grass.clone(); grassFar.needsUpdate = true;
+  g.add(mesh(planeUV(700, 700, 175, 175).rotateX(-Math.PI / 2).translate(0, -0.02, 0), new THREE.MeshStandardMaterial({ map: grassFar, color: 0xa3ab97, roughness: 0.97, envMapIntensity: 0.25 }), false, true));
+  g.add(mesh(planeUV(170, 76, 170 / 6, 76 / 6).rotateX(-Math.PI / 2).translate(6, 0, 0), new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.95, envMapIntensity: 0.3 }), false, true));
+  g.add(mesh(planeUV(46, 8, 46 / 2.4, 8 / 2.4).rotateX(-Math.PI / 2).translate(0, 0.03, 12), new THREE.MeshStandardMaterial({ map: TEX.paving, roughness: 0.9 }), false, true));
+
+  const grassMat = new THREE.MeshStandardMaterial({ map: TEX.grass, roughness: 0.95, envMapIntensity: 0.3 });
+  const hedgeMat = new THREE.MeshStandardMaterial({ map: TEX.hedge, roughness: 0.9, envMapIntensity: 0.3 });
+  const curbMat = new THREE.MeshStandardMaterial({ map: TEX.curb, roughness: 0.7 });
+  const lawns = [], hedges = [], curbs = [];
+  for (const s of [-1, 1]) {
+    lawns.push(worldUV(bg(11, 0.12, 2.8, s * 10.6, 0, 9.8), 0.4));
+    hedges.push(worldUV(new RoundedBoxGeometry(10.4, 0.8, 0.9, 2, 0.25).translate(s * 10.6, 0.52, 9.1), 0.5));
+    curbs.push(worldUV(bg(11, 0.18, 0.24, s * 10.6, 0, 11.3), 1));
+  }
+  // lawns around the two example buildings
+  lawns.push(worldUV(bg(34, 0.08, 5, -47, 0, 4), 0.4), worldUV(bg(50, 0.08, 6, 52, 0, 0), 0.4));
+  g.add(merged(lawns, grassMat, false, true), merged(hedges, hedgeMat), merged(curbs, curbMat));
+
+  // parking stalls in front of building 1
+  const paint = new THREE.MeshStandardMaterial({ color: 0xe8e8e2, roughness: 0.8 });
+  const lines = [];
+  for (const row of [[19, 24], [24, 29]]) {
+    for (let x = -22.5; x <= 22.5 + 1e-3; x += 2.5) lines.push(new THREE.PlaneGeometry(0.12, 5).rotateX(-Math.PI / 2).translate(x, 0.035, (row[0] + row[1]) / 2));
+  }
+  lines.push(new THREE.PlaneGeometry(45, 0.12).rotateX(-Math.PI / 2).translate(0, 0.035, 24));
+  g.add(merged(lines, paint, false, true));
+
+  // cars — 3 instanced meshes, one draw call each however many cars
+  const r = rng(41), spots = [];
+  for (const zc of [21.5, 26.5]) for (let x = -21.25; x < 22; x += 2.5) if (r() < 0.55) spots.push([x, zc]);
+  const bodyGeo = new RoundedBoxGeometry(1.84, 0.78, 4.4, 3, 0.26).translate(0, 0.62, 0);
+  const cabGeo = new RoundedBoxGeometry(1.62, 0.66, 2.3, 3, 0.22).translate(0, 1.24, 0.2);
+  const wheels = [];
+  for (const sx of [-0.82, 0.82]) for (const sz of [-1.38, 1.38]) wheels.push(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 14).rotateZ(Math.PI / 2).translate(sx, 0.34, sz));
+  const wheelGeo = mergeGeometries(wheels);
+  const body = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ metalness: 0.65, roughness: 0.32, envMapIntensity: 1.2 }), spots.length);
+  const cab = new THREE.InstancedMesh(cabGeo, new THREE.MeshStandardMaterial({ color: 0x1b2328, metalness: 0.5, roughness: 0.08, envMapIntensity: 1.4 }), spots.length);
+  const whl = new THREE.InstancedMesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.8 }), spots.length);
+  const paints = [0xf2f2f0, 0xf2f2f0, 0xb9bdc0, 0x7d8286, 0x23272b, 0x2c3e5c, 0x8e1f22];
+  const o = new THREE.Object3D(), col = new THREE.Color();
+  spots.forEach(([x, z], i) => {
+    o.position.set(x, 0, z); o.rotation.y = z < 24 ? Math.PI : 0; o.updateMatrix();
+    body.setMatrixAt(i, o.matrix); cab.setMatrixAt(i, o.matrix); whl.setMatrixAt(i, o.matrix);
+    body.setColorAt(i, col.setHex(paints[(r() * paints.length) | 0]));
+  });
+  for (const m of [body, cab, whl]) { m.castShadow = m.receiveShadow = true; g.add(m); }
+
+  trees(g, [[-26, 13, 1.1], [26, 14, 1], [-30, -6, 1.2], [29, -2, 1], [-27, 22, 0.9], [27, 24, 1], [-60, 6, 1.1], [-33, 8, 0.95], [30, 6, 1], [76, 2, 1.1], [42, 4, 0.9], [-64, -22, 1.2]]);
+  return g;
+}
+
+const site = buildSite();
+buildingScene.add(site);
+for (const b of BUILDINGS) {
+  const root = new THREE.Group();
+  root.position.set(...b.pos);
+  root.rotation.y = b.rot || 0;
+  b.floorsArr = [];
+  for (let f = 1; f <= b.floors; f++) {
+    const e = f === 1 ? groundFloor(b) : (b.style === 'balcony' ? balconyFloor(b, f) : curtainFloor(b, f));
+    b.floorsArr[f] = e;
+    root.add(e.group);
+    lifts.push(e);
+  }
+  b.roof = roofOf(b);
+  root.add(b.roof.group);
+  lifts.push(b.roof);
+  b.root = root;
+  buildingScene.add(root);
+  root.updateMatrixWorld(true);
+}
+const byId = id => BUILDINGS.find(b => b.id === id);
+const allShells = BUILDINGS.flatMap(b => b.floorsArr.slice(1).map(e => e.shell));
+
+function setOpacity(entry, a) {
+  entry.group.visible = a > 0.002;
+  entry.group.traverse(o => {
+    if (!o.isMesh || o.userData.noFade) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (m.userData.baseT === undefined) m.userData.baseT = m.transparent;
+      m.transparent = m.userData.baseT || a < 0.999;
+      m.opacity = a;
+      m.depthWrite = a > 0.6;
+    }
+  });
+}
+
+/* =====================================================================
+   5) FLOOR PLAN (cutaway at 1.2 m, rebuilt per floor)
+   ===================================================================== */
+const planRoot = new THREE.Group();
+planScene.add(planRoot);
+const pins = [];
+
+function zoneOf(job) {
+  const b = byId(job.building), plan = b.plans[job.floor];
+  const inside = r => job.x >= r.x && job.x <= r.x + r.w && job.z >= r.z && job.z <= r.z + r.d;
+  if (plan) for (const z of plan.zones) if (inside(z)) return z.name;
+  for (const c of b.core) if (inside(c)) return c.label;
+  return 'พื้นที่ส่วนกลาง';
+}
+
+function clearPlan() {
+  planRoot.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  planRoot.clear();
+  pins.length = 0;
+  removeLabels('plan');
+}
+
+function buildPlan(b, f) {
+  clearPlan();
+  const W = b.width, D = b.depth, plan = b.plans[f];
+  const PX = x => x - W / 2, PZ = z => z - D / 2;
+  const CUT = 1.2;
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf2f1ec, roughness: 0.85, envMapIntensity: 0.5 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x3a3f44, roughness: 0.8 });
+  const colMat = new THREE.MeshStandardMaterial({ map: TEX.concrete, color: 0xd9d8d2, roughness: 0.9 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0xa9d0e6, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.3, depthWrite: false });
+
+  const tile = TEX.tile.clone(); tile.needsUpdate = true; tile.repeat.set(W / 2.4, D / 2.4);
+  planRoot.add(mesh(worldUV(bg(W + 0.6, 0.35, D + 0.6, 0, -0.35, 0)), new THREE.MeshStandardMaterial({ map: TEX.concrete, color: 0xb5b8b8, roughness: 0.9 })));
+  planRoot.add(mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2).translate(0, 0.005, 0), new THREE.MeshStandardMaterial({ map: tile, roughness: 0.35, envMapIntensity: 0.6 }), false, true));
+
+  const walls = [], caps = [], WT = 0.12;
+  const seg = (x1, z1, x2, z2, h = CUT, t = WT) => {
+    const horiz = Math.abs(z1 - z2) < 1e-6, len = horiz ? Math.abs(x2 - x1) : Math.abs(z2 - z1);
+    if (len < 0.05) return;
+    const cx = PX((x1 + x2) / 2), cz = PZ((z1 + z2) / 2);
+    const w = horiz ? len : t, d = horiz ? t : len;
+    walls.push(bg(w, h, d, cx, 0, cz));
+    caps.push(bg(w + 0.01, 0.025, d + 0.01, cx, h, cz));
+  };
+  const onEdge = (x1, z1, x2, z2) => (Math.abs(z1 - z2) < 1e-6 && (z1 < 0.05 || z1 > D - 0.05)) || (Math.abs(x1 - x2) < 1e-6 && (x1 < 0.05 || x1 > W - 0.05));
+  const edgeWithDoor = (x1, z1, x2, z2) => {
+    if (onEdge(x1, z1, x2, z2)) return;
+    const horiz = Math.abs(z1 - z2) < 1e-6, len = horiz ? x2 - x1 : z2 - z1;
+    if (len < 2.6) return seg(x1, z1, x2, z2);
+    const m = len / 2, gap = 0.5;
+    if (horiz) { seg(x1, z1, x1 + m - gap, z1); seg(x1 + m + gap, z1, x2, z2); }
+    else { seg(x1, z1, x1, z1 + m - gap); seg(x1, z1 + m + gap, x2, z2); }
+  };
+  const outline = r => {
+    edgeWithDoor(r.x, r.z, r.x + r.w, r.z);
+    edgeWithDoor(r.x, r.z + r.d, r.x + r.w, r.z + r.d);
+    edgeWithDoor(r.x, r.z, r.x, r.z + r.d);
+    edgeWithDoor(r.x + r.w, r.z, r.x + r.w, r.z + r.d);
+  };
+
+  // zones: carpet tinted by zone colour + coloured outline on the floor
+  const zoneLines = [];
+  if (plan) {
+    for (const z of plan.zones) {
+      const carpet = TEX.carpet.clone(); carpet.needsUpdate = true; carpet.repeat.set(z.w / 3, z.d / 3);
+      const tint = new THREE.Color(z.color).lerp(new THREE.Color(0xdedcd6), 0.35);
+      planRoot.add(mesh(new THREE.PlaneGeometry(z.w - 0.12, z.d - 0.12).rotateX(-Math.PI / 2).translate(PX(z.x + z.w / 2), 0.012, PZ(z.z + z.d / 2)),
+        new THREE.MeshStandardMaterial({ map: carpet, color: tint, roughness: 0.95, envMapIntensity: 0.3 }), false, true));
+      zoneLines.push(new THREE.Color(z.color), [PX(z.x + 0.15), PZ(z.z + 0.15), PX(z.x + z.w - 0.15), PZ(z.z + z.d - 0.15)]);
+      outline(z);
+      addLabel('plan', new THREE.Vector3(PX(z.x + z.w / 2), 1.7, PZ(z.z + z.d / 2)),
+        `<div class="zone-lbl">${z.name}<small>${z.area % 1 ? z.area.toFixed(2) : z.area} ตร.ม.</small></div>`);
+    }
+    for (let i = 0; i < zoneLines.length; i += 2) {
+      const c = zoneLines[i], [x1, z1, x2, z2] = zoneLines[i + 1];
+      const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1, 0.03, z1), new THREE.Vector3(x2, 0.03, z1), new THREE.Vector3(x2, 0.03, z2), new THREE.Vector3(x1, 0.03, z2)]);
+      planRoot.add(new THREE.LineLoop(lg, new THREE.LineBasicMaterial({ color: c })));
+    }
+    addLabel('plan', new THREE.Vector3(PX(W * 0.62), 1.4, PZ(D / 2)), `<div class="zone-lbl">พื้นที่ส่วนกลาง<small>${plan.commonArea.toFixed(2)} ตร.ม.</small></div>`);
+  } else {
+    addLabel('plan', new THREE.Vector3(0, 1.6, PZ(D * 0.68)), `<div class="zone-lbl">ยังไม่มีผังห้องของชั้นนี้<small>แสดงเฉพาะโครงสร้าง แกนกลาง และจุดงานซ่อม</small></div>`);
+  }
+
+  // core: toilets, stairs, lift, A.H.U.
+  const stairs = [];
+  for (const c of b.core) {
+    const fm = c.floor === 'tile'
+      ? new THREE.MeshStandardMaterial({ map: TEX.wetTile, roughness: 0.3, envMapIntensity: 0.7 })
+      : new THREE.MeshStandardMaterial({ color: c.lift ? 0x9aa1a7 : 0xc6c8c8, roughness: c.lift ? 0.3 : 0.85, metalness: c.lift ? 0.6 : 0 });
+    if (fm.map) { fm.map = fm.map.clone(); fm.map.needsUpdate = true; fm.map.repeat.set(c.w / 1.2, c.d / 1.2); }
+    planRoot.add(mesh(new THREE.PlaneGeometry(c.w - 0.12, c.d - 0.12).rotateX(-Math.PI / 2).translate(PX(c.x + c.w / 2), 0.012, PZ(c.z + c.d / 2)), fm, false, true));
+    outline(c);
+    if (c.stairs) {
+      const n = 10, run = (c.w - 0.5) / 2, tread = (c.d - 0.8) / n;
+      for (let i = 0; i < n; i++) {
+        const z = PZ(c.z + c.d - 0.4 - (i + 0.5) * tread);
+        stairs.push(bg(run - 0.06, 0.12 * (i + 1), tread, PX(c.x + 0.2 + run / 2), 0, z));
+        stairs.push(bg(run - 0.06, Math.min(CUT, 0.12 * (n + i + 1)), tread, PX(c.x + 0.3 + run * 1.5), 0, z));
+      }
+    }
+    addLabel('plan', new THREE.Vector3(PX(c.x + c.w / 2), 1.55, PZ(c.z + c.d / 2)), `<div class="core-lbl">${c.label}</div>`);
+  }
+  if (stairs.length) planRoot.add(merged(stairs.map(s => worldUV(s)), colMat));
+
+  // facade: sill wall + glass, entrance gap
+  const ent = plan && plan.entrance;
+  const front = ent ? [[0, ent.x], [ent.x + ent.w, W]] : [[0, W]];
+  for (const [a, c] of front) seg(a, D - 0.1, c, D - 0.1, 0.9, 0.2);
+  seg(0, 0.1, W, 0.1, 0.9, 0.2);
+  seg(0.1, 0, 0.1, D, 0.9, 0.2);
+  seg(W - 0.1, 0, W - 0.1, D, 0.9, 0.2);
+  const gl = [bg(W, CUT - 0.9, 0.04, 0, 0.9, PZ(0.1)), bg(0.04, CUT - 0.9, D, PX(0.1), 0.9, 0), bg(0.04, CUT - 0.9, D, PX(W - 0.1), 0.9, 0)];
+  for (const [a, c] of front) gl.push(bg(c - a, CUT - 0.9, 0.04, PX((a + c) / 2), 0.9, PZ(D - 0.1)));
+  const glm = merged(gl, glassMat, false, false); glm.userData.noAO = true; planRoot.add(glm);
+
+  // columns on the structural grid
+  const zs = [0]; b.rows.forEach(r => zs.push(zs.at(-1) + r));
+  for (let x = 0; x <= W + 1e-3; x += b.bay) for (const z of zs) {
+    walls.push(bg(0.5, CUT, 0.5, PX(x), 0, PZ(z)));
+    caps.push(bg(0.51, 0.025, 0.51, PX(x), CUT, PZ(z)));
+  }
+  planRoot.add(merged(walls.map(w => worldUV(w)), wallMat), merged(caps, capMat, false, false));
+
+  // dimension ticks + labels (like the CAD drawing)
+  const tick = [];
+  for (let x = 0; x <= W + 1e-3; x += b.bay) tick.push(PX(x), 0.03, PZ(0) - 0.6, PX(x), 0.03, PZ(0) - 2.0);
+  for (const z of zs) tick.push(PX(0) - 0.6, 0.03, PZ(z), PX(0) - 2.4, 0.03, PZ(z));
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(tick, 3));
+  planRoot.add(new THREE.LineSegments(tg, new THREE.LineBasicMaterial({ color: 0xc0392b })));
+  for (let x = 0; x + b.bay <= W + 1e-3; x += b.bay) addLabel('plan', new THREE.Vector3(PX(x + b.bay / 2), 0.05, PZ(0) - 1.3), `<div class="dim-lbl">${b.bay * 1000}</div>`);
+  let acc = 0;
+  for (const r of b.rows) { addLabel('plan', new THREE.Vector3(PX(0) - 1.7, 0.05, PZ(acc + r / 2)), `<div class="dim-lbl">${r * 1000}</div>`); acc += r; }
+
+  // furniture: instanced desks with monitors + task chairs
+  if (plan) {
+    const spots = [];
+    for (const z of plan.zones) {
+      const nx = Math.floor((z.w - 1.0) / 1.9), nz = Math.floor((z.d - 1.2) / 2.2);
+      if (nx < 1 || nz < 1) continue;
+      const sx = z.x + (z.w - (nx - 1) * 1.9) / 2, sz = z.z + (z.d - (nz - 1) * 2.2) / 2 - 0.35;
+      for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) spots.push([PX(sx + i * 1.9), PZ(sz + j * 2.2)]);
+    }
+    const deskGeo = mergeGeometries([
+      new THREE.BoxGeometry(1.4, 0.035, 0.7).translate(0, 0.735, 0),
+      mergeGeometries([new THREE.BoxGeometry(0.04, 0.72, 0.62).translate(-0.66, 0.36, 0), new THREE.BoxGeometry(0.04, 0.72, 0.62).translate(0.66, 0.36, 0), new THREE.BoxGeometry(1.3, 0.3, 0.02).translate(0, 0.5, -0.3)]),
+      mergeGeometries([new THREE.BoxGeometry(0.58, 0.35, 0.03).translate(0, 1.0, -0.22), new THREE.BoxGeometry(0.06, 0.18, 0.06).translate(0, 0.84, -0.25), new THREE.BoxGeometry(0.24, 0.015, 0.18).translate(0, 0.76, -0.25)]),
+    ], true);
+    const ni = g => (g.index ? g.toNonIndexed() : g);
+    const chairGeo = mergeGeometries([
+      mergeGeometries([new RoundedBoxGeometry(0.5, 0.08, 0.48, 2, 0.03).translate(0, 0.47, 0.72), new RoundedBoxGeometry(0.46, 0.5, 0.06, 2, 0.03).translate(0, 0.78, 0.96)].map(ni)),
+      mergeGeometries([new THREE.CylinderGeometry(0.03, 0.03, 0.4, 6).translate(0, 0.24, 0.72), new THREE.CylinderGeometry(0.3, 0.3, 0.04, 12).translate(0, 0.04, 0.72)].map(ni)),
+    ], true);
+    const dm = new THREE.InstancedMesh(deskGeo, [
+      new THREE.MeshStandardMaterial({ color: 0xe9e3d7, roughness: 0.55 }),
+      new THREE.MeshStandardMaterial({ color: 0x5d646a, metalness: 0.6, roughness: 0.4 }),
+      new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.25, metalness: 0.3 }),
+    ], spots.length);
+    const cm = new THREE.InstancedMesh(chairGeo, [
+      new THREE.MeshStandardMaterial({ color: 0x30363c, roughness: 0.9 }),
+      new THREE.MeshStandardMaterial({ color: 0x6f767c, metalness: 0.7, roughness: 0.35 }),
+    ], spots.length);
+    const o = new THREE.Object3D(), r = rng(f * 3 + 1);
+    spots.forEach(([x, z], i) => {
+      o.position.set(x, 0, z); o.rotation.y = 0; o.updateMatrix(); dm.setMatrixAt(i, o.matrix);
+      o.rotation.y = (r() - 0.5) * 0.6; o.updateMatrix(); cm.setMatrixAt(i, o.matrix);
+    });
+    dm.castShadow = cm.castShadow = dm.receiveShadow = true;
+    planRoot.add(dm, cm);
+    if (plan.reception) {
+      const rc = plan.reception;
+      planRoot.add(mesh(bg(rc.w, 1.05, rc.d, PX(rc.x + rc.w / 2), 0, PZ(rc.z + rc.d / 2)), new THREE.MeshStandardMaterial({ color: 0x7d5f43, roughness: 0.55 })));
+      planRoot.add(mesh(bg(rc.w + 0.1, 0.04, rc.d + 0.15, PX(rc.x + rc.w / 2), 1.05, PZ(rc.z + rc.d / 2)), new THREE.MeshStandardMaterial({ color: 0xf0eee8, roughness: 0.3 })));
+      addLabel('plan', new THREE.Vector3(PX(rc.x + rc.w / 2), 1.6, PZ(rc.z + rc.d / 2)), '<div class="core-lbl">Information</div>');
+    }
+    // potted plants in the common area
+    const pots = [], plants = [];
+    for (const [px, pz] of [[12.6, 6.6], [23.4, 6.6], [12.6, 14.2], [23.4, 14.2]].filter(([x, z]) => x < W && z < D)) {
+      pots.push(new THREE.CylinderGeometry(0.28, 0.22, 0.45, 12).translate(PX(px), 0.225, PZ(pz)));
+      plants.push([PX(px), 0.95, PZ(pz), 0.55, 12]);
+    }
+    if (pots.length) { planRoot.add(merged(pots, new THREE.MeshStandardMaterial({ color: 0x6e6a64, roughness: 0.7 }))); leafClusters(planRoot, plants); }
+  }
+
+  // equipment pins
+  const stemGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.9, 8).translate(0, 0.95, 0);
+  const headGeo = new THREE.SphereGeometry(0.36, 24, 16).translate(0, 2.2, 0);
+  const ringGeo = new THREE.RingGeometry(0.45, 0.62, 40).rotateX(-Math.PI / 2).translate(0, 0.06, 0);
+  const hitGeo = new THREE.CylinderGeometry(0.75, 0.75, 2.8, 8).translate(0, 1.4, 0);
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x6b747c, metalness: 0.5, roughness: 0.4 });
+  for (const job of JOBS.filter(j => j.building === b.id && j.floor === f)) {
+    const colr = new THREE.Color(STATUS[job.status].color);
+    const gp = new THREE.Group();
+    gp.position.set(PX(job.x), 0.02, PZ(job.z));
+    const head = mesh(headGeo, new THREE.MeshStandardMaterial({ color: colr, emissive: colr, emissiveIntensity: 0.5, roughness: 0.3 }));
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: colr, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+    const hit = new THREE.Mesh(hitGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }));
+    ring.userData.noAO = hit.userData.noAO = true;
+    hit.userData.jobId = job.id;
+    gp.add(mesh(stemGeo, stemMat), head, ring, hit);
+    planRoot.add(gp);
+    const label = addLabel('plan', new THREE.Vector3(PX(job.x), 3.05, PZ(job.z)), `<div class="pin-lbl">${job.id.slice(-3)}</div>`);
+    pins.push({ job, group: gp, head, ring, hit, label });
+  }
+
+  const s = Math.max(W, D) / 2 + 6;
+  Object.assign(planSun.shadow.camera, { left: -s, right: s, top: s, bottom: -s });
+  planSun.shadow.camera.updateProjectionMatrix();
+  renderer.shadowMap.needsUpdate = true;
+}
+
+/* =====================================================================
+   6) HTML LABELS projected from 3D
+   ===================================================================== */
+const labels = [];
+function addLabel(scene, pos, html, { anchor = 'center', onClick } = {}) {
+  const el = document.createElement('div');
+  el.className = 'lbl';
+  el.innerHTML = html;
+  el.hidden = true;
+  if (onClick) el.firstElementChild.addEventListener('click', onClick);
+  labelsEl.appendChild(el);
+  const L = { scene, pos, el, anchor };
+  labels.push(L);
+  return L;
+}
+function removeLabels(scene) {
+  for (let i = labels.length - 1; i >= 0; i--) if (labels[i].scene === scene) { labels[i].el.remove(); labels.splice(i, 1); }
+}
+const pv = new THREE.Vector3();
+function updateLabels(w, h) {
+  for (const L of labels) {
+    if (L.scene !== mode || (L.bid && L.bid !== focusId)) { L.el.hidden = true; continue; }
+    pv.copy(L.pos).project(camera);
+    if (pv.z > 1) { L.el.hidden = true; continue; }
+    L.el.hidden = false;
+    const x = (pv.x * 0.5 + 0.5) * w, y = (-pv.y * 0.5 + 0.5) * h;
+    L.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(${L.anchor === 'left' ? '0' : '-50%'},-50%)`;
+  }
+}
+
+/* =====================================================================
+   7) STATE + STATUS
+   ===================================================================== */
+let mode = 'site';            // 'site' | 'building' | 'plan' | 'transition'
+let focusId = null;           // building in focus
+let planCtx = null;           // { b, f }
+let hover = null;             // { bid, f }
+let hoverJob = null;
+let selectedJob = null;
+
+const jobsOf = (bid, f) => JOBS.filter(j => j.building === bid && (f == null || j.floor === f));
+const openOf = (bid, f) => jobsOf(bid, f).filter(j => j.status !== 'done');
+function worst(list) {
+  let best = null;
+  for (const j of list) if (j.status !== 'done' && (!best || STATUS[j.status].rank > STATUS[best].rank)) best = j.status;
+  return best;
+}
+const floorStatus = (bid, f) => worst(jobsOf(bid, f));
+
+function refreshBadges() {
+  removeLabels('site');
+  removeLabels('building');
+  for (const b of BUILDINGS) {
+    const st = worst(jobsOf(b.id)), n = openOf(b.id).length;
+    const top = b.root.localToWorld(new THREE.Vector3(0, b.floors * b.floorHeight + (b.roofSign ? 6.4 : 3.2), 0));
+    addLabel('site', top,
+      `<button class="badge bld ${st || 'ok'}" type="button"><i class="dot"></i><span><strong>${b.name}</strong> · ${n ? `${n} งานค้าง` : 'ปกติ'}</span></button>`,
+      { onClick: () => focusBuilding(b.id) });
+    for (let f = 1; f <= b.floors; f++) {
+      const fs = floorStatus(b.id, f);
+      if (!fs) continue;
+      const p = b.root.localToWorld(new THREE.Vector3(b.width / 2 + b.overhang + 0.7, (f - 1) * b.floorHeight + b.floorHeight * 0.55, b.depth / 2 + b.overhang));
+      const L = addLabel('building', p,
+        `<button class="badge ${fs}" type="button" aria-label="เปิดแปลน ${b.name} ชั้น ${f}"><i class="dot"></i><span>ชั้น <b>${f}</b> · ${openOf(b.id, f).length} งาน</span></button>`,
+        { anchor: 'left', onClick: () => enterFloor(b.id, f) });
+      L.bid = b.id;
+    }
+  }
+}
+
+/* =====================================================================
+   8) CAMERA + TRANSITIONS
+   ===================================================================== */
+const tweens = [];
+function tween(dur, fn, done) { tweens.push({ t0: performance.now(), dur: reduceMotion ? 1 : dur, fn, done }); }
+function tweenCamera(pos, target, dur = 800) {
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  controls.enabled = false;
+  tween(dur, k => { const e = ease(k); camera.position.lerpVectors(p0, pos, e); controls.target.lerpVectors(t0, target, e); },
+    () => { controls.enabled = true; });
+}
+function fitSphere(sphere, dir, k = 1) {
+  const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
+  const hf = Math.atan(Math.tan(vf) * camera.aspect);
+  const dist = sphere.radius / Math.sin(Math.min(vf, hf)) * k;
+  return { pos: sphere.center.clone().addScaledVector(dir, dist), target: sphere.center.clone() };
+}
+const VIEW_DIR = new THREE.Vector3(0.42, 0.3, 0.8).normalize();
+function sitePose() {
+  const box = new THREE.Box3();
+  BUILDINGS.forEach(b => box.expandByObject(b.root));
+  const s = box.getBoundingSphere(new THREE.Sphere());
+  s.center.y *= 0.6;
+  return fitSphere(s, VIEW_DIR, 0.98);
+}
+function buildingPose(b) {
+  const s = new THREE.Box3().setFromObject(b.root).getBoundingSphere(new THREE.Sphere());
+  const dir = VIEW_DIR.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), b.rot || 0);
+  return fitSphere(s, dir, 0.92);
+}
+function planPose(b) {
+  const target = new THREE.Vector3(0, 0, 0.8);
+  const vf = THREE.MathUtils.degToRad(camera.fov) / 2, hf = Math.atan(Math.tan(vf) * camera.aspect);
+  const dist = Math.max((b.width / 2 + 5) / Math.tan(hf), (b.depth / 2 + 5) / Math.tan(vf)) * 1.05;
+  return { pos: target.clone().addScaledVector(new THREE.Vector3(0, 0.8, 0.6).normalize(), dist), target };
+}
+function floorFocus(b, f) {
+  const t = b.root.localToWorld(new THREE.Vector3(0, (f - 1) * b.floorHeight + 0.5, 0));
+  const k = Math.max(b.width, b.depth) / 32;
+  const off = new THREE.Vector3(0, 30 * k, 24 * k).applyAxisAngle(new THREE.Vector3(0, 1, 0), b.rot || 0);
+  return { pos: t.clone().add(off), target: t };
+}
+function setControls(kind) {
+  if (kind === 'plan') Object.assign(controls, { minDistance: 8, maxDistance: 90, maxPolarAngle: 1.2, minPolarAngle: 0 });
+  else Object.assign(controls, { minDistance: 18, maxDistance: 320, maxPolarAngle: 1.45, minPolarAngle: 0.12 });
+}
+
+const fadeEl = document.getElementById('fade');
+function fadeSwap(cb) {
+  fadeEl.classList.add('on');
+  setTimeout(() => { cb(); requestAnimationFrame(() => fadeEl.classList.remove('on')); }, reduceMotion ? 0 : 230);
+}
+
+function focusBuilding(id) {
+  if (mode === 'plan' || mode === 'transition') return;
+  focusId = id;
+  mode = id ? 'building' : 'site';
+  const p = id ? buildingPose(byId(id)) : sitePose();
+  tweenCamera(p.pos, p.target, 900);
+  syncChrome();
+}
+
+function enterFloor(bid, f) {
+  if (mode !== 'site' && mode !== 'building') return;
+  const b = byId(bid);
+  mode = 'transition';
+  focusId = bid;
+  planCtx = { b, f };
+  hideTip();
+  const lift = b.floorHeight * 5;
+  for (const e of lifts) if (e.b === b && e.f > f) tween(650, k => { e.group.position.y = k * lift; setOpacity(e, 1 - k); });
+  const p = floorFocus(b, f);
+  tweenCamera(p.pos, p.target, 750);
+  syncChrome();
+  setTimeout(() => fadeSwap(() => showPlan(b, f)), reduceMotion ? 0 : 640);
+}
+
+function showPlan(b, f) {
+  buildPlan(b, f);
+  currentScene = planScene;
+  aoPass.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1, thickness: 1, scale: 1 });
+  mode = 'plan';
+  selectedJob = null;
+  setControls('plan');
+  const p = planPose(b);
+  camera.position.copy(p.pos).add(new THREE.Vector3(0, 6, 5));
+  controls.target.copy(p.target);
+  tweenCamera(p.pos, p.target, 600);
+  syncChrome();
+}
+
+function backFromPlan() {
+  if (mode !== 'plan') return;
+  const { b, f } = planCtx;
+  mode = 'transition';
+  hideTip();
+  fadeSwap(() => {
+    clearPlan();
+    currentScene = buildingScene;
+    aoPass.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1, thickness: 1, scale: 1 });
+    setControls('building');
+    const p0 = floorFocus(b, f);
+    camera.position.copy(p0.pos); controls.target.copy(p0.target);
+    const lift = b.floorHeight * 5;
+    for (const e of lifts) if (e.b === b && e.f > f) tween(650, k => { e.group.position.y = (1 - k) * lift; setOpacity(e, k); });
+    const p = buildingPose(b);
+    tweenCamera(p.pos, p.target, 850);
+    renderer.shadowMap.needsUpdate = true;
+    planCtx = null;
+    selectedJob = null;
+    setTimeout(() => { mode = 'building'; syncChrome(); }, reduceMotion ? 0 : 700);
+    syncChrome();
+  });
+}
+document.getElementById('backBtn').addEventListener('click', backFromPlan);
+
+function selectJob(id) { selectedJob = id; renderPanel(); }
+
+/* =====================================================================
+   9) CHROME: building switcher, crumb, hint, side panel
+   ===================================================================== */
+const segEl = document.getElementById('seg');
+segEl.innerHTML = `<button type="button" data-b="">ทุกอาคาร</button>` + BUILDINGS.map(b => `<button type="button" data-b="${b.id}">${b.name}</button>`).join('');
+segEl.addEventListener('click', e => { const t = e.target.closest('button'); if (t) focusBuilding(t.dataset.b || null); });
+
+function syncChrome() {
+  const inPlan = mode === 'plan' || (mode === 'transition' && planCtx);
+  segEl.hidden = !!inPlan;
+  segEl.querySelectorAll('button').forEach(btn => btn.setAttribute('aria-pressed', String((btn.dataset.b || null) === focusId)));
+  document.getElementById('backBtn').hidden = mode !== 'plan';
+  const crumb = document.getElementById('crumb');
+  crumb.hidden = !inPlan;
+  if (planCtx) crumb.innerHTML = `${planCtx.b.name} <span>›</span> ชั้น ${planCtx.f}`;
+  document.getElementById('hint').textContent = mode === 'plan'
+    ? 'ลากเพื่อหมุน · คลิกหมุดเพื่อดูรายละเอียดงานซ่อม'
+    : 'ลากเพื่อหมุน · ล้อเมาส์เพื่อซูม · คลิกชั้นเพื่อเปิดแปลน';
+  renderPanel();
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const chip = (st, live) => `<span class="chip ${st}${live ? ' live' : ''}">${STATUS[st].label}</span>`;
+function counts(list, small) {
+  const n = s => list.filter(j => j.status === s).length;
+  return `<div class="counts">${['pending', 'in_progress', 'done'].map(s => `<span class="count ${s}"><b>${n(s)}</b>${STATUS[s].label}</span>`).join('')}</div>`;
+}
+
+function renderPanel() {
+  if (planCtx && mode !== 'site' && mode !== 'building') return renderFloorPanel(planCtx.b, planCtx.f);
+  if (focusId) return renderBuildingPanel(byId(focusId));
+  const cards = BUILDINGS.map(b => {
+    const stack = Array.from({ length: b.floors }, (_, i) => `<i class="${floorStatus(b.id, i + 1) || ''}"></i>`).join('');
+    return `<button class="bcard${hover && hover.bid === b.id ? ' hover' : ''}" type="button" data-bid="${b.id}">
+      <span class="t">${b.name}${b.example ? '<small>ตัวอย่าง</small>' : ''}</span>
+      <span class="m">${b.floors} ชั้น · ${b.width} × ${b.depth} ม. · ${openOf(b.id).length} งานค้าง</span>
+      ${counts(jobsOf(b.id))}
+      <span class="stack" aria-hidden="true">${stack}</span>
+    </button>`;
+  }).join('');
+  panel.innerHTML = `
+    <div><h2>ทุกอาคาร</h2><p class="sub">${BUILDINGS.length} อาคาร · ${BUILDINGS.reduce((a, b) => a + b.floors, 0)} ชั้น</p></div>
+    <div><p class="eyebrow">ใบแจ้งซ่อมทั้งหมด</p>${counts(JOBS)}</div>
+    <div><p class="eyebrow">อาคาร · แถบด้านขวาคือชั้นที่มีงานค้าง</p><div class="bcards">${cards}</div></div>
+    <p class="foot">ต่อกับระบบแจ้งซ่อมจริงด้วย <code>window.facility.setJobs(jobs)</code> และเพิ่มอาคารได้ในตัวแปร <code>BUILDINGS</code></p>`;
+}
+
+function renderBuildingPanel(b) {
+  let rows = '';
+  for (let f = b.floors; f >= 1; f--) {
+    const st = floorStatus(b.id, f), all = jobsOf(b.id, f), open = openOf(b.id, f).length, done = all.length - open;
+    const meta = all.length ? `${open} งานค้าง${done ? ` · ${done} เสร็จแล้ว` : ''}` : 'ไม่มีงานซ่อม';
+    const hv = hover && hover.bid === b.id && hover.f === f;
+    rows += `<button class="floor-row${hv ? ' hover' : ''}" type="button" data-floor="${f}">
+      <span class="floor-no"><small>ชั้น</small>${f}</span>
+      <span class="floor-meta">${meta}${b.plans[f] ? ' · มีแปลน' : ''}</span>
+      ${st ? chip(st, true) : '<span class="chip ok">ปกติ</span>'}
+      <span class="chev" aria-hidden="true">›</span></button>`;
+  }
+  panel.innerHTML = `
+    <button class="linkback" type="button" data-all>← ทุกอาคาร</button>
+    <div><h2>${b.name}</h2><p class="sub">${b.floors} ชั้น · ${b.width} × ${b.depth} ม. · ${b.width * b.depth} ตร.ม./ชั้น</p></div>
+    <div><p class="eyebrow">ใบแจ้งซ่อมในอาคาร</p>${counts(jobsOf(b.id))}</div>
+    <div><p class="eyebrow">สถานะรายชั้น</p><div class="floors">${rows}</div></div>
+    ${b.example ? '<p class="notice">อาคารนี้เป็นอาคารสมมติ ใช้ทดสอบการแสดงผลหลายตึก</p>' : ''}`;
+}
+
+function renderFloorPanel(b, f) {
+  const jobs = jobsOf(b.id, f).sort((a, c) => STATUS[c.status].rank - STATUS[a.status].rank);
+  const sel = jobs.find(j => j.id === selectedJob);
+  const list = jobs.map(j => `
+    <button class="job${j.id === selectedJob ? ' sel' : ''}" type="button" data-job="${esc(j.id)}">
+      <span class="name">${esc(j.equipment)}</span>${chip(j.status, j.status !== 'done')}
+      <span class="issue">${esc(j.issue)}</span>
+      <span class="id">${esc(j.id)} · ${esc(zoneOf(j))}</span>
+    </button>`).join('');
+  const detail = sel ? `
+    <div class="detail">
+      <h3>${esc(sel.equipment)}</h3>
+      <dl>
+        <dt>สถานะ</dt><dd>${chip(sel.status, sel.status !== 'done')}</dd>
+        <dt>อาการ</dt><dd>${esc(sel.issue)}</dd>
+        <dt>ตำแหน่ง</dt><dd>${b.name} ชั้น ${sel.floor} · ${esc(zoneOf(sel))}</dd>
+        <dt>พิกัดแปลน</dt><dd class="mono">x ${sel.x.toFixed(1)} ม. · y ${sel.z.toFixed(1)} ม.</dd>
+        <dt>ช่างผู้รับผิดชอบ</dt><dd>${esc(sel.tech)}</dd>
+        <dt>เลขที่ใบงาน</dt><dd class="mono">${esc(sel.id)}</dd>
+        <dt>อัปเดตล่าสุด</dt><dd>${esc(sel.updated)}</dd>
+      </dl>
+    </div>` : '';
+  const plan = b.plans[f];
+  panel.innerHTML = `
+    <div><h2>${b.name} · ชั้น ${f}</h2>
+      <p class="sub">พื้นที่ ${b.width * b.depth} ตร.ม.${plan ? ` · ส่วนกลาง ${plan.commonArea.toFixed(2)} ตร.ม.` : ''}</p></div>
+    ${plan ? '' : '<p class="notice">ยังไม่ได้ใส่ผังห้องของชั้นนี้ เพิ่มได้ใน BUILDINGS → plans</p>'}
+    ${detail}
+    <div><p class="eyebrow">งานซ่อมในชั้นนี้ (${jobs.length})</p>
+      ${jobs.length ? `<div class="jobs">${list}</div>` : '<p class="empty">ไม่มีงานซ่อมในชั้นนี้</p>'}</div>`;
+}
+
+panel.addEventListener('click', e => {
+  if (e.target.closest('[data-all]')) return focusBuilding(null);
+  const bc = e.target.closest('[data-bid]'); if (bc) return focusBuilding(bc.dataset.bid);
+  const fr = e.target.closest('[data-floor]'); if (fr) return enterFloor(focusId, +fr.dataset.floor);
+  const jb = e.target.closest('[data-job]'); if (jb) return selectJob(jb.dataset.job);
+});
+panel.addEventListener('pointerover', e => {
+  const fr = e.target.closest('[data-floor]'), bc = e.target.closest('[data-bid]');
+  hover = fr && focusId ? { bid: focusId, f: +fr.dataset.floor } : bc ? { bid: bc.dataset.bid, f: 0 } : null;
+});
+panel.addEventListener('pointerleave', () => { hover = null; });
+
+/* =====================================================================
+   10) POINTER PICKING
+   ===================================================================== */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let downAt = null;
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  if (mode === 'site' || mode === 'building') {
+    const hit = ray.intersectObjects(allShells, false)[0];
+    return hit ? { bid: hit.object.userData.bid, f: hit.object.userData.floor } : null;
+  }
+  if (mode === 'plan') {
+    const hit = ray.intersectObjects(pins.map(p => p.hit), false)[0];
+    return hit ? { job: hit.object.userData.jobId } : null;
+  }
+  return null;
+}
+function hideTip() { tipEl.hidden = true; renderer.domElement.style.cursor = ''; }
+function showTip(ev, html) {
+  const r = vp.getBoundingClientRect();
+  tipEl.innerHTML = html;
+  tipEl.hidden = false;
+  const x = Math.min(ev.clientX - r.left + 14, r.width - tipEl.offsetWidth - 8);
+  const y = Math.min(ev.clientY - r.top + 14, r.height - tipEl.offsetHeight - 8);
+  tipEl.style.transform = `translate(${x}px,${y}px)`;
+}
+renderer.domElement.addEventListener('pointermove', ev => {
+  if (ev.pointerType === 'touch') return;
+  const h = pick(ev);
+  hover = h && h.bid ? { bid: h.bid, f: h.f } : null;
+  hoverJob = h && h.job ? h.job : null;
+  if (h && h.bid) {
+    const b = byId(h.bid), st = floorStatus(h.bid, h.f), n = openOf(h.bid, h.f).length;
+    showTip(ev, `<strong>${b.name} · ชั้น ${h.f}</strong>${st ? `${n} งานค้าง · ${STATUS[st].label}` : 'ไม่มีงานค้าง'}<br><em>คลิกเพื่อเปิดแปลน</em>`);
+    renderer.domElement.style.cursor = 'pointer';
+  } else if (h && h.job) {
+    const j = JOBS.find(x => x.id === h.job);
+    showTip(ev, `<strong>${esc(j.equipment)}</strong>${esc(j.issue)}<br><em>${STATUS[j.status].label} · ${esc(j.id)}</em>`);
+    renderer.domElement.style.cursor = 'pointer';
+  } else hideTip();
+});
+renderer.domElement.addEventListener('pointerleave', () => { hover = null; hoverJob = null; hideTip(); });
+renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 6) return;
+  const h = pick(ev);
+  if (h && h.bid) enterFloor(h.bid, h.f);
+  else if (h && h.job) selectJob(h.job);
+});
+
+/* =====================================================================
+   11) QUALITY, RESIZE, LOOP, HUD
+   ===================================================================== */
+let currentScene = buildingScene;
+let vw = 0, vh = 0;
+const qualityBtn = document.getElementById('qualityBtn');
+function applyQuality() {
+  const pr = quality.high ? Math.min(devicePixelRatio, 2) : 1;
+  renderer.setPixelRatio(pr);
+  composer.setPixelRatio(pr);
+  qualityBtn.setAttribute('aria-pressed', String(quality.high));
+  qualityBtn.textContent = quality.high ? 'คุณภาพสูง' : 'คุณภาพมาตรฐาน';
+  qualityBtn.title = quality.high ? 'เปิด AO + ความละเอียดเต็มจอ · คลิกเพื่อประหยัดเครื่อง' : 'ปิด AO + ความละเอียด 1x · คลิกเพื่อภาพสวยขึ้น';
+  resize(true);
+}
+qualityBtn.addEventListener('click', () => { quality.high = !quality.high; applyQuality(); });
+
+function resize(force) {
+  const r = vp.getBoundingClientRect();
+  const widthChanged = Math.abs(r.width - vw) > 40;
+  if (!force && r.width === vw && r.height === vh) return;
+  vw = Math.max(1, r.width); vh = Math.max(1, r.height);
+  renderer.setSize(vw, vh, false);
+  composer.setSize(vw, vh);
+  camera.aspect = vw / vh;
+  camera.updateProjectionMatrix();
+  if (widthChanged && !tweens.length && (mode === 'site' || mode === 'building' || mode === 'plan')) {
+    const p = mode === 'plan' ? planPose(planCtx.b) : mode === 'building' ? buildingPose(byId(focusId)) : sitePose();
+    camera.position.copy(p.pos); controls.target.copy(p.target);
+  }
+}
+new ResizeObserver(() => resize()).observe(vp);
+
+setControls('building');
+aoPass.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1, thickness: 1, scale: 1, samples: 16 });
+applyQuality();
+{ const p = sitePose(); camera.position.copy(p.pos); controls.target.copy(p.target); }
+refreshBadges();
+syncChrome();
+renderer.shadowMap.needsUpdate = true;
+
+const hud = { fps: document.getElementById('fps'), calls: document.getElementById('calls'), tris: document.getElementById('tris') };
+let frames = 0, lastHud = performance.now(), statCalls = 0, statTris = 0;
+const white = new THREE.Color(0xffffff), accent = new THREE.Color(0x2b8fd6), tmp = new THREE.Color();
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  if (tweens.length) renderer.shadowMap.needsUpdate = true;
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const t = tweens[i], k = Math.min(1, (now - t.t0) / t.dur);
+    t.fn(k);
+    if (k >= 1) { tweens.splice(i, 1); t.done && t.done(); }
+  }
+  const s = now / 1000;
+  const pulse = reduceMotion ? 0.6 : 0.5 + 0.5 * Math.sin(s * 4.2);
+  const showStatus = mode === 'site' || mode === 'building';
+
+  for (const b of BUILDINGS) for (let f = 1; f <= b.floors; f++) {
+    const o = b.floorsArr[f];
+    const st = showStatus ? floorStatus(b.id, f) : null;
+    const hov = showStatus && hover && hover.bid === b.id && (hover.f === f || hover.f === 0);
+    let so = 0, eo = 0;
+    if (st) {
+      tmp.setHex(STATUS[st].color);
+      o.shell.material.color.copy(tmp); o.edges.material.color.copy(tmp);
+      so = (hov ? 0.08 : 0.02) + 0.07 * pulse; eo = 0.3 + 0.7 * pulse;
+      o.glowMat.emissive.copy(tmp); o.glowMat.emissiveIntensity = 0.12 + 0.5 * pulse;
+    } else {
+      o.shell.material.color.copy(accent); o.edges.material.color.copy(hov ? accent : white);
+      so = hov ? 0.06 : 0; eo = hov ? 0.9 : 0;
+      o.glowMat.emissiveIntensity = 0;
+    }
+    o.shell.material.opacity = so; o.edges.material.opacity = eo;
+    o.shell.visible = so > 0.001; o.edges.visible = eo > 0.001;
+  }
+
+  if (mode === 'plan') {
+    for (const p of pins) {
+      const active = p.job.status !== 'done';
+      const sel = p.job.id === selectedJob, hv = p.job.id === hoverJob;
+      const sc = sel ? 1.35 : hv ? 1.18 : 1;
+      p.head.scale.setScalar(sc);
+      p.head.position.y = (1 - sc) * 2.2;
+      p.head.material.emissiveIntensity = active ? 0.35 + 0.55 * pulse : 0.25;
+      if (active && !reduceMotion) {
+        const ph = (s * 0.9 + p.group.position.x * 0.07) % 1;
+        p.ring.scale.setScalar(1 + ph * 2.2);
+        p.ring.material.opacity = 0.85 * (1 - ph);
+      } else { p.ring.scale.setScalar(1); p.ring.material.opacity = active ? 0.7 : 0.35; }
+      p.label.el.firstElementChild.classList.toggle('sel', sel);
+    }
+  }
+
+  controls.update();
+  renderer.info.reset();
+  if (quality.high) {
+    renderPass.scene = currentScene;
+    aoPass.scene = currentScene;
+    composer.render();
+  } else {
+    renderer.render(currentScene, camera);
+  }
+  statCalls = renderer.info.render.calls;
+  statTris = renderer.info.render.triangles;
+  updateLabels(vw, vh);
+
+  frames++;
+  if (now - lastHud > 500) {
+    hud.fps.textContent = Math.round(frames * 1000 / (now - lastHud));
+    hud.calls.textContent = statCalls;
+    hud.tris.textContent = statTris >= 1000 ? (statTris / 1000).toFixed(0) + 'k' : statTris;
+    frames = 0; lastHud = now;
+  }
+}
+requestAnimationFrame(animate);
+
+/* =====================================================================
+   12) PUBLIC API — ต่อกับระบบแจ้งซ่อมจริง
+   ===================================================================== */
+window.facility = {
+  setJobs(list) {
+    JOBS = list;
+    refreshBadges();
+    if (mode === 'plan' && planCtx) buildPlan(planCtx.b, planCtx.f);
+    renderPanel();
+  },
+  getJobs: () => JOBS,
+  focusBuilding: id => focusBuilding(id || null),
+  openFloor: (bid, f) => enterFloor(bid, f),
+  back: backFromPlan,
+  setQuality: high => { quality.high = !!high; applyQuality(); },
+  stats: () => ({ ...renderer.info.render, memory: { ...renderer.info.memory } }),
+};
+</script>
+
+</body></html>

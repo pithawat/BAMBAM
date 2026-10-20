@@ -32,8 +32,6 @@ export function priorityReason(r: { source: PrioritySource; symptom?: string; ca
       return r.categoryName ? `ใช้ระดับเริ่มต้นของหมวด${r.categoryName}` : "ใช้ระดับเริ่มต้นของหมวดงาน";
     case "default":
       return "ใช้ระดับเริ่มต้นสำหรับหมวดอื่นๆ";
-    case "admin":
-      return "Admin ปรับระดับแล้ว";
     case "reporter":
       return "ผู้แจ้งเลือกเอง";
   }

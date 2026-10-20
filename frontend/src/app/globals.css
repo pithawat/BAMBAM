@@ -44,7 +44,7 @@
   --attention: #B93D0A;              /* tangerine "needs you": review banner, badge (was violet); 4.9:1 on its tint */
   --gold: #E09B0C;                   /* rating stars only */
   /* step colours: S07 status band, action card, badges — each ≥ 4.5:1 on its own 10% tint */
-  --status-new: #5B6676;             /* รับเรื่อง: waiting for the technician */
+  --status-new: #8C6600;             /* รับเรื่อง: deep yellow (CR-018), 5.2:1 on white, 4.6:1 on its tint */
   --status-in-progress: #2741FA;     /* กำลังซ่อม */
   --status-rework: #B42318;          /* กำลังแก้ไขตามที่ส่งกลับ */
   --status-resolved: #B93D0A;        /* ซ่อมเสร็จ รอให้คะแนน */
@@ -83,7 +83,7 @@
   --warning: #94600F;               /* deep mustard */
   --attention: #8A5A12;             /* "needs you": review banner, ตรวจงาน button */
   --gold: #C08A2E;                  /* stars, 3:1 on white */
-  --status-new: #566273;            /* รับเรื่อง: waiting, nothing for the reporter to do */
+  --status-new: #7F6A00;            /* รับเรื่อง: olive yellow (CR-018), 5.3:1 on white */
   --status-in-progress: #2741FA;
   --status-rework: #B2410E;
   --status-resolved: #8A5A12;       /* รอประเมินตรวจงาน */

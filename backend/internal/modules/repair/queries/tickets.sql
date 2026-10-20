@@ -99,10 +99,6 @@ WHERE (@scope_all::boolean OR (
 ORDER BY
     -- BR-F06-2: resolved tickets awaiting the viewer's rating first
     (@awaiting_first::boolean AND t.status = 'resolved' AND t.reporter_id = @viewer_id) DESC,
-    -- technician work list (BR-F21-1): most urgent, then oldest
-    CASE WHEN @sort::text = 'priority:asc' THEN
-        CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END END ASC,
-    CASE WHEN @sort::text = 'priority:asc' THEN t.created_at END ASC,
     CASE WHEN @sort::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
     CASE WHEN @sort::text = 'createdAt:desc' THEN t.created_at END DESC,
     CASE WHEN @sort::text = 'createdAt:asc' THEN t.created_at END ASC,
@@ -216,6 +212,12 @@ WHERE id = @id;
 UPDATE repair.tickets
 SET status = 'closed', closed_reason = 'confirmed', rating = @rating, rating_comment = sqlc.narg('rating_comment')::text,
     closed_at = @now, auto_close_at = NULL, updated_at = @now
+WHERE id = @id;
+
+-- name: AdminCloseTicket :exec
+-- F08-B: admin closes an open ticket from any status (BR-F08B-1).
+UPDATE repair.tickets
+SET status = 'closed', closed_reason = 'admin_closed', closed_at = @now, auto_close_at = NULL, updated_at = @now
 WHERE id = @id;
 
 -- name: SendBackTicket :exec

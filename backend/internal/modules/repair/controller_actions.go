@@ -108,6 +108,20 @@ func (ctl *Controller) Confirm(c *gin.Context) {
 	respondTicket(c, t, err)
 }
 
+// Close handles #21 POST /repair/tickets/{id}/close (admin, F08-B).
+func (ctl *Controller) Close(c *gin.Context) {
+	v, id, ok := ticketAction(c)
+	if !ok {
+		return
+	}
+	var req CloseRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	t, err := ctl.svc.Close(c.Request.Context(), v, id, req.Reason)
+	respondTicket(c, t, err)
+}
+
 // SendBack handles #12 POST /repair/tickets/{id}/send-back.
 func (ctl *Controller) SendBack(c *gin.Context) {
 	v, id, ok := ticketAction(c)

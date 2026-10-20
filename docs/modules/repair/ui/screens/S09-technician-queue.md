@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-015 (approved 2026-10-19):** the list is ordered **oldest report first** (`sort=createdAt:asc`), not by priority; the priority chip on each row stays as information. Replaces 'most urgent first' below.
+
 > **CR-009 (approved 2026-10-18):** tabs `รับเรื่อง` (`awaiting_assessment`) · `กำลังดำเนินการ` (`in_repair`, `reworking` — row badge `ส่งกลับให้แก้`) · `รอประเมินตรวจงาน` (`awaiting_rating`).
 
 

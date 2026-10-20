@@ -1,0 +1,48 @@
+Lightweight, standard-quality 3D model of an existing office building for a
+web dashboard (Three.js, GLB). Build it from the attached photos.
+Priority: smallest possible file and fewest draw calls, while still clearly
+recognizable as the real building at normal viewing distance.
+
+BUILDING DATA
+- Name: [อาคาร 1]   Floors: [6]   Floor-to-floor: [3.5 m]
+- Footprint: [32 m x 15 m], grid [8 bays x 4 m]
+- Facade: [white concrete, 1.2 m cantilevered balcony slab with 1.0 m solid
+  parapet on every upper floor, recessed dark tinted ribbon windows]
+- Ground floor: [raised plinth, central entrance canopy + steps, blue poster panels]
+- Roof: [railing, full-width blue billboard, small machine room]
+
+GEOMETRY RULES (keep it low)
+- Model ONE typical upper floor only (slab + parapet + window wall as simple
+  boxes/planes). Reuse it for floors 2-6 as instances of the same mesh.
+- Window wall = one flat plane per side. Mullions, frames, blinds and interior
+  are painted into the texture, NOT modeled.
+- Only model what changes the silhouette: slab overhang, parapet, canopy,
+  steps, billboard, machine room. No bevels, no railing bars (railing = one
+  plane with an alpha texture), no small props.
+- Remove all faces that can never be seen (slab tops under walls, inner faces).
+- Budget: typical floor ≤ 600 triangles, ground floor ≤ 1,500, roof ≤ 1,000,
+  whole building ≤ 6,000 triangles.
+
+TEXTURE / MATERIAL RULES
+- ONE texture atlas for the whole building (2048 x 2048, or 1024 for mobile),
+  laid out as a trim sheet: concrete strip, parapet with rain streaks,
+  window band (glass + mullions + faint interior), poster panels, billboard,
+  roof surface, railing (alpha).
+- Bake ambient occlusion and soft shadow into the atlas (under balconies,
+  inner corners), so the web app needs no real-time AO.
+- Exactly 2 materials: "Building" (opaque, atlas, roughness 0.85) and
+  "Glass" (same atlas, roughness 0.1, slight metalness for sky reflection).
+  No normal maps, no extra maps.
+- Export textures as KTX2 (or WebP), sRGB.
+
+STRUCTURE FOR THE APP (required)
+- Objects: Floor_01 (ground), Floor_Typical (used for 02-06), Roof.
+  Pivot of each floor at the floor's bottom-center so the app can stack it
+  at y = (n-1) * 3.5 m, lift it and highlight it on its own.
+- Origin at ground center of the footprint, Y-up, units in meters.
+- Clean names, no hidden objects, no unused materials, apply all transforms.
+
+EXPORT
+- GLB with meshopt or Draco compression, total size ≤ 1.5 MB including textures.
+- Also deliver a far-distance LOD: one box per building (≤ 200 triangles)
+  using the same atlas, for when many buildings are on screen.

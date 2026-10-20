@@ -11,6 +11,8 @@ run:
 test:
 	go test ./... -race
 
+migrate:
+	goose -dir db/migrations postgres "postgres://user:pass@host:5432/dbname?sslmode=disable" up
 # Postgres integration tests need a migrated database (docker compose db, port 5433):
 #   make test-db && TEST_DATABASE_URL=postgres://bambam:bambam@localhost:5433/bambam_test?sslmode=disable make test
 TEST_DATABASE_URL_LOCAL = postgres://bambam:bambam@localhost:5433/bambam_test?sslmode=disable

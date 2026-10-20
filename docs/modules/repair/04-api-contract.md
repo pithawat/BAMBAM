@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — API contract
 
-Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16 · CR-014 applied 2026-10-19
+Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16 · CR-014 applied 2026-10-19 · CR-015, CR-016 applied 2026-10-19
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Single source for backend DTOs and frontend types.ts.
      Conventions (envelope, errors, dates, pagination): docs/shared/architecture.md
@@ -41,7 +41,7 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | 17 | GET | `/api/v1/repair/contractors/{id}` | one contractor | technician, admin, executive | 2 |
 | 18 | PUT | `/api/v1/repair/contractors/{id}` | edit / deactivate a contractor | technician | 2 |
 | 19 | GET | `/api/v1/repair/contractors/{id}/jobs` | job history with scores (S18) | technician, admin, executive | 2 |
-| 20 | PATCH | `/api/v1/repair/tickets/{id}/priority` | change priority | admin | 3 |
+| ~~20~~ | ~~PATCH~~ | ~~`/api/v1/repair/tickets/{id}/priority`~~ | ~~change priority~~ — **removed (CR-015)**: priority is policy only, never changed after creation | — | — |
 | 21 | POST | `/api/v1/repair/tickets/{id}/close` | admin closes any open ticket | admin | 3 |
 | 22 | GET | `/api/v1/repair/tickets/duplicates` | open tickets on the same floor + category + room (S04, CR-014) | all | 4 |
 | 23 | POST | `/api/v1/repair/tickets/{id}/follow` | follow an existing case with note + photos | all | 4 |
@@ -52,7 +52,13 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | P5 | GET | `/api/v1/notifications/unread-count` | bell count (platform) | all | 6 |
 | P6 | POST | `/api/v1/notifications/{id}/read` | mark one read (platform) | all | 6 |
 | P7 | POST | `/api/v1/notifications/read-all` | mark all read (platform) | all | 6 |
-| 27 | GET | `/api/v1/repair/admin/overview` | S27 ภาพรวมองค์กร: KPIs, floors with open counts + highest priority, rooms, attention list, 7-day trend (CR-008; shape fixed in Stage 7) | admin, executive | 7 |
+| 27 | GET | `/api/v1/repair/admin/overview` | S29 dashboard (admin / executive Home): key numbers, buildings → floors with open counts, attention list (CR-016 replaces the CR-008 S27 shape) | admin, executive | 3D (CR-016) |
+| 29 | GET | `/api/v1/repair/asset-types` | equipment types for the palette (CR-016) | admin, executive (+ super_admin) | 3D |
+| 30 | GET | `/api/v1/repair/floors/{id}/plan` | floor plan: size, rooms with outlines + open counts, active assets (CR-016) | admin, executive (+ super_admin) | 3D |
+| 31 | POST | `/api/v1/repair/assets` | add an asset to a room (CR-016) | admin (+ super_admin) | 3D |
+| 32 | PUT | `/api/v1/repair/assets/{id}` | edit code / name, move (room + position) (CR-016) | admin (+ super_admin) | 3D |
+| 33 | POST | `/api/v1/repair/assets/{id}/deactivate` | remove = deactivate (CR-016) | admin (+ super_admin) | 3D |
+| 34 | GET | `/api/v1/repair/assets/suggest-code?assetTypeId=&floorId=` | next free code for the add dialog (CR-016) | admin (+ super_admin) | 3D |
 | 28 | GET | `/api/v1/repair/me/recent-places` | the caller's last 3 distinct places (building · floor · room · location detail) for "ที่เคยแจ้ง" (S03, CR-008, CR-014) | all | 2R (CR-014: 2M) |
 
 S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,resolved`).
@@ -119,7 +125,7 @@ S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,res
 - `status`: `in_progress` · `resolved` · `closed` (`new` removed by CR-005). `closedReason`: `confirmed` · `auto_closed` · `team_handled` · `admin_closed` · `null`.
 - `step` (derived, CR-005): `awaiting_assessment` (in progress, no expected date) · `in_repair` · `reworking` (in progress after a send back) · `awaiting_rating` (resolved) · `closed`. Lists, badges and the tracker use `step`.
 - `priority`: `critical` · `high` · `medium` · `low`.
-- `prioritySource` (CR-008): `symptom` (highest priority of the picked symptoms) · `category` (only "อื่นๆ" symptom → the category's default) · `default` (category "อื่นๆ" → `medium`) · `admin` (changed by #20) · `reporter` (tickets created before CR-008).
+- `prioritySource` (CR-008): `symptom` (highest priority of the picked symptoms) · `category` (only "อื่นๆ" symptom → the category's default) · `default` (category "อื่นๆ" → `medium`) · `admin` (removed, CR-015) · `reporter` (tickets created before CR-008).
 - `category` is `null` and `categoryOther` holds the typed category when the reporter picked "อื่นๆ" (CR-008); `symptomOther` = the typed symptom (with or without listed symptoms). Titles join the symptom names, then `symptomOther`.
 - (CR-014) New tickets always have `category`; `categoryOther` is the optional typed name under the `isOther` category (shown as `อื่น ๆ · {categoryOther}`). `category: null` remains only on tickets created before CR-014.
 - (CR-014) `room`: the picked room (`Ref`); `null` only on tickets created before CR-014. `locationDetail` is now the optional extra spot (`บอกจุดเพิ่มเติม`). Location line: `{building} ชั้น {floor} · {room}` (+ ` · {locationDetail}` when set); old tickets keep `ชั้น {floor} · {locationDetail}`.
@@ -152,7 +158,7 @@ S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,res
 ```
 
 - `asset`, `result` may be `null`. `result` is the latest resolution; earlier ones stay in the timeline (`resolved` events with their photos). `contractorRating` / `contractorRatingComment` are staff-only (`null` for others).
-- `allowedActions` values: `assess` · `resolve` (technician, `in_progress`) · `confirm` · `send_back` (reporter, `resolved`) · later: `handover` · `close` · `change_priority`.
+- `allowedActions` values: `assess` · `resolve` (technician, `in_progress`) · `confirm` · `send_back` (reporter, `resolved`) · later: `handover` · `close` (CR-015: no `change_priority`).
 - `blockedActions`: `{ "resolve": "ASSESSMENT_REQUIRED" }` while the technician has not assessed yet (no expected date or no `workBy`) → disabled "บันทึกผลซ่อม" + helper.
 
 ### `TimelineEvent`
@@ -168,7 +174,7 @@ S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,res
 }
 ```
 
-`type` → S07 label: `created` · `subscribed` · `assessed` / `assessment_changed` (`data.expectedDoneOn`, `data.workBy`) · `resolved` (`note` = result, photos = result photos) · `sent_back` (`note` = reason, photos) · `confirmed` (`data.rating`, `note` = comment) · `auto_closed` · `team_handled` · `handed_over` · `admin_closed` · `priority_changed` (`data.from`, `data.to`).
+`type` → S07 label: `created` · `subscribed` · `assessed` / `assessment_changed` (`data.expectedDoneOn`, `data.workBy`) · `resolved` (`note` = result, photos = result photos) · `sent_back` (`note` = reason, photos) · `confirmed` (`data.rating`, `note` = comment) · `auto_closed` · `team_handled` · `handed_over` · `admin_closed`  (CR-015: no `priority_changed`; existing rows, if any, stay readable).
 
 ---
 
@@ -267,7 +273,7 @@ Response 201 `{ "data": <TicketDetail> }`.
 | 403 | `TEAM_HANDLED_NOT_ALLOWED` | `teamHandled` sent by a non-lead | คุณไม่มีสิทธิ์ทำรายการนี้ |
 
 ### 6. GET /api/v1/repair/tickets
-Query: `scope=mine|all` (default `mine`) · `status` (comma list of statuses) · `step` (comma list of steps, CR-005) · `closedReason` · `q` (ticket no or location text) · `createdFrom`, `createdTo` (RFC 3339) · `relation=all|reported|following` (mine only) · `categoryId`, `buildingId`, `floorId`, `priority` (all only) · `page`, `pageSize` · `sort`: `updatedAt:desc` (default) · `createdAt:desc` · `createdAt:asc` · `closedAt:desc` (default for `status=closed`) · `priority:asc` (most urgent, then oldest — S09).
+Query: `scope=mine|all` (default `mine`) · `status` (comma list of statuses) · `step` (comma list of steps, CR-005) · `closedReason` · `q` (ticket no or location text) · `createdFrom`, `createdTo` (RFC 3339) · `relation=all|reported|following` (mine only) · `categoryId`, `buildingId`, `floorId`, `priority` (all only) · `page`, `pageSize` · `sort`: `updatedAt:desc` (default) · `createdAt:desc` · `createdAt:asc` · `closedAt:desc` (default for `status=closed`). ~~`priority:asc`~~ removed (CR-015): S09 / S11 open lists use `createdAt:asc`; an unknown sort → 400.
 
 - `mine` = tickets I reported or follow (BR-F06-1). In `status=resolved`, tickets awaiting my confirmation come first (BR-F06-2).
 - `all` = every ticket (technician, admin, executive — CR-005).
@@ -391,11 +397,12 @@ Tickets done by the contractor, newest first:
 
 ## Stage 3 — admin (CR-005: the admin queue endpoints are removed)
 
-### 20. PATCH /api/v1/repair/tickets/{id}/priority
-Request `{ "priority": "high" }` → 200 `<TicketDetail>`. Event `priority_changed`. Errors: 403 `FORBIDDEN`, 409 `TICKET_CLOSED`, 400 `VALIDATION_FAILED`.
+### 20. ~~PATCH /api/v1/repair/tickets/{id}/priority~~ — removed (CR-015)
+Not built. `priority` is set by the system at creation (BR-F02-2) and never changed; lists are not ordered by it (#6 default for `scope=all` work lists = `createdAt:asc`; `priority:asc` stays accepted but unused by the FE).
 
 ### 21. POST /api/v1/repair/tickets/{id}/close
-Request `{ "reason": "ส่งเรื่องเปลี่ยนเครื่องใหม่ผ่านฝ่ายจัดซื้อแล้ว" }` (1–500) → 200 `<TicketDetail>` (`closed` / `admin_closed`). Errors: 400 `VALIDATION_FAILED` (`reason` REQUIRED → กรุณาใส่เหตุผล), 403 `FORBIDDEN`, 409 `TICKET_CLOSED`.
+Request `{ "reason": "ส่งเรื่องเปลี่ยนเครื่องใหม่ผ่านฝ่ายจัดซื้อแล้ว" }` (1–500) → 200 `<TicketDetail>` (`closed` / `admin_closed`). Errors: 400 `VALIDATION_FAILED` (`reason` REQUIRED → กรุณาใส่เหตุผล, TOO_LONG), 403 `FORBIDDEN`, 404 `TICKET_NOT_FOUND`, 409 `TICKET_CLOSED`.
+Built in Stage 3: works from any open status (BR-F08B-1); writes event `admin_closed` with `note` = reason; `allowedActions` has `close` for admin on every open ticket (never for the executive).
 
 ---
 
@@ -487,6 +494,64 @@ Floors with no open tickets are included (`openCount: 0`, `highestPriority: null
 
 ---
 
+## Stage 3D — dashboard Home + assets + 3D อาคาร 1 (CR-016)
+
+Assets live in `platform.assets` (like `platform.rooms`, CR-014) but are served by the repair module until settings Stage 4 moves locations to `platform` (D-073 precedent). Permission: admin now; `super_admin` (always) and a future `asset.manage` permission when settings Stage 1 lands. Executive: read only (#27, #29, #30).
+
+### `Asset`
+```json
+{ "id": "a55e…", "code": "AC-1-003", "name": "แอร์ห้อง HR ตัวซ้าย", "type": { "id": "…", "key": "aircon", "name": "เครื่องปรับอากาศ" },
+  "room": { "id": "r1…", "name": "HR" }, "x": 26.4, "z": 1.2, "rotationDeg": 180, "openTickets": 1 }
+```
+`x`, `z` = metres on the floor plan (origin top-left, x right, z down); both `null` when not placed yet. `openTickets` counts open tickets with this `asset_id`.
+
+### 27. GET /api/v1/repair/admin/overview (CR-016 shape, replaces the CR-008 one below)
+```json
+{ "data": {
+  "counts": { "open": 12, "awaitingAssessment": 4, "inRepair": 5, "reworking": 1, "awaitingRating": 3, "overdue": 2, "reportedToday": 3, "closedToday": 2,
+              "closedLast7Days": 18, "ratingAvgLast7Days": 4.6, "oldestAwaitingAssessmentAt": "2026-10-17T02:00:00Z", "nextAutoCloseAt": "2026-10-20T03:10:00Z" },
+  "buildings": [ { "id": "b1…", "name": "อาคาร 1", "hasModel": true, "floors": [
+    { "id": "f1…", "name": "1", "level": 1, "openCount": 3, "highestPriority": "high" } ] } ],
+  "attention": [ "<TicketSummary> × ≤ 5: overdue first, then reworking, then critical / high, oldest first" ]
+} }
+```
+`overdue` = open with `expectedDoneOn` < today (Asia/Bangkok). Every number equals S11 with the same filter (BR-F23-1). 403 for other roles.
+(CR-018) `floors[]` also carry `criticalCount` (open ฉุกเฉิน tickets — the emergency marker on the model).
+(CR-017) `floors[]` also carry `steps: { awaitingAssessment, inRepair, awaitingRating }` (open tickets per S11 step, `inRepair` includes reworking — they colour the model); `buildings[]` carry `widthM` / `depthM` (footprint = the largest floor plan of the building, `null` without a plan) so the model is built from the database.
+(CR-016, D-083, Stage 3D prepare) Added for the approved S29 sub-lines: `reworking` (part of `inRepair`, S11 กำลังดำเนินการ), `closedLast7Days` + `ratingAvgLast7Days` (closed since Bangkok midnight 6 days ago; average of the reporter ratings, one decimal, `null` without ratings), `oldestAwaitingAssessmentAt` and `nextAutoCloseAt` (`null` when none). `overdue` counts **in-progress** tickets only (a resolved ticket waits for the reporter, not the technician). "Today" starts at Bangkok midnight. `attention` rows are in-progress tickets that are overdue, reworking, or critical / high.
+
+### 29. GET /api/v1/repair/asset-types → `{ "data": [ { "id", "key", "name", "codePrefix", "icon", "mount" } ] }`
+Active types by sort order. Seed: `aircon` เครื่องปรับอากาศ `AC` wall · `microphone` ไมโครโฟน `MIC` floor · `speaker` ลำโพง `SPK` ceiling · `tv` จอทีวี `TV` wall.
+
+### 30. GET /api/v1/repair/floors/{id}/plan
+```json
+{ "data": {
+  "floor": { "id": "f1…", "name": "1", "level": 1 }, "building": { "id": "b1…", "name": "อาคาร 1" },
+  "widthM": 32, "depthM": 15, "modelUrl": null,
+  "rooms": [ { "id": "r1…", "name": "Data and Digitization", "areaType": "office",
+               "shape": [[0,0],[12,0],[12,6],[0,6]], "openCount": 1, "highestPriority": "medium" } ],
+  "assets": [ "<Asset>" ]
+} }
+```
+`widthM` / `depthM` / `shape` are `null` for a floor without a plan (the UI shows the list instead). Only active rooms and assets. 404 `FLOOR_NOT_FOUND`.
+
+### 31. POST /api/v1/repair/assets
+Request `{ "assetTypeId", "code", "name", "roomId", "x": 26.4, "z": 1.2, "rotationDeg": 0 }` (`x`, `z`, `rotationDeg` optional) → 201 `<Asset>`.
+Errors: 400 `VALIDATION_FAILED` (`code` REQUIRED / TOO_LONG > 50 / INVALID (letters, digits, `-`, `_` only); `name` REQUIRED / TOO_LONG > 100; `x` / `z` INVALID outside the plan) · 409 `ASSET_CODE_TAKEN` · 422 `POINT_OUTSIDE_ROOM` (point not inside the room outline) · 422 `MASTER_DATA_CHANGED` (type / room inactive) · 403.
+
+### 32. PUT /api/v1/repair/assets/{id}
+Same body as #31 except `assetTypeId` (type never changes) → 200 `<Asset>`. Moving = new `roomId` / `x` / `z`. 404 `ASSET_NOT_FOUND` (also for inactive), other errors as #31.
+
+### 33. POST /api/v1/repair/assets/{id}/deactivate → 204
+`is_active = false`; tickets keep their `asset_id`; the code stays taken (a new asset cannot reuse it). 404 `ASSET_NOT_FOUND`.
+
+### 34. GET /api/v1/repair/assets/suggest-code?assetTypeId=&floorId= → `{ "data": { "code": "AC-1-003" } }`
+`{codePrefix}-{floor name}-{lowest free 3-digit number}`; only a suggestion, the user may type any free code.
+
+Every #31–#33 writes `platform.audit_log` (`asset.created` / `asset.updated` / `asset.deactivated`, data = before / after).
+
+---
+
 ## Error codes (module-wide)
 
 | code | Status | Meaning | Thai message (shown in UI) |
@@ -504,6 +569,9 @@ Floors with no open tickets are included (`openCount: 0`, `highestPriority: null
 | `NOT_REPORTER` | 403 | confirm / send back by non-reporter | เฉพาะผู้แจ้งเท่านั้นที่ประเมินงานได้ |
 | `TICKET_CLOSED` | 409 | ticket closed meanwhile | S08/S04: งานนี้ปิดไปแล้ว / เคสนี้ปิดไปแล้ว · S10/S17: งานนี้ถูกปิดไปแล้ว |
 | `INVALID_STATE` | 409 | status moved on | งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว |
+| `ASSET_CODE_TAKEN` | 409 | code used by another asset, active or not (CR-016) | รหัสนี้มีอุปกรณ์อื่นใช้แล้ว |
+| `POINT_OUTSIDE_ROOM` | 422 | drop point not inside the room (CR-016) | วางอุปกรณ์ในห้องที่เลือกเท่านั้น |
+| `FLOOR_NOT_FOUND` | 404 | (CR-016) | ไม่พบชั้นนี้ |
 | `ASSESSMENT_REQUIRED` | 422 | resolve before assessing | ประเมินงาน (วันที่คาดว่าจะเสร็จ และผู้ดำเนินการ) ก่อนบันทึกผล |
 | `CONTRACTOR_NOT_FOUND` | 404 / 422 | unknown, or inactive on resolve | ไม่พบช่างภายนอกนี้ หรือถูกปิดใช้งานแล้ว |
 | `CONTRACTOR_TYPE_NOT_FOUND` | 422 | unknown type id | ประเภทช่างบางรายการไม่มีในระบบแล้ว เลือกใหม่อีกครั้ง |

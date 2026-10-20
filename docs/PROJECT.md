@@ -15,7 +15,7 @@
 
 | Key | Name (TH) | Purpose | Main users | Phase | Stage | Status |
 |---|---|---|---|---|---|---|
-| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 2M of 8 (next 3) | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stage 2M (CR-014) accepted 2026-10-19 (`repair-stage-2M`); Stages 1 / 2 / 2R / 2N built, waiting acceptance |
+| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 3D of 8 (next: 4) | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stage 2M (CR-014) accepted 2026-10-19 (`repair-stage-2M`); Stage 3D (CR-016–CR-018: S29 dashboard + 3D อาคาร 1 + equipment) accepted 2026-10-20 (`repair-stage-3D`); Stages 1 / 2 / 2R / 2N / 3 built, waiting acceptance |
 | `car_booking` | ระบบจองรถ | จองรถส่วนกลาง | ✏️ | – | – | brief needed |
 | `room_booking` | ระบบจองห้องประชุม | จองห้องประชุม | ✏️ | – | – | brief needed |
 | `settings` | ตั้งค่าระบบ (Superadmin) | ตั้งค่า master ผังอาคาร role / สิทธิ์ และผู้ใช้ ใช้ร่วมทั้ง 3 ระบบ | `super_admin` | P5 | 0 of 6 | screens + plan + CR-007 approved 2026-10-16; Stage 1 next |
@@ -68,14 +68,18 @@ Cross-module dependencies: ผู้ใช้และ role อยู่ที�
 | ผู้ติดตามเคสเดิม | `subscriber` | ผู้แจ้งเรื่องซ้ำที่ถูกผูกกับ ticket เดิม (F03) |
 | หมวดงาน | `category` | ใช้แยกคิวของช่าง |
 | อาการ | `symptom` | เลือกได้หลายข้อต่อ ticket |
-| ความเร่งด่วน | `priority` | `critical` ฉุกเฉิน · `high` สูง · `medium` ปกติ · `low` ต่ำ (ผู้แจ้งเลือก, Admin ปรับได้) |
-| คิวงานช่าง | `queue` | ticket ที่ยังไม่มีช่างรับ เรียง priority → เวลาแจ้ง หรือตามที่ Admin จัด |
+| ความเร่งด่วน | `priority` | `critical` ฉุกเฉิน · `high` สูง · `medium` ปกติ · `low` ต่ำ ระบบกำหนดจากอาการตอนแจ้ง เป็นนโยบาย ไม่มีใครปรับภายหลัง และไม่ใช้เรียงงาน (CR-008, CR-015) |
+| คิวงานช่าง | `queue` | ~~คิวงาน~~ ตัดออก (CR-005): ช่างเห็นทุกงานที่ยังไม่ปิด เรียงตามเวลาแจ้ง เก่าก่อน (CR-015) |
 | รับงาน | `claim` | ช่างจอง ticket จากคิว |
 | ตรวจรับ | `confirmation` | ผู้แจ้งยืนยันว่างานเสร็จ → closed |
 | คะแนนความพึงพอใจ | `rating` | 1–5 ดาว ไม่บังคับ |
 | งานที่ทีมดำเนินการเอง | `team_handled` | หัวหน้าแม่บ้าน/รปภ. ปิดเองทันที ไม่มีประเมิน (F04) |
 | ส่งต่อให้ช่าง | `handover` | ส่ง ticket เดิมกลับเข้าคิวช่าง (F05) |
-| อาคาร / ชั้น | `building` / `floor` | ตำแหน่งปัญหา |
+| อาคาร (ตึก) / ชั้น | `building` / `floor` | ตำแหน่งปัญหา ("ตึก" = "อาคาร" ระดับเดียวกัน) |
+| ห้องหรือจุด | `room` | ห้อง / พื้นที่ในชั้น (`platform.rooms`, CR-014); ทุกชั้นมี "พื้นที่ส่วนกลางชั้น n" |
+| อุปกรณ์ | `asset` | ของ 1 ชิ้นในห้อง เช่น แอร์ ไมค์ ลำโพง จอทีวี: รหัส (`code`, ไม่ซ้ำ) + ชื่อ, อยู่ในห้องเดียว (CR-016) |
+| ประเภทอุปกรณ์ | `asset_type` | แอร์ / ไมค์ / ลำโพง / จอทีวี (CR-016) |
+| ผังชั้น | `floor_plan` | ขนาดชั้น + โมเดล 3D + เส้นขอบห้อง (`plan_shape`) (CR-016) |
 | Superadmin | `super_admin` | role ของระบบ มีทุกสิทธิ์เสมอ ใช้โมดูล `settings` ได้คนเดียว (D-044) |
 | ตั้งค่าระบบ | `settings` | โมดูลหน้าตั้งค่าของ Superadmin |
 | สิทธิ์ | `permission` | การกระทำ 1 อย่างที่ role ทำได้ เช่น `repair.ticket.close_any`; รายการกำหนดในโค้ด (D-045) |

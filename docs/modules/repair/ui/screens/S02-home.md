@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-016 (approved 2026-10-19):** admin and executive no longer get variant C — their Home is **S29** (`S29-admin-dashboard.md`, dashboard + 3D อาคาร 1), built in Stage 3D. Variants A / B (other roles) stay for Stage 6.
+
 - **Flows:** F01 step 3 (land on Home by role), F06 (my open tickets, BR-F06-2), F21 (technician: current job + queue), F22/F23 entry for admin and executive (see ../../02-flows.md)
 - **Persona:** employee, housekeeper_lead, security_lead, technician on mobile; admin, executive on desktop (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** show each role the one thing to do next — report a problem, confirm a repair, work the queue, or watch the backlog.

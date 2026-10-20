@@ -2,12 +2,14 @@ package repair
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 
+	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
@@ -116,6 +118,10 @@ func allowedActions(v Viewer, d TicketDetail) ([]string, map[string]string) {
 		if d.Reporter.ID == v.ID {
 			actions = append(actions, ActionConfirm, ActionSendBack)
 		}
+	}
+	// F08-B: admin closes any open ticket; the executive is read-only (BR-F22-6).
+	if v.Role == users.RoleAdmin && d.Status != StatusClosed {
+		actions = append(actions, ActionClose)
 	}
 	return actions, blocked
 }
@@ -293,4 +299,141 @@ func optional(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// ---- CR-016: dashboard and equipment ----
+
+// seesDashboard: the S29 dashboard and floor plans (#27, #29, #30) are for admin and executive (BR-F23-2).
+// super_admin joins when settings Stage 1 adds it (D-079).
+func seesDashboard(role string) bool {
+	return role == users.RoleAdmin || role == users.RoleExecutive
+}
+
+// managesAssets: add / move / edit / deactivate equipment (#31–#34). Admin now; super_admin and the
+// asset.manage permission when settings Stage 1 lands (D-079). The executive is read-only.
+func managesAssets(role string) bool {
+	return role == users.RoleAdmin
+}
+
+// validateAsset trims the input and returns field codes (BR-F31-1, contract #31).
+func validateAsset(in AssetInput) (AssetInput, map[string]string) {
+	in.Code = strings.TrimSpace(in.Code)
+	in.Name = strings.Join(strings.Fields(in.Name), " ")
+	fields := map[string]string{}
+	checkText(fields, "code", in.Code, MaxAssetCodeChars, true)
+	if _, bad := fields["code"]; !bad && !validAssetCode(in.Code) {
+		fields["code"] = "INVALID"
+	}
+	checkText(fields, "name", in.Name, MaxAssetNameChars, true)
+	if in.RoomID == uuid.Nil {
+		fields["roomId"] = "REQUIRED"
+	}
+	// A position is both coordinates or none (none = in the room, not placed on the plan yet).
+	if (in.X == nil) != (in.Z == nil) {
+		if in.X == nil {
+			fields["x"] = "REQUIRED"
+		} else {
+			fields["z"] = "REQUIRED"
+		}
+	}
+	if in.RotationDeg != nil && (*in.RotationDeg < 0 || *in.RotationDeg > 359) {
+		fields["rotationDeg"] = "INVALID"
+	}
+	return in, fields
+}
+
+// validAssetCode: letters, digits, "-" and "_" only (it goes into the QR URL, D-024).
+func validAssetCode(code string) bool {
+	for _, r := range code {
+		ok := r == '-' || r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		if !ok {
+			return false
+		}
+	}
+	return code != ""
+}
+
+// checkPlacement applies BR-F31-3: a placed asset must be on its floor's plan and inside the room it
+// is saved in. A point belongs to the smallest room around it (ห้องน้ำ lies inside the common area).
+func checkPlacement(in AssetInput, room PlacementRoom, rooms []RoomShape) error {
+	if in.X == nil {
+		return nil
+	}
+	x, z := *in.X, *in.Z
+	if !room.HasPlan || x < 0 || z < 0 || x > room.WidthM || z > room.DepthM {
+		return invalidPoint()
+	}
+	if at, ok := roomAt(x, z, rooms); !ok || at != room.ID {
+		return ErrPointOutsideRoom
+	}
+	return nil
+}
+
+func invalidPoint() error {
+	return apperr.Validation(map[string]string{"x": "INVALID", "z": "INVALID"})
+}
+
+// roomAt returns the smallest room whose outline contains the point (edges count as inside).
+func roomAt(x, z float64, rooms []RoomShape) (uuid.UUID, bool) {
+	best, bestArea := uuid.Nil, math.Inf(1)
+	for _, r := range rooms {
+		if len(r.Shape) < 3 || !pointInShape(x, z, r.Shape) {
+			continue
+		}
+		if a := shapeArea(r.Shape); a < bestArea {
+			best, bestArea = r.ID, a
+		}
+	}
+	return best, best != uuid.Nil
+}
+
+// pointInShape: ray casting; a point on an edge is inside.
+func pointInShape(x, z float64, s Shape) bool {
+	const eps = 1e-9
+	inside := false
+	for i, j := 0, len(s)-1; i < len(s); j, i = i, i+1 {
+		xi, zi, xj, zj := s[i][0], s[i][1], s[j][0], s[j][1]
+		// on the segment j → i
+		cross := (x-xj)*(zi-zj) - (z-zj)*(xi-xj)
+		if math.Abs(cross) < eps && x >= math.Min(xi, xj)-eps && x <= math.Max(xi, xj)+eps &&
+			z >= math.Min(zi, zj)-eps && z <= math.Max(zi, zj)+eps {
+			return true
+		}
+		if (zi > z) != (zj > z) && x < (xj-xi)*(z-zi)/(zj-zi)+xi {
+			inside = !inside
+		}
+	}
+	return inside
+}
+
+// shapeArea: shoelace formula, m².
+func shapeArea(s Shape) float64 {
+	sum := 0.0
+	for i := range s {
+		j := (i + 1) % len(s)
+		sum += s[i][0]*s[j][1] - s[j][0]*s[i][1]
+	}
+	return math.Abs(sum) / 2
+}
+
+// nextAssetCode implements #34: {prefix}-{floor name}-{lowest free 3-digit number}, compared ignoring
+// case against every code in use (inactive ones too, BR-F31-4).
+func nextAssetCode(prefix, floorName string, taken []string) string {
+	used := make(map[string]bool, len(taken))
+	for _, c := range taken {
+		used[strings.ToLower(c)] = true
+	}
+	base := prefix + "-" + floorName + "-"
+	for n := 1; ; n++ {
+		code := fmt.Sprintf("%s%03d", base, n)
+		if !used[strings.ToLower(code)] {
+			return code
+		}
+	}
+}
+
+// bangkokDayStart is midnight Asia/Bangkok of the day t falls on.
+func bangkokDayStart(t time.Time) time.Time {
+	b := t.In(bangkok)
+	return time.Date(b.Year(), b.Month(), b.Day(), 0, 0, 0, 0, bangkok)
 }

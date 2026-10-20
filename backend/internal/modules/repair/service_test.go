@@ -22,24 +22,24 @@ import (
 // ---- fakes ----
 
 type fakeRepo struct {
-	cats      map[uuid.UUID]bool               // id → active
-	catDef    map[uuid.UUID]string             // category → default priority
-	catOther  map[uuid.UUID]bool               // the "อื่น ๆ" category (CR-014)
-	symptoms  map[uuid.UUID]uuid.UUID          // symptom → category
-	symPrio   map[uuid.UUID]string             // symptom → priority
-	recent    []RecentPlace                    // #28 result
-	floors    map[uuid.UUID]uuid.UUID          // floor → building
-	rooms     map[uuid.UUID]uuid.UUID          // active room → floor (CR-014)
-	photos    map[uuid.UUID]*Photo             // all photos
-	photoAt   map[uuid.UUID]time.Time          // created at
-	format    TicketNumberFormat               // repair.settings
-	counters  map[int]int64                    // year → last number
-	tickets   map[uuid.UUID]*TicketDetail      // by id
-	order     []uuid.UUID                      // insertion order
-	subs      map[uuid.UUID]map[uuid.UUID]bool // ticket → subscribers
-	inserted  []NewTicket
-	sampleIns []Building
-	refreshed int
+	cats     map[uuid.UUID]bool               // id → active
+	catDef   map[uuid.UUID]string             // category → default priority
+	catOther map[uuid.UUID]bool               // the "อื่น ๆ" category (CR-014)
+	symptoms map[uuid.UUID]uuid.UUID          // symptom → category
+	symPrio  map[uuid.UUID]string             // symptom → priority
+	recent   []RecentPlace                    // #28 result
+	floors   map[uuid.UUID]uuid.UUID          // floor → building
+	rooms    map[uuid.UUID]uuid.UUID          // active room → floor (CR-014)
+	photos   map[uuid.UUID]*Photo             // all photos
+	photoAt  map[uuid.UUID]time.Time          // created at
+	format   TicketNumberFormat               // repair.settings
+	counters map[int]int64                    // year → last number
+	tickets  map[uuid.UUID]*TicketDetail      // by id
+	order    []uuid.UUID                      // insertion order
+	subs     map[uuid.UUID]map[uuid.UUID]bool // ticket → subscribers
+	inserted []NewTicket
+	events   []NewEvent // ticket events written by actions
+	dash     *dashFake  // CR-016 dashboard and equipment (service_dashboard_test.go)
 }
 
 func newFakeRepo() *fakeRepo {
@@ -51,19 +51,12 @@ func newFakeRepo() *fakeRepo {
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
 		subs: map[uuid.UUID]map[uuid.UUID]bool{},
+		dash: newDashFake(),
 	}
 }
 
 func (f *fakeRepo) ListCategories(context.Context) ([]Category, error) { return nil, nil }
 func (f *fakeRepo) ListBuildings(context.Context) ([]Building, error)  { return nil, nil }
-func (f *fakeRepo) InsertSampleLocations(_ context.Context, b []Building) error {
-	f.sampleIns = b
-	return nil
-}
-func (f *fakeRepo) RefreshSampleData(context.Context, []SampleRename) error {
-	f.refreshed++
-	return nil
-}
 func (f *fakeRepo) ListRecentPlaces(context.Context, uuid.UUID) ([]RecentPlace, error) {
 	return f.recent, nil
 }
@@ -165,8 +158,17 @@ func (f *fakeRepo) ResolveTicket(context.Context, uuid.UUID, uuid.UUID, ResolveI
 func (f *fakeRepo) ConfirmTicket(context.Context, uuid.UUID, int16, *string, time.Time) error {
 	return nil
 }
-func (f *fakeRepo) SendBackTicket(context.Context, uuid.UUID, time.Time) error      { return nil }
-func (f *fakeRepo) InsertEvent(context.Context, NewEvent) error                     { return nil }
+func (f *fakeRepo) SendBackTicket(context.Context, uuid.UUID, time.Time) error { return nil }
+func (f *fakeRepo) AdminCloseTicket(_ context.Context, id uuid.UUID, now time.Time) error {
+	t := f.tickets[id]
+	reason := "admin_closed"
+	t.Status, t.ClosedReason, t.ClosedAt, t.AutoCloseAt = StatusClosed, &reason, &now, nil
+	return nil
+}
+func (f *fakeRepo) InsertEvent(_ context.Context, e NewEvent) error {
+	f.events = append(f.events, e)
+	return nil
+}
 func (f *fakeRepo) ActiveContractorExists(context.Context, uuid.UUID) (bool, error) { return true, nil }
 func (f *fakeRepo) CountContractorTypes(_ context.Context, ids []uuid.UUID) (int, error) {
 	return len(ids), nil
@@ -880,50 +882,68 @@ func TestPurgeUnattachedPhotos(t *testing.T) {
 	}
 }
 
-func TestEnsureSampleData(t *testing.T) {
+func TestAdminClose(t *testing.T) {
 	f := newFixture(t)
-	if err := f.svc.EnsureSampleData(context.Background()); err != nil || f.repo.refreshed != 1 || len(f.repo.sampleIns) == 0 {
-		t.Fatalf("sample data: %v refreshed=%d buildings=%d", err, f.repo.refreshed, len(f.repo.sampleIns))
-	}
-	if a, b := sampleBuildings()[0].Floors[0].Rooms[0].ID, sampleBuildings()[0].Floors[0].Rooms[0].ID; a != b {
-		t.Fatal("sample ids must be stable")
-	}
-}
+	d := f.create(t)
+	admin := Viewer{ID: uuid.New(), Role: users.RoleAdmin}
+	ctx := context.Background()
 
-// CR-014: every sample floor has rooms with valid area types and exactly one common area, named
-// like the migration's; one floor has more than 9 rooms so S03 shows the picker.
-func TestSampleRooms(t *testing.T) {
-	areas := map[string]bool{AreaMeetingRoom: true, AreaRestroom: true, AreaOffice: true, AreaPantry: true, AreaCommon: true, AreaParking: true, AreaOther: true}
-	picker := false
-	for _, b := range sampleBuildings() {
-		for _, fl := range b.Floors {
-			common, names := 0, map[string]bool{}
-			for _, rm := range fl.Rooms {
-				if !areas[rm.AreaType] || names[strings.ToLower(rm.Name)] {
-					t.Fatalf("%s %s: bad or duplicate room %+v", b.Name, fl.Name, rm)
-				}
-				names[strings.ToLower(rm.Name)] = true
-				if rm.AreaType == AreaCommon {
-					common++
-					if rm.Name != "พื้นที่ส่วนกลางชั้น "+fl.Name {
-						t.Fatalf("common area name %q", rm.Name)
-					}
-				}
-			}
-			if common != 1 {
-				t.Fatalf("%s %s: %d common areas", b.Name, fl.Name, common)
-			}
-			picker = picker || len(fl.Rooms) > 9
+	for _, role := range []string{users.RoleExecutive, users.RoleTechnician, users.RoleEmployee, users.RoleHousekeeperLead} {
+		if _, err := f.svc.Close(ctx, Viewer{ID: uuid.New(), Role: role}, d.ID, "ปิด"); !errors.Is(err, apperr.ErrForbidden) {
+			t.Fatalf("%s close: %v, want FORBIDDEN", role, err)
 		}
 	}
-	if !picker {
-		t.Fatal("no sample floor has more than 9 rooms")
+	if _, err := f.svc.Close(ctx, admin, d.ID, "   "); code(err) != "VALIDATION_FAILED" {
+		t.Fatalf("blank reason: %v", err)
+	}
+	if _, err := f.svc.Close(ctx, admin, d.ID, strings.Repeat("ก", MaxNoteChars+1)); code(err) != "VALIDATION_FAILED" {
+		t.Fatalf("long reason: %v", err)
+	}
+	if _, err := f.svc.Close(ctx, admin, uuid.New(), "ปิด"); code(err) != "TICKET_NOT_FOUND" {
+		t.Fatalf("unknown ticket: %v", err)
+	}
+
+	before, _ := f.svc.Ticket(ctx, admin, d.ID)
+	if !contains(before.AllowedActions, ActionClose) {
+		t.Fatalf("admin actions on an open ticket: %v", before.AllowedActions)
+	}
+	got, err := f.svc.Close(ctx, admin, d.ID, "  ส่งเรื่องเปลี่ยนเครื่องใหม่แล้ว  ")
+	if err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if got.Status != StatusClosed || got.ClosedReason == nil || *got.ClosedReason != "admin_closed" || contains(got.AllowedActions, ActionClose) {
+		t.Fatalf("after close: status=%s reason=%v actions=%v", got.Status, got.ClosedReason, got.AllowedActions)
+	}
+	last := f.repo.events[len(f.repo.events)-1]
+	if last.Type != EventAdminClosed || last.Note == nil || *last.Note != "ส่งเรื่องเปลี่ยนเครื่องใหม่แล้ว" || *last.ActorID != admin.ID {
+		t.Fatalf("event: %+v", last)
+	}
+	if _, err := f.svc.Close(ctx, admin, d.ID, "อีกครั้ง"); code(err) != "TICKET_CLOSED" {
+		t.Fatalf("close twice: %v", err)
 	}
 }
 
-func TestSampleBuildingRenames(t *testing.T) {
-	b, rn := sampleBuildings(), sampleBuildingRenames()
-	if b[0].Name != "อาคารฝั่ง Office" || rn[0].ID != b[0].ID || rn[0].From != "อาคารหลัก" {
-		t.Fatalf("renamed building keeps its id: %+v %+v", b[0], rn[0])
+// Every status that is not closed can be closed by admin (BR-F08B-1).
+func TestAdminCloseFromAnyOpenStatus(t *testing.T) {
+	for _, status := range []string{StatusInProgress, StatusResolved} {
+		f := newFixture(t)
+		d := f.create(t)
+		f.repo.tickets[d.ID].Status = status
+		if _, err := f.svc.Close(context.Background(), Viewer{ID: uuid.New(), Role: users.RoleAdmin}, d.ID, "ปิด"); err != nil {
+			t.Fatalf("%s: %v", status, err)
+		}
+	}
+}
+
+// BR-F22-6: the executive sees every ticket but gets no actions.
+func TestExecutiveHasNoActions(t *testing.T) {
+	f := newFixture(t)
+	d := f.create(t)
+	for _, status := range []string{StatusInProgress, StatusResolved, StatusClosed} {
+		f.repo.tickets[d.ID].Status = status
+		got, err := f.svc.Ticket(context.Background(), Viewer{ID: uuid.New(), Role: users.RoleExecutive}, d.ID)
+		if err != nil || len(got.AllowedActions) != 0 {
+			t.Fatalf("%s: actions=%v err=%v", status, got.AllowedActions, err)
+		}
 	}
 }

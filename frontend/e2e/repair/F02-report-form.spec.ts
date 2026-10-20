@@ -21,8 +21,9 @@ const next = (page: Page) => page.getByRole("button", { name: "ถัดไป" 
 
 async function pickPlace(page: Page, room: string) {
   const s = step(page, "location");
-  await s.getByText("อาคารฝั่ง Office", { exact: true }).click();
-  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("5", { exact: true }).click();
+  await s.getByText("อาคาร 1", { exact: true }).click();
+  // floor 4 has 8 rooms → buttons (more than 10 → a searchable picker)
+  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("4", { exact: true }).click();
   await s.getByText(room, { exact: true }).click();
 }
 
@@ -54,23 +55,23 @@ test("AC3 + AC5 + demo 1: room required, matching rooms first, review, ticket sh
   await next(page);
 
   const s = step(page, "location");
-  await s.getByText("อาคารฝั่ง Office", { exact: true }).click();
-  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("5", { exact: true }).click();
+  await s.getByText("อาคาร 1", { exact: true }).click();
+  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("4", { exact: true }).click();
   await next(page);
   await expect(s.getByText("เลือกห้องหรือจุดที่เกิด", { exact: true })).toBeVisible();
   await expect(s.getByText("ห้องที่ตรงกับปัญหา (ห้องประชุมและโสตทัศนูปกรณ์)")).toBeVisible();
-  await s.getByText("ห้องประชุม 5B", { exact: true }).click();
+  await s.getByText("อ.1 ห้อง 401", { exact: true }).click();
   await s.getByLabel("บอกจุดเพิ่มเติม").fill("ฝั่งหน้าต่าง");
   await next(page);
 
   const review = step(page, "send").locator("dl");
-  await expect(review).toContainText("ห้องประชุม 5B · ฝั่งหน้าต่าง");
+  await expect(review).toContainText("อ.1 ห้อง 401 · ฝั่งหน้าต่าง");
   await review.getByRole("button", { name: "แก้ไขสถานที่" }).click();
   await expect(page.getByRole("button", { name: "2. สถานที่" })).toHaveAttribute("aria-current", "step");
   await next(page);
 
   await attachAndSend(page);
-  await expect(page.getByText("อาคารฝั่ง Office ชั้น 5 · ห้องประชุม 5B · ฝั่งหน้าต่าง").first()).toBeVisible();
+  await expect(page.getByText("อาคาร 1 ชั้น 4 · อ.1 ห้อง 401 · ฝั่งหน้าต่าง").first()).toBeVisible();
 });
 
 test("AC2: อื่น ๆ + ใช้งานไม่ได้ + typed ลิฟต์ → category อื่น ๆ · ลิฟต์, priority ปกติ", async ({ page }) => {
@@ -79,9 +80,9 @@ test("AC2: อื่น ๆ + ใช้งานไม่ได้ + typed ล�
   await p.getByText("อื่น ๆ", { exact: true }).click();
   await p.getByText("ใช้งานไม่ได้").click();
   await p.getByLabel("ระบุหมวดงาน").fill("ลิฟต์");
-  await expect(p.getByText("ปกติ")).toBeVisible();
+  await expect(p.getByText("ปกติ", { exact: true })).toBeVisible();
   await next(page);
-  await pickPlace(page, "พื้นที่ส่วนกลางชั้น 5");
+  await pickPlace(page, "พื้นที่ส่วนกลางชั้น 4");
   await next(page);
   await attachAndSend(page);
   await expect(page.getByText("ใช้งานไม่ได้ · อื่น ๆ · ลิฟต์").first()).toBeVisible();
@@ -98,7 +99,7 @@ test("AC4: the frame keeps its size on every step (desktop)", async ({ page, isM
   await step(page, "problem").getByText("แอร์ไม่เย็น").click();
   await next(page);
   await size();
-  await pickPlace(page, "ห้องประชุม 5B");
+  await pickPlace(page, "WPS ห้องกาแฟ");
   await next(page);
   await size();
   expect(new Set(sizes).size).toBe(1);

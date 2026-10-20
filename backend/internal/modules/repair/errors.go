@@ -21,3 +21,11 @@ var (
 	ErrContractorInactive   = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_NOT_FOUND", "contractor unknown or inactive")
 	ErrContractorTypeAbsent = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_TYPE_NOT_FOUND", "a contractor type does not exist")
 )
+
+// CR-016 equipment and floor plans.
+var (
+	ErrAssetNotFound    = apperr.New(apperr.KindNotFound, "ASSET_NOT_FOUND", "asset not found or inactive")
+	ErrAssetCodeTaken   = apperr.New(apperr.KindConflict, "ASSET_CODE_TAKEN", "asset code used by another asset")
+	ErrPointOutsideRoom = apperr.New(apperr.KindBusinessRule, "POINT_OUTSIDE_ROOM", "point is not inside the room outline")
+	ErrFloorNotFound    = apperr.New(apperr.KindNotFound, "FLOOR_NOT_FOUND", "floor not found")
+)

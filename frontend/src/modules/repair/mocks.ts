@@ -1,13 +1,22 @@
 import { ApiError } from "@/lib/http";
 import { mockMeByRole } from "@/lib/platform/mocks";
+import { roomAt } from "./plan-geometry";
 import { ticketPriority } from "./priority";
 import type { Role } from "@/lib/platform/types";
 import type {
   AreaType,
+  Asset,
+  AssetType,
   Building,
   Category,
+  CreateAssetRequest,
+  FloorPlan,
+  Overview,
+  OverviewBuilding,
+  OverviewCounts,
   Photo,
   PersonRef,
+  PlanShape,
   Priority,
   PrioritySource,
   RecentPlace,
@@ -22,6 +31,7 @@ import type {
   TicketStep,
   TicketSummary,
   TimelineEvent,
+  UpdateAssetRequest,
 } from "./types";
 
 // Mock data for building the UI without the backend (NEXT_PUBLIC_USE_MOCKS=true).
@@ -41,6 +51,11 @@ import type {
 //   upload_error    every photo upload fails (tile "ลองใหม่")
 // Fixed ids: MOCK_IDS.forbiddenTicket is someone else's ticket (forbidden for the employee in
 // `normal`); MOCK_IDS.notFoundTicket does not exist (S07 not-found state).
+// Stage 3D (S29, CR-016): อาคาร 1 uses the migration ids and real room outlines; tickets 160–165 sit in
+// its rooms (160 overdue, 161 reworking, 162 critical). #27 / #30 follow the scenarios: `empty` → no
+// tickets and no equipment, `error` → reads fail, `forbidden` → 403, `slow` → skeletons. Equipment
+// writes keep the backend rules (AC-1-004 is inactive, so its code is taken). Switch role with the
+// role switcher: admin edits, executive reads, other roles get 403 (S02 Home).
 
 export const MOCK_SCENARIOS = [
   "normal",
@@ -138,6 +153,85 @@ function sampleRooms(b: number, level: number): Room[] {
   return rooms.map(([name, areaType], k) => ({ id: roomId(b, level, k + 1), name, areaType }));
 }
 
+// CR-016: อาคาร 1 — real building, same ids as migration 20261020000001. 6 floors of 32 × 15 m; room
+// outlines traced from attachments/building plan/1-อาคาร 1.pdf (metres, origin top-left, x right, z down).
+export const B1_ID = "c016b1d0-0000-4000-8000-000000000001";
+export const B1_SIZE = { widthM: 32, depthM: 15, floorHeightM: 3.5 } as const;
+const b1FloorId = (level: number) => `c016f100-0000-4000-8000-00000000000${level}`;
+const b1RoomId = (level: number, k: number) => `c016e00${level}-0000-4000-8000-${k.toString().padStart(12, "0")}`;
+/** [name, area type, id key, outline] per floor; the common area (key 99) is the rest of the floor. */
+const B1_ROOMS: Record<number, [string, AreaType, number, PlanShape][]> = {
+  1: [
+    ["Data and Digitization", "office", 1, [[0, 0], [12, 0], [12, 6], [0, 6]]],
+    ["ห้องย่อย", "other", 2, [[0, 6], [4, 6], [4, 9], [0, 9]]],
+    ["Marketing ทีมพี่สุ้ง", "office", 3, [[0, 9], [12, 9], [12, 15], [0, 15]]],
+    ["HR 1", "office", 4, [[24, 0], [28, 0], [28, 4.35], [24, 4.35]]],
+    ["HR 2", "office", 5, [[28, 0], [32, 0], [32, 5.2], [28, 5.2]]],
+    ["HR 3", "office", 6, [[24, 9], [32, 9], [32, 15], [24, 15]]],
+    ["ห้องน้ำ", "restroom", 7, [[12, 0], [16, 0], [16, 6], [12, 6]]],
+    ["พื้นที่ส่วนกลางชั้น 1", "common_area", 99, [[12, 0], [24, 0], [24, 4.35], [28, 4.35], [28, 5.2], [32, 5.2], [32, 9], [24, 9], [24, 15], [12, 15], [12, 9], [4, 9], [4, 6], [12, 6]]],
+  ],
+  2: [
+    ["Call center 1", "office", 1, [[0, 0], [12, 0], [12, 9], [0, 9]]],
+    ["RMC METRO - ท่าหลวง", "office", 2, [[20, 0], [32, 0], [32, 9], [20, 9]]],
+    ["Call center 2", "office", 3, [[0, 9], [24, 9], [24, 15], [0, 15]]],
+    ["RRC METRO - ท่าหลวง", "office", 4, [[24, 9], [32, 9], [32, 15], [24, 15]]],
+    ["ห้องน้ำ", "restroom", 5, [[12, 0], [16, 0], [16, 6], [12, 6]]],
+    ["พื้นที่ส่วนกลางชั้น 2", "common_area", 99, [[12, 0], [20, 0], [20, 9], [12, 9]]],
+  ],
+  3: [
+    ["RMC METRO - ท่าหลวง 1", "office", 1, [[0, 0], [12, 0], [12, 6], [0, 6]]],
+    ["RMC METRO - ท่าหลวง 2", "office", 2, [[20, 0], [32, 0], [32, 6], [20, 6]]],
+    ["WPS ห้องพี่มีด", "office", 3, [[0, 9], [4, 9], [4, 15], [0, 15]]],
+    ["RMC METRO - ท่าหลวง 3", "office", 4, [[4, 9], [32, 9], [32, 15], [4, 15]]],
+    ["ห้องน้ำ", "restroom", 5, [[12, 0], [16, 0], [16, 6], [12, 6]]],
+    ["พื้นที่ส่วนกลางชั้น 3", "common_area", 99, [[12, 0], [20, 0], [20, 6], [32, 6], [32, 9], [0, 9], [0, 6], [12, 6]]],
+  ],
+  4: [
+    ["อ.1 ห้อง 401", "meeting_room", 1, [[0, 0], [8, 0], [8, 15], [0, 15]]],
+    ["WPS ห้องกาแฟ", "pantry", 2, [[8, 0], [12, 0], [12, 6], [8, 6]]],
+    ["RMC Excellence พี่จร 1", "office", 3, [[20, 0], [24, 0], [24, 6], [20, 6]]],
+    ["RMC Excellence พี่จร 2", "office", 4, [[24, 0], [28, 0], [28, 6], [24, 6]]],
+    ["RMC Excellence พี่จร 3", "office", 5, [[28, 0], [32, 0], [32, 6], [28, 6]]],
+    ["RMC Excellence", "office", 6, [[8, 9], [32, 9], [32, 15], [8, 15]]],
+    ["ห้องน้ำ", "restroom", 7, [[12, 0], [16, 0], [16, 6], [12, 6]]],
+    ["พื้นที่ส่วนกลางชั้น 4", "common_area", 99, [[12, 0], [20, 0], [20, 6], [32, 6], [32, 9], [8, 9], [8, 6], [12, 6]]],
+  ],
+  5: [
+    ["RMC Network 1", "office", 1, [[0, 0], [6, 0], [6, 6], [0, 6]]],
+    ["ห้องย่อย", "other", 2, [[6, 0], [8, 0], [8, 6], [6, 6]]],
+    ["บัญชี", "office", 3, [[8, 0], [12, 0], [12, 6], [8, 6]]],
+    ["Legal & GRC ห้องเอกสาร", "office", 4, [[20, 0], [24, 0], [24, 6], [20, 6]]],
+    ["License", "office", 5, [[24, 0], [28, 0], [28, 3], [24, 3]]],
+    ["UMO", "office", 6, [[24, 3], [28, 3], [28, 6], [24, 6]]],
+    ["BSSD พี่โอ", "office", 7, [[28, 0], [32, 0], [32, 6], [28, 6]]],
+    ["RMC Network Director พี่เอ็ม", "office", 8, [[0, 9], [4, 9], [4, 15], [0, 15]]],
+    ["RMC Network 2", "office", 9, [[4, 9], [12, 9], [12, 15], [4, 15]]],
+    ["Franchise", "office", 10, [[12, 9], [16, 9], [16, 15], [12, 15]]],
+    ["Legal & GRC", "office", 11, [[16, 9], [22, 9], [22, 15], [16, 15]]],
+    ["CCM", "office", 12, [[22, 9], [28, 9], [28, 15], [22, 15]]],
+    ["BAM", "office", 13, [[28, 9], [32, 9], [32, 15], [28, 15]]],
+    ["ห้องน้ำ", "restroom", 14, [[12, 0], [16, 0], [16, 6], [12, 6]]],
+    ["พื้นที่ส่วนกลางชั้น 5", "common_area", 99, [[12, 0], [20, 0], [20, 6], [32, 6], [32, 9], [0, 9], [0, 6], [12, 6]]],
+  ],
+  6: [
+    ["อ.1 ห้อง CPAC Common room", "meeting_room", 1, [[0, 0], [8, 0], [8, 6], [0, 6]]],
+    ["สำรอง คจ.", "office", 2, [[8, 0], [12, 0], [12, 6], [8, 6]]],
+    ["ห้องเอกสาร Legal & GRC", "office", 3, [[20, 0], [24, 0], [24, 6], [20, 6]]],
+    ["Strategic Planning", "office", 4, [[24, 0], [32, 0], [32, 6], [24, 6]]],
+    ["Head of Concrete Business ห้องพี่หก", "office", 5, [[0, 9], [8, 9], [8, 15], [0, 15]]],
+    ["เลขา", "office", 6, [[8, 9], [12, 9], [12, 15], [8, 15]]],
+    ["อ.1 ห้อง CPAC 72 ปี", "meeting_room", 7, [[12, 9], [24, 9], [24, 15], [12, 15]]],
+    ["QMIX พี่นุ้ย", "office", 8, [[24, 9], [29.2, 9], [29.2, 15], [24, 15]]],
+    ["Strategic Planning พี่ปี", "office", 9, [[29.2, 9], [32, 9], [32, 15], [29.2, 15]]],
+    ["พื้นที่ส่วนกลางชั้น 6", "common_area", 99, [[12, 0], [20, 0], [20, 6], [32, 6], [32, 9], [0, 9], [0, 6], [12, 6]]],
+  ],
+};
+/** Room outlines by room id (mock #30). */
+const b1Shapes = new Map<string, PlanShape>(
+  Object.entries(B1_ROOMS).flatMap(([level, list]) => list.map(([, , k, shape]) => [b1RoomId(Number(level), k), shape] as const)),
+);
+
 // CR-008 names: อาคารหลัก → อาคารฝั่ง Office, อาคารด้านหลัง → อาคาร Office โรงงานบางซ่อน (ids unchanged).
 // CR-014: the car park is an outdoor "building" with one floor and room (migration ids).
 export const mockBuildings: Building[] = [
@@ -158,6 +252,14 @@ export const mockBuildings: Building[] = [
       id: "c014f100-0000-4000-8000-000000000001", name: "ลานจอดรถ", level: 1,
       rooms: [{ id: "c014e000-0000-4000-8000-000000000001", name: "ลานจอดรถ", areaType: "parking" }],
     }],
+  },
+  {
+    id: B1_ID,
+    name: "อาคาร 1",
+    floors: Object.entries(B1_ROOMS).map(([level, list]) => ({
+      id: b1FloorId(Number(level)), name: level, level: Number(level),
+      rooms: list.map(([name, areaType, k]) => ({ id: b1RoomId(Number(level), k), name, areaType })),
+    })),
   },
 ];
 
@@ -396,6 +498,43 @@ function stepOf(status: TicketStatus, assessed: boolean, sendBacks: number): Tic
 const P = mockPeople;
 
 const seeds: Seed[] = [
+  // CR-016: อาคาร 1 (building 4) — pins on the S29 model; 160 is overdue, 161 reworking, 162 critical.
+  {
+    n: 160, status: "in_progress", priority: "high", category: 2, symptoms: [2], building: 4, floor: 1,
+    room: "HR 3", location: "แอร์ตัวริมหน้าต่าง", details: "น้ำแอร์หยดลงโต๊ะทำงาน", reporter: P.kittipat, technician: P.thanakorn,
+    createdAgo: 5 * DAY, assessedAgo: 4 * DAY, photos: [mockPhoto(HUE.ac, "แอร์ HR")],
+  },
+  {
+    n: 161, status: "in_progress", priority: "medium", category: 1, symptoms: [1], building: 4, floor: 5,
+    room: "บัญชี", reporter: P.wanna, technician: P.thanakorn, sendBackCount: 1,
+    createdAgo: 3 * DAY, assessedAgo: 2 * DAY + 20 * HOUR, photos: [mockPhoto(HUE.electric, "ไฟฝ่ายบัญชี")],
+    extraEvents: [
+      ev("resolved", P.thanakorn, ago(2 * DAY)),
+      ev("sent_back", P.wanna, ago(DAY + 20 * HOUR), { note: "ยังกะพริบอยู่ 1 ดวงค่ะ", photos: [] }),
+    ],
+  },
+  {
+    n: 162, status: "in_progress", priority: "critical", category: 5, symptoms: [6], building: 4, floor: 4,
+    room: "อ.1 ห้อง 401", location: "ฝ้าเหนือโต๊ะประชุม", details: "แผ่นฝ้าแตก ห้อยลงมา เสี่ยงหล่นใส่คน",
+    reporter: P.kittipat, createdAgo: 3 * HOUR, photos: [mockPhoto(HUE.building, "ฝ้าห้อง 401")],
+  },
+  {
+    n: 163, status: "in_progress", priority: "medium", category: 4, symptoms: [1], building: 4, floor: 6,
+    room: "อ.1 ห้อง CPAC 72 ปี", reporter: P.wanna, createdAgo: 2 * DAY, photos: [mockPhoto(HUE.building, "ไมค์ห้อง 72 ปี")],
+  },
+  {
+    n: 164, status: "resolved", priority: "medium", category: 1, symptoms: [1], building: 4, floor: 3,
+    room: "พื้นที่ส่วนกลางชั้น 3", location: "ทางเดินหน้าลิฟต์", reporter: P.wanna, technician: P.thanakorn,
+    createdAgo: DAY + 6 * HOUR, assessedAgo: DAY, resolvedAgo: 5 * HOUR, photos: [mockPhoto(HUE.electric, "ไฟทางเดินชั้น 3")],
+    result: { note: "เปลี่ยนหลอด LED 2 ดวง", photos: [mockPhoto(HUE.result, "หลังเปลี่ยนหลอด")] },
+  },
+  {
+    n: 165, status: "closed", closedReason: "confirmed", priority: "medium", category: 2, symptoms: [1], building: 4, floor: 1,
+    room: "Data and Digitization", reporter: P.wanna, technician: P.thanakorn,
+    createdAgo: 4 * DAY, assessedAgo: 4 * DAY - 2 * HOUR, resolvedAgo: 3 * DAY, closedAgo: 2 * DAY, rating: 4,
+    photos: [mockPhoto(HUE.ac, "แอร์ Data")],
+    result: { note: "ล้างแผงคอยล์เย็นและเติมน้ำยา", photos: [mockPhoto(HUE.result, "หลังล้างแอร์")] },
+  },
   {
     n: 150, status: "in_progress", priority: "high", category: 2, symptoms: [1, 2], building: 1, floor: 5,
     room: "ห้องประชุม 5B", location: "ฝั่งหน้าต่าง", details: "น้ำหยดใส่โต๊ะประชุม เริ่มตั้งแต่เช้า แอร์เปิดแล้วลมไม่เย็น",
@@ -496,7 +635,7 @@ const store = {
   tickets: seeds.map(build),
   subscribers: new Map<string, string[]>(seeds.map((s) => [ticketId(s.n), (s.subscribers ?? []).map((p) => p.id)])),
   photos: new Map<string, Photo>(),
-  nextNo: 151,
+  nextNo: 170,
 };
 
 // ---- visibility + decoration (mirrors the backend rules, BR-F06-1/2/3) ----
@@ -561,7 +700,25 @@ function withActions(t: TicketDetail, v: Viewer): TicketDetail {
     else blockedActions.resolve = "ASSESSMENT_REQUIRED";
   }
   if (t.status === "resolved" && t.reporter.id === v.id) allowedActions.push("confirm", "send_back");
+  if (v.role === "admin" && t.status !== "closed") allowedActions.push("close");
   return { ...t, allowedActions, blockedActions };
+}
+
+/** #21 (Stage 3): same rules as `Service.Close` — admin only, reason 1–500, closed → 409. */
+export function mockCloseTicket(id: string, reason: string, v: Viewer): TicketDetail {
+  const t = store.tickets.find((x) => x.id === id);
+  if (!t) throw mockErrors.notFound();
+  if (v.role !== "admin") throw mockErrors.forbidden();
+  const text = reason.trim();
+  if (!text || text.length > 500) {
+    throw new ApiError(400, "VALIDATION_FAILED", "mock: reason", { reason: text ? "TOO_LONG" : "REQUIRED" });
+  }
+  if (t.status === "closed") throw new ApiError(409, "TICKET_CLOSED", "mock: ticket is closed");
+  const now = new Date().toISOString();
+  const actor = Object.values(mockPeople).find((p) => p.id === v.id) ?? mockPeople.paweena;
+  Object.assign(t, { status: "closed", step: "closed", closedReason: "admin_closed", closedAt: now, autoCloseAt: null, updatedAt: now });
+  t.timeline = [ev("admin_closed", actor, now, { note: text }), ...t.timeline];
+  return mockTicketDetail(id, v);
 }
 
 function matches(t: TicketSummary, q: TicketCountsQuery, v: Viewer): boolean {
@@ -718,4 +875,244 @@ export function mockCreateTicket(
   store.tickets.unshift(detail);
   store.subscribers.set(detail.id, []);
   return withActions(decorate(detail, v), v);
+}
+
+// ---- Stage 3D (CR-016): #27 overview, #29 asset types, #30 floor plan, #31–#34 assets ----
+// Same rules as the backend (service_dashboard.go): admin / executive read, admin writes; unique code
+// ignoring case (inactive included); a placed asset must lie in its room (smallest room wins).
+
+export const mockAssetTypes: AssetType[] = [
+  { id: "c016a700-0000-4000-8000-000000000001", key: "aircon", name: "เครื่องปรับอากาศ", codePrefix: "AC", icon: "air-vent", mount: "wall" },
+  { id: "c016a700-0000-4000-8000-000000000002", key: "microphone", name: "ไมโครโฟน", codePrefix: "MIC", icon: "mic", mount: "floor" },
+  { id: "c016a700-0000-4000-8000-000000000003", key: "speaker", name: "ลำโพง", codePrefix: "SPK", icon: "speaker", mount: "ceiling" },
+  { id: "c016a700-0000-4000-8000-000000000004", key: "tv", name: "จอทีวี", codePrefix: "TV", icon: "tv", mount: "wall" },
+];
+
+type MockAsset = { id: string; code: string; name: string; typeId: string; roomId: string; x: number | null; z: number | null; rotationDeg: number; isActive: boolean };
+
+const assetId = (n: number) => `a55e0000-0000-4000-8000-${n.toString().padStart(12, "0")}`;
+const [AC, MIC, SPK, TV] = mockAssetTypes.map((t) => t.id);
+
+const assetStore: { items: MockAsset[]; seq: number } = {
+  items: [
+    { id: assetId(1), code: "AC-1-001", name: "แอร์ Data and Digitization", typeId: AC, roomId: b1RoomId(1, 1), x: 6, z: 0.6, rotationDeg: 180, isActive: true },
+    { id: assetId(2), code: "AC-1-002", name: "แอร์ Marketing", typeId: AC, roomId: b1RoomId(1, 3), x: 6, z: 14.4, rotationDeg: 0, isActive: true },
+    { id: assetId(3), code: "AC-1-003", name: "แอร์ห้อง HR ตัวริมหน้าต่าง", typeId: AC, roomId: b1RoomId(1, 6), x: 28, z: 14.4, rotationDeg: 0, isActive: true },
+    { id: assetId(4), code: "TV-1-001", name: "จอทีวีจุดประชาสัมพันธ์", typeId: TV, roomId: b1RoomId(1, 99), x: 18, z: 11.6, rotationDeg: 0, isActive: true },
+    { id: assetId(5), code: "SPK-1-001", name: "ลำโพงพื้นที่ส่วนกลาง", typeId: SPK, roomId: b1RoomId(1, 99), x: 21, z: 7.5, rotationDeg: 0, isActive: true },
+    { id: assetId(6), code: "TV-4-001", name: "จอทีวีห้อง 401", typeId: TV, roomId: b1RoomId(4, 1), x: 0.4, z: 7.5, rotationDeg: 90, isActive: true },
+    { id: assetId(7), code: "MIC-4-001", name: "ไมค์ห้อง 401 ตัวที่ 1", typeId: MIC, roomId: b1RoomId(4, 1), x: 4, z: 6, rotationDeg: 0, isActive: true },
+    { id: assetId(8), code: "MIC-6-001", name: "ไมค์ห้อง CPAC 72 ปี", typeId: MIC, roomId: b1RoomId(6, 7), x: 18, z: 12, rotationDeg: 0, isActive: true },
+    // Deactivated: off the plan, but its code stays taken (BR-F31-4).
+    { id: assetId(9), code: "AC-1-004", name: "แอร์ HR เครื่องเก่า", typeId: AC, roomId: b1RoomId(1, 4), x: 26, z: 0.6, rotationDeg: 180, isActive: false },
+  ],
+  seq: 10,
+};
+
+/** Open tickets reported from an asset (`tickets.asset_id`, Stage 5 QR); 160 = the leaking HR air conditioner. */
+const ticketAsset = new Map<string, string>([[ticketId(160), assetId(3)]]);
+
+const readsDashboard = (v: Viewer) => v.role === "admin" || v.role === "executive";
+const isOpen = (t: TicketSummary) => t.status !== "closed";
+
+function highest(list: TicketSummary[]): Priority | null {
+  for (const p of ["critical", "high", "medium", "low"] as Priority[]) if (list.some((t) => t.priority === p)) return p;
+  return null;
+}
+
+/** "YYYY-MM-DD" and the midnight of today in Asia/Bangkok (UTC+7, no DST). */
+function bangkokToday(): { date: string; start: number } {
+  const date = new Date(Date.now() + 7 * HOUR).toISOString().slice(0, 10);
+  return { date, start: new Date(`${date}T00:00:00+07:00`).getTime() };
+}
+
+const isOverdue = (t: TicketSummary, today: string) => t.status === "in_progress" && !!t.expectedDoneOn && t.expectedDoneOn < today;
+
+/** #27. `empty` → no tickets; `forbidden` → 403 for everyone. */
+export function mockOverview(v: Viewer): Overview {
+  if (mockScenario() === "forbidden" || !readsDashboard(v)) throw mockErrors.forbidden();
+  const all = mockScenario() === "empty" ? [] : store.tickets.map(toSummary);
+  const { date: today, start } = bangkokToday();
+  const weekStart = start - 6 * DAY;
+  const closed7 = all.filter((t) => t.status === "closed" && t.closedAt && Date.parse(t.closedAt) >= weekStart);
+  const rated7 = closed7.filter((t) => t.rating !== null);
+  const step = (s: TicketStep) => all.filter((t) => t.step === s);
+  const earliest = (list: TicketSummary[], key: "createdAt" | "autoCloseAt") =>
+    list.map((t) => t[key]).filter((d): d is string => !!d).sort()[0] ?? null;
+
+  const counts: OverviewCounts = {
+    open: all.filter(isOpen).length,
+    awaitingAssessment: step("awaiting_assessment").length,
+    inRepair: step("in_repair").length + step("reworking").length,
+    reworking: step("reworking").length,
+    awaitingRating: step("awaiting_rating").length,
+    overdue: all.filter((t) => isOverdue(t, today)).length,
+    reportedToday: all.filter((t) => Date.parse(t.createdAt) >= start).length,
+    closedToday: all.filter((t) => t.status === "closed" && t.closedAt && Date.parse(t.closedAt) >= start).length,
+    closedLast7Days: closed7.length,
+    ratingAvgLast7Days: rated7.length ? Math.round((rated7.reduce((n, t) => n + (t.rating ?? 0), 0) / rated7.length) * 10) / 10 : null,
+    oldestAwaitingAssessmentAt: earliest(step("awaiting_assessment"), "createdAt"),
+    nextAutoCloseAt: earliest(step("awaiting_rating"), "autoCloseAt"),
+  };
+
+  const buildings: OverviewBuilding[] = mockBuildings.map((b) => ({
+    id: b.id,
+    name: b.name,
+    hasModel: b.id === B1_ID,
+    widthM: b.id === B1_ID ? B1_SIZE.widthM : null,
+    depthM: b.id === B1_ID ? B1_SIZE.depthM : null,
+    floors: b.floors.map((f) => {
+      const open = all.filter((t) => isOpen(t) && t.floor.id === f.id);
+      const n = (...steps: TicketStep[]) => open.filter((t) => steps.includes(t.step)).length;
+      return {
+        id: f.id, name: f.name, level: f.level, openCount: open.length, highestPriority: highest(open),
+        steps: { awaitingAssessment: n("awaiting_assessment"), inRepair: n("in_repair", "reworking"), awaitingRating: n("awaiting_rating") },
+        criticalCount: open.filter((t) => t.priority === "critical").length,
+      };
+    }),
+  }));
+
+  const rank = (t: TicketSummary) => [isOverdue(t, today) ? 0 : 1, t.step === "reworking" ? 0 : 1, t.priority === "critical" ? 0 : 1];
+  const attention = all
+    .filter((t) => t.status === "in_progress" && (isOverdue(t, today) || t.step === "reworking" || t.priority === "critical" || t.priority === "high"))
+    .sort((a, b) => {
+      const ra = rank(a);
+      const rb = rank(b);
+      for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
+      return a.createdAt.localeCompare(b.createdAt);
+    })
+    .slice(0, 5)
+    .map((t) => decorate(t, v));
+
+  return { counts, buildings, attention };
+}
+
+/** #29. */
+export function mockGetAssetTypes(v: Viewer): AssetType[] {
+  if (!readsDashboard(v)) throw mockErrors.forbidden();
+  return mockAssetTypes;
+}
+
+function findFloor(floorId: string) {
+  for (const b of mockBuildings) {
+    const f = b.floors.find((x) => x.id === floorId);
+    if (f) return { building: b, floor: f };
+  }
+  return null;
+}
+
+function toAsset(a: MockAsset): Asset {
+  const type = mockAssetTypes.find((t) => t.id === a.typeId)!;
+  const roomName = mockBuildings.flatMap((b) => b.floors.flatMap((f) => f.rooms)).find((r) => r.id === a.roomId)?.name ?? "";
+  const openTickets = mockScenario() === "empty" ? 0 : store.tickets.filter((t) => isOpen(t) && ticketAsset.get(t.id) === a.id).length;
+  return {
+    id: a.id, code: a.code, name: a.name, type: { id: type.id, key: type.key, name: type.name }, room: { id: a.roomId, name: roomName },
+    x: a.x, z: a.z, rotationDeg: a.rotationDeg, openTickets,
+  };
+}
+
+/** #30. Floors of อาคาร 1 have a plan; every other floor answers with `widthM: null` and no outlines. */
+export function mockFloorPlan(floorId: string, v: Viewer): FloorPlan {
+  if (mockScenario() === "forbidden" || !readsDashboard(v)) throw mockErrors.forbidden();
+  const found = findFloor(floorId);
+  if (!found) throw new ApiError(404, "FLOOR_NOT_FOUND", "mock: floor not found");
+  const { building, floor } = found;
+  const hasPlan = building.id === B1_ID;
+  const open = mockScenario() === "empty" ? [] : store.tickets.map(toSummary).filter((t) => isOpen(t) && t.floor.id === floorId);
+  const roomIds = new Set(floor.rooms.map((r) => r.id));
+  return {
+    floor: { id: floor.id, name: floor.name, level: floor.level },
+    building: { id: building.id, name: building.name },
+    widthM: hasPlan ? B1_SIZE.widthM : null,
+    depthM: hasPlan ? B1_SIZE.depthM : null,
+    modelUrl: null,
+    rooms: floor.rooms.map((r) => {
+      const inRoom = open.filter((t) => t.room?.id === r.id);
+      return {
+        id: r.id, name: r.name, areaType: r.areaType, shape: hasPlan ? (b1Shapes.get(r.id) ?? null) : null,
+        openCount: inRoom.length, highestPriority: highest(inRoom),
+      };
+    }),
+    assets: mockScenario() === "empty" ? []
+      : assetStore.items.filter((a) => a.isActive && roomIds.has(a.roomId)).sort((a, b) => a.code.localeCompare(b.code)).map(toAsset),
+  };
+}
+
+function assetFields(req: UpdateAssetRequest) {
+  const fields: Record<string, string> = {};
+  const code = req.code.trim();
+  const name = req.name.trim().replace(/\s+/g, " ");
+  if (!code) fields.code = "REQUIRED";
+  else if (code.length > 50) fields.code = "TOO_LONG";
+  else if (!/^[A-Za-z0-9_-]+$/.test(code)) fields.code = "INVALID";
+  if (!name) fields.name = "REQUIRED";
+  else if ([...name].length > 100) fields.name = "TOO_LONG";
+  if (!req.roomId) fields.roomId = "REQUIRED";
+  if ((req.x == null) !== (req.z == null)) fields[req.x == null ? "x" : "z"] = "REQUIRED";
+  if (req.rotationDeg !== undefined && (req.rotationDeg < 0 || req.rotationDeg > 359)) fields.rotationDeg = "INVALID";
+  if (Object.keys(fields).length) throw new ApiError(400, "VALIDATION_FAILED", "mock: validation failed", fields);
+  return { code, name };
+}
+
+function checkRoomAndCode(req: UpdateAssetRequest, code: string, self?: string) {
+  const owner = mockBuildings.find((b) => b.floors.some((f) => f.rooms.some((r) => r.id === req.roomId)));
+  const floor = owner?.floors.find((f) => f.rooms.some((r) => r.id === req.roomId));
+  if (!owner || !floor) throw mockErrors.masterChanged();
+  if (req.x != null && req.z != null) {
+    if (owner.id !== B1_ID || req.x < 0 || req.z < 0 || req.x > B1_SIZE.widthM || req.z > B1_SIZE.depthM) {
+      throw new ApiError(400, "VALIDATION_FAILED", "mock: point outside the plan", { x: "INVALID", z: "INVALID" });
+    }
+    const rooms = floor.rooms.map((r) => ({ id: r.id, shape: b1Shapes.get(r.id) ?? null }));
+    if (roomAt(req.x, req.z, rooms)?.id !== req.roomId) throw new ApiError(422, "POINT_OUTSIDE_ROOM", "mock: point not in the room");
+  }
+  if (assetStore.items.some((a) => a.id !== self && a.code.toLowerCase() === code.toLowerCase())) {
+    throw new ApiError(409, "ASSET_CODE_TAKEN", "mock: code taken");
+  }
+}
+
+/** #31 (admin). */
+export function mockCreateAsset(req: CreateAssetRequest, v: Viewer): Asset {
+  if (v.role !== "admin") throw mockErrors.forbidden();
+  const { code, name } = assetFields(req);
+  if (!mockAssetTypes.some((t) => t.id === req.assetTypeId)) throw mockErrors.masterChanged();
+  checkRoomAndCode(req, code);
+  const a: MockAsset = {
+    id: assetId(assetStore.seq++), code, name, typeId: req.assetTypeId, roomId: req.roomId,
+    x: req.x ?? null, z: req.z ?? null, rotationDeg: req.rotationDeg ?? 0, isActive: true,
+  };
+  assetStore.items.push(a);
+  return toAsset(a);
+}
+
+/** #32 (admin): edit or move; the type never changes. */
+export function mockUpdateAsset(id: string, req: UpdateAssetRequest, v: Viewer): Asset {
+  if (v.role !== "admin") throw mockErrors.forbidden();
+  const { code, name } = assetFields(req);
+  const a = assetStore.items.find((x) => x.id === id && x.isActive);
+  if (!a) throw new ApiError(404, "ASSET_NOT_FOUND", "mock: asset not found");
+  checkRoomAndCode(req, code, id);
+  Object.assign(a, { code, name, roomId: req.roomId, x: req.x ?? null, z: req.z ?? null, rotationDeg: req.rotationDeg ?? a.rotationDeg });
+  return toAsset(a);
+}
+
+/** #33 (admin): deactivate only. */
+export function mockDeactivateAsset(id: string, v: Viewer): void {
+  if (v.role !== "admin") throw mockErrors.forbidden();
+  const a = assetStore.items.find((x) => x.id === id && x.isActive);
+  if (!a) throw new ApiError(404, "ASSET_NOT_FOUND", "mock: asset not found");
+  a.isActive = false;
+}
+
+/** #34 (admin): `{prefix}-{floor}-{lowest free nnn}`; inactive codes stay taken. */
+export function mockSuggestAssetCode(assetTypeId: string, floorId: string, v: Viewer): string {
+  if (v.role !== "admin") throw mockErrors.forbidden();
+  const type = mockAssetTypes.find((t) => t.id === assetTypeId);
+  if (!type) throw mockErrors.masterChanged();
+  const found = findFloor(floorId);
+  if (!found) throw new ApiError(404, "FLOOR_NOT_FOUND", "mock: floor not found");
+  const taken = new Set(assetStore.items.map((a) => a.code.toLowerCase()));
+  for (let n = 1; ; n++) {
+    const code = `${type.codePrefix}-${found.floor.name}-${n.toString().padStart(3, "0")}`;
+    if (!taken.has(code.toLowerCase())) return code;
+  }
 }

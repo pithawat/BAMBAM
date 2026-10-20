@@ -202,6 +202,11 @@ type SendBackRequest struct {
 	PhotoIDs []string `json:"photoIds"`
 }
 
+// #21
+type CloseRequest struct {
+	Reason string `json:"reason"`
+}
+
 // #14
 type ContractorTypeRequest struct {
 	Name string `json:"name"`

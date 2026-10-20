@@ -74,7 +74,7 @@ Two themes, chosen per browser in the account menu → `ธีมสี` (stored
 | Action, in progress | `#2741FA` | `#2741FA` (unchanged) |
 | Needs you (`--attention`, `--status-resolved`; badge, banner edge — buttons stay blue) | tangerine `#B93D0A` (4.9:1 on its tint) | deep mustard `#8A5A12` (5.9:1) |
 | Done (`--success`, `--status-closed`) | emerald `#0B7A5E` | deep sage `#2C6B67` (6.2:1) |
-| Waiting (`--status-new`) · sent back (`--status-rework`) | slate `#5B6676` · red `#B42318` | slate `#566273` |
+| Waiting (`--status-new`) · sent back (`--status-rework`) | deep yellow `#8C6600` (CR-018, was slate) · red `#B42318` | olive yellow `#7F6A00` (CR-018) |
 | Warning / stars | `#B54708` / `#E09B0C` | `#94600F` / `#C08A2E` (3:1) |
 | Field border (`--input`) | `#D0D6E2` | `#B0B8C3` |
 

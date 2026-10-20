@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14) · layout replaced by CR-011 (approved 2026-10-18) · **refined by CR-012 (approved 2026-10-19)**
 
+> **CR-015 (approved 2026-10-19):** no priority `Select` / change-priority dialog / toast / `priority_changed` event for anyone, including admin; priority stays a read-only row for staff. Overrides any text below.
+
 > **CR-012 (approved 2026-10-19) — replaces items 2–5 of the CR-011 block below (D-067).** Visual source: `output/ticket-detail-redesign/` minus its priority row.
 > 1. **Heading** (no card): ticket no + copy · status tag (radius 5px, step colour + icon; closed = folder-check) · H1 title · `แจ้งเมื่อ {date} เวลา {time} น.` (CR-012)
 > 2. **Reporter, awaiting rating, `confirm` allowed → review card** (white, full width): `ซ่อมเสร็จแล้ว งานซ่อมเป็นอย่างไรบ้าง?` / `ตรวจผลซ่อมด้านล่าง แล้วให้คะแนนความพึงพอใจ` · five empty stars (tap → S08 with that draft score) · `ประเมินพร้อมความคิดเห็น` (→ S08 without a score) · footer `ประเมินภายใน {date} เวลา {time} น. ก่อนระบบปิดงานอัตโนมัติ` + `ยังไม่เรียบร้อย · ส่งกลับให้แก้` (if `send_back` allowed). Hidden in print. **Everyone else → next-action card** (CR-011 texts and buttons, now a white card; the step colour stays on the icon only; no violet). (CR-012)

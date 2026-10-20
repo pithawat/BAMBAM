@@ -39,9 +39,6 @@ func newPgFixture(t *testing.T) *pgFixture {
 	}
 	t.Cleanup(pool.Close)
 	svc := NewService(NewRepository(pool), newMemStore())
-	if err := svc.EnsureSampleData(ctx); err != nil {
-		t.Fatal(err)
-	}
 	cats, err := svc.Categories(ctx)
 	if err != nil || len(cats) < 2 || !cats[len(cats)-1].IsOther {
 		t.Fatalf("categories: %v", err)
@@ -358,5 +355,134 @@ func TestPgMasterData(t *testing.T) {
 	}
 	if !parking {
 		t.Fatal("no parking room")
+	}
+}
+
+// CR-016 ids from migration 20261020000001.
+var (
+	b1Building = uuid.MustParse("c016b1d0-0000-4000-8000-000000000001")
+	b1Floor1   = uuid.MustParse("c016f100-0000-4000-8000-000000000001")
+	b1HR3      = uuid.MustParse("c016e001-0000-4000-8000-000000000006")
+	b1WC       = uuid.MustParse("c016e001-0000-4000-8000-000000000007")
+	b1DD       = uuid.MustParse("c016e001-0000-4000-8000-000000000001")
+	acType     = uuid.MustParse("c016a700-0000-4000-8000-000000000001")
+)
+
+// CR-016: #27 numbers equal S11 (BR-F23-1), อาคาร 1 has 6 traced floors, and the asset rules hold
+// against the real SQL (unique code ignoring case, point in polygon, deactivate, audit log).
+func TestPgDashboardAndAssets(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	admin := p.user(t, users.RoleAdmin)
+	reporter := p.user(t, users.RoleEmployee)
+	t.Cleanup(func() {
+		for _, q := range []string{
+			`DELETE FROM platform.audit_log WHERE actor_user_id = $1`,
+			`DELETE FROM platform.assets WHERE created_by = $1`,
+		} {
+			if _, err := p.pool.Exec(context.Background(), q, admin.ID); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
+		}
+	})
+
+	photo, err := p.svc.UploadPhoto(ctx, reporter, p.png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, f, r := b1Building, b1Floor1, b1HR3
+	if _, err := p.svc.CreateTicket(ctx, reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID},
+		BuildingID: &b, FloorID: &f, RoomID: &r, PhotoIDs: []uuid.UUID{photo}}); err != nil {
+		t.Fatal(err)
+	}
+
+	o, err := p.svc.Overview(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s11, err := p.svc.TicketCounts(ctx, admin, TicketFilter{ScopeAll: true, Relation: "all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.Counts.AwaitingAssessment != s11.AwaitingAssessment || o.Counts.InRepair != s11.InRepair ||
+		o.Counts.AwaitingRating != s11.Resolved || o.Counts.Open != s11.InProgress+s11.Resolved {
+		t.Fatalf("#27 %+v ≠ S11 %+v", o.Counts, s11)
+	}
+	if o.Counts.ReportedToday < 1 {
+		t.Errorf("reportedToday = %d", o.Counts.ReportedToday)
+	}
+	var b1 *OverviewBuilding
+	for i := range o.Buildings {
+		if o.Buildings[i].ID == b1Building {
+			b1 = &o.Buildings[i]
+		}
+	}
+	if b1 == nil || !b1.HasModel || len(b1.Floors) != 6 || b1.Floors[0].Open.Total() < 1 {
+		t.Fatalf("อาคาร 1 = %+v", b1)
+	}
+	if b1.WidthM == nil || *b1.WidthM != 32 || b1.DepthM == nil || *b1.DepthM != 15 {
+		t.Errorf("อาคาร 1 footprint = %v × %v, want 32 × 15", b1.WidthM, b1.DepthM)
+	}
+	for _, f := range b1.Floors { // CR-017: steps split the same open tickets
+		if st := f.Steps; st.AwaitingAssessment+st.InRepair+st.AwaitingRating != f.Open.Total() {
+			t.Errorf("floor %s steps %+v ≠ open %d", f.Name, st, f.Open.Total())
+		}
+	}
+
+	plan, err := p.svc.FloorPlan(ctx, admin, b1Floor1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.WidthM == nil || *plan.WidthM != 32 || len(plan.Rooms) != 8 {
+		t.Fatalf("plan = %+v", plan)
+	}
+	area := 0.0
+	for _, rm := range plan.Rooms {
+		if rm.AreaType != AreaRestroom {
+			area += shapeArea(rm.Shape)
+		}
+	}
+	if area < 479.99 || area > 480.01 {
+		t.Errorf("floor 1 rooms add up to %v m², want 480", area)
+	}
+
+	code1 := "TST-" + uuid.NewString()[:6]
+	x, z := 28.0, 12.0
+	a, err := p.svc.CreateAsset(ctx, admin, AssetInput{AssetTypeID: acType, Code: code1, Name: "แอร์ทดสอบ", RoomID: b1HR3, X: &x, Z: &z})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.X == nil || *a.X != 28 || a.Type.Key != "aircon" || a.Room.ID != b1HR3 {
+		t.Fatalf("asset = %+v", a)
+	}
+	if _, err := p.svc.CreateAsset(ctx, admin, AssetInput{AssetTypeID: acType, Code: strings.ToLower(code1), Name: "x", RoomID: b1DD}); code(err) != "ASSET_CODE_TAKEN" {
+		t.Errorf("duplicate code: %v", err)
+	}
+	if _, err := p.svc.UpdateAsset(ctx, admin, a.ID, AssetInput{Code: code1, Name: "แอร์ทดสอบ", RoomID: b1HR3, X: &[]float64{6}[0], Z: &[]float64{3}[0]}); code(err) != "POINT_OUTSIDE_ROOM" {
+		t.Errorf("point in another room: %v", err)
+	}
+	wx, wz := 13.0, 3.0
+	moved, err := p.svc.UpdateAsset(ctx, admin, a.ID, AssetInput{Code: code1, Name: "แอร์ทดสอบ", RoomID: b1WC, X: &wx, Z: &wz})
+	if err != nil || moved.Room.ID != b1WC {
+		t.Fatalf("move into ห้องน้ำ: %+v %v", moved, err)
+	}
+	if err := p.svc.DeactivateAsset(ctx, admin, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = p.svc.FloorPlan(ctx, admin, b1Floor1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, as := range plan.Assets {
+		if as.ID == a.ID {
+			t.Error("deactivated asset still on the plan")
+		}
+	}
+	var audits int
+	if err := p.pool.QueryRow(ctx, `SELECT count(*) FROM platform.audit_log WHERE target_type = 'asset' AND target_id = $1`, a.ID.String()).Scan(&audits); err != nil || audits != 3 {
+		t.Errorf("audit rows = %d, %v (created, updated, deactivated)", audits, err)
+	}
+	if suggested, err := p.svc.SuggestAssetCode(ctx, admin, acType, b1Floor1); err != nil || !strings.HasPrefix(suggested, "AC-1-") {
+		t.Errorf("suggest = %s, %v", suggested, err)
 	}
 }

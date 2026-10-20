@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import {
-  ArrowLeft, CalendarClock, Camera, Check, ChevronRight, CircleCheck, ClipboardList, Clock, Copy, FileText, FolderCheck, Hourglass,
+  ArrowLeft, CalendarClock, Camera, Check, ChevronRight, CircleCheck, CircleX, ClipboardList, Clock, Copy, FileText, FolderCheck, Hourglass,
   Image as ImageIcon, List, MapPin, Printer, RotateCcw, Star, UserRound, Wrench, X, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,9 +37,10 @@ const STEP_ICON: Record<TicketStep, LucideIcon> = {
 export function TicketDetailScreen({ id }: { id: string }) {
   const me = useCurrentUser();
   const technician = me.role === "technician";
-  const [backHref] = useState(() => (technician ? "/repair/work" : ticketReturnHref(id)));
+  const staff = me.role === "admin" || me.role === "executive";
+  const [backHref] = useState(() => (technician ? "/repair/work" : ticketReturnHref(id, staff ? "/repair/admin/queue" : "/repair/my")));
   const { ticket, loading, error, reload, replace } = useTicket(id);
-  const listLabel = technician ? "งานซ่อม" : "ติดตามงานซ่อม";
+  const listLabel = technician ? "งานซ่อม" : backHref.startsWith("/repair/admin/queue") ? "งานทั้งหมด" : "ติดตามงานซ่อม";
   return <div className="mx-auto w-full max-w-290 px-4 pt-4 pb-8 lg:px-0 lg:pt-1 print:max-w-none print:p-0">
     <nav aria-label="เส้นทางหน้า" className="print:hidden">
       <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted-foreground">
@@ -225,7 +226,7 @@ function NextAction({ ticket, viewer, story, meId, executive, actions }: { ticke
         break;
     }
   } else {
-    // Follower, admin, executive: what is happening (admin actions come with Stage 3).
+    // Follower, admin, executive: what is happening; admin closes from here (F08-B, below).
     const line: Record<TicketStep, string> = {
       awaiting_assessment: "รับเรื่องแล้ว รอช่างกำหนดวันเสร็จ",
       in_repair: `ช่างกำลังดำเนินการ คาดว่าจะเสร็จ ${expected}`,
@@ -238,6 +239,10 @@ function NextAction({ ticket, viewer, story, meId, executive, actions }: { ticke
       note = ticket.step === "in_repair" ? moved : "";
     } else { title = stepLabel(ticket); desc = line[ticket.step] + (executive ? " · ผู้บริหารดูได้อย่างเดียว" : ""); }
   }
+
+  // F08-B: admin can close any open ticket, whatever their relation to it (BR-F08B-1).
+  if (actions.allowed.has("close")) buttons.push(<Button key="close" type="button" variant="outline" onClick={actions.close}
+    className="h-11 border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive max-sm:w-full"><CircleX aria-hidden />ปิดงาน</Button>);
 
   const tone = ticket.step === "closed" ? "closed" : ticket.step === "reworking" ? "rework" : "open";
   const Icon = icon;

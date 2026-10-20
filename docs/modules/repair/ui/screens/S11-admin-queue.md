@@ -2,6 +2,21 @@
 
 Status: APPROVED (2026-10-14)
 
+> **CR-015 (approved 2026-10-19):** admin does **not** change priority — no priority `Select`, no change-priority dialog, no toast. Priority is shown as `PriorityIndicator` + the priority filter stays (information). Default order everywhere: oldest report first (`createdAt:asc`); closed tab newest closed first. Overrides any priority text below.
+
+> **Stage 3 re-spec (built 2026-10-19, CR-005 + CR-015 — confirm at Stage 3 acceptance; overrides everything below):**
+> - Title **งานทั้งหมด**, route `/repair/admin/queue?tab=assess|repair|rating|closed&category=&building=&priority=&reason=&q=&page=` (default tab `assess`, page 1; every filter change resets the page). Subtitle (phone) `ทุกงานแจ้งซ่อม เรียงตามเวลาแจ้ง (เก่าก่อน)`.
+> - Toolbar card: search `ค้นหาเลขงาน หรือสถานที่` (ticket no / room / location, 300 ms) · FilterPill หมวดงาน (ทุกหมวด) · อาคาร (ทุกอาคาร) · ความเร่งด่วน (ทุกระดับ, information only) · closed tab adds เหตุผลที่ปิด (ทุกเหตุผล / ตรวจรับแล้ว / ปิดอัตโนมัติ / ทีมดำเนินการเอง / Admin ปิดงาน) · `ล้างตัวกรอง` when anything is set. Phones: pills scroll sideways.
+> - Tabs (same steps and words as S09, CR-009): `รับเรื่อง {n}` (awaiting_assessment) · `กำลังดำเนินการ {n}` (in_repair + reworking) · `รอประเมินตรวจงาน {n}` (awaiting_rating) · `ปิดแล้ว`. Counts follow search + filters. Phones: the tab bar scrolls sideways.
+> - Order: open tabs oldest report first (`createdAt:asc`, BR-F22-1); ปิดแล้ว newest closed first.
+> - Desktop (≥ 1024px) table — always เลขงาน · เรื่อง / สถานที่ (title links to S07) · หมวดงาน, then per tab: รับเรื่อง → ความเร่งด่วน · ผู้แจ้ง · แจ้งเมื่อ; กำลังดำเนินการ → ความเร่งด่วน · ผู้ซ่อม · แจ้งเมื่อ · คาดว่าจะเสร็จ (`เลยกำหนด` red when late) · ส่งกลับ (`n ครั้ง`, blank at 0); รอประเมินตรวจงาน → ผู้ซ่อม · ซ่อมเสร็จเมื่อ · ปิดอัตโนมัติ; ปิดแล้ว → เหตุผลที่ปิด · คะแนน (`★ n` / –) · ปิดเมื่อ. Admin: ghost destructive `ปิดงาน` at the row end on open tabs → close dialog (`_common.md` §7) → toast `ปิดงานแล้ว` → list + counts refetch.
+> - Phones: card rows (thumb, title + priority, category · place, ticket no · per-tab facts, `ปิดงาน` for admin).
+> - Footer: `แสดง {a}–{b} จาก {n} งาน` + `ก่อนหน้า` / `หน้า x / y` / `ถัดไป` (20 per page).
+> - Executive: strip `โหมดดูอย่างเดียว — ผู้บริหารดูงานได้ แต่ปิดงานหรือแก้ไขไม่ได้`, no close buttons (S07 shows none either).
+> - States: skeleton rows; empty per tab (`ไม่มีงานที่รอช่างเริ่มดำเนินการ` · `ไม่มีงานที่ช่างกำลังดำเนินการ` · `ไม่มีงานที่รอผู้แจ้งประเมินตรวจงาน` · `ยังไม่มีงานที่ปิดแล้ว`); filtered empty `ไม่พบงานตามตัวกรองนี้` + `ล้างตัวกรอง`; error `โหลดงานทั้งหมดไม่สำเร็จ` + retry; forbidden `หน้านี้สำหรับ Admin และผู้บริหาร`. Refetch on window focus.
+> - S07: admin gets an outline destructive `ปิดงาน` in the next-action card on every open ticket; back link returns to S11 with its filters (`กลับไปงานทั้งหมด`).
+> - Not in Stage 3: hand over (Stage 4), notifications for the close (Stage 6 — the dialog text already promises them).
+
 > **CR-005 (2026-10-15):** no queue → S11 becomes **งานทั้งหมด** (Stage 3): tabs by step, filters, priority change and close; drag and drop, "จัดลำดับเอง", undo and the reserved group are removed. Re-spec in Stage 3 before building.
 
 

@@ -66,10 +66,6 @@ func run() error {
 			return err
 		}
 		slog.Info("role switcher enabled, demo users seeded")
-		// dev/UAT: sample master data until the real seed files arrive (D-032)
-		if err := repairSvc.EnsureSampleData(ctx); err != nil {
-			return err
-		}
 	}
 
 	r := gin.New()

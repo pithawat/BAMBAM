@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — Build plan
 
-Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19)
+Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19) · Stage 3 reduced + S09 sort rework by CR-015 (2026-10-19) · Stage 3D added, Stage 7 replaced by CR-016 (2026-10-19)
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -18,14 +18,15 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 2 | ช่างเห็นทุกงาน ประเมิน (วันคาดเสร็จ) บันทึกผล + ผู้ดำเนินการ + คะแนนช่างภายนอก; ผู้แจ้งให้ดาว (บังคับ) หรือส่งกลับ; ปิดเองเมื่อครบ 3 วัน — วงจรหลักครบ (CR-005) | F21, F07, F24 (technician) | S09, S17, S10, S08, S07 actions, S18 | built — waiting acceptance (no tests, CR-005) |
 | 2R | **CR-008 rework:** ระบบกำหนดความเร่งด่วนจากอาการ + "อื่นๆ" · หน้าตาใหม่ทั้งแอป (design-system CR-008) · S03 แบบทีละขั้น + ตรวจสอบก่อนส่ง + ที่เคยแจ้ง + ร่าง · S05 · S07 หน้าติดตามแนวตั้ง + การ์ดสิ่งที่ต้องทำ + พิมพ์รายงาน · S08 ให้คะแนนไม่ตั้งค่าไว้ก่อน · S17 ปุ่มวัน + เหตุผลที่เลื่อน · S10 เป็น sheet — ตรวจรับพร้อม Stage 1–2 | F02, F06, F07, F21 | S03, S05, S06, S07, S08, S09, S10, S17, shell | in progress |
 | 2M | **CR-014 rework:** หมวดงาน / อาการจริงตามเอกสาร (เก็บใน DB) · ฟอร์ม 3 ขั้น กรอบเท่ากันทุกขั้น · ห้องหรือจุดที่เกิดบังคับ เลือกจากรายการห้อง ผูกกับหมวด | F02, F06 | S03, location line on S05 / S06 / S07 / S09 | done (2026-10-19, `repair-stage-2M`) |
-| 3 | Admin เห็นทุกงาน ปรับความเร่งด่วน ปิดงานได้; ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | pending |
+| 3 | Admin เห็นทุกงาน ปิดงานได้ (CR-015: ไม่ปรับความเร่งด่วน); ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | built 2026-10-19 — waiting acceptance |
+| 3D | **CR-016:** หน้าแรก Admin / ผู้บริหาร = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over) | pending |
-| 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ | F13-B | S16, S03 (QR banner) | pending |
-| 6 | หน้าแรกตาม role และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง | F01 (Home), F19-B | S02, S13, bell | pending |
-| 7 | ภาพรวมองค์กร S27 (แทน S12, CR-008): ตัวเลข ภาพอาคาร isometric ผังชั้นคร่าว สิ่งที่ควรติดตาม แนวโน้ม 7 วัน บริการอื่น (ตัวอย่าง) | F23 | S27 | pending |
+| 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
+| 6 | หน้าแรกตาม role (CR-016: admin / ผู้บริหารทำแล้วใน 3D) และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง | F01 (Home), F19-B | S02, S13, bell | pending |
+| 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
 | 8 | ตรวจสิทธิ์ทุก role, edge cases, a11y และความพร้อม UAT | all phase-1 flows | all | pending |
 
-Order rationale: 1→2 is the main loop (report → assess → repair → rate), re-planned by CR-005 (one in-house technician, no queue; contractors). Admin control (3) comes next. 4–5 add entry variants of F02. Notifications (6) come after all events exist. 3D (7) is mockup-first (D-010). 8 hardens everything.
+Order rationale: 1→2 is the main loop (report → assess → repair → rate), re-planned by CR-005 (one in-house technician, no queue; contractors). Admin control (3) comes next. 4–5 add entry variants of F02. Notifications (6) come after all events exist. 3D moved up to 3D right after Stage 3 (CR-016, owner 2026-10-19). 8 hardens everything.
 
 ---
 
@@ -107,14 +108,14 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 
 **Frontend (Claude, CR-005)**
 - [x] Types / api for 9–19; error copy + field messages
-- [x] S09 `/repair/work` (tabs by step, building filter, priority order, overdue mark); nav: sidebar "งานช่าง" + bottom-nav slot for the technician
+- [x] S09 `/repair/work` (tabs by step, building filter, priority order → oldest first in Stage 3 rework (CR-015), overdue mark); nav: sidebar "งานช่าง" + bottom-nav slot for the technician
 - [x] S07 action bar: ประเมินงาน / เลื่อนวันคาดว่าเสร็จ, บันทึกผลซ่อม (disabled until assessed), ประเมินงาน (stars), ส่งกลับให้แก้; `?action=confirm|sendback`
 - [x] S10 `/repair/tickets/[id]/resolve`: note + photos, contractor stars for contractor jobs (CR-006); S17 assess dialog: date + ผู้ดำเนินการ + contractor picker with inline "เพิ่มใหม่"
 - [x] S18 `/repair/contractors` + `/repair/contractors/[id]` (technician edits; admin / executive view)
 - [ ] e2e (skipped this round)
 
 **Acceptance criteria**
-- [ ] AC1: Employee reports → S06 shows "กำลังดำเนินการ · รอช่างประเมิน"; the technician sees it under รอประเมิน (most urgent first)
+- [ ] AC1: Employee reports → S06 shows "กำลังดำเนินการ · รอช่างประเมิน"; the technician sees it under รอประเมิน (oldest first, CR-015)
 - [ ] AC2: "บันทึกผลซ่อม" is disabled until the technician sets an expected date and ผู้ดำเนินการ; after assessing, the reporter sees "คาดว่าจะเสร็จ {date}"
 - [ ] AC3: Assess with ช่างภายนอก requires a contractor (pick or เพิ่มใหม่); resolve then requires the contractor stars; the reporter sees "ดำเนินการโดยช่างภายนอก · {ประเภท}" from the กำลังซ่อม step but never the name or score
 - [ ] AC3b: "แก้การประเมิน" can switch to ช่างในระบบ or another contractor; the timeline shows the change
@@ -244,25 +245,72 @@ Status: done — accepted 2026-10-19, tag `repair-stage-2M`
 
 ---
 
-## Stage 3 — Admin งานทั้งหมดและการจัดการ (CR-005: no queue reorder)
+## Stage 3 — Admin งานทั้งหมดและการจัดการ (CR-005: no queue reorder; CR-015: no priority change)
 
 **Scope**
-- Flows: F22 (all tickets, change priority), F08-B (close any ticket), BR-F06-1 all tickets, BR-F22-6 executive read-only, F24 admin view
-- Screens: S11 งานทั้งหมด (tabs by step, filters, executive mode, mobile list), S07 admin actions (ปิดงาน, priority select), S18 view
-- Endpoints: 6 + 7 (`scope=all`), 20, 21
+- Flows: F22 (all tickets; CR-015: no priority change), F08-B (close any ticket), BR-F06-1 all tickets, BR-F22-6 executive read-only, F24 admin view
+- Screens: S11 งานทั้งหมด (tabs by step, filters, executive mode, mobile list; oldest first, priority shown as info), S07 admin action (ปิดงาน), S18 view
+- Endpoints: 6 + 7 (`scope=all`), 21 (CR-015: #20 removed)
 - Out of this stage: hand over (Stage 4)
 
 **Backend (Claude)**
-- [ ] Service rules: priority change (event `priority_changed`, audit), admin close from any open status (event `admin_closed`)
-- [ ] Tests: executive gets 403 on every write
+- [x] Service rules: admin close from any open status (event `admin_closed`) — #21, `allowedActions` `close`
+- [x] Tests: executive gets 403 on every write (`TestExecutiveWritesForbidden`, `TestAdminClose*`)
 
 **Frontend**
-- [ ] S11 list (re-spec without drag and drop — `@dnd-kit/sortable` no longer needed, D-025 superseded), S07 admin actions card + close / priority dialogs
+- [x] S11 list (re-spec without drag and drop — `@dnd-kit/sortable` no longer needed, D-025 superseded), S07 admin action card + close dialog (CR-015: no priority select / dialog)
+
+**Rework from CR-015 (Stage 2 code)**
+- [x] `technician-work.tsx` (S09): `sort: "createdAt:asc"` instead of `priority:asc` (2 calls); keep the priority chip; update Stage 2 AC1 wording "most urgent first" → oldest first
+- [x] Home technician `top` list (#home) ordered oldest first if it uses priority; remove `change_priority` / `priority_changed` leftovers in types / mocks if any
+
+- [x] e2e `e2e/repair/F22-admin-tickets.spec.ts` (written, not run yet: needs the local API on current code)
 
 **Acceptance criteria**
-- [ ] AC1: Changing priority asks for confirmation and moves the ticket in the technician's list
+- [ ] AC1 (CR-015): S11 lists open tickets oldest first; priority is shown but admin has no way to change it (no select, no endpoint)
 - [ ] AC2: Admin closes an in-progress ticket with a reason; reporter sees Admin ปิดงาน
 - [ ] AC3: Executive sees the same data with no selects or close buttons; direct API writes return 403
+
+---
+
+## Stage 3D — Dashboard หน้าแรก Admin / ผู้บริหาร + อุปกรณ์ + 3D อาคาร 1 (CR-016)
+
+**Start:** owner said go 2026-10-19 (S29 approved with `S29-admin-dashboard-modern.html` + the owner's model, D-082). Branch `repair/stage-3D`.
+
+**Scope**
+- Flows: F23 (dashboard + 3D drill-down), F31 (place equipment)
+- Screens: S29 (admin / executive Home: overview band, repair counts, 3D card, other-service sample blocks, attention list; edit mode + asset dialog; phone = floor list)
+- Endpoints: 27 (CR-016 shape), 29–34
+- Data: อาคาร 1 = 6 floors × 32 × 15 m (`attachments/building plan/1-อาคาร 1.pdf`); real rooms per floor + outlines traced from the PDF (owner checks); 4 asset types
+- Out of this stage: QR lookup / scan (Stage 5), notifications (Stage 6), other buildings' models
+
+**Backend (Claude)**
+- [x] Migration `20261020000001_repair_cr016`: `platform.asset_types` (+ seed 4), `repair.asset_type_categories`, `platform.assets`, `platform.floor_plans`, `platform.rooms.plan_shape`, `repair.tickets.asset_id`; อาคาร 1 floors / rooms / outlines (every environment, stable ids)
+- [x] Queries + repository + service: #27 (counts, floors, attention), #29, #30, #31–#34 with rules BR-F31-1…6 (unique code ignoring case, point in polygon, deactivate only, audit log)
+- [x] Tests: point-in-polygon, code rules, permissions (admin writes, executive 403 on #31–#34, others 403 on all), #27 numbers = S11 counts
+
+**Frontend**
+- [x] `types.ts` / `mocks.ts` / `api.ts` for #27, #29–#34 (+ `plan-geometry.ts`, `service-samples.ts`, `three` 0.160.1)
+- [x] Home: admin / executive get S29; other roles keep the current Home (Stage 6)
+- [x] `BuildingScene` (D-082: the owner's model ported to plain `three`, lazy-loaded): building → floor → plan, pins, legend, keyboard floor picker; list fallback < 1024px and for buildings without a plan
+- [x] Edit mode: palette drag → drop on a room → asset dialog; drag to move (toast with undo); click → edit / ปิดใช้งาน; "เพิ่มอุปกรณ์" form without a pointer
+
+**Wiring + e2e (Claude)**
+- [x] `e2e/repair/F23-dashboard.spec.ts` (numbers match S11, floor drill-down, executive read-only, employee keeps the normal Home)
+- [x] `e2e/repair/F31-assets.spec.ts` (add by form, move, duplicate code, deactivate)
+
+**Acceptance criteria**
+- [x] AC1: Admin / executive Home shows the key numbers and they match S11
+- [x] AC2: อาคาร 1 shows 6 floors; clicking a floor opens its plan with rooms, assets and open-ticket pins; back to the building
+- [x] AC3: Admin adds an แอร์ by dragging it into a room, enters code + name, sees it after reload; moves it to another room; deactivates it (it disappears, the code stays taken)
+- [x] AC4: Duplicate code → `รหัสนี้มีอุปกรณ์อื่นใช้แล้ว`; drop outside a room is refused
+- [x] AC5: Executive sees everything without edit controls; direct writes 403; employee / technician Home unchanged
+- [x] AC6: Phone (390px): no 3D, floor list + numbers, no horizontal scroll
+
+**Demo script**
+1. Admin → หน้าแรก → numbers → click อาคาร 1 ชั้น 1 → room pin → ticket
+2. จัดวางอุปกรณ์ → drag แอร์ into HR → `AC-1-001` / `แอร์ห้อง HR` → save → move it → ปิดใช้งาน
+3. Switch to ผู้บริหาร; open on a phone
 
 ---
 
@@ -316,7 +364,7 @@ Status: done — accepted 2026-10-19, tag `repair-stage-2M`
 - Out of this stage: F13-A (printing QR labels) — phase 1 labels are generated outside the app from the URL format in the contract (D-024)
 
 **Backend (Claude)**
-- [ ] Migration `assets` (code unique case-insensitive, category, building, floor, location detail) + dev seed (`AC-05-012` …); ticket keeps `asset_code` · (CR-014) assets carry `room_id`; #25 returns `room` and S03 prefills it
+- [ ] ~~Migration `assets`~~ — created in Stage 3D (CR-016: `platform.assets`, room only, category via `asset_type_categories`); here: #25 lookup returns `room` + type, S03 prefills, ticket stores `asset_id` + `asset_code`
 - [ ] Endpoint 25; tests
 
 **Frontend contract (Claude)**
@@ -372,7 +420,7 @@ Status: done — accepted 2026-10-19, tag `repair-stage-2M`
 **Acceptance criteria**
 - [ ] AC1: Running the Stage 2 demo loop produces exactly the F19-B notifications for each role, with the exact S13 copy
 - [ ] AC2: Tapping a notification marks it read and opens S07; the bell count drops
-- [ ] AC3: Home shows the awaiting card on top for a reporter with a resolved ticket; technician Home shows รอประเมิน / กำลังซ่อม counts and the most urgent jobs; admin Home shows counts linking to S11 tabs
+- [ ] AC3: Home shows the awaiting card on top for a reporter with a resolved ticket; technician Home shows รอประเมิน / กำลังซ่อม counts and the oldest open jobs (CR-015); admin Home shows counts linking to S11 tabs
 - [ ] AC4: A ticket 48 h after `resolved` produces one reminder; at 72 h the auto-closed notification
 
 **Demo script**
@@ -382,6 +430,8 @@ Status: done — accepted 2026-10-19, tag `repair-stage-2M`
 ---
 
 ## Stage 7 — ภาพรวมอาคาร 3D
+
+> **CR-016 (2026-10-19): replaced by Stage 3D.** The tasks below are kept for history only.
 
 **Scope**
 - Flows: F23 — model generated from buildings/floors; pins by highest priority; floor list

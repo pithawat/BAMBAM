@@ -19,11 +19,6 @@ import (
 type Repository interface {
 	ListCategories(ctx context.Context) ([]Category, error)
 	ListBuildings(ctx context.Context) ([]Building, error)
-	// InsertSampleLocations inserts sample buildings, floors and rooms by id, leaving existing rows
-	// as they are (dev / UAT only, D-032, CR-014).
-	InsertSampleLocations(ctx context.Context, buildings []Building) error
-	// RefreshSampleData renames sample buildings still at their first sample name (dev / UAT only, CR-008).
-	RefreshSampleData(ctx context.Context, renames []SampleRename) error
 	ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]RecentPlace, error)
 
 	InsertPhoto(ctx context.Context, p NewPhoto) error
@@ -43,6 +38,22 @@ type Repository interface {
 	ListContractors(ctx context.Context, f ContractorFilter) ([]Contractor, int64, error)
 	GetContractor(ctx context.Context, id uuid.UUID) (Contractor, error)
 	ListContractorJobs(ctx context.Context, id uuid.UUID, page, pageSize int) ([]ContractorJob, int64, error)
+
+	// CR-016 dashboard, floor plans and equipment (service_dashboard.go).
+	// OverviewCounts: dayStart / weekStart are Bangkok midnights, today the Bangkok date (BR-F23-1).
+	OverviewCounts(ctx context.Context, today, dayStart, weekStart time.Time) (OverviewCounts, error)
+	OverviewBuildings(ctx context.Context) ([]OverviewBuilding, error)
+	AttentionTicketIDs(ctx context.Context, today time.Time, limit int) ([]uuid.UUID, error)
+	ListAssetTypes(ctx context.Context) ([]AssetType, error)
+	// GetFloorPlan returns ErrFloorNotFound for an unknown or inactive floor.
+	GetFloorPlan(ctx context.Context, floorID uuid.UUID) (FloorPlan, error)
+	// GetAsset returns ErrAssetNotFound for an unknown or inactive asset.
+	GetAsset(ctx context.Context, id uuid.UUID) (Asset, error)
+	// ActiveFloorName returns ErrFloorNotFound for an unknown or inactive floor.
+	ActiveFloorName(ctx context.Context, floorID uuid.UUID) (string, error)
+	// ActiveAssetType: ok is false when the type is unknown or inactive.
+	ActiveAssetType(ctx context.Context, id uuid.UUID) (t AssetType, ok bool, err error)
+	AssetCodesWithPrefix(ctx context.Context, prefix string) ([]string, error)
 
 	// InTx runs fn in one transaction with a repository bound to it.
 	InTx(ctx context.Context, fn func(tx TxRepository) error) error
@@ -68,6 +79,7 @@ type TxRepository interface {
 	ResolveTicket(ctx context.Context, id, technicianID uuid.UUID, in ResolveInput, now, autoCloseAt time.Time) error
 	ConfirmTicket(ctx context.Context, id uuid.UUID, rating int16, comment *string, now time.Time) error
 	SendBackTicket(ctx context.Context, id uuid.UUID, now time.Time) error
+	AdminCloseTicket(ctx context.Context, id uuid.UUID, now time.Time) error
 	// InsertEvent writes a timeline event and attaches its photos.
 	InsertEvent(ctx context.Context, e NewEvent) error
 	ActiveContractorExists(ctx context.Context, id uuid.UUID) (bool, error)
@@ -77,6 +89,21 @@ type TxRepository interface {
 	// UpdateContractor returns false when the contractor does not exist.
 	UpdateContractor(ctx context.Context, id uuid.UUID, in ContractorInput) (bool, error)
 	SetContractorTypes(ctx context.Context, id uuid.UUID, typeIDs []uuid.UUID) error
+
+	// CR-016 equipment writes.
+	ActiveAssetType(ctx context.Context, id uuid.UUID) (t AssetType, ok bool, err error)
+	// PlacementRoom: ok is false when the room (or its floor) is unknown or inactive.
+	PlacementRoom(ctx context.Context, roomID uuid.UUID) (room PlacementRoom, ok bool, err error)
+	RoomShapesOnFloor(ctx context.Context, floorID uuid.UUID) ([]RoomShape, error)
+	// AssetCodeTaken: an asset other than excludeID uses the code, ignoring case (inactive included).
+	AssetCodeTaken(ctx context.Context, code string, excludeID uuid.UUID) (bool, error)
+	// LockAsset returns ErrAssetNotFound for an unknown asset.
+	LockAsset(ctx context.Context, id uuid.UUID) (LockedAsset, error)
+	// InsertAsset / UpdateAsset return ErrAssetCodeTaken when the unique index rejects the code.
+	InsertAsset(ctx context.Context, id uuid.UUID, in AssetInput, by uuid.UUID) error
+	UpdateAsset(ctx context.Context, id uuid.UUID, in AssetInput, by uuid.UUID) error
+	DeactivateAsset(ctx context.Context, id, by uuid.UUID) error
+	InsertAudit(ctx context.Context, actor uuid.UUID, action string, assetID uuid.UUID, data []byte) error
 }
 
 // photoTTL: unattached uploads older than this are deleted and cannot be attached (D-022).
@@ -100,19 +127,6 @@ func (s *Service) Categories(ctx context.Context) ([]Category, error) {
 
 func (s *Service) Buildings(ctx context.Context) ([]Building, error) {
 	return s.repo.ListBuildings(ctx)
-}
-
-// EnsureSampleData inserts the sample buildings, floors and rooms (seed.go) that are missing and
-// renames sample buildings still at their first sample name. Categories and symptoms are the real
-// master loaded by migration (CR-014). main.go calls it only in dev/UAT (D-032).
-func (s *Service) EnsureSampleData(ctx context.Context) error {
-	if err := s.repo.RefreshSampleData(ctx, sampleBuildingRenames()); err != nil {
-		return fmt.Errorf("refresh sample master data: %w", err)
-	}
-	if err := s.repo.InsertSampleLocations(ctx, sampleBuildings()); err != nil {
-		return fmt.Errorf("insert sample locations: %w", err)
-	}
-	return nil
 }
 
 // ---- photos ----
@@ -541,6 +555,39 @@ func (s *Service) SendBack(ctx context.Context, v Viewer, id uuid.UUID, reason s
 		}
 		return tx.InsertEvent(ctx, NewEvent{ID: uuid.New(), TicketID: id, Type: EventSentBack, ActorID: &v.ID, At: now,
 			Note: &reason, Data: []byte("{}"), PhotoKind: PhotoKindSendBack, PhotoIDs: photoIDs})
+	})
+	if err != nil {
+		return TicketDetail{}, err
+	}
+	return s.Ticket(ctx, v, id)
+}
+
+// Close implements endpoint #21: admin closes any open ticket with a reason, without waiting for
+// the reporter (F08-B, BR-F08B-1). The executive sees the same screens read-only (BR-F22-6).
+func (s *Service) Close(ctx context.Context, v Viewer, id uuid.UUID, reason string) (TicketDetail, error) {
+	if v.Role != users.RoleAdmin {
+		return TicketDetail{}, apperr.ErrForbidden
+	}
+	reason = strings.TrimSpace(reason)
+	fields := map[string]string{}
+	checkText(fields, "reason", reason, MaxNoteChars, true)
+	if len(fields) > 0 {
+		return TicketDetail{}, apperr.Validation(fields)
+	}
+	now := s.now()
+	err := s.repo.InTx(ctx, func(tx TxRepository) error {
+		t, err := tx.LockTicket(ctx, id)
+		if err != nil {
+			return err
+		}
+		if t.Status == StatusClosed {
+			return ErrTicketClosed
+		}
+		if err := tx.AdminCloseTicket(ctx, id, now); err != nil {
+			return err
+		}
+		return tx.InsertEvent(ctx, NewEvent{ID: uuid.New(), TicketID: id, Type: EventAdminClosed, ActorID: &v.ID, At: now,
+			Note: &reason, Data: []byte("{}")})
 	})
 	if err != nil {
 		return TicketDetail{}, err

@@ -159,3 +159,53 @@ func TestControllerReportFlow(t *testing.T) {
 		t.Fatalf("list: %d %s", w.Code, w.Body.String())
 	}
 }
+
+// Stage 3 AC3: the executive is read-only — every write except reporting returns 403.
+func TestExecutiveWritesForbidden(t *testing.T) {
+	f := newFixture(t)
+	d := f.create(t)
+	f.repo.tickets[d.ID].Status = StatusResolved
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	exec := middleware.Principal{UserID: uuid.New(), Role: users.RoleExecutive}
+	RegisterRoutes(r.Group("/api/v1", middleware.RequireAuth(fixedSession{exec})).Group("/repair"), NewController(f.svc))
+
+	ticket := "/api/v1/repair/tickets/" + d.ID.String()
+	cases := []struct{ method, path, body string }{
+		{"POST", ticket + "/assess", `{"expectedDoneOn":"2026-10-20","workBy":"in_house"}`},
+		{"POST", ticket + "/resolve", `{"note":"ซ่อมแล้ว","photoIds":[]}`},
+		{"POST", ticket + "/confirm", `{"rating":5}`},
+		{"POST", ticket + "/send-back", `{"reason":"ยังไม่หาย"}`},
+		{"POST", ticket + "/close", `{"reason":"ปิด"}`},
+		{"POST", "/api/v1/repair/contractor-types", `{"name":"แอร์"}`},
+		{"POST", "/api/v1/repair/contractors", `{"name":"ช่าง ก.","typeIds":[]}`},
+		{"PUT", "/api/v1/repair/contractors/" + uuid.NewString(), `{"name":"ช่าง ก.","typeIds":[],"isActive":true}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			w, env := do(t, r, tc.method, tc.path, []byte(tc.body), "application/json")
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("got %d %s, want 403 (%s)", w.Code, env.Error.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestCloseStatusCodes(t *testing.T) {
+	f := newFixture(t)
+	d := f.create(t)
+	r := newTestRouter(f, users.RoleAdmin)
+	path := "/api/v1/repair/tickets/" + d.ID.String() + "/close"
+
+	w, env := do(t, r, "POST", path, []byte(`{"reason":""}`), "application/json")
+	if w.Code != 400 || env.Error.Fields["reason"] != "REQUIRED" {
+		t.Fatalf("empty reason: %d %v", w.Code, env.Error)
+	}
+	if w, _ = do(t, r, "POST", path, []byte(`{"reason":"ส่งซ่อมภายนอกแล้ว"}`), "application/json"); w.Code != 200 {
+		t.Fatalf("close: %d %s", w.Code, w.Body.String())
+	}
+	w, env = do(t, r, "POST", path, []byte(`{"reason":"อีกครั้ง"}`), "application/json")
+	if w.Code != 409 || env.Error.Code != "TICKET_CLOSED" {
+		t.Fatalf("close twice: %d %s", w.Code, env.Error.Code)
+	}
+}

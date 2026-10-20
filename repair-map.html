@@ -1,0 +1,1152 @@
+<title>แผนผังงานซ่อมอาคาร</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: operations console — live 3D viewport on the left, floor directory / work orders on the right; stacks on phones */
+:root{
+  --bg:#E8ECEF; --surface:#FFFFFF; --surface-2:#F2F5F7; --fg:#15202A; --muted:#5A6874; --line:#D2D9DF;
+  --accent:#1B78BC; --accent-soft:#E2EFF9;
+  --pending:#D33139; --progress:#C76A00; --done:#2B8A3E;
+  --pending-soft:#FBE3E4; --progress-soft:#FCEBD5; --done-soft:#E0F2E4;
+  --sky-1:#C9DEEE; --sky-2:#EDF1F4;
+  --shadow:0 2px 10px rgba(21,32,42,.12);
+  --font-display:"Bai Jamjuree","IBM Plex Sans Thai",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E151B; --surface:#151F27; --surface-2:#1B2731; --fg:#E5ECF1; --muted:#93A2AF; --line:#27353F;
+    --accent:#58A9E4; --accent-soft:#16324A;
+    --pending:#FF6B70; --progress:#FFA94D; --done:#5FD07A;
+    --pending-soft:#3A1C20; --progress-soft:#3A2814; --done-soft:#17321F;
+    --sky-1:#172532; --sky-2:#0E151B;
+    --shadow:0 2px 12px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E151B; --surface:#151F27; --surface-2:#1B2731; --fg:#E5ECF1; --muted:#93A2AF; --line:#27353F;
+  --accent:#58A9E4; --accent-soft:#16324A;
+  --pending:#FF6B70; --progress:#FFA94D; --done:#5FD07A;
+  --pending-soft:#3A1C20; --progress-soft:#3A2814; --done-soft:#17321F;
+  --sky-1:#172532; --sky-2:#0E151B;
+  --shadow:0 2px 12px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--font-body); font-size:14px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:14px;
+}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{height:100%;max-width:1520px;margin:0 auto;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
+.top h1{margin:0;font:700 22px/1.2 var(--font-display);letter-spacing:.01em;text-wrap:balance}
+.top p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.sample{font:500 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:4px 8px}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;min-height:0}
+.viewport{position:relative;min-height:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);
+  background:linear-gradient(180deg,var(--sky-1) 0%,var(--sky-2) 72%)}
+.viewport canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.fade{position:absolute;inset:0;background:var(--sky-2);opacity:0;pointer-events:none;transition:opacity .22s ease}
+.fade.on{opacity:1}
+
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;will-change:transform}
+.badge{pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:7px;padding:4px 10px 4px 8px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font:500 12px var(--font-body)}
+.badge b{font:600 12px var(--font-mono)}
+.badge .dot{width:9px;height:9px;border-radius:50%;background:currentColor;animation:blink 1.2s ease-in-out infinite}
+.badge.pending{color:var(--pending)} .badge.in_progress{color:var(--progress)}
+.badge span{color:var(--fg)}
+@keyframes blink{50%{opacity:.25}}
+.zone-lbl{display:flex;flex-direction:column;align-items:center;gap:0;padding:3px 9px;border-radius:6px;
+  background:color-mix(in srgb,var(--surface) 82%,transparent);font:600 12px/1.3 var(--font-display);text-align:center}
+.zone-lbl small{font:400 11px var(--font-mono);color:var(--muted)}
+.core-lbl{font:500 10.5px var(--font-mono);letter-spacing:.06em;color:#3E4952;text-transform:uppercase}
+.dim-lbl{font:500 11px var(--font-mono);color:#B3261E}
+.pin-lbl{font:500 10.5px var(--font-mono);padding:1px 6px;border-radius:4px;background:var(--surface);border:1px solid var(--line);color:var(--fg)}
+.pin-lbl.sel{background:var(--fg);color:var(--surface);border-color:var(--fg)}
+
+.tip{position:absolute;left:0;top:0;pointer-events:none;z-index:3;max-width:240px;padding:7px 10px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:12.5px;line-height:1.4}
+.tip strong{display:block;font-weight:600}
+.tip em{font-style:normal;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+.vp-top{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none}
+.vp-top > *{pointer-events:auto}
+.crumb{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font:600 13px var(--font-display)}
+.crumb span{color:var(--muted);font-weight:500}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:500;font-size:13px;box-shadow:var(--shadow)}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.vp-bottom{position:absolute;left:12px;right:12px;bottom:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px;flex-wrap:wrap;pointer-events:none}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:6px 10px;border-radius:8px;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--line);font-size:12px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.hint{font-size:12px;color:var(--muted);padding:4px 8px;border-radius:6px;background:color-mix(in srgb,var(--surface) 70%,transparent)}
+
+.panel{min-height:0;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:18px}
+.panel h2{margin:0;font:700 19px/1.25 var(--font-display)}
+.panel .sub{margin:2px 0 0;color:var(--muted);font-size:12.5px;font-family:var(--font-mono)}
+.eyebrow{margin:0 0 8px;font:600 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.counts{display:flex;gap:8px;flex-wrap:wrap}
+.count{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-size:12.5px;font-weight:500}
+.count b{font:600 14px var(--font-mono);font-variant-numeric:tabular-nums}
+.count.pending{background:var(--pending-soft);color:var(--pending)}
+.count.in_progress{background:var(--progress-soft);color:var(--progress)}
+.count.done{background:var(--done-soft);color:var(--done)}
+
+.floors{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.floor-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto 14px;align-items:center;gap:10px;padding:10px 12px;border:0;border-top:1px solid var(--line);background:var(--surface);text-align:left;cursor:pointer}
+.floor-row:first-child{border-top:0}
+.floor-row:hover,.floor-row.hover{background:var(--surface-2)}
+.floor-no{font:600 20px/1 var(--font-mono);font-variant-numeric:tabular-nums;display:flex;flex-direction:column;gap:3px}
+.floor-no small{font:500 10px var(--font-body);color:var(--muted);letter-spacing:.04em}
+.floor-meta{min-width:0;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chev{color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.chip.pending{background:var(--pending-soft);color:var(--pending)}
+.chip.in_progress{background:var(--progress-soft);color:var(--progress)}
+.chip.done{background:var(--done-soft);color:var(--done)}
+.chip.ok{background:var(--surface-2);color:var(--muted)}
+.chip.live::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;animation:blink 1.2s ease-in-out infinite}
+
+.jobs{display:flex;flex-direction:column;gap:6px}
+.job{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--surface);text-align:left;cursor:pointer}
+.job:hover{background:var(--surface-2)}
+.job.sel{border-color:var(--accent);background:var(--accent-soft)}
+.job .name{font-weight:600;font-size:13.5px;min-width:0}
+.job .issue{grid-column:1 / -1;color:var(--muted);font-size:12.5px}
+.job .id{grid-column:1 / -1;font:400 11px var(--font-mono);color:var(--muted)}
+.detail{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surface-2)}
+.detail h3{margin:0 0 10px;font:700 15px/1.35 var(--font-display)}
+.detail dl{margin:0;display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:6px 14px;font-size:13px}
+.detail dt{color:var(--muted)}
+.detail dd{margin:0;min-width:0}
+.detail .mono{font-family:var(--font-mono);font-size:12px}
+.notice{margin:0;padding:10px 12px;border-radius:8px;background:var(--surface-2);color:var(--muted);font-size:12.5px}
+.empty{margin:0;color:var(--muted);font-size:13px}
+.foot{margin-top:auto;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.foot code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+
+@media (max-width:880px){
+  html,body{height:auto}
+  .app{height:auto}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .viewport{height:62vh;min-height:380px}
+  .panel{overflow:visible}
+}
+@media (prefers-reduced-motion: reduce){
+  .badge .dot,.chip.live::before{animation:none}
+  .fade{transition:none}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>แผนผังงานซ่อม · อาคาร 1</h1>
+      <p>คลิกที่ชั้นของอาคารเพื่อเปิดแปลนและดูจุดอุปกรณ์ที่กำลังซ่อม</p>
+    </div>
+    <span class="sample">ข้อมูลงานซ่อมเป็นตัวอย่าง</span>
+  </header>
+
+  <div class="main">
+    <section class="viewport" id="viewport" aria-label="โมเดล 3 มิติของอาคาร">
+      <div class="labels" id="labels"></div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="vp-top">
+        <button class="btn" id="backBtn" type="button" hidden>← กลับไปที่ตัวอาคาร</button>
+        <div class="crumb" id="crumb">อาคาร 1 <span>· มุมมองภายนอก</span></div>
+      </div>
+      <div class="vp-bottom">
+        <div class="legend">
+          <span><i style="background:var(--pending)"></i>รอดำเนินการ</span>
+          <span><i style="background:var(--progress)"></i>กำลังซ่อม</span>
+          <span><i style="background:var(--done)"></i>ซ่อมเสร็จ</span>
+        </div>
+        <div class="hint" id="hint">ลากเพื่อหมุน · ล้อเมาส์เพื่อซูม · คลิกชั้นเพื่อเปิดแปลน</div>
+      </div>
+      <div class="fade" id="fade"></div>
+    </section>
+
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* =====================================================================
+   1) DATA — แก้ตรงนี้ หรือเรียก window.facility.setJobs([...]) จากระบบจริง
+   ===================================================================== */
+const BUILDING = { name: 'อาคาร 1', floors: 6, width: 32, depth: 15, floorHeight: 3.5, overhang: 1.2 };
+
+const STATUS = {
+  pending:     { label: 'รอดำเนินการ', color: 0xff3b30, rank: 2 },
+  in_progress: { label: 'กำลังซ่อม',   color: 0xff9f0a, rank: 1 },
+  done:        { label: 'ซ่อมเสร็จ',   color: 0x34c759, rank: 0 },
+};
+
+// พิกัดแปลน: หน่วยเมตร วัดจากมุมซ้ายบนของแปลน (x ไปทางขวา, z ลงล่าง; ขอบล่าง = ด้านหน้าอาคาร/ทางเข้า)
+const FLOOR_PLANS = {
+  1: {
+    commonArea: 237.8,
+    zones: [
+      { name: 'Data and Digitization', area: 72,   x: 0,  z: 0, w: 12, d: 6,    color: 0x8fa9dc },
+      { name: 'ห้องย่อย',              area: 12,   x: 0,  z: 6, w: 4,  d: 3,    color: 0x9ccb87 },
+      { name: 'Marketing · ทีมพี่สุ้ง', area: 72,   x: 0,  z: 9, w: 12, d: 6,    color: 0x9ccb87 },
+      { name: 'HR',                    area: 17.4, x: 24, z: 0, w: 4,  d: 4.35, color: 0xf2b072 },
+      { name: 'HR',                    area: 20.8, x: 28, z: 0, w: 4,  d: 5.2,  color: 0xf2b072 },
+      { name: 'HR',                    area: 48,   x: 24, z: 9, w: 8,  d: 6,    color: 0xf2b072 },
+    ],
+    reception: { x: 14.6, z: 10.4, w: 4.4, d: 0.8 },
+    entrance: { x: 14, w: 6 },
+  },
+};
+// แกนกลางอาคาร (เหมือนกันทุกชั้น)
+const CORE = [
+  { label: 'ห้องน้ำ', x: 12.6, z: 0.4, w: 3.6, d: 5.2, color: 0xbcd0db },
+  { label: 'บันได',  x: 16.6, z: 0.4, w: 3.4, d: 4.8, color: 0xc9ccd0, stairs: true },
+  { label: 'A.H.U.', x: 20.4, z: 0.4, w: 3.2, d: 2.6, color: 0xc9ccd0 },
+  { label: 'ลิฟต์',   x: 30.2, z: 6.3, w: 1.8, d: 2.4, color: 0xaeb4ba },
+];
+
+let JOBS = [
+  { id: 'WO-6910-014', floor: 1, x: 4.5,  z: 2.4,  status: 'in_progress', equipment: 'แอร์ FCU-1-02',           issue: 'น้ำแอร์หยดลงโต๊ะทำงาน',       tech: 'สมชาย ร.',  updated: '19 ต.ค. 2569 · 10:40' },
+  { id: 'WO-6910-017', floor: 1, x: 7.5,  z: 12.2, status: 'pending',     equipment: 'โคมไฟ LED แถว C',         issue: 'หลอดกระพริบ 3 ดวง',            tech: '—',         updated: '19 ต.ค. 2569 · 11:05' },
+  { id: 'WO-6910-020', floor: 1, x: 14.4, z: 3.0,  status: 'pending',     equipment: 'ก๊อกอ่างล้างมือ ห้องน้ำชาย', issue: 'น้ำรั่วซึมใต้อ่าง',             tech: '—',         updated: '19 ต.ค. 2569 · 12:15' },
+  { id: 'WO-6910-009', floor: 1, x: 27.6, z: 12.6, status: 'done',        equipment: 'เครื่องสแกนบัตรประตู HR',   issue: 'อ่านบัตรไม่ติด',               tech: 'วิชัย ก.',  updated: '18 ต.ค. 2569 · 16:30' },
+  { id: 'WO-6910-011', floor: 3, x: 21.8, z: 1.6,  status: 'in_progress', equipment: 'เครื่องส่งลมเย็น AHU-3',    issue: 'ลมเย็นไม่ออกฝั่งตะวันออก',      tech: 'สมชาย ร.',  updated: '19 ต.ค. 2569 · 09:10' },
+  { id: 'WO-6910-019', floor: 3, x: 26.0, z: 10.5, status: 'pending',     equipment: 'เต้ารับไฟฟ้าผนัง P3-07',    issue: 'ไฟไม่เข้า',                     tech: '—',         updated: '19 ต.ค. 2569 · 11:48' },
+  { id: 'WO-6910-006', floor: 4, x: 6.0,  z: 7.5,  status: 'done',        equipment: 'โปรเจกเตอร์ห้องประชุม 4A',  issue: 'ภาพไม่ขึ้น',                    tech: 'อนันต์ ส.', updated: '17 ต.ค. 2569 · 14:00' },
+  { id: 'WO-6910-015', floor: 5, x: 18.2, z: 5.6,  status: 'in_progress', equipment: 'ประตูหนีไฟ FD-5-01',        issue: 'ปิดไม่สนิท โช้คอัพเสื่อม',       tech: 'วิชัย ก.',  updated: '19 ต.ค. 2569 · 08:55' },
+];
+
+/* =====================================================================
+   2) SETUP
+   ===================================================================== */
+const W = BUILDING.width, D = BUILDING.depth, FH = BUILDING.floorHeight, OH = BUILDING.overhang, NF = BUILDING.floors;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const vp = document.getElementById('viewport');
+const labelsEl = document.getElementById('labels');
+const tipEl = document.getElementById('tip');
+const panel = document.getElementById('panel');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+vp.prepend(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(36, 1, 0.5, 800);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const buildingScene = new THREE.Scene();
+const planScene = new THREE.Scene();
+buildingScene.environment = envTex;
+planScene.environment = envTex;
+
+function addLights(scene, size) {
+  scene.add(new THREE.HemisphereLight(0xe4f0ff, 0x8d877a, 0.9));
+  const sun = new THREE.DirectionalLight(0xfff1dc, 2.3);
+  sun.position.set(28, 48, 34);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -size, right: size, top: size, bottom: -size, near: 1, far: 160 });
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.03;
+  scene.add(sun);
+}
+addLights(buildingScene, 34);
+addLights(planScene, 24);
+
+/* ---------- helpers ---------- */
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+// box geometry with its bottom at y
+function bg(w, h, d, x, y, z) { return new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z); }
+function mesh(geo, mat, shadow = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = m.receiveShadow = shadow;
+  return m;
+}
+function merged(list, mat, shadow = true) { return mesh(mergeGeometries(list), mat, shadow); }
+function planeUV(w, h, repeatU, repeatV = 1) {
+  const g = new THREE.PlaneGeometry(w, h);
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * repeatU, uv.getY(i) * repeatV);
+  return g;
+}
+const ease = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+
+/* ---------- textures ---------- */
+const TEX = {};
+TEX.glass = canvasTex(128, 192, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, '#4f6a7b'); gr.addColorStop(0.55, '#23323c'); gr.addColorStop(1, '#1a252d');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,255,255,.07)';
+  g.beginPath(); g.moveTo(24, 0); g.lineTo(78, 0); g.lineTo(34, h); g.lineTo(-20, h); g.fill();
+  g.fillStyle = '#626b72';
+  g.fillRect(0, 0, 6, h); g.fillRect(0, 0, w, 5); g.fillRect(0, Math.round(h * 0.7), w, 4);
+});
+TEX.glass.wrapS = TEX.glass.wrapT = THREE.RepeatWrapping;
+
+TEX.poster = canvasTex(256, 160, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, w, h);
+  gr.addColorStop(0, '#125d9e'); gr.addColorStop(1, '#3a9fdc');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,255,255,.22)';
+  g.beginPath(); g.ellipse(w * 0.72, h * 0.95, 120, 70, -0.2, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.9)';
+  g.fillRect(18, 20, 112, 11); g.fillRect(18, 38, 74, 7);
+  g.fillStyle = '#dfe8ee'; g.fillRect(150, 52, 84, 62);
+  g.fillStyle = '#9fb3c1'; g.fillRect(156, 92, 72, 16);
+  g.strokeStyle = '#ffffff'; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6);
+});
+TEX.portrait = canvasTex(64, 96, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, '#8aa6bd'); gr.addColorStop(1, '#4c5d6c');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#e9e2d0';
+  g.beginPath(); g.ellipse(w / 2, h * 0.36, 9, 11, 0, 0, Math.PI * 2); g.fill();
+  g.fillRect(w / 2 - 15, h * 0.5, 30, h * 0.5);
+});
+TEX.curb = canvasTex(64, 8, (g, w, h) => {
+  g.fillStyle = '#f07b22'; g.fillRect(0, 0, w / 2, h);
+  g.fillStyle = '#f4f4f0'; g.fillRect(w / 2, 0, w / 2, h);
+});
+TEX.curb.wrapS = THREE.RepeatWrapping;
+TEX.curb.repeat.set(10, 1);
+TEX.groundFade = (() => {
+  const t = canvasTex(256, 256, (g, w, h) => {
+    const gr = g.createRadialGradient(w / 2, h / 2, w * 0.18, w / 2, h / 2, w / 2);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#000');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  });
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+})();
+TEX.hatch = canvasTex(64, 64, (g, w, h) => {
+  g.fillStyle = '#dde2e6'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#4aa3df'; g.lineWidth = 3;
+  for (let i = -w; i < w * 2; i += 32) { g.beginPath(); g.moveTo(i, h); g.lineTo(i + w, 0); g.stroke(); }
+});
+TEX.hatch.wrapS = TEX.hatch.wrapT = THREE.RepeatWrapping;
+
+function drawSign(g, w, h) {
+  g.fillStyle = '#1e7fc2'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#ffffff'; g.lineWidth = 6; g.strokeRect(8, 8, w - 16, h - 16);
+  g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
+  g.font = '600 62px "Bai Jamjuree", sans-serif';
+  g.textAlign = 'left'; g.fillText('เจาะจงคุณภาพ  เจาะจง', 60, h / 2 + 4);
+  g.textAlign = 'center';
+  g.strokeRect(w * 0.56 - 90, 26, 180, h - 52);
+  g.font = '700 60px "Bai Jamjuree", sans-serif'; g.fillText('CPAC', w * 0.56, h / 2 + 2);
+  g.textAlign = 'right'; g.font = '600 62px "IBM Plex Mono", monospace'; g.fillText('02-555-5555', w - 60, h / 2 + 2);
+}
+const signCanvas = document.createElement('canvas');
+signCanvas.width = 2048; signCanvas.height = 176;
+drawSign(signCanvas.getContext('2d'), 2048, 176);
+TEX.sign = new THREE.CanvasTexture(signCanvas);
+TEX.sign.colorSpace = THREE.SRGBColorSpace;
+TEX.sign.anisotropy = 8;
+Promise.all([
+  document.fonts.load('600 62px "Bai Jamjuree"', 'เจาะจง'),
+  document.fonts.load('600 62px "IBM Plex Mono"', '02'),
+]).then(() => { drawSign(signCanvas.getContext('2d'), 2048, 176); TEX.sign.needsUpdate = true; }).catch(() => {});
+
+/* ---------- per-floor materials (cloned so each floor can fade on its own) ---------- */
+function floorMats() {
+  return {
+    concrete: new THREE.MeshStandardMaterial({ color: 0xf0efea, roughness: 0.9, envMapIntensity: 0.5 }),
+    slab:     new THREE.MeshStandardMaterial({ color: 0xcfcfc8, roughness: 0.92, envMapIntensity: 0.45 }),
+    glass:    new THREE.MeshStandardMaterial({ map: TEX.glass, metalness: 0.55, roughness: 0.15, envMapIntensity: 1.25 }),
+    metal:    new THREE.MeshStandardMaterial({ color: 0x3b4249, metalness: 0.6, roughness: 0.45, envMapIntensity: 0.8 }),
+  };
+}
+
+/* =====================================================================
+   3) BUILDING EXTERIOR
+   ===================================================================== */
+const floors = [];   // index 1..NF  -> { f, group, parapetMat, shell, edges, y0 }
+let roof = null;
+
+function makeShell(f, y0) {
+  const geo = new THREE.BoxGeometry(W + 2 * OH + 0.5, FH - 0.04, D + 2 * OH + 0.5);
+  const shell = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+  shell.position.set(0, y0 + FH / 2, 0);
+  shell.userData = { floor: f, noFade: true };
+  shell.renderOrder = 5;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+  edges.position.copy(shell.position);
+  edges.renderOrder = 6;
+  return { shell, edges };
+}
+
+function buildGroundFloor() {
+  const M = floorMats();
+  const stone  = new THREE.MeshStandardMaterial({ color: 0x8c8f8c, roughness: 0.85, envMapIntensity: 0.4 });
+  const poster = new THREE.MeshStandardMaterial({ map: TEX.poster, roughness: 0.5, envMapIntensity: 0.6 });
+  const gold   = new THREE.MeshStandardMaterial({ color: 0xc9a23a, metalness: 0.85, roughness: 0.3 });
+  const photo  = new THREE.MeshStandardMaterial({ map: TEX.portrait, roughness: 0.6 });
+  const g = new THREE.Group();
+  const P = 0.6;            // plinth height (raised ground floor)
+  const wallH = FH - P;
+
+  g.add(merged([bg(W + 1.0, P, D + 1.0, 0, 0, 0)], stone));
+  // steps down to the plaza
+  const steps = [];
+  for (let i = 0; i < 4; i++) steps.push(bg(7.6, P - i * 0.15, 0.42, 0, 0, D / 2 + 0.5 + 0.21 + i * 0.42));
+  g.add(merged(steps, stone));
+
+  // wall body
+  g.add(mesh(bg(W, wallH, D, 0, P, 0), M.concrete));
+
+  // window band on sides and back
+  const glass = [];
+  const bandH = 1.7, bandY = P + 0.6 + bandH / 2;
+  glass.push(planeUV(W - 1, bandH, (W - 1) / 2).rotateY(Math.PI).translate(0, bandY, -D / 2 - 0.02));
+  glass.push(planeUV(D - 1, bandH, (D - 1) / 2).rotateY(Math.PI / 2).translate(W / 2 + 0.02, bandY, 0));
+  glass.push(planeUV(D - 1, bandH, (D - 1) / 2).rotateY(-Math.PI / 2).translate(-W / 2 - 0.02, bandY, 0));
+  // entrance glass doors
+  glass.push(planeUV(5, 2.5, 2.5).translate(0, P + 1.25, D / 2 + 0.02));
+  g.add(merged(glass, M.glass));
+
+  // posters along the front
+  const posters = [];
+  for (const x of [-14, -10.4, -6.8, 6.8, 10.4, 14]) posters.push(new THREE.PlaneGeometry(3.3, 2.1).translate(x, P + 1.3, D / 2 + 0.03));
+  g.add(merged(posters, poster, false));
+
+  // entrance canopy + posts
+  g.add(merged([
+    bg(7.4, 0.3, 3.6, 0, 2.95, D / 2 + 1.8),
+    bg(0.28, 2.35, 0.28, -3.3, P, D / 2 + 3.3),
+    bg(0.28, 2.35, 0.28, 3.3, P, D / 2 + 3.3),
+  ], M.concrete));
+  // framed portrait on top of the canopy
+  g.add(mesh(bg(1.8, 2.4, 0.25, 0, 3.25, D / 2 + 3.2), gold));
+  g.add(mesh(new THREE.PlaneGeometry(1.36, 1.96).translate(0, 4.45, D / 2 + 3.33), photo, false));
+
+  const { shell, edges } = makeShell(1, 0);
+  g.add(shell, edges);
+  return { f: 1, group: g, parapetMat: M.concrete, shell, edges, y0: 0 };
+}
+
+function buildUpperFloor(f) {
+  const M = floorMats();
+  const y0 = (f - 1) * FH;
+  const g = new THREE.Group();
+  const ph = 1.0, pt = 0.2, ys = 0.35, yP = y0 + ys;
+
+  g.add(mesh(bg(W + 2 * OH, ys, D + 2 * OH, 0, y0, 0), M.slab));
+
+  const par = [
+    bg(W + 2 * OH, ph, pt, 0, yP,  D / 2 + OH - pt / 2),
+    bg(W + 2 * OH, ph, pt, 0, yP, -(D / 2 + OH - pt / 2)),
+    bg(pt, ph, D + 2 * OH - 2 * pt,  W / 2 + OH - pt / 2, yP, 0),
+    bg(pt, ph, D + 2 * OH - 2 * pt, -(W / 2 + OH - pt / 2), yP, 0),
+  ];
+  const finH = FH - ys - ph;
+  for (const x of [-(W / 2 + OH - 0.15), -8, 0, 8, W / 2 + OH - 0.15])
+    for (const s of [1, -1]) par.push(bg(0.2, finH, 0.22, x, yP + ph, s * (D / 2 + OH - 0.11)));
+  for (const z of [-(D / 2 + OH - 0.15), D / 2 + OH - 0.15])
+    for (const s of [1, -1]) par.push(bg(0.22, finH, 0.2, s * (W / 2 + OH - 0.11), yP + ph, z));
+  g.add(merged(par, M.concrete));
+
+  const gh = FH - ys, gy = y0 + ys + gh / 2;
+  g.add(merged([
+    planeUV(W, gh, W / 2).translate(0, gy, D / 2),
+    planeUV(W, gh, W / 2).rotateY(Math.PI).translate(0, gy, -D / 2),
+    planeUV(D, gh, D / 2).rotateY(Math.PI / 2).translate(W / 2, gy, 0),
+    planeUV(D, gh, D / 2).rotateY(-Math.PI / 2).translate(-W / 2, gy, 0),
+  ], M.glass));
+
+  const { shell, edges } = makeShell(f, y0);
+  g.add(shell, edges);
+  return { f, group: g, parapetMat: M.concrete, shell, edges, y0 };
+}
+
+function buildRoof() {
+  const M = floorMats();
+  const blue = new THREE.MeshStandardMaterial({ color: 0x1e7fc2, roughness: 0.5, envMapIntensity: 0.6 });
+  const signFace = new THREE.MeshStandardMaterial({ map: TEX.sign, roughness: 0.45, envMapIntensity: 0.6 });
+  const leaf = new THREE.MeshStandardMaterial({ color: 0x4f7d3a, roughness: 0.9, flatShading: true });
+  const g = new THREE.Group();
+  const yR = NF * FH, top = yR + 0.4;
+
+  g.add(mesh(bg(W + 2 * OH, 0.4, D + 2 * OH, 0, yR, 0), M.slab));
+  g.add(mesh(bg(7, 2.8, 5, 0, top, -3), M.concrete));       // machine room
+
+  // railing
+  const rail = [];
+  const ex = W / 2 + OH - 0.1, ez = D / 2 + OH - 0.1;
+  for (let x = -ex; x <= ex + 0.01; x += 2) { rail.push(bg(0.06, 1.1, 0.06, x, top, ez), bg(0.06, 1.1, 0.06, x, top, -ez)); }
+  for (let z = -ez + 2; z < ez; z += 2) { rail.push(bg(0.06, 1.1, 0.06, ex, top, z), bg(0.06, 1.1, 0.06, -ex, top, z)); }
+  for (const h of [0.55, 1.08]) {
+    rail.push(bg(2 * ex, 0.06, 0.06, 0, top + h, ez), bg(2 * ex, 0.06, 0.06, 0, top + h, -ez));
+    rail.push(bg(0.06, 0.06, 2 * ez, ex, top + h, 0), bg(0.06, 0.06, 2 * ez, -ex, top + h, 0));
+  }
+  // billboard posts
+  for (const x of [-12, -4, 4, 12]) rail.push(bg(0.22, 2.2, 0.22, x, top, ez - 0.7));
+  g.add(merged(rail, M.metal));
+
+  // planters with shrubs
+  const pots = [], bushes = [];
+  for (let x = -14; x <= 14; x += 4) {
+    pots.push(bg(2.4, 0.5, 0.7, x, top, ez - 1.5));
+    bushes.push(new THREE.IcosahedronGeometry(0.55, 0).scale(1.6, 0.8, 0.8).translate(x, top + 0.75, ez - 1.5));
+  }
+  g.add(merged(pots, M.concrete));
+  g.add(merged(bushes, leaf));
+
+  // billboard: material index 4 = +Z face
+  const board = new THREE.Mesh(new THREE.BoxGeometry(30, 2.6, 0.35), [blue, blue, blue, blue, signFace, blue]);
+  board.position.set(0, top + 2.2 + 1.3, ez - 0.45);
+  board.castShadow = true;
+  g.add(board);
+  return { f: NF + 1, group: g };
+}
+
+function buildSite() {
+  const g = new THREE.Group();
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(80, 64).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x9c9f9b, roughness: 0.95, alphaMap: TEX.groundFade, transparent: true, depthWrite: false }));
+  ground.receiveShadow = true;
+  g.add(ground);
+  const paving = mesh(new THREE.PlaneGeometry(46, 13).rotateX(-Math.PI / 2).translate(0, 0.01, D / 2 + 7.5),
+    new THREE.MeshStandardMaterial({ color: 0xc6c2b8, roughness: 0.9 }), false);
+  paving.receiveShadow = true;
+  g.add(paving);
+
+  const lawn = new THREE.MeshStandardMaterial({ color: 0x6f9a4c, roughness: 0.95 });
+  const hedge = new THREE.MeshStandardMaterial({ color: 0x3e6a32, roughness: 0.9 });
+  const curb = new THREE.MeshStandardMaterial({ map: TEX.curb, roughness: 0.7 });
+  for (const s of [-1, 1]) {
+    g.add(mesh(bg(11, 0.12, 2.8, s * 10.6, 0, D / 2 + 2.3), lawn));
+    g.add(mesh(bg(10.4, 0.8, 0.9, s * 10.6, 0.12, D / 2 + 1.6), hedge));
+    g.add(mesh(bg(11, 0.18, 0.24, s * 10.6, 0, D / 2 + 3.8), curb));
+  }
+
+  const trunk = new THREE.MeshStandardMaterial({ color: 0x6b5440, roughness: 0.9 });
+  const crown = new THREE.MeshStandardMaterial({ color: 0x4c7c38, roughness: 0.9, flatShading: true });
+  const tk = [], cr = [];
+  for (const [x, z, s] of [[-25, 13, 1.1], [24, 14, 1], [-28, -5, 1.2], [28, -3, 1], [-17, 19, 0.9], [17, 20, 1]]) {
+    tk.push(new THREE.CylinderGeometry(0.18 * s, 0.25 * s, 3 * s, 6).translate(x, 1.5 * s, z));
+    cr.push(new THREE.IcosahedronGeometry(2.3 * s, 0).scale(1, 0.85, 1).translate(x, 4.2 * s, z));
+  }
+  g.add(merged(tk, trunk), merged(cr, crown));
+  return g;
+}
+
+buildingScene.add(buildSite());
+floors[1] = buildGroundFloor();
+for (let f = 2; f <= NF; f++) floors[f] = buildUpperFloor(f);
+roof = buildRoof();
+for (let f = 1; f <= NF; f++) buildingScene.add(floors[f].group);
+buildingScene.add(roof.group);
+const liftable = () => [...floors.slice(1), roof];
+const shells = () => floors.slice(1).map(o => o.shell);
+
+function setOpacity(entry, a) {
+  entry.group.visible = a > 0.002;
+  entry.group.traverse(o => {
+    if (!o.isMesh || o.userData.noFade) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (m.userData.baseT === undefined) m.userData.baseT = m.transparent;
+      m.transparent = m.userData.baseT || a < 0.999;
+      m.opacity = a;
+      m.depthWrite = a > 0.6;
+    }
+  });
+}
+
+/* =====================================================================
+   4) FLOOR PLAN (rebuilt per floor)
+   ===================================================================== */
+const planRoot = new THREE.Group();
+planScene.add(planRoot);
+const PX = x => x - W / 2, PZ = z => z - D / 2;
+const pins = [];   // { job, group, head, ring, hit, label }
+
+function zoneOf(job) {
+  const plan = FLOOR_PLANS[job.floor];
+  const inside = r => job.x >= r.x && job.x <= r.x + r.w && job.z >= r.z && job.z <= r.z + r.d;
+  if (plan) for (const z of plan.zones) if (inside(z)) return z.name;
+  for (const c of CORE) if (inside(c)) return c.label;
+  return 'พื้นที่ส่วนกลาง';
+}
+
+function clearPlan() {
+  planRoot.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  planRoot.clear();
+  pins.length = 0;
+  removeLabels('plan');
+}
+
+function buildPlan(f) {
+  clearPlan();
+  const plan = FLOOR_PLANS[f];
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf3f2ee, roughness: 0.85, envMapIntensity: 0.5 });
+  const colMat  = new THREE.MeshStandardMaterial({ color: 0xd9d8d2, roughness: 0.9, envMapIntensity: 0.5 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x9ccbe8, transparent: true, opacity: 0.22, roughness: 0.1, metalness: 0.2, depthWrite: false });
+
+  // slab + hatched common floor
+  planRoot.add(mesh(bg(W + 0.6, 0.35, D + 0.6, 0, -0.35, 0), new THREE.MeshStandardMaterial({ color: 0xb9bcbd, roughness: 0.9 })));
+  const hatch = TEX.hatch.clone(); hatch.needsUpdate = true; hatch.repeat.set(W / 1.6, D / 1.6);
+  const floorM = mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2).translate(0, 0.005, 0),
+    new THREE.MeshStandardMaterial({ map: hatch, roughness: 0.9 }), false);
+  floorM.receiveShadow = true;
+  planRoot.add(floorM);
+
+  const walls = [], WT = 0.12, WH = 1.1;
+  const outline = (r, h = WH) => {
+    walls.push(bg(r.w, h, WT, PX(r.x + r.w / 2), 0, PZ(r.z) + WT / 2));
+    walls.push(bg(r.w, h, WT, PX(r.x + r.w / 2), 0, PZ(r.z + r.d) - WT / 2));
+    walls.push(bg(WT, h, r.d, PX(r.x) + WT / 2, 0, PZ(r.z + r.d / 2)));
+    walls.push(bg(WT, h, r.d, PX(r.x + r.w) - WT / 2, 0, PZ(r.z + r.d / 2)));
+  };
+
+  // zones
+  if (plan) {
+    for (const z of plan.zones) {
+      const zm = mesh(bg(z.w - 0.1, 0.05, z.d - 0.1, PX(z.x + z.w / 2), 0.01, PZ(z.z + z.d / 2)),
+        new THREE.MeshStandardMaterial({ color: z.color, roughness: 0.85 }), false);
+      zm.receiveShadow = true;
+      planRoot.add(zm);
+      outline(z);
+      addLabel('plan', new THREE.Vector3(PX(z.x + z.w / 2), 1.6, PZ(z.z + z.d / 2)),
+        `<div class="zone-lbl">${z.name}<small>${z.area.toFixed(z.area % 1 ? 2 : 0)} ตร.ม.</small></div>`);
+    }
+    addLabel('plan', new THREE.Vector3(PX(20), 1.4, PZ(7.6)),
+      `<div class="zone-lbl">พื้นที่ส่วนกลาง<small>${plan.commonArea.toFixed(2)} ตร.ม.</small></div>`);
+  } else {
+    addLabel('plan', new THREE.Vector3(0, 1.6, PZ(10.5)), `<div class="zone-lbl">ยังไม่มีผังห้องของชั้นนี้<small>แสดงเฉพาะโครงสร้างและแกนกลาง</small></div>`);
+  }
+
+  // core rooms
+  const stairs = [];
+  for (const c of CORE) {
+    planRoot.add(mesh(bg(c.w - 0.1, 0.05, c.d - 0.1, PX(c.x + c.w / 2), 0.01, PZ(c.z + c.d / 2)), new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.8 }), false));
+    outline(c, c.label === 'ลิฟต์' ? 2.4 : WH);
+    if (c.stairs) {
+      const n = 9, run = (c.w - 0.4) / 2;
+      for (let i = 0; i < n; i++) {
+        stairs.push(bg(run - 0.1, 0.12 * (i + 1), (c.d - 0.6) / n, PX(c.x + 0.2 + run / 2), 0, PZ(c.z + c.d - 0.3 - (i + 0.5) * (c.d - 0.6) / n)));
+        stairs.push(bg(run - 0.1, 0.12 * (n - i), (c.d - 0.6) / n, PX(c.x + 0.2 + run * 1.5 + 0.1), 0, PZ(c.z + c.d - 0.3 - (i + 0.5) * (c.d - 0.6) / n)));
+      }
+    }
+    addLabel('plan', new THREE.Vector3(PX(c.x + c.w / 2), c.label === 'ลิฟต์' ? 2.9 : 1.5, PZ(c.z + c.d / 2)), `<div class="core-lbl">${c.label}</div>`);
+  }
+  if (stairs.length) planRoot.add(merged(stairs, colMat));
+
+  // perimeter: low wall + glass band (gap at the entrance on floor 1)
+  const ent = plan && plan.entrance;
+  const front = ent
+    ? [[0, ent.x], [ent.x + ent.w, W]]
+    : [[0, W]];
+  for (const [a, b] of front) walls.push(bg(b - a, 0.9, 0.2, PX((a + b) / 2), 0, PZ(D) - 0.1));
+  walls.push(bg(W, 0.9, 0.2, 0, 0, PZ(0) + 0.1));
+  walls.push(bg(0.2, 0.9, D, PX(0) + 0.1, 0, 0));
+  walls.push(bg(0.2, 0.9, D, PX(W) - 0.1, 0, 0));
+  planRoot.add(merged(walls, wallMat));
+  const gl = [bg(W, 1.6, 0.05, 0, 0.9, PZ(0) + 0.1), bg(0.05, 1.6, D, PX(0) + 0.1, 0.9, 0), bg(0.05, 1.6, D, PX(W) - 0.1, 0.9, 0)];
+  for (const [a, b] of front) gl.push(bg(b - a, 1.6, 0.05, PX((a + b) / 2), 0.9, PZ(D) - 0.1));
+  planRoot.add(merged(gl, glassMat, false));
+
+  // column grid 4 m x (6, 3, 6) m
+  const cols = [];
+  for (let i = 0; i <= 8; i++) for (const z of [0, 6, 9, 15]) cols.push(bg(0.45, 2.4, 0.45, PX(i * 4), 0, PZ(z)));
+  planRoot.add(merged(cols, colMat));
+
+  // dimension ticks + labels, like the drawing
+  const tick = [];
+  for (let i = 0; i <= 8; i++) tick.push(PX(i * 4), 0.02, PZ(0) - 0.6, PX(i * 4), 0.02, PZ(0) - 2.0);
+  for (const z of [0, 6, 9, 15]) tick.push(PX(0) - 0.6, 0.02, PZ(z), PX(0) - 2.4, 0.02, PZ(z));
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(tick, 3));
+  planRoot.add(new THREE.LineSegments(tg, new THREE.LineBasicMaterial({ color: 0xc0392b })));
+  for (let i = 0; i < 8; i++) addLabel('plan', new THREE.Vector3(PX(i * 4 + 2), 0.05, PZ(0) - 1.3), '<div class="dim-lbl">4000</div>');
+  [[3, '6000'], [7.5, '3000'], [12, '6000']].forEach(([z, t]) => addLabel('plan', new THREE.Vector3(PX(0) - 1.6, 0.05, PZ(z)), `<div class="dim-lbl">${t}</div>`));
+
+  // furniture (instanced)
+  if (plan) {
+    const desks = [];
+    for (const z of plan.zones) {
+      const nx = Math.floor((z.w - 1.0) / 1.9), nz = Math.floor((z.d - 1.0) / 2.1);
+      if (nx < 1 || nz < 1) continue;
+      const sx = z.x + (z.w - (nx - 1) * 1.9) / 2, sz = z.z + (z.d - (nz - 1) * 2.1) / 2 - 0.3;
+      for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) desks.push([PX(sx + i * 1.9), PZ(sz + j * 2.1)]);
+    }
+    const deskGeo = new THREE.BoxGeometry(1.4, 0.75, 0.7).translate(0, 0.375 + 0.06, 0);
+    const chairGeo = new THREE.BoxGeometry(0.5, 0.9, 0.5).translate(0, 0.45 + 0.06, 0.75);
+    const dm = new THREE.InstancedMesh(deskGeo, new THREE.MeshStandardMaterial({ color: 0xe2d3b8, roughness: 0.7 }), desks.length);
+    const cm = new THREE.InstancedMesh(chairGeo, new THREE.MeshStandardMaterial({ color: 0x404850, roughness: 0.8 }), desks.length);
+    const o = new THREE.Object3D();
+    desks.forEach(([x, z], i) => { o.position.set(x, 0, z); o.updateMatrix(); dm.setMatrixAt(i, o.matrix); cm.setMatrixAt(i, o.matrix); });
+    dm.castShadow = cm.castShadow = true;
+    planRoot.add(dm, cm);
+    if (plan.reception) {
+      const r = plan.reception;
+      planRoot.add(mesh(bg(r.w, 1.05, r.d, PX(r.x + r.w / 2), 0, PZ(r.z + r.d / 2)), new THREE.MeshStandardMaterial({ color: 0x8a6b4e, roughness: 0.6 })));
+      addLabel('plan', new THREE.Vector3(PX(r.x + r.w / 2), 1.5, PZ(r.z + r.d / 2)), '<div class="core-lbl">Information</div>');
+    }
+  }
+
+  // equipment pins
+  const stemGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.9, 8).translate(0, 0.95, 0);
+  const headGeo = new THREE.SphereGeometry(0.36, 20, 14).translate(0, 2.2, 0);
+  const ringGeo = new THREE.RingGeometry(0.45, 0.62, 40).rotateX(-Math.PI / 2).translate(0, 0.09, 0);
+  const hitGeo  = new THREE.CylinderGeometry(0.75, 0.75, 2.8, 8).translate(0, 1.4, 0);
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x6b747c, metalness: 0.4, roughness: 0.5 });
+  for (const job of JOBS.filter(j => j.floor === f)) {
+    const col = new THREE.Color(STATUS[job.status].color);
+    const gp = new THREE.Group();
+    gp.position.set(PX(job.x), 0.06, PZ(job.z));
+    const stem = mesh(stemGeo, stemMat);
+    const head = mesh(headGeo, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.5, roughness: 0.35 }));
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+    const hit = new THREE.Mesh(hitGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }));
+    hit.userData.jobId = job.id;
+    gp.add(stem, head, ring, hit);
+    planRoot.add(gp);
+    const label = addLabel('plan', new THREE.Vector3(PX(job.x), 3.05, PZ(job.z)), `<div class="pin-lbl">${job.id.slice(-3)}</div>`);
+    pins.push({ job, group: gp, head, ring, hit, label });
+  }
+}
+
+/* =====================================================================
+   5) HTML LABELS projected from 3D
+   ===================================================================== */
+const labels = [];
+function addLabel(scene, pos, html, { anchor = 'center', onClick } = {}) {
+  const el = document.createElement('div');
+  el.className = 'lbl';
+  el.innerHTML = html;
+  el.hidden = true;
+  if (onClick) el.firstElementChild.addEventListener('click', onClick);
+  labelsEl.appendChild(el);
+  const L = { scene, pos, el, anchor };
+  labels.push(L);
+  return L;
+}
+function removeLabels(scene) {
+  for (let i = labels.length - 1; i >= 0; i--) if (labels[i].scene === scene) { labels[i].el.remove(); labels.splice(i, 1); }
+}
+const pv = new THREE.Vector3();
+function updateLabels(w, h) {
+  for (const L of labels) {
+    const show = (L.scene === 'building' && mode === 'building') || (L.scene === 'plan' && mode === 'plan');
+    if (!show) { L.el.hidden = true; continue; }
+    pv.copy(L.pos).project(camera);
+    if (pv.z > 1) { L.el.hidden = true; continue; }
+    L.el.hidden = false;
+    const x = (pv.x * 0.5 + 0.5) * w, y = (-pv.y * 0.5 + 0.5) * h;
+    L.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(${L.anchor === 'left' ? '0' : '-50%'},-50%)`;
+  }
+}
+
+/* =====================================================================
+   6) STATE + STATUS LOGIC
+   ===================================================================== */
+let mode = 'building';      // 'building' | 'transition' | 'plan'
+let currentFloor = null;
+let hoverFloor = null;
+let hoverJob = null;
+let selectedJob = null;
+
+function floorJobs(f) { return JOBS.filter(j => j.floor === f); }
+function activeJobs(f) { return floorJobs(f).filter(j => j.status !== 'done'); }
+function floorStatus(f) {
+  let best = null;
+  for (const j of activeJobs(f)) if (!best || STATUS[j.status].rank > STATUS[best].rank) best = j.status;
+  return best;   // null = no open job
+}
+
+function refreshBadges() {
+  removeLabels('building');
+  for (let f = 1; f <= NF; f++) {
+    const st = floorStatus(f);
+    if (!st) continue;
+    const n = activeJobs(f).length;
+    addLabel('building', new THREE.Vector3(W / 2 + OH + 0.6, (f - 1) * FH + FH * 0.55, D / 2 + OH),
+      `<button class="badge ${st}" type="button" aria-label="เปิดแปลนชั้น ${f}"><i class="dot"></i><span>ชั้น <b>${f}</b> · ${n} งาน</span></button>`,
+      { anchor: 'left', onClick: () => enterFloor(f) });
+  }
+}
+
+/* =====================================================================
+   7) CAMERA + TRANSITIONS
+   ===================================================================== */
+const tweens = [];
+function tween(dur, fn, done) { tweens.push({ t0: performance.now(), dur: reduceMotion ? 1 : dur, fn, done }); }
+function tweenCamera(pos, target, dur = 800) {
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  controls.enabled = false;
+  tween(dur, k => {
+    const e = ease(k);
+    camera.position.lerpVectors(p0, pos, e);
+    controls.target.lerpVectors(t0, target, e);
+  }, () => { controls.enabled = true; });
+}
+function fitDistance(halfW, halfH) {
+  const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
+  const hf = Math.atan(Math.tan(vf) * camera.aspect);
+  return Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf));
+}
+const BLD_DIR = new THREE.Vector3(0.55, 0.36, 0.86).normalize();
+function buildingPose() {
+  const target = new THREE.Vector3(0, NF * FH * 0.5 + 0.5, 0);
+  const dist = fitDistance(27, 17) * 1.02;
+  return { pos: target.clone().addScaledVector(BLD_DIR, dist), target };
+}
+const PLAN_DIR = new THREE.Vector3(0, 0.8, 0.6).normalize();
+function planPose() {
+  const target = new THREE.Vector3(0, 0, 0.8);
+  const dist = fitDistance(W / 2 + 3.5, D / 2 + 4) * 1.05;
+  return { pos: target.clone().addScaledVector(PLAN_DIR, dist), target };
+}
+function setBuildingControls() {
+  Object.assign(controls, { minDistance: 25, maxDistance: 160, maxPolarAngle: 1.45, minPolarAngle: 0.15 });
+}
+function setPlanControls() {
+  Object.assign(controls, { minDistance: 10, maxDistance: 80, maxPolarAngle: 1.2, minPolarAngle: 0 });
+}
+
+const fadeEl = document.getElementById('fade');
+function fadeSwap(cb) {
+  fadeEl.classList.add('on');
+  setTimeout(() => { cb(); requestAnimationFrame(() => fadeEl.classList.remove('on')); }, reduceMotion ? 0 : 230);
+}
+
+function enterFloor(f) {
+  if (mode !== 'building') return;
+  mode = 'transition';
+  currentFloor = f;
+  hideTip();
+  for (const o of liftable()) {
+    if (o.f <= f) continue;
+    tween(650, k => { o.group.position.y = k * 16; setOpacity(o, 1 - k); });
+  }
+  const target = new THREE.Vector3(0, (f - 1) * FH + 0.5, 0);
+  tweenCamera(target.clone().add(new THREE.Vector3(0, 30, 24)), target, 750);
+  setTimeout(() => fadeSwap(() => showPlan(f)), reduceMotion ? 0 : 640);
+}
+
+function showPlan(f) {
+  buildPlan(f);
+  currentScene = planScene;
+  mode = 'plan';
+  selectedJob = null;
+  setPlanControls();
+  const p = planPose();
+  camera.position.copy(p.pos).add(new THREE.Vector3(0, 6, 5));
+  controls.target.copy(p.target);
+  tweenCamera(p.pos, p.target, 600);
+  document.getElementById('backBtn').hidden = false;
+  document.getElementById('crumb').innerHTML = `${BUILDING.name} <span>›</span> ชั้น ${f}`;
+  document.getElementById('hint').textContent = 'ลากเพื่อหมุน · คลิกหมุดเพื่อดูรายละเอียดงานซ่อม';
+  renderPanel();
+}
+
+function backToBuilding() {
+  if (mode !== 'plan') return;
+  mode = 'transition';
+  hideTip();
+  fadeSwap(() => {
+    clearPlan();
+    currentScene = buildingScene;
+    setBuildingControls();
+    const f = currentFloor;
+    const target = new THREE.Vector3(0, (f - 1) * FH + 0.5, 0);
+    camera.position.copy(target).add(new THREE.Vector3(0, 30, 24));
+    controls.target.copy(target);
+    for (const o of liftable()) if (o.f > f) tween(650, k => { o.group.position.y = (1 - k) * 16; setOpacity(o, k); });
+    const p = buildingPose();
+    tweenCamera(p.pos, p.target, 850);
+    setTimeout(() => { mode = 'building'; }, reduceMotion ? 0 : 700);
+    currentFloor = null;
+    selectedJob = null;
+    document.getElementById('backBtn').hidden = true;
+    document.getElementById('crumb').innerHTML = `${BUILDING.name} <span>· มุมมองภายนอก</span>`;
+    document.getElementById('hint').textContent = 'ลากเพื่อหมุน · ล้อเมาส์เพื่อซูม · คลิกชั้นเพื่อเปิดแปลน';
+    renderPanel();
+  });
+}
+document.getElementById('backBtn').addEventListener('click', backToBuilding);
+
+function selectJob(id) {
+  selectedJob = id;
+  renderPanel();
+}
+
+/* =====================================================================
+   8) SIDE PANEL
+   ===================================================================== */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function chip(st, live) { return `<span class="chip ${st}${live ? ' live' : ''}">${STATUS[st].label}</span>`; }
+
+function renderPanel() {
+  if (currentFloor && mode !== 'building') return renderFloorPanel(currentFloor);
+  const count = s => JOBS.filter(j => j.status === s).length;
+  let rows = '';
+  for (let f = NF; f >= 1; f--) {
+    const st = floorStatus(f), all = floorJobs(f), open = activeJobs(f).length, done = all.length - open;
+    const meta = all.length ? `${open} งานค้าง${done ? ` · ${done} เสร็จแล้ว` : ''}` : 'ไม่มีงานซ่อม';
+    rows += `<button class="floor-row${hoverFloor === f ? ' hover' : ''}" type="button" data-floor="${f}">
+      <span class="floor-no"><small>ชั้น</small>${f}</span>
+      <span class="floor-meta">${meta}</span>
+      ${st ? chip(st, true) : '<span class="chip ok">ปกติ</span>'}
+      <span class="chev" aria-hidden="true">›</span></button>`;
+  }
+  panel.innerHTML = `
+    <div>
+      <h2>${BUILDING.name}</h2>
+      <p class="sub">${NF} ชั้น · ${W} × ${D} ม. · ${W * D} ตร.ม./ชั้น</p>
+    </div>
+    <div>
+      <p class="eyebrow">ใบแจ้งซ่อมทั้งอาคาร</p>
+      <div class="counts">
+        <span class="count pending"><b>${count('pending')}</b>รอดำเนินการ</span>
+        <span class="count in_progress"><b>${count('in_progress')}</b>กำลังซ่อม</span>
+        <span class="count done"><b>${count('done')}</b>ซ่อมเสร็จ</span>
+      </div>
+    </div>
+    <div>
+      <p class="eyebrow">สถานะรายชั้น</p>
+      <div class="floors">${rows}</div>
+    </div>
+    <p class="foot">ต่อกับระบบแจ้งซ่อมจริงได้โดยเรียก <code>window.facility.setJobs(jobs)</code> ทุกครั้งที่ข้อมูลเปลี่ยน</p>`;
+}
+
+function renderFloorPanel(f) {
+  const jobs = floorJobs(f).sort((a, b) => STATUS[b.status].rank - STATUS[a.status].rank);
+  const sel = jobs.find(j => j.id === selectedJob);
+  const list = jobs.map(j => `
+    <button class="job${j.id === selectedJob ? ' sel' : ''}" type="button" data-job="${esc(j.id)}">
+      <span class="name">${esc(j.equipment)}</span>${chip(j.status, j.status !== 'done')}
+      <span class="issue">${esc(j.issue)}</span>
+      <span class="id">${esc(j.id)} · ${esc(zoneOf(j))}</span>
+    </button>`).join('');
+  const detail = sel ? `
+    <div class="detail">
+      <h3>${esc(sel.equipment)}</h3>
+      <dl>
+        <dt>สถานะ</dt><dd>${chip(sel.status, sel.status !== 'done')}</dd>
+        <dt>อาการ</dt><dd>${esc(sel.issue)}</dd>
+        <dt>ตำแหน่ง</dt><dd>ชั้น ${sel.floor} · ${esc(zoneOf(sel))}</dd>
+        <dt>พิกัดแปลน</dt><dd class="mono">x ${sel.x.toFixed(1)} ม. · y ${sel.z.toFixed(1)} ม.</dd>
+        <dt>ช่างผู้รับผิดชอบ</dt><dd>${esc(sel.tech)}</dd>
+        <dt>เลขที่ใบงาน</dt><dd class="mono">${esc(sel.id)}</dd>
+        <dt>อัปเดตล่าสุด</dt><dd>${esc(sel.updated)}</dd>
+      </dl>
+    </div>` : '';
+  const plan = FLOOR_PLANS[f];
+  panel.innerHTML = `
+    <div>
+      <h2>ชั้น ${f}</h2>
+      <p class="sub">${BUILDING.name} · พื้นที่รวม ${W * D} ตร.ม.${plan ? ` · ส่วนกลาง ${plan.commonArea.toFixed(2)} ตร.ม.` : ''}</p>
+    </div>
+    ${plan ? '' : '<p class="notice">ยังไม่ได้ใส่ผังห้องของชั้นนี้ แสดงเฉพาะเสา แกนกลาง และจุดงานซ่อม เพิ่มได้ใน FLOOR_PLANS</p>'}
+    ${detail}
+    <div>
+      <p class="eyebrow">งานซ่อมในชั้นนี้ (${jobs.length})</p>
+      ${jobs.length ? `<div class="jobs">${list}</div>` : '<p class="empty">ไม่มีงานซ่อมในชั้นนี้</p>'}
+    </div>`;
+}
+
+panel.addEventListener('click', e => {
+  const fr = e.target.closest('[data-floor]');
+  if (fr) return enterFloor(+fr.dataset.floor);
+  const jb = e.target.closest('[data-job]');
+  if (jb) return selectJob(jb.dataset.job);
+});
+panel.addEventListener('pointerover', e => {
+  const fr = e.target.closest('[data-floor]');
+  hoverFloor = fr ? +fr.dataset.floor : null;
+});
+panel.addEventListener('pointerleave', () => { hoverFloor = null; });
+
+/* =====================================================================
+   9) POINTER PICKING
+   ===================================================================== */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let downAt = null;
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  if (mode === 'building') {
+    const hit = ray.intersectObjects(shells(), false)[0];
+    return hit ? { floor: hit.object.userData.floor } : null;
+  }
+  if (mode === 'plan') {
+    const hit = ray.intersectObjects(pins.map(p => p.hit), false)[0];
+    return hit ? { job: hit.object.userData.jobId } : null;
+  }
+  return null;
+}
+function hideTip() { tipEl.hidden = true; renderer.domElement.style.cursor = ''; }
+function showTip(ev, html) {
+  const r = vp.getBoundingClientRect();
+  tipEl.innerHTML = html;
+  tipEl.hidden = false;
+  const x = Math.min(ev.clientX - r.left + 14, r.width - tipEl.offsetWidth - 8);
+  const y = Math.min(ev.clientY - r.top + 14, r.height - tipEl.offsetHeight - 8);
+  tipEl.style.transform = `translate(${x}px,${y}px)`;
+}
+renderer.domElement.addEventListener('pointermove', ev => {
+  if (ev.pointerType === 'touch') return;
+  const h = pick(ev);
+  hoverFloor = h?.floor ?? null;
+  hoverJob = h?.job ?? null;
+  if (h?.floor) {
+    const st = floorStatus(h.floor), n = activeJobs(h.floor).length;
+    showTip(ev, `<strong>ชั้น ${h.floor}</strong>${st ? `${n} งานค้าง · ${STATUS[st].label}` : 'ไม่มีงานค้าง'}<br><em>คลิกเพื่อเปิดแปลน</em>`);
+    renderer.domElement.style.cursor = 'pointer';
+  } else if (h?.job) {
+    const j = JOBS.find(x => x.id === h.job);
+    showTip(ev, `<strong>${esc(j.equipment)}</strong>${esc(j.issue)}<br><em>${STATUS[j.status].label} · ${esc(j.id)}</em>`);
+    renderer.domElement.style.cursor = 'pointer';
+  } else hideTip();
+});
+renderer.domElement.addEventListener('pointerleave', () => { hoverFloor = hoverJob = null; hideTip(); });
+renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 6) return;
+  const h = pick(ev);
+  if (h?.floor) enterFloor(h.floor);
+  else if (h?.job) selectJob(h.job);
+});
+
+/* =====================================================================
+   10) RESIZE + LOOP
+   ===================================================================== */
+let currentScene = buildingScene;
+let vw = 1, vh = 1;
+function resize() {
+  const r = vp.getBoundingClientRect();
+  const widthChanged = Math.abs(r.width - vw) > 40;
+  vw = Math.max(1, r.width); vh = Math.max(1, r.height);
+  renderer.setSize(vw, vh, false);
+  camera.aspect = vw / vh;
+  camera.updateProjectionMatrix();
+  // re-frame the view when the viewport width changes a lot (rotate phone, resize window)
+  if (widthChanged && !tweens.length && (mode === 'building' || mode === 'plan')) {
+    const p = mode === 'plan' ? planPose() : buildingPose();
+    camera.position.copy(p.pos); controls.target.copy(p.target);
+  }
+}
+new ResizeObserver(resize).observe(vp);
+resize();
+
+setBuildingControls();
+{ const p = buildingPose(); camera.position.copy(p.pos); controls.target.copy(p.target); }
+refreshBadges();
+renderPanel();
+
+const white = new THREE.Color(0xffffff);
+const accent = new THREE.Color(0x2b8fd6);
+function animate(now) {
+  requestAnimationFrame(animate);
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const t = tweens[i], k = Math.min(1, (now - t.t0) / t.dur);
+    t.fn(k);
+    if (k >= 1) { tweens.splice(i, 1); t.done && t.done(); }
+  }
+  const s = now / 1000;
+  const pulse = reduceMotion ? 0.6 : 0.5 + 0.5 * Math.sin(s * 4.2);
+
+  // building: blinking floors
+  for (let f = 1; f <= NF; f++) {
+    const o = floors[f];
+    const st = mode === 'building' ? floorStatus(f) : null;
+    const hov = mode === 'building' && hoverFloor === f;
+    if (st) {
+      const c = new THREE.Color(STATUS[st].color);
+      o.shell.material.color.copy(c);
+      o.edges.material.color.copy(c);
+      o.shell.material.opacity = (hov ? 0.12 : 0.05) + 0.16 * pulse;
+      o.edges.material.opacity = 0.35 + 0.65 * pulse;
+      o.parapetMat.emissive.copy(c);
+      o.parapetMat.emissiveIntensity = 0.12 + 0.5 * pulse;
+    } else {
+      o.shell.material.color.copy(accent);
+      o.edges.material.color.copy(hov ? accent : white);
+      o.shell.material.opacity = hov ? 0.12 : 0;
+      o.edges.material.opacity = hov ? 0.9 : 0;
+      o.parapetMat.emissiveIntensity = 0;
+    }
+  }
+
+  // plan: pins
+  if (mode === 'plan') {
+    for (const p of pins) {
+      const active = p.job.status !== 'done';
+      const sel = p.job.id === selectedJob, hov = p.job.id === hoverJob;
+      const sc = sel ? 1.35 : hov ? 1.18 : 1;
+      p.head.scale.setScalar(sc);
+      p.head.position.y = (1 - sc) * 2.2;
+      p.head.material.emissiveIntensity = active ? 0.35 + 0.55 * pulse : 0.25;
+      if (active && !reduceMotion) {
+        const ph = (s * 0.9 + p.group.position.x * 0.07) % 1;
+        p.ring.scale.setScalar(1 + ph * 2.2);
+        p.ring.material.opacity = 0.85 * (1 - ph);
+      } else { p.ring.scale.setScalar(1); p.ring.material.opacity = active ? 0.7 : 0.35; }
+      p.label.el.firstElementChild.classList.toggle('sel', sel);
+    }
+  }
+
+  controls.update();
+  renderer.render(currentScene, camera);
+  updateLabels(vw, vh);
+}
+requestAnimationFrame(animate);
+
+/* =====================================================================
+   11) PUBLIC API — ใช้ต่อกับระบบแจ้งซ่อมจริง
+   ===================================================================== */
+window.facility = {
+  setJobs(list) {
+    JOBS = list;
+    refreshBadges();
+    if (mode === 'plan' && currentFloor) buildPlan(currentFloor);
+    renderPanel();
+  },
+  getJobs: () => JOBS,
+  openFloor: f => enterFloor(f),
+  back: backToBuilding,
+};
+</script>

@@ -31,19 +31,6 @@ SELECT r.id, r.floor_id, r.name, r.area_type FROM platform.rooms r
 WHERE r.is_active
 ORDER BY r.sort_order, r.name;
 
--- Sample locations (dev / UAT only, D-032): inserted by id, existing rows are left as they are.
--- name: InsertSampleBuilding :exec
-INSERT INTO repair.buildings (id, name, sort_order) VALUES (@id, @name, @sort_order)
-ON CONFLICT DO NOTHING;
-
--- name: InsertSampleFloor :exec
-INSERT INTO repair.floors (id, building_id, name, level) VALUES (@id, @building_id, @name, @level)
-ON CONFLICT DO NOTHING;
-
--- name: InsertSampleRoom :exec
-INSERT INTO platform.rooms (id, floor_id, name, area_type, sort_order) VALUES (@id, @floor_id, @name, @area_type, @sort_order)
-ON CONFLICT DO NOTHING;
-
 -- name: LockActiveCategory :one
 -- Locks the category so it cannot be deactivated while a ticket is created in it; returns its default
 -- priority (CR-008) and whether it is the "อื่น ๆ" category (CR-014).
@@ -79,6 +66,4 @@ INSERT INTO repair.ticket_counters (year, last_no) VALUES (@year, 1)
 ON CONFLICT (year) DO UPDATE SET last_no = repair.ticket_counters.last_no + 1, updated_at = now()
 RETURNING last_no;
 
--- Sample data refresh (dev / UAT only, D-032, CR-008): applied by id so existing databases keep their ids.
--- name: RenameSampleBuilding :exec
-UPDATE repair.buildings SET name = @new_name, updated_at = now() WHERE id = @id AND name = @old_name;
+

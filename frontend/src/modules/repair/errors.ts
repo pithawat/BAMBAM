@@ -24,6 +24,9 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   ALREADY_FOLLOWING: "คุณติดตามเคสนี้อยู่แล้ว",
   NOT_TEAM_HANDLED: "งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว",
   ASSET_NOT_FOUND: "ไม่พบอุปกรณ์นี้",
+  ASSET_CODE_TAKEN: "รหัสนี้มีอุปกรณ์อื่นใช้แล้ว",
+  POINT_OUTSIDE_ROOM: "วางอุปกรณ์ในห้องที่เลือกเท่านั้น",
+  FLOOR_NOT_FOUND: "ไม่พบชั้นนี้",
 };
 
 /** `TICKET_CLOSED` copy depends on where it happens (contract "Error codes"). */
@@ -123,4 +126,14 @@ export const contractorFieldMessages: FieldMessages = {
   contactName: { TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
   phone: { TOO_LONG: "ไม่เกิน 30 ตัวอักษร" },
   note: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
+};
+
+/** S29 asset dialog (CR-016). A point outside the plan comes back as `x` / `z` INVALID. */
+export const assetFieldMessages: FieldMessages = {
+  code: { REQUIRED: "กรุณาใส่รหัสอุปกรณ์", TOO_LONG: "ไม่เกิน 50 ตัวอักษร", INVALID: "ใช้ได้เฉพาะตัวอักษร ตัวเลข - และ _" },
+  name: { REQUIRED: "กรุณาใส่ชื่ออุปกรณ์", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
+  roomId: { REQUIRED: "เลือกห้อง", INVALID: "เลือกห้อง" },
+  assetTypeId: { REQUIRED: "เลือกประเภท", INVALID: "เลือกประเภท" },
+  x: { INVALID: "วางในห้องเท่านั้น", REQUIRED: "วางในห้องเท่านั้น" },
+  z: { INVALID: "วางในห้องเท่านั้น", REQUIRED: "วางในห้องเท่านั้น" },
 };

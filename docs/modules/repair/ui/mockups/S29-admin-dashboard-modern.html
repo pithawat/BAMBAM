@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S29 · ภาพรวมวันนี้ — Modern mockup</title>
+<!-- S29 (CR-016) mockup: admin / executive Home = dashboard + 3D อาคาร 1. Sample data only.
+     Building: 6 floors × 32 × 15 m, floor height 3.5 m (attachments/building plan/1-อาคาร 1.pdf, prompt_for_3D_model).
+     Floor 1 rooms traced from PDF page 2 on the 4 m grid (rows 6 + 3 + 6 m). Floors 2–6: rooms not traced yet. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --background:#F5F7FA;--foreground:#172033;--card:#fff;--primary:#2741FA;--primary-fg:#fff;--secondary:#EFF2FF;--secondary-fg:#1B31D6;
+  --muted:#F1F3F7;--muted-fg:#5B6676;--border:#E5E8EF;--input:#D0D6E2;--destructive:#C33432;--success:#0B7A5E;--attention:#B93D0A;
+  --p-critical:#B42318;--p-high:#B93815;--p-medium:#2741FA;--p-low:#475467;--svc-repair:#F97316;--svc-car:#0284C7;--svc-room:#0D9488;
+  --shadow-card:0 1px 2px rgb(24 34 56/.04);--shadow-raised:0 10px 28px -16px rgb(24 34 56/.25);--r:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--background);color:var(--foreground);font-family:Anuphan,system-ui,sans-serif;font-size:15px;line-height:1.55}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:inherit;text-decoration:none}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.wrap{max-width:1440px;margin:0 auto;padding:12px 24px 40px}
+.mock{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted-fg);margin-bottom:10px}
+.mock b{color:var(--foreground)}
+.seg{display:inline-flex;gap:2px;border:1px solid var(--border);background:#fff;border-radius:999px;padding:3px}
+.seg button{border:0;background:none;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600;color:var(--muted-fg)}
+.seg button[aria-pressed=true]{background:var(--foreground);color:#fff}
+/* navbar (CR-010) */
+.nav{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:10px 16px;box-shadow:var(--shadow-card)}
+.logo{font-weight:700;font-size:30px;letter-spacing:-.04em;color:var(--primary);margin-right:20px;line-height:1}
+.nav a{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:10px;font-weight:500;font-size:15px}
+.nav a.on{background:var(--secondary);color:var(--secondary-fg);font-weight:600}
+.nav .sp{flex:1}
+.who{display:flex;align-items:center;gap:10px;padding-left:14px;border-left:1px solid var(--border);margin-left:6px}
+.av{width:38px;height:38px;border-radius:50%;background:var(--secondary);color:var(--secondary-fg);display:grid;place-items:center;font-weight:600;font-size:14px}
+.who small{display:block;color:var(--muted-fg);font-size:12px;line-height:1.2}
+.who strong{font-size:14px;line-height:1.2}
+/* greeting */
+.hello{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:22px 0 14px}
+.hello h1{font-size:28px;line-height:39px;margin:0;font-weight:600}
+.hello p{margin:0;color:var(--muted-fg);font-size:14px}
+.hello .grow{flex:1;min-width:240px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 16px;border-radius:8px;border:1px solid var(--input);background:#fff;font-weight:600;font-size:14px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{height:34px;padding:0 12px;font-size:13px}
+.btn.danger{background:var(--destructive);border-color:var(--destructive);color:#fff}
+.btn:focus-visible,.chip-btn:focus-visible,.seg button:focus-visible{outline:3px solid rgb(39 65 250/.35);outline-offset:2px}
+.select{height:42px;border:1px solid var(--input);border-radius:999px;background:#fff;padding:0 14px;font:inherit;font-size:14px;font-weight:600}
+/* panels */
+.panel{background:#fff;border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-card)}
+.ptitle{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;font-size:16px;margin:0}
+.sample{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:var(--muted);color:var(--muted-fg);font-size:12px;font-weight:600;white-space:nowrap}
+.band{padding:16px 18px;margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}
+.tile{display:block;border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:#fff}
+a.tile:hover{border-color:#c9d1ff;background:#fbfcff}
+.tile .n{font-size:28px;font-weight:600;line-height:1.2}
+.tile .l{font-size:14px;color:var(--muted-fg);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tile.warn .n{color:var(--attention)}
+.tile small{color:var(--muted-fg);font-size:13px}
+.grid{display:grid;grid-template-columns:290px minmax(0,1fr) 290px;gap:16px;align-items:start}
+.col{display:flex;flex-direction:column;gap:16px}
+.stat{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--border)}
+.stat:hover{background:#fafbff}
+.stat .n{font-size:24px;font-weight:600;min-width:42px}
+.stat .l{flex:1;font-size:14px}
+.stat .l small{display:block;color:var(--muted-fg);font-size:12.5px;line-height:1.3}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ph{padding:14px 14px 10px}
+.att{display:block;padding:10px 14px;border-top:1px solid var(--border)}
+.att:hover{background:#fafbff}
+.att b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att span{font-size:12.5px;color:var(--muted-fg)}
+.tag{display:inline-flex;height:20px;align-items:center;padding:0 7px;border-radius:5px;font-size:12px;font-weight:600;margin-right:6px}
+.tag.late{background:#FEF0EA;color:var(--attention)}.tag.back{background:#FEECEB;color:var(--p-critical)}.tag.crit{background:#FEECEB;color:var(--p-critical)}
+.more{display:flex;justify-content:center;padding:10px;border-top:1px solid var(--border);color:var(--primary);font-weight:600;font-size:14px}
+.svc{padding:14px}
+.svc + .svc{border-top:1px solid var(--border)}
+.svc h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px}
+.svc .ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kv div{background:var(--muted);border-radius:10px;padding:8px 10px}
+.kv b{display:block;font-size:20px;font-weight:600;line-height:1.2}
+.kv span{font-size:12.5px;color:var(--muted-fg)}
+.note{font-size:12.5px;color:var(--muted-fg);margin:10px 0 0}
+/* 3D card */
+.card3d{position:relative;height:640px;overflow:hidden;border-radius:16px;background:#F2F5F8}
+#scene{position:absolute;inset:0}
+#scene canvas{display:block;touch-action:none}
+.c3head{position:absolute;top:14px;left:16px;right:16px;display:flex;align-items:center;gap:10px;pointer-events:none;z-index:3}
+.c3head > *{pointer-events:auto}
+.c3title{font-weight:600;font-size:16px;background:rgb(255 255 255/.85);border:1px solid var(--border);border-radius:10px;padding:6px 12px;backdrop-filter:blur(6px)}
+.c3title small{color:var(--muted-fg);font-weight:400;margin-left:6px}
+.zoom{margin-left:auto;display:flex;gap:6px}
+.icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:rgb(255 255 255/.9);display:grid;place-items:center}
+.floors{position:absolute;left:16px;top:66px;display:flex;flex-direction:column;gap:6px;z-index:3}
+.chip-btn{min-width:64px;height:36px;border-radius:10px;border:1px solid var(--border);background:rgb(255 255 255/.92);font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px}
+.chip-btn[aria-current=true]{background:var(--foreground);color:#fff;border-color:var(--foreground)}
+.chip-btn .c{font-size:12px;min-width:20px;height:20px;border-radius:999px;display:grid;place-items:center;color:#fff}
+.legend{position:absolute;left:16px;bottom:14px;z-index:3;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12.5px;color:var(--muted-fg);background:rgb(255 255 255/.88);border:1px solid var(--border);border-radius:10px;padding:7px 12px;backdrop-filter:blur(6px);max-width:calc(100% - 32px)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+#overlay{position:absolute;inset:0;pointer-events:none;z-index:2}
+.pin{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;display:flex;align-items:center;gap:5px;color:#fff;font-size:13px;font-weight:600;padding:3px 9px 3px 4px;border-radius:999px;box-shadow:0 6px 14px -6px rgb(23 32 51/.5);white-space:nowrap;border:2px solid #fff;cursor:pointer}
+.pin i{width:20px;height:20px;border-radius:50%;background:rgb(255 255 255/.25);display:grid;place-items:center;font-style:normal}
+.pin::after{content:"";position:absolute;left:50%;bottom:-7px;width:2px;height:6px;background:inherit;transform:translateX(-50%)}
+.rlabel{position:absolute;transform:translate(-50%,-50%);font-size:12px;font-weight:600;color:#334;text-align:center;line-height:1.25;text-shadow:0 1px 0 #fff,0 0 6px #fff;white-space:nowrap}
+.rlabel small{display:block;font-weight:400;color:var(--muted-fg);font-size:11px}
+.asset{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--primary);display:grid;place-items:center;color:var(--primary);pointer-events:auto;box-shadow:0 4px 10px -4px rgb(23 32 51/.45);cursor:pointer;touch-action:none}
+.asset svg{width:16px;height:16px}
+.asset .b{position:absolute;top:-6px;right:-7px;min-width:17px;height:17px;border-radius:999px;background:var(--p-high);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;border:2px solid #fff}
+body.editing .asset{cursor:grab}
+.asset.dragging{cursor:grabbing;transform:translate(-50%,-50%) scale(1.15);border-color:var(--foreground)}
+.asset.bad{border-color:var(--destructive);color:var(--destructive)}
+.empty-floor{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 16px;font-size:14px;color:var(--muted-fg);z-index:3;display:none}
+.tip{position:absolute;z-index:4;pointer-events:none;background:var(--foreground);color:#fff;font-size:12.5px;padding:5px 9px;border-radius:7px;display:none;white-space:nowrap}
+/* edit palette */
+.palette{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:4;display:none;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:8px;box-shadow:var(--shadow-raised)}
+body.editing .palette{display:flex}
+body.editing .legend{display:none}
+.palette .hint{font-size:12.5px;color:var(--muted-fg);padding:0 8px;max-width:150px;line-height:1.3}
+.ptype{display:flex;flex-direction:column;align-items:center;gap:2px;width:72px;padding:7px 4px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:12px;font-weight:600;touch-action:none;user-select:none;cursor:grab}
+.palette .btn{white-space:nowrap}
+.ptype:hover{border-color:var(--primary);background:var(--secondary)}
+.ptype svg{width:20px;height:20px;color:var(--primary)}
+.ghost{position:fixed;z-index:50;pointer-events:none;width:38px;height:38px;border-radius:50%;background:#fff;border:2px solid var(--primary);display:grid;place-items:center;color:var(--primary);transform:translate(-50%,-50%);box-shadow:var(--shadow-raised)}
+.ghost.bad{border-color:var(--destructive);color:var(--destructive)}
+.ghost em{position:absolute;top:42px;left:50%;transform:translateX(-50%);font-style:normal;font-size:12px;font-weight:600;white-space:nowrap;background:var(--foreground);color:#fff;padding:3px 8px;border-radius:6px}
+.ghost.bad em{background:var(--destructive)}
+.editbar{position:absolute;top:64px;right:16px;z-index:3;display:none;background:var(--secondary);color:var(--secondary-fg);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600}
+body.editing .editbar{display:block}
+/* popover, dialogs, toast */
+.pop{position:absolute;z-index:6;width:250px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-raised);padding:12px;display:none;font-size:14px}
+.pop h4{margin:0 0 2px;font-size:15px}
+.pop p{margin:0;color:var(--muted-fg);font-size:13px}
+.pop .row{display:flex;gap:6px;margin-top:10px}
+dialog{border:0;border-radius:16px;padding:0;width:min(440px,calc(100vw - 32px));box-shadow:var(--shadow-raised)}
+dialog::backdrop{background:rgb(23 32 51/.35)}
+dialog form{padding:20px}
+dialog h2{margin:0 0 4px;font-size:19px}
+dialog .desc{margin:0 0 14px;color:var(--muted-fg);font-size:14px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-weight:600;font-size:15px}
+.field input,.field select{height:44px;border:1px solid var(--input);border-radius:8px;padding:0 12px;font:inherit;font-size:15px}
+.field input[aria-invalid=true]{border-color:var(--destructive)}
+.err{color:var(--destructive);font-size:13.5px;display:none}
+.typechip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:8px;background:var(--secondary);color:var(--secondary-fg);font-weight:600;font-size:14px;width:max-content}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;background:var(--foreground);color:#fff;border-radius:10px;padding:10px 14px;font-size:14px;display:none;align-items:center;gap:14px;box-shadow:var(--shadow-raised)}
+.toast button{background:none;border:0;color:#B9C4FF;font-weight:700}
+/* executive: read only */
+body.exec .admin-only{display:none!important}
+/* phone list (< 1024px) */
+.floorlist{display:none}
+.floorlist details{border-top:1px solid var(--border)}
+.floorlist summary{display:flex;align-items:center;gap:10px;padding:12px 14px;list-style:none;cursor:pointer}
+.floorlist summary::-webkit-details-marker{display:none}
+.floorlist summary b{flex:1}
+.floorlist .body{padding:0 14px 12px;font-size:13.5px;color:var(--muted-fg)}
+@media (max-width:1279px){.grid{grid-template-columns:250px minmax(0,1fr) 250px}.kv{grid-template-columns:1fr}}
+@media (max-width:1023px){
+  .wrap{padding:8px 16px 32px}
+  .nav a:not(.on),.who div{display:none}
+  .hello h1{font-size:24px;line-height:34px}
+  .tiles{grid-template-columns:1fr 1fr}
+  .tiles .tile:first-child{grid-column:1/-1}
+  .grid{grid-template-columns:1fr}
+  .card3d-wrap{display:none}
+  .floorlist{display:block}
+  .kv{grid-template-columns:repeat(3,1fr)}
+  .hello .admin-only{display:none!important}
+}
+/* Standalone visual proposal; original data and interaction module retained. */
+html,body{background:#EDEFF3;font-family:Anuphan,"Leelawadee UI",Tahoma,system-ui,sans-serif}body{padding:24px}
+.wrap{max-width:1512px;padding:22px 28px 28px;background:#FAFBFD;border:1px solid #fff;border-radius:28px;box-shadow:0 12px 48px -32px #536079}
+.mock{font-size:12px;margin:0 0 16px}.seg{border-radius:10px;background:#F0F2F6;border:0}.seg button{border-radius:7px;min-height:32px}.seg button[aria-pressed=true]{background:#fff;color:var(--foreground);box-shadow:0 1px 4px #17203314}
+.nav{border-radius:16px;box-shadow:none;padding:12px 18px;gap:8px}.logo{letter-spacing:-1.5px;font-size:28px;margin-right:28px}.nav a{padding:10px 16px;font-size:14px}.who{padding-left:20px}
+.hello{margin:28px 0 24px;gap:10px}.hello h1{font-size:25px;line-height:1.5;letter-spacing:-.5px}.hello p{margin-top:4px;font-size:13px}
+.btn,.select{border-radius:10px;height:44px;font-weight:500}#editBtn{background:var(--primary);color:#fff;border-color:var(--primary)}#editBtn[aria-pressed=true]{background:#172033;border-color:#172033}
+.panel{border-color:#E5E9F0;border-radius:18px;box-shadow:none}.band{padding:0;border:0;background:none;margin-bottom:22px}.band>.ptitle{font-size:14px;color:var(--muted-fg);font-weight:500;margin-bottom:12px}
+.tiles{gap:12px;margin:0}.tile{border-radius:16px;padding:20px;background:#fff;min-height:116px;display:flex;flex-direction:column;justify-content:space-between;gap:12px}.tile .n{font-size:32px;letter-spacing:-1px;font-weight:600;font-variant-numeric:tabular-nums}.tile .l{font-size:13px;gap:5px}.tile:nth-child(2){background:#EDF2FF;border-color:#DAE3FF}.tile:nth-child(2) .n{color:var(--primary)}.tile.warn{background:#FFF8F1;border-color:#F2E3D4}.tile small{font-size:17px;letter-spacing:0;margin-left:3px}.sample{font-size:12px;padding:0 6px;background:#F1F3F6;color:#5B6676;font-weight:400;height:20px}
+.grid{grid-template-columns:minmax(0,1fr) 330px;grid-template-areas:"model status" "model attention" "services services";gap:18px;align-items:stretch}.grid>.col:first-child{display:contents}.grid>.col:first-child>.panel:first-child{grid-area:status}.grid>.col:first-child>.panel:last-child{grid-area:attention}.card3d-wrap{grid-area:model;min-width:0}.card3d{height:100%;min-height:660px}.grid>.col:last-child{grid-area:services}.grid>.col:last-child>.panel{display:grid;grid-template-columns:1fr 1fr}
+.ph{padding:18px 20px 14px}.ptitle{font-size:15px}.stat{padding:13px 20px;border-top-color:#F0F2F6;gap:10px}.stat .n{font-size:23px;min-width:30px;font-variant-numeric:tabular-nums}.stat .l{font-size:14px}.stat .l small{font-size:12px;margin-top:3px}.stat>.i{width:15px;color:#7C8796}.dot{width:8px;height:8px}.att{padding:13px 20px;border-top-color:#F0F2F6}.att b{font-size:14px;margin-bottom:4px}.att span{font-size:12px}.tag{border-radius:6px;font-weight:500}.more{padding:12px;font-size:13px}
+.svc{padding:20px 24px}.svc+.svc{border-top:0;border-left:1px solid var(--border)}.svc h3{margin-bottom:16px}.kv{grid-template-columns:repeat(3,1fr);gap:16px}.kv div{background:none;border-radius:0;padding:0 16px;border-left:1px solid var(--border)}.kv div:first-child{padding-left:0;border:0}.kv b{font-size:24px;margin-bottom:5px}.kv span{font-size:13px}.note{font-size:12px;margin-top:16px}
+.c3head{top:18px;left:18px;right:18px;gap:6px}.c3title{background:#fff;border:0;padding:10px 12px;border-radius:10px;font-size:15px;backdrop-filter:none}.c3title small{font-size:12px}.icon-btn{width:40px;height:40px;background:#fff;border-radius:10px}.floors{left:18px;top:82px;gap:8px}.chip-btn{height:40px;min-width:76px;border-color:#E2E7EE;background:#fff}.chip-btn[aria-current=true]{background:var(--primary);border-color:var(--primary)}.legend{left:18px;bottom:18px;background:#fff;border:0;font-size:12px;padding:10px 12px;gap:8px 12px;backdrop-filter:none}.palette{max-width:calc(100% - 28px);gap:4px;padding:10px;flex-wrap:wrap;justify-content:center}.palette .hint{max-width:100px;font-size:12px}.ptype{width:60px}.editbar{top:74px;font-size:12px}
+a:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #2741FA;outline-offset:3px}
+@media(min-width:1024px) and (max-width:1279px){body{padding:12px}.wrap{padding:18px}.grid{grid-template-columns:minmax(0,1fr) 300px}.nav a{padding:10px}.logo{margin-right:12px}.tile{padding:16px}.card3d{min-height:690px}.c3title small{display:block;margin-left:0}.palette .hint{display:none}}
+@media(max-width:1023px){body{padding:12px}.wrap{padding:16px;border-radius:22px}.nav{padding:10px 14px}.logo{margin-right:8px}.nav a:not(.on){display:none}.hello{margin:22px 0 20px}.hello h1{font-size:23px}.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.tiles .tile:first-child{grid-column:auto}.grid{grid-template-columns:1fr 1fr;grid-template-areas:"status attention" "floors floors" "services services";gap:14px}.floorlist{grid-area:floors}.card3d-wrap{display:none}.grid>.col:last-child>.panel{display:grid}}
+@media(max-width:599px){body{padding:0}.wrap{border:0;border-radius:0;padding:14px;min-height:100vh}.mock{gap:8px;font-size:12px}.mock>span:last-child{width:100%;display:flex;align-items:center;justify-content:space-between}.nav{gap:4px}.nav a{padding:9px;font-size:13px}.logo{font-size:25px}.who{padding-left:8px;margin-left:0}.av{width:32px;height:32px}.hello h1{font-size:22px}.hello .grow{min-width:100%}.hello p{font-size:12px}.select{width:100%}.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tiles .tile:first-child{grid-column:1/-1;flex-direction:row;align-items:center;min-height:80px}.tile{padding:16px;min-height:112px}.tile .n{font-size:30px}.tile .l{font-size:12px}.grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"status" "attention" "floors" "services"}.grid>.col:last-child>.panel{grid-template-columns:1fr}.svc{padding:18px}.svc+.svc{border-left:0;border-top:1px solid var(--border)}.kv{gap:8px}.kv div{padding:0 10px}.kv span{font-size:12px}.toast{width:calc(100% - 28px);font-size:13px}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-aircon" viewBox="0 0 24 24"><path d="M2 12h20M12 2v20M20 16l-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"/></symbol>
+  <symbol id="i-microphone" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><path d="M12 6h.01"/></symbol>
+  <symbol id="i-tv" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="i-car" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></symbol>
+  <symbol id="i-room" viewBox="0 0 24 24"><path d="M2 3h20M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3M7 21l5-5 5 5"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="mock">
+    <span><b>S29 · แบบร่างใหม่</b> · ข้อมูลตัวอย่าง</span>
+    <span>ดูในบทบาท <span class="seg" role="group" aria-label="บทบาทใน mockup"><button type="button" data-role="admin" aria-pressed="true">Admin</button><button type="button" data-role="exec" aria-pressed="false">ผู้บริหาร</button></span></span>
+  </div>
+
+  <nav class="nav" aria-label="เมนูหลัก">
+    <span class="logo">BAM</span>
+    <a href="#" class="on"><svg class="i"><use href="#i-home"/></svg>หน้าแรก</a>
+    <a href="#"><svg class="i"><use href="#i-wrench"/></svg>แจ้งซ่อม</a>
+    <a href="#"><svg class="i"><use href="#i-car"/></svg>จองรถ</a>
+    <a href="#"><svg class="i"><use href="#i-room"/></svg>จองห้องประชุม</a>
+    <span class="sp"></span>
+    <button class="icon-btn" aria-label="การแจ้งเตือน" style="border:0"><svg class="i"><use href="#i-bell"/></svg></button>
+    <span class="who"><span class="av" id="avatar">ปศ</span><div><strong id="whoName">ปวีณา ศรีสุข</strong><small id="whoRole">Admin</small></div></span>
+  </nav>
+
+  <div class="hello">
+    <div class="grow">
+      <h1 id="greet">สวัสดีตอนเช้า คุณปวีณา</h1>
+      <p>จันทร์ 19 ต.ค. 2569 · ภาพรวมวันนี้ของสำนักงานใหญ่</p>
+    </div>
+    <select class="select" aria-label="อาคาร"><option>อาคาร 1</option><option disabled>อาคาร 2 (ยังไม่มีโมเดล)</option></select>
+    <button class="btn admin-only" id="editBtn" type="button" aria-pressed="false"><svg class="i"><use href="#i-move"/></svg><span>จัดวางอุปกรณ์</span></button>
+  </div>
+
+  <section class="panel band" aria-labelledby="bandTitle">
+    <h2 class="ptitle" id="bandTitle">ภาพรวมวันนี้</h2>
+    <div class="tiles">
+      <a class="tile" href="#"><div class="n">3</div><div class="l">แจ้งซ่อมวันนี้</div></a>
+      <a class="tile" href="#"><div class="n">12</div><div class="l">งานค้างทั้งหมด</div></a>
+      <a class="tile warn" href="#"><div class="n">2</div><div class="l">เลยกำหนดเสร็จ</div></a>
+      <div class="tile"><div class="n">5</div><div class="l">รถออกวันนี้ <span class="sample">ข้อมูลตัวอย่าง</span></div></div>
+      <div class="tile"><div class="n">4<small>/12</small></div><div class="l">ห้องประชุมใช้อยู่ <span class="sample">ข้อมูลตัวอย่าง</span></div></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-labelledby="repTitle">
+        <div class="ph"><h2 class="ptitle" id="repTitle"><span style="display:flex;align-items:center;gap:8px"><span class="svc ico" style="padding:0;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#FFF1E7;color:var(--svc-repair)"><svg class="i" style="width:16px;height:16px"><use href="#i-wrench"/></svg></span>แจ้งซ่อม</span></h2></div>
+        <a class="stat" href="#"><span class="dot" style="background:#5B6676"></span><span class="n">4</span><span class="l">รับเรื่อง<small>รอช่างเริ่มดำเนินการ · เก่าสุด 2 วัน</small></span><svg class="i"><use href="#i-chev"/></svg></a>
+        <a class="stat" href="#"><span class="dot" style="background:var(--primary)"></span><span class="n">5</span><span class="l">กำลังดำเนินการ<small>เลยกำหนด 2 · ส่งกลับ 1</small></span><svg class="i"><use href="#i-chev"/></svg></a>
+        <a class="stat" href="#"><span class="dot" style="background:var(--attention)"></span><span class="n">3</span><span class="l">รอประเมินตรวจงาน<small>ปิดอัตโนมัติเร็วสุดพรุ่งนี้</small></span><svg class="i"><use href="#i-chev"/></svg></a>
+        <a class="stat" href="#"><span class="dot" style="background:var(--success)"></span><span class="n">18</span><span class="l">ปิดแล้ว 7 วัน<small>คะแนนเฉลี่ย 4.6</small></span><svg class="i"><use href="#i-chev"/></svg></a>
+      </section>
+      <section class="panel" aria-labelledby="attTitle">
+        <div class="ph"><h2 class="ptitle" id="attTitle">งานที่ควรติดตาม</h2></div>
+        <a class="att" href="#"><b>แอร์ไม่เย็น/น้ำหยด</b><span><span class="tag late">เลยกำหนด</span>อาคาร 1 ชั้น 1 · HR</span></a>
+        <a class="att" href="#"><b>ไฟไม่ติด/ไฟกะพริบ</b><span><span class="tag late">เลยกำหนด</span>อาคาร 1 ชั้น 5 · ห้องประชุม</span></a>
+        <a class="att" href="#"><b>ท่อน้ำรั่ว</b><span><span class="tag crit">ฉุกเฉิน</span>อาคาร 1 ชั้น 4 · ห้องน้ำหญิง</span></a>
+        <a class="att" href="#"><b>ไมค์ไม่มีเสียง</b><span><span class="tag back">ส่งกลับ</span>อาคาร 1 ชั้น 3 · ห้องประชุม</span></a>
+        <a class="more" href="#">ดูทั้งหมด</a>
+      </section>
+    </div>
+
+    <div class="col card3d-wrap">
+      <section class="panel card3d" aria-label="อาคาร 1 แบบ 3 มิติ" id="card3d">
+        <div id="scene"></div>
+        <div id="overlay"></div>
+        <div class="c3head">
+          <button class="btn sm" id="backBtn" type="button" style="display:none"><svg class="i"><use href="#i-back"/></svg>ภาพอาคาร</button>
+          <span class="c3title" id="c3title">อาคาร 1<small>6 ชั้น · งานค้าง 12</small></span>
+          <span class="zoom">
+            <button class="icon-btn" id="zin" type="button" aria-label="ซูมเข้า"><svg class="i"><use href="#i-plus"/></svg></button>
+            <button class="icon-btn" id="zout" type="button" aria-label="ซูมออก"><svg class="i"><use href="#i-minus"/></svg></button>
+            <button class="icon-btn" id="zreset" type="button" aria-label="รีเซ็ตมุมมอง"><svg class="i"><use href="#i-reset"/></svg></button>
+          </span>
+        </div>
+        <div class="floors" id="floorPicker" role="group" aria-label="เลือกชั้น"></div>
+        <div class="editbar admin-only" id="editbar">โหมดจัดวางอุปกรณ์</div>
+        <div class="empty-floor" id="emptyFloor">ยังไม่มีผังห้องของชั้นนี้</div>
+        <div class="legend" id="legend">
+          <span><span class="dot" style="background:var(--p-critical)"></span>ฉุกเฉิน</span>
+          <span><span class="dot" style="background:var(--p-high)"></span>สูง</span>
+          <span><span class="dot" style="background:var(--p-medium)"></span>ปกติ / ต่ำ</span>
+          <span>· หมุด = งานค้าง</span>
+          <span><svg class="i" style="width:14px;height:14px"><use href="#i-aircon"/></svg>แอร์</span>
+          <span><svg class="i" style="width:14px;height:14px"><use href="#i-microphone"/></svg>ไมค์</span>
+          <span><svg class="i" style="width:14px;height:14px"><use href="#i-speaker"/></svg>ลำโพง</span>
+          <span><svg class="i" style="width:14px;height:14px"><use href="#i-tv"/></svg>จอทีวี</span>
+        </div>
+        <div class="palette admin-only" id="palette" aria-label="อุปกรณ์">
+          <span class="hint" id="palHint">ลากอุปกรณ์ไปวางในห้อง</span>
+          <div class="ptype" data-type="aircon"><svg class="i"><use href="#i-aircon"/></svg>แอร์</div>
+          <div class="ptype" data-type="microphone"><svg class="i"><use href="#i-microphone"/></svg>ไมค์</div>
+          <div class="ptype" data-type="speaker"><svg class="i"><use href="#i-speaker"/></svg>ลำโพง</div>
+          <div class="ptype" data-type="tv"><svg class="i"><use href="#i-tv"/></svg>จอทีวี</div>
+          <button class="btn sm" id="addBtn" type="button"><svg class="i"><use href="#i-plus"/></svg>เพิ่มอุปกรณ์</button>
+        </div>
+        <div class="tip" id="tip"></div>
+        <div class="pop" id="pop"></div>
+      </section>
+    </div>
+
+    <section class="panel floorlist" aria-labelledby="flTitle">
+      <div class="ph"><h2 class="ptitle" id="flTitle">อาคาร 1 · งานค้างตามชั้น</h2><p class="note" style="margin-top:4px">ภาพ 3 มิติและการจัดวางอุปกรณ์ใช้ได้บนคอมพิวเตอร์</p></div>
+      <div id="floorList"></div>
+    </section>
+
+    <div class="col">
+      <section class="panel" aria-label="บริการอื่น">
+        <div class="svc">
+          <h3><span class="ico" style="background:#E6F4FB;color:var(--svc-car)"><svg class="i" style="width:16px;height:16px"><use href="#i-car"/></svg></span>จองรถ <span class="sample" style="margin-left:auto">ข้อมูลตัวอย่าง</span></h3>
+          <div class="kv"><div><b>5</b><span>รถออกวันนี้</span></div><div><b>2</b><span>รออนุมัติ</span></div><div><b>3/8</b><span>รถว่างตอนนี้</span></div></div>
+          <p class="note">ระบบจองรถยังไม่เปิดใช้งาน</p>
+        </div>
+        <div class="svc">
+          <h3><span class="ico" style="background:#E3F5F2;color:var(--svc-room)"><svg class="i" style="width:16px;height:16px"><use href="#i-room"/></svg></span>จองห้องประชุม <span class="sample" style="margin-left:auto">ข้อมูลตัวอย่าง</span></h3>
+          <div class="kv"><div><b>4</b><span>ใช้อยู่ตอนนี้</span></div><div><b>18</b><span>จองวันนี้</span></div><div><b>8</b><span>ห้องว่าง</span></div></div>
+          <p class="note">ระบบจองห้องประชุมยังไม่เปิดใช้งาน</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<dialog id="assetDialog">
+  <form method="dialog" id="assetForm" novalidate>
+    <h2 id="dlgTitle">เพิ่มอุปกรณ์</h2>
+    <p class="desc" id="dlgDesc">อาคาร 1 ชั้น 1</p>
+    <div class="field"><label>ประเภท</label><span class="typechip" id="dlgTypeChip"></span><select id="dlgType" aria-label="ประเภท" style="display:none"></select></div>
+    <div class="field"><label for="dlgCode">รหัสอุปกรณ์ <span style="color:var(--destructive)">*</span></label><input id="dlgCode" maxlength="50" autocomplete="off"><span class="err" id="errCode"></span></div>
+    <div class="field"><label for="dlgName">ชื่ออุปกรณ์ <span style="color:var(--destructive)">*</span></label><input id="dlgName" maxlength="100" placeholder="เช่น แอร์ห้อง HR ตัวซ้าย"><span class="err" id="errName"></span></div>
+    <div class="field"><label for="dlgRoom">ห้อง</label><select id="dlgRoom"></select></div>
+    <div class="actions"><button class="btn" value="cancel" type="button" id="dlgCancel">ยกเลิก</button><button class="btn primary" id="dlgSave" type="submit">บันทึก</button></div>
+  </form>
+</dialog>
+<dialog id="confirmDialog">
+  <form method="dialog">
+    <h2 id="cfTitle">ปิดใช้งาน?</h2>
+    <p class="desc">อุปกรณ์จะหายจากผัง งานซ่อมเดิมยังอ้างถึงได้ และรหัสนี้จะใช้กับอุปกรณ์ใหม่ไม่ได้</p>
+    <div class="actions"><button class="btn" value="cancel">ยกเลิก</button><button class="btn danger" value="ok">ปิดใช้งาน</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status"><span id="toastText"></span><button type="button" id="toastUndo">เลิกทำ</button></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// ---------- sample data (shapes of #27 / #30) ----------
+const W = 32, D = 15, H = 3.5;
+const PRIO = { critical: "#B42318", high: "#B93815", medium: "#2741FA", low: "#475467" };
+const TYPES = {
+  aircon: { name: "เครื่องปรับอากาศ", short: "แอร์", prefix: "AC" },
+  microphone: { name: "ไมโครโฟน", short: "ไมค์", prefix: "MIC" },
+  speaker: { name: "ลำโพง", short: "ลำโพง", prefix: "SPK" },
+  tv: { name: "จอทีวี", short: "จอทีวี", prefix: "TV" },
+};
+const floors = [
+  { level: 1, open: 3, top: "high" }, { level: 2, open: 0, top: null }, { level: 3, open: 2, top: "medium" },
+  { level: 4, open: 1, top: "critical" }, { level: 5, open: 4, top: "medium" }, { level: 6, open: 2, top: "low" },
+];
+// Floor 1 (PDF p.2): 8 bays × 4 m, rows 6 + 3 + 6 m; origin = plan top-left, x right, z down (front / entrance at z = 15).
+const rooms = [
+  { id: "dd", name: "Data and Digitization", area: 72, tint: 0xDCE3FF, shape: [[0,0],[12,0],[12,6],[0,6]], open: 1, top: "medium" },
+  { id: "sm", name: "ห้องย่อย", area: 12, tint: 0xD9F0E4, shape: [[0,6],[4,6],[4,9],[0,9]], open: 0 },
+  { id: "mk", name: "Marketing", area: 72, tint: 0xD9F0E4, shape: [[0,9],[12,9],[12,15],[0,15]], open: 0 },
+  { id: "hr1", name: "HR", area: 17.4, tint: 0xFDE5D4, shape: [[24,0],[28,0],[28,4.35],[24,4.35]], open: 0 },
+  { id: "hr2", name: "HR", area: 20.8, tint: 0xFDE5D4, shape: [[28,0],[32,0],[32,5.2],[28,5.2]], open: 0 },
+  { id: "hr3", name: "HR", area: 48, tint: 0xFDE5D4, shape: [[24,9],[32,9],[32,15],[24,15]], open: 1, top: "high" },
+  { id: "cm", name: "พื้นที่ส่วนกลางชั้น 1", area: 237.8, tint: 0xF3F5F9, common: true, label: [18, 7.6],
+    shape: [[12,0],[24,0],[24,4.35],[28,4.35],[28,5.2],[32,5.2],[32,9],[24,9],[24,15],[12,15],[12,9],[4,9],[4,6],[12,6]], open: 1, top: "medium" },
+];
+let assets = [
+  { id: 1, code: "AC-1-001", name: "แอร์ Data and Digitization", type: "aircon", room: "dd", x: 6, z: 0.6, open: 0 },
+  { id: 2, code: "AC-1-002", name: "แอร์ Marketing", type: "aircon", room: "mk", x: 6, z: 14.4, open: 0 },
+  { id: 3, code: "AC-1-003", name: "แอร์ห้อง HR", type: "aircon", room: "hr3", x: 28, z: 14.4, open: 1 },
+  { id: 4, code: "TV-1-001", name: "จอทีวีจุดประชาสัมพันธ์", type: "tv", room: "cm", x: 18, z: 11.6, open: 0 },
+  { id: 5, code: "SPK-1-001", name: "ลำโพงพื้นที่ส่วนกลาง", type: "speaker", room: "cm", x: 21, z: 6.2, open: 0 },
+];
+const usedCodes = new Set(assets.map((a) => a.code.toLowerCase()));
+let nextId = 10;
+
+// ---------- page state ----------
+const state = { view: "building", floor: null, editing: false, role: "admin", hoverFloor: null };
+const $ = (id) => document.getElementById(id);
+const roomById = (id) => rooms.find((r) => r.id === id);
+const roomLabel = (r) => (r.name === "HR" ? `HR (${r.area} ตร.ม.)` : r.name);
+
+// ---------- three.js ----------
+const host = $("scene");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, -500, 500);
+const controls = new OrbitControls(cam, renderer.domElement);
+controls.enablePan = false; controls.minZoom = 0.6; controls.maxZoom = 4;
+controls.minPolarAngle = 0.25; controls.maxPolarAngle = 1.3;
+controls.addEventListener("change", () => render());
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd6dce8, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 1.7); sun.position.set(30, 60, 40); scene.add(sun);
+const fill = new THREE.DirectionalLight(0xdfe6ff, 0.5); fill.position.set(-40, 20, -30); scene.add(fill);
+
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...o });
+const box = (w, h, d, m, x = 0, y = 0, z = 0) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); return b; };
+const wx = (x) => x - W / 2, wz = (z) => z - D / 2;
+
+// building: slabs + tinted glass + parapets, one hit box per floor
+const white = mat(0xffffff), glassBase = 0x9AACC4;
+const building = new THREE.Group(); scene.add(building);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 48), mat(0xE7EBF2)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.62; scene.add(ground);
+building.add(box(W + 2.4, 0.6, D + 2.4, mat(0xF4F6FA), 0, -0.3, 0)); // plinth
+const floorMeshes = [];
+floors.forEach((f, i) => {
+  const y0 = i * H, g = new THREE.Group();
+  const glass = new THREE.MeshStandardMaterial({ color: glassBase, roughness: 0.25, metalness: 0.15 });
+  g.add(box(W + 0.8, 0.35, D + 0.8, white, 0, y0 + 0.175, 0));
+  g.add(box(W - 0.8, H - 0.35, D - 0.8, glass, 0, y0 + 0.35 + (H - 0.35) / 2, 0));
+  if (i > 0) {
+    const ph = 0.95, py = y0 + 0.35 + ph / 2, t = 0.18;
+    g.add(box(W + 0.8, ph, t, white, 0, py, (D + 0.8) / 2 - t / 2), box(W + 0.8, ph, t, white, 0, py, -(D + 0.8) / 2 + t / 2));
+    g.add(box(t, ph, D + 0.8, white, (W + 0.8) / 2 - t / 2, py, 0), box(t, ph, D + 0.8, white, -(W + 0.8) / 2 + t / 2, py, 0));
+  }
+  const hit = box(W + 0.8, H, D + 0.8, new THREE.MeshBasicMaterial({ visible: false }), 0, y0 + H / 2, 0);
+  hit.userData.level = f.level; g.add(hit);
+  building.add(g); floorMeshes.push({ f, glass, hit, y0 });
+});
+const roofY = floors.length * H;
+building.add(box(W + 0.8, 0.45, D + 0.8, white, 0, roofY + 0.22, 0));
+building.add(box(6, 2.4, 5, mat(0xF2F4F8), 8, roofY + 1.6, -2.5));
+building.add(box(20, 2.4, 0.3, mat(0x6F82F2, { roughness: 0.7 }), -2, roofY + 1.7, D / 2 - 1.2)); // roof billboard
+building.add(box(7, 0.25, 3, white, 0, 3.0, D / 2 + 1.5)); // entrance canopy
+building.add(box(9, 0.3, 2.2, mat(0xEDEFF4), 0, 0.15, D / 2 + 1.5));
+
+// floor plan group (rebuilt on floor change)
+const plan = new THREE.Group(); scene.add(plan);
+const roomMeshes = new Map();
+function buildPlan(level) {
+  plan.clear(); roomMeshes.clear();
+  plan.add(box(W, 0.3, D, mat(0xE9EDF3), 0, -0.15, 0));
+  const wallM = mat(0xCDD3DE), colM = mat(0xBFC7D4);
+  const wall = (x1, z1, x2, z2, h = 1.2) => {
+    const len = Math.hypot(x2 - x1, z2 - z1), m = box(len, h, 0.14, wallM, wx((x1 + x2) / 2), h / 2, wz((z1 + z2) / 2));
+    m.rotation.y = -Math.atan2(z2 - z1, x2 - x1); plan.add(m);
+  };
+  [[0,0,W,0],[W,0,W,D],[W,D,0,D],[0,D,0,0]].forEach((e) => wall(...e, 1.4));
+  for (let x = 0; x <= W; x += 4) for (const z of [0, 6, 9, 15]) plan.add(box(0.45, 1.5, 0.45, colM, wx(x), 0.75, wz(z)));
+  if (level !== 1) return;
+  for (const r of rooms) {
+    const s = new THREE.Shape(r.shape.map(([x, z]) => new THREE.Vector2(wx(x), -wz(z))));
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(s), mat(r.tint));
+    m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.userData.room = r.id; plan.add(m); roomMeshes.set(r.id, m);
+    if (!r.common) r.shape.forEach((p, i) => { const q = r.shape[(i + 1) % r.shape.length]; wall(p[0], p[1], q[0], q[1]); });
+  }
+  for (const a of assets) plan.add(assetMarker(a));
+}
+function assetMarker(a) {
+  const y = a.type === "speaker" ? 2.6 : a.type === "aircon" ? 2.2 : 1.0;
+  const g = new THREE.Group(); g.userData.asset = a.id;
+  g.add(box(0.06, y, 0.06, mat(0x9AA6B8), 0, y / 2, 0));
+  g.add(box(0.9, 0.45, 0.45, mat(0x2741FA, { roughness: 0.5 }), 0, y, 0));
+  g.position.set(wx(a.x), 0, wz(a.z)); return g;
+}
+
+// cameras for the two views
+const VIEWS = {
+  building: { pos: [52, 40, 62], target: [0, 10.5, 0], size: 38 },
+  floor: { pos: [-2, 48, 30], target: [-2, 0, 1], size: 21 },
+};
+// Fit the 32 m plan (plus room for the floor picker) to the card's width.
+const fitSize = (name) => { const a = host.clientWidth / Math.max(1, host.clientHeight); return name === "floor" ? Math.max(18, (W + 9) / a) : Math.max(36, 44 / a); };
+let frustum = VIEWS.building.size;
+function setFrustum(size) {
+  frustum = size; const a = host.clientWidth / Math.max(1, host.clientHeight);
+  cam.left = -size * a / 2; cam.right = size * a / 2; cam.top = size / 2; cam.bottom = -size / 2; cam.updateProjectionMatrix();
+}
+function goView(name, animate = true) {
+  const v = VIEWS[name], from = { p: cam.position.clone(), t: controls.target.clone(), s: frustum, z: cam.zoom };
+  const to = { p: new THREE.Vector3(...v.pos), t: new THREE.Vector3(...v.target), s: fitSize(name) };
+  if (!animate) { cam.position.copy(to.p); controls.target.copy(to.t); cam.zoom = 1; setFrustum(to.s); controls.update(); render(); return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / 450), e = 1 - Math.pow(1 - k, 3);
+    cam.position.lerpVectors(from.p, to.p, e); controls.target.lerpVectors(from.t, to.t, e);
+    cam.zoom = from.z + (1 - from.z) * e; setFrustum(from.s + (to.s - from.s) * e); controls.update(); render();
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// ---------- overlays (pins, labels, asset chips) ----------
+const overlay = $("overlay");
+let overlayItems = [];
+const v3 = new THREE.Vector3();
+function project(x, y, z) {
+  v3.set(x, y, z).project(cam);
+  return [(v3.x + 1) / 2 * host.clientWidth, (1 - v3.y) / 2 * host.clientHeight];
+}
+function pinEl(count, prio, label) {
+  const el = document.createElement("button"); el.type = "button"; el.className = "pin";
+  el.style.background = PRIO[prio] ?? PRIO.medium; el.innerHTML = `<i>${count}</i>งาน`; el.setAttribute("aria-label", label); return el;
+}
+const icon = (t) => `<svg class="i"><use href="#i-${t}"/></svg>`;
+function buildOverlays() {
+  overlay.innerHTML = ""; overlayItems = [];
+  if (state.view === "building") {
+    for (const fm of floorMeshes) {
+      if (!fm.f.open) continue;
+      const el = pinEl(fm.f.open, fm.f.top, `ชั้น ${fm.f.level} งานค้าง ${fm.f.open}`);
+      el.addEventListener("click", () => enterFloor(fm.f.level));
+      overlay.append(el); overlayItems.push({ el, p: [W / 2 + 0.4, fm.y0 + H * 0.62, D / 2 + 0.4] });
+    }
+    return;
+  }
+  if (state.floor !== 1) return;
+  for (const r of rooms) {
+    const [lx, lz] = r.label ?? centroid(r.shape);
+    const el = document.createElement("div"); el.className = "rlabel";
+    el.innerHTML = `${r.name}<small>${r.area} ตร.ม.</small>`;
+    overlay.append(el); overlayItems.push({ el, p: [wx(lx), 0.1, wz(lz)] });
+    if (r.open) {
+      const pin = pinEl(r.open, r.top, `${roomLabel(r)} งานค้าง ${r.open}`);
+      pin.addEventListener("click", (e) => showPop(e, `<h4>${roomLabel(r)}</h4><p>งานค้าง ${r.open} งาน</p><div class="row"><a class="btn sm" href="#">ดูรายการงาน</a></div>`));
+      overlay.append(pin); overlayItems.push({ el: pin, p: [wx(lx), 1.4, wz(lz) - 0.9] });
+    }
+  }
+  for (const a of assets) {
+    const el = document.createElement("button"); el.type = "button"; el.className = "asset"; el.dataset.id = a.id;
+    el.innerHTML = icon(a.type) + (a.open ? `<span class="b">${a.open}</span>` : "");
+    el.setAttribute("aria-label", `${TYPES[a.type].short} ${a.code} ${a.name}`);
+    el.addEventListener("pointerdown", (e) => startAssetDrag(e, a, el));
+    overlay.append(el); overlayItems.push({ el, asset: a });
+  }
+}
+function placeOverlays() {
+  for (const it of overlayItems) {
+    const [x, y] = it.asset ? project(wx(it.asset.x), it.asset.type === "speaker" ? 2.6 : it.asset.type === "aircon" ? 2.2 : 1.0, wz(it.asset.z)) : project(...it.p);
+    it.el.style.left = `${x}px`; it.el.style.top = `${y}px`;
+  }
+}
+const centroid = (pts) => [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+function inPoly(x, z, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, zi] = pts[i], [xj, zj] = pts[j];
+    if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const roomAt = (x, z) => rooms.find((r) => !r.common && inPoly(x, z, r.shape)) ?? rooms.find((r) => r.common && inPoly(x, z, r.shape));
+
+// ---------- render on demand ----------
+let queued = false;
+function render() {
+  if (queued) return; queued = true;
+  requestAnimationFrame(() => { queued = false; renderer.render(scene, cam); placeOverlays(); });
+}
+function resize() { renderer.setSize(host.clientWidth, host.clientHeight); setFrustum(frustum); render(); }
+new ResizeObserver(resize).observe(host);
+
+// ---------- views ----------
+function setTitle() {
+  const total = floors.reduce((s, f) => s + f.open, 0);
+  $("c3title").innerHTML = state.view === "building"
+    ? `อาคาร 1<small>${floors.length} ชั้น · งานค้าง ${total}</small>`
+    : `อาคาร 1 · ชั้น ${state.floor}<small>งานค้าง ${floors[state.floor - 1].open} · อุปกรณ์ ${state.floor === 1 ? assets.length : 0}</small>`;
+  $("backBtn").style.display = state.view === "floor" ? "" : "none";
+  $("emptyFloor").style.display = state.view === "floor" && state.floor !== 1 ? "block" : "none";
+  $("palHint").textContent = state.view === "floor" ? (state.floor === 1 ? "ลากอุปกรณ์ไปวางในห้อง" : "ชั้นนี้ยังไม่มีผังห้อง") : "เลือกชั้นก่อนจัดวางอุปกรณ์";
+  document.querySelectorAll(".floors .chip-btn").forEach((b) => b.setAttribute("aria-current", String(+b.dataset.level === state.floor && state.view === "floor")));
+}
+function enterFloor(level) {
+  state.view = "floor"; state.floor = level; hidePop();
+  building.visible = false; ground.visible = false; buildPlan(level); plan.visible = true;
+  controls.minPolarAngle = 0.15; controls.maxPolarAngle = 1.05;
+  buildOverlays(); setTitle(); goView("floor");
+}
+function showBuilding() {
+  state.view = "building"; state.floor = null; hidePop();
+  plan.visible = false; building.visible = true; ground.visible = true;
+  controls.minPolarAngle = 0.25; controls.maxPolarAngle = 1.3;
+  buildOverlays(); setTitle(); goView("building");
+}
+// floor picker (top floor first, keyboard arrows)
+const picker = $("floorPicker");
+[...floors].reverse().forEach((f) => {
+  const b = document.createElement("button"); b.type = "button"; b.className = "chip-btn"; b.dataset.level = f.level;
+  b.innerHTML = `ชั้น ${f.level}${f.open ? `<span class="c" style="background:${PRIO[f.top]}">${f.open}</span>` : ""}`;
+  b.setAttribute("aria-label", `ชั้น ${f.level} งานค้าง ${f.open}`);
+  b.addEventListener("click", () => enterFloor(f.level));
+  b.addEventListener("mouseenter", () => hoverFloor(f.level)); b.addEventListener("mouseleave", () => hoverFloor(null));
+  b.addEventListener("keydown", (e) => {
+    const btns = [...picker.children], i = btns.indexOf(b);
+    if (e.key === "ArrowDown" && btns[i + 1]) { e.preventDefault(); btns[i + 1].focus(); }
+    if (e.key === "ArrowUp" && btns[i - 1]) { e.preventDefault(); btns[i - 1].focus(); }
+  });
+  picker.append(b);
+});
+$("backBtn").addEventListener("click", showBuilding);
+$("zin").addEventListener("click", () => { cam.zoom = Math.min(4, cam.zoom * 1.25); cam.updateProjectionMatrix(); render(); });
+$("zout").addEventListener("click", () => { cam.zoom = Math.max(0.6, cam.zoom / 1.25); cam.updateProjectionMatrix(); render(); });
+$("zreset").addEventListener("click", () => goView(state.view));
+
+function hoverFloor(level) {
+  state.hoverFloor = level;
+  for (const fm of floorMeshes) {
+    const on = fm.f.level === level;
+    fm.glass.color.set(on ? 0x8C9DFF : glassBase); fm.glass.emissive.set(on ? 0x1B31D6 : 0x000000); fm.glass.emissiveIntensity = on ? 0.25 : 0;
+  }
+  render();
+}
+
+// ---------- pointer: hover / click on the model ----------
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ground0 = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitP = new THREE.Vector3();
+const tip = $("tip");
+function setNdc(e) { const r = host.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ndc, cam); return r; }
+function planPoint(e) {
+  const r = host.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return null;
+  setNdc(e); if (!ray.ray.intersectPlane(ground0, hitP)) return null;
+  const x = hitP.x + W / 2, z = hitP.z + D / 2; return x >= 0 && x <= W && z >= 0 && z <= D ? { x, z } : { x, z, out: true };
+}
+let downAt = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; hidePop(); });
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (drag) return;
+  const r = setNdc(e);
+  if (state.view === "building") {
+    const hit = ray.intersectObjects(floorMeshes.map((f) => f.hit))[0];
+    const level = hit?.object.userData.level ?? null;
+    if (level !== state.hoverFloor) hoverFloor(level);
+    renderer.domElement.style.cursor = level ? "pointer" : "grab";
+    if (level) { const f = floors[level - 1]; tip.textContent = `ชั้น ${level} · งานค้าง ${f.open}`; tip.style.display = "block"; tip.style.left = `${e.clientX - r.left + 14}px`; tip.style.top = `${e.clientY - r.top + 10}px`; }
+    else tip.style.display = "none";
+  } else tip.style.display = "none";
+});
+renderer.domElement.addEventListener("pointerleave", () => { tip.style.display = "none"; if (state.view === "building") hoverFloor(null); });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  if (state.view === "building" && state.hoverFloor) enterFloor(state.hoverFloor);
+});
+
+// ---------- edit mode: drag from the palette, drag existing chips ----------
+let drag = null; // { kind: "new" | "move", type, asset, el, ghost, moved, start, orig }
+function highlight(roomId, bad = false) {
+  for (const [id, m] of roomMeshes) m.material.color.set(id === roomId ? (bad ? 0xF8C9C6 : 0xBFC9FF) : roomById(id).tint);
+  render();
+}
+document.querySelectorAll(".ptype").forEach((p) => p.addEventListener("pointerdown", (e) => {
+  if (state.view !== "floor" || state.floor !== 1) { toast(state.view === "floor" ? "ชั้นนี้ยังไม่มีผังห้อง" : "เลือกชั้นก่อนจัดวางอุปกรณ์"); return; }
+  e.preventDefault();
+  const ghost = document.createElement("div"); ghost.className = "ghost"; ghost.innerHTML = icon(p.dataset.type) + "<em></em>";
+  document.body.append(ghost); drag = { kind: "new", type: p.dataset.type, ghost }; moveGhost(e);
+}));
+function startAssetDrag(e, a, el) {
+  e.stopPropagation(); hidePop();
+  drag = { kind: "move", asset: a, el, start: [e.clientX, e.clientY], moved: false, orig: { x: a.x, z: a.z, room: a.room } };
+  controls.enabled = false; el.setPointerCapture?.(e.pointerId);
+}
+function moveGhost(e) {
+  const g = drag.ghost; g.style.left = `${e.clientX}px`; g.style.top = `${e.clientY}px`;
+  const p = planPoint(e), r = p && !p.out ? roomAt(p.x, p.z) : null;
+  g.classList.toggle("bad", !!p && !r); g.querySelector("em").textContent = r ? roomLabel(r) : p ? "วางในห้องเท่านั้น" : "ลากไปบนผัง";
+  highlight(r?.id ?? null);
+}
+window.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  if (drag.kind === "new") return moveGhost(e);
+  if (!state.editing) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.start[0], e.clientY - drag.start[1]) < 4) return;
+  drag.moved = true; drag.el.classList.add("dragging");
+  const p = planPoint(e); if (!p || p.out) { drag.el.classList.add("bad"); return; }
+  drag.asset.x = p.x; drag.asset.z = p.z; const r = roomAt(p.x, p.z);
+  drag.el.classList.toggle("bad", !r); highlight(r?.id ?? null); render();
+});
+window.addEventListener("pointerup", (e) => {
+  if (!drag) return;
+  const d = drag; drag = null; controls.enabled = true; highlight(null);
+  if (d.kind === "new") {
+    d.ghost.remove(); const p = planPoint(e); if (!p) return;
+    const r = p.out ? null : roomAt(p.x, p.z);
+    if (!r) return toast("วางในห้องเท่านั้น");
+    return openDialog({ mode: "add", type: d.type, room: r.id, x: p.x, z: p.z });
+  }
+  d.el.classList.remove("dragging", "bad");
+  if (!d.moved) return showAssetPop(e, d.asset);
+  const p = planPoint(e), r = p && !p.out ? roomAt(p.x, p.z) : null;
+  if (!r) { Object.assign(d.asset, { x: d.orig.x, z: d.orig.z }); render(); return toast("วางในห้องเท่านั้น"); }
+  d.asset.room = r.id; buildPlan(1); buildOverlays(); render();
+  toast(`ย้าย ${d.asset.code} ไป${roomLabel(r)}แล้ว`, () => { Object.assign(d.asset, d.orig); buildPlan(1); buildOverlays(); render(); });
+});
+
+// ---------- popover ----------
+const pop = $("pop");
+function showPop(e, html) {
+  const r = $("card3d").getBoundingClientRect(); pop.innerHTML = html; pop.style.display = "block";
+  pop.style.left = `${Math.min(e.clientX - r.left + 12, r.width - 262)}px`; pop.style.top = `${Math.min(e.clientY - r.top + 12, r.height - 170)}px`;
+}
+function hidePop() { pop.style.display = "none"; }
+function showAssetPop(e, a) {
+  const r = roomById(a.room);
+  showPop(e, `<h4>${a.name}</h4><p>${TYPES[a.type].name} · ${a.code}</p><p>${roomLabel(r)} · งานค้าง ${a.open}</p>` +
+    (state.editing ? `<div class="row"><button class="btn sm" type="button" id="popEdit">แก้ไข</button><button class="btn sm" type="button" id="popOff" style="color:var(--destructive)">ปิดใช้งาน</button></div>` : ""));
+  $("popEdit")?.addEventListener("click", () => { hidePop(); openDialog({ mode: "edit", asset: a }); });
+  $("popOff")?.addEventListener("click", () => { hidePop(); deactivate(a); });
+}
+document.addEventListener("pointerdown", (e) => { if (!pop.contains(e.target) && !e.target.closest(".asset,.pin")) hidePop(); });
+
+// ---------- dialogs ----------
+const dlg = $("assetDialog"); let dlgCtx = null;
+const floorRooms = () => rooms;
+function suggest(type) {
+  const prefix = TYPES[type].prefix; for (let n = 1; ; n++) { const c = `${prefix}-1-${String(n).padStart(3, "0")}`; if (!usedCodes.has(c.toLowerCase())) return c; }
+}
+function openDialog(ctx) {
+  dlgCtx = ctx; const edit = ctx.mode === "edit", a = ctx.asset;
+  const type = edit ? a.type : ctx.type;
+  $("dlgTitle").textContent = edit ? "แก้ไขอุปกรณ์" : "เพิ่มอุปกรณ์";
+  $("dlgDesc").textContent = "อาคาร 1 ชั้น 1";
+  $("dlgType").innerHTML = Object.entries(TYPES).map(([k, t]) => `<option value="${k}">${t.name}</option>`).join("");
+  $("dlgType").style.display = ctx.mode === "add-form" ? "" : "none";
+  $("dlgTypeChip").style.display = ctx.mode === "add-form" ? "none" : "";
+  $("dlgTypeChip").innerHTML = type ? icon(type) + TYPES[type].name : "";
+  $("dlgRoom").innerHTML = floorRooms().map((r) => `<option value="${r.id}">${roomLabel(r)}</option>`).join("");
+  $("dlgRoom").value = edit ? a.room : ctx.room ?? "cm";
+  $("dlgCode").value = edit ? a.code : suggest(type ?? "aircon");
+  $("dlgName").value = edit ? a.name : "";
+  for (const id of ["dlgCode", "dlgName"]) $(id).removeAttribute("aria-invalid");
+  $("errCode").style.display = $("errName").style.display = "none";
+  dlg.showModal(); $("dlgName").focus();
+}
+$("dlgType").addEventListener("change", () => { $("dlgCode").value = suggest($("dlgType").value); });
+$("dlgCancel").addEventListener("click", () => dlg.close());
+$("assetForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const code = $("dlgCode").value.trim(), name = $("dlgName").value.trim(), ctx = dlgCtx;
+  const own = ctx.mode === "edit" ? ctx.asset.code.toLowerCase() : null;
+  const codeErr = !code ? "กรุณาใส่รหัสอุปกรณ์" : !/^[A-Za-z0-9_-]+$/.test(code) ? "ใช้ได้เฉพาะตัวอักษร ตัวเลข - และ _"
+    : usedCodes.has(code.toLowerCase()) && code.toLowerCase() !== own ? "รหัสนี้มีอุปกรณ์อื่นใช้แล้ว" : "";
+  const nameErr = name ? "" : "กรุณาใส่ชื่ออุปกรณ์";
+  for (const [id, err, el] of [["dlgCode", codeErr, "errCode"], ["dlgName", nameErr, "errName"]]) {
+    $(id).setAttribute("aria-invalid", String(!!err)); $(el).textContent = err; $(el).style.display = err ? "block" : "none";
+  }
+  if (codeErr || nameErr) return;
+  const room = $("dlgRoom").value;
+  const roomPos = (id) => { const r = roomById(id); const [x, z] = r.label ?? centroid(r.shape); return { x, z: z + 1.2 }; };
+  if (ctx.mode === "edit") {
+    const a = ctx.asset; usedCodes.delete(a.code.toLowerCase());
+    Object.assign(a, { code, name }, room !== a.room ? { room, ...roomPos(room) } : {});
+    usedCodes.add(code.toLowerCase()); toast("บันทึกแล้ว");
+  } else {
+    const type = ctx.mode === "add-form" ? $("dlgType").value : ctx.type;
+    const pos = ctx.mode === "add-form" || room !== ctx.room ? roomPos(room) : { x: ctx.x, z: ctx.z };
+    assets.push({ id: nextId++, code, name, type, room, ...pos, open: 0 }); usedCodes.add(code.toLowerCase());
+    toast(`เพิ่ม ${code} แล้ว`);
+  }
+  dlg.close(); buildPlan(1); buildOverlays(); setTitle(); render();
+});
+$("addBtn").addEventListener("click", () => {
+  if (state.view !== "floor" || state.floor !== 1) return toast(state.view === "floor" ? "ชั้นนี้ยังไม่มีผังห้อง" : "เลือกชั้นก่อนจัดวางอุปกรณ์");
+  openDialog({ mode: "add-form", type: "aircon" });
+});
+function deactivate(a) {
+  const c = $("confirmDialog"); $("cfTitle").textContent = `ปิดใช้งาน ${a.code}?`; c.showModal();
+  c.addEventListener("close", () => {
+    if (c.returnValue !== "ok") return;
+    assets = assets.filter((x) => x !== a); // code stays in usedCodes: it cannot be reused (BR-F31-4)
+    buildPlan(1); buildOverlays(); setTitle(); render(); toast(`ปิดใช้งาน ${a.code} แล้ว`);
+  }, { once: true });
+}
+
+// ---------- toast ----------
+let toastTimer;
+function toast(text, undo) {
+  const t = $("toast"); $("toastText").textContent = text; $("toastUndo").style.display = undo ? "" : "none";
+  $("toastUndo").onclick = () => { undo?.(); t.style.display = "none"; };
+  t.style.display = "flex"; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.style.display = "none"), 4000);
+}
+
+// ---------- edit toggle + mockup role switch ----------
+function setEditing(on) {
+  state.editing = on; document.body.classList.toggle("editing", on);
+  $("editBtn").setAttribute("aria-pressed", String(on));
+  $("editBtn").querySelector("span").textContent = on ? "เสร็จสิ้น" : "จัดวางอุปกรณ์";
+  $("editBtn").classList.toggle("primary", on); hidePop();
+  if (on && state.view === "building") enterFloor(1);
+}
+$("editBtn").addEventListener("click", () => setEditing(!state.editing));
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  const exec = b.dataset.role === "exec"; state.role = exec ? "exec" : "admin";
+  document.body.classList.toggle("exec", exec); if (exec) setEditing(false);
+  $("whoName").textContent = exec ? "ประเสริฐ วงศ์ไทย" : "ปวีณา ศรีสุข"; $("whoRole").textContent = exec ? "ผู้บริหาร" : "Admin";
+  $("avatar").textContent = exec ? "ปว" : "ปศ"; $("greet").textContent = exec ? "สวัสดีตอนเช้า คุณประเสริฐ" : "สวัสดีตอนเช้า คุณปวีณา";
+}));
+
+// ---------- phone floor list ----------
+$("floorList").innerHTML = [...floors].reverse().map((f) => `<details><summary><span class="dot" style="background:${f.open ? PRIO[f.top] : "#D0D6E2"}"></span><b>ชั้น ${f.level}</b><span>${f.open ? `งานค้าง ${f.open}` : "ไม่มีงานค้าง"}</span><svg class="i"><use href="#i-chev"/></svg></summary>
+  <div class="body">${f.level === 1 ? `ห้องที่มีงานค้าง: Data and Digitization 1 · HR 1 · พื้นที่ส่วนกลางชั้น 1 1<br>อุปกรณ์ ${assets.length} ชิ้น (แอร์ 3 · ทีวี 1 · ลำโพง 1)` : "แตะเพื่อดูรายการงานของชั้นนี้"}</div></details>`).join("");
+
+// ---------- start ----------
+plan.visible = false; buildOverlays(); setTitle(); resize(); goView("building", false);
+</script>
+</body>
+</html>

@@ -1,6 +1,127 @@
 # UI handoff — ระบบแจ้งซ่อม — Stages 1–2 + 2R (CR-008)
 
-Status: BUILT BY CLAUDE — Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+Status: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+
+## Stage 3D (2026-10-19 / 20) — BUILT BY CLAUDE (D-085): S29 dashboard Home for admin / executive + 3D อาคาร 1 + equipment (CR-016)
+
+> Written as a Codex brief; the owner then asked Claude to build it. Files (Claude owns): `app/(app)/page.tsx` (role switch), `modules/repair/components/dashboard/{admin-dashboard,building-card,asset-dialog,floor-list,dashboard-ui}.tsx`, `dashboard/scene/{kit,building-one,floor-plan,engine}.ts`, e2e `F23-dashboard` / `F31-assets`. Results in "Stage 3D checklist results" below.
+
+Goal: admin and executive open `/` and see the key numbers, a 3D model of อาคาร 1 in the centre (building → floor → rooms, open-ticket pins, equipment), and admin can place equipment by drag and drop (`../03-plan.md` Stage 3D, AC1–AC6). Every other role keeps the current Home.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md`
+2. **`ui/screens/S29-admin-dashboard.md`** (APPROVED; read the "Approved sources" box first) and `../02-flows.md` F23 + F31
+3. **Layout / look:** `ui/mockups/S29-admin-dashboard-modern.html` (open in a browser). Use its layout, panels, colours, copy, edit-mode bar, palette, dialog and phone layout. **Do not port its 3D code** (lines from `<script type="module">` on) — that was only a placeholder.
+4. **3D model:** `แผนผังงานซ่อมอาคาร.html` (repo root, the owner's model) — port **อาคาร 1 only** + its floor-plan renderer, as listed below
+5. `frontend/src/modules/repair/{types,api,mocks,plan-geometry,service-samples}.ts` (data — do not change)
+
+### What to build
+
+| Piece | Where | Notes |
+|---|---|---|
+| Home switch | `app/(app)/page.tsx` (**this stage only**) | `useCurrentUser()`: role `admin` / `executive` → render `<AdminDashboard />`; every other role → the current Home JSX unchanged (move it into a local `EmployeeHome` component in the same file, no other change) |
+| S29 page | `modules/repair/components/dashboard/admin-dashboard.tsx` (+ small parts in the same folder) | greeting row (สวัสดีตอนเช้า < 12:00 · ตอนบ่าย < 17:00 · ตอนเย็น, Bangkok time; `formatLongDate`), building `ChoiceField`/`FilterPill` (only buildings from #27; `hasModel` → 3D, else floor list), admin-only `จัดวางอุปกรณ์` toggle (`aria-pressed`, label `เสร็จสิ้น` while on); band ภาพรวมวันนี้; แจ้งซ่อม column + งานที่ควรติดตาม; 3D card; บริการอื่น column; states |
+| 3D scene | `modules/repair/components/dashboard/building-scene.tsx` + `components/dashboard/scene/*.ts` | client only, loaded with `next/dynamic(..., { ssr: false })` **only** when the viewport is ≥ 1024 px **and** WebGL is available; otherwise the floor list. Dispose renderer, geometries, materials, textures and listeners on unmount |
+| Asset dialog, deactivate confirm, popovers, toast with undo | `components/dashboard/*` | shadcn `Dialog` / `AlertDialog` / `Popover` + `sonner` (already in the app) |
+| Phone / tablet (< 1024 px) | same page | no 3D: band as 2 columns, แจ้งซ่อม counts, งานที่ควรติดตาม, floor list (`ชั้น {n}` · open count · priority dot · `›` → bottom sheet with that floor's rooms from #30: open count + equipment count, and its open tickets), บริการอื่น, caption `จัดวางอุปกรณ์ได้บนคอมพิวเตอร์` |
+
+### Port from `แผนผังงานซ่อมอาคาร.html` (line numbers of that file)
+
+Keep (convert to TypeScript modules; `three` **0.160.1** is installed, same as the model's import map; addons from `three/examples/jsm/...`):
+
+- Helpers 653–697 (`canvasTex`, `rng`, `noise`, `bg`, `worldUV`, `mesh`, `merged`, `planeUV`) and the textures 699–877 (+ environment / fog 878–886) that อาคาร 1 and the plan use (sky / env, concrete, interior, poster, portrait, sign, fan, tile, wetTile, carpet, leaves for the plan's potted plants).
+- Building config **B1 only** (228–251) **without `plans`**: `floors 6, width 32, depth 15, floorHeight 3.5, overhang 1.2, style 'balcony', entrance 'main', roofSign, cladding, frame, rows [6,3,6], bay 4, core [...]`.
+- Building: `addLights`, `floorMats`, `glassBox`, `mullionGrid`, `makeShell`, `finishFloor`, `groundFloor`, `balconyFloor`, `roofOf` (887–1092); the stacking loop 1188–1205 for B1 only; `setOpacity`.
+- Plan: `buildPlan` 1247–1446 — floor slab + tile, low walls cut at 1.2 m with door gaps, core (ห้องน้ำ / บันได / A.H.U. / ลิฟต์ — drawn on every floor), facade sill + glass + entrance gap (floor 1 only: `entrance { x: 14, w: 6 }`, `reception` → floor 1 only), columns on the grid, dimension ticks + labels, instanced desks / chairs, potted plants.
+- HTML labels projected from 3D (1451–1479), camera poses / tweens / `fitSphere` / `focusBuilding` / `enterFloor` / `showPlan` / `backFromPlan` (1521–1612), picking (1631–1688), resize with `ResizeObserver` (1703–1717).
+
+Change:
+
+- **Rooms come from #30, not from `plans[f].zones`.** For every room with a `shape` (polygon, metres, origin top-left): `common_area` = not drawn as a tile (it is the floor); `restroom` = no tile (the core draws ห้องน้ำ) but still a hit area / pin place; every other room = a tinted tile from the polygon (`THREE.Shape` → `ShapeGeometry`), outline line, walls along its edges (skip edges on the outer boundary, draw a shared edge once, door gap on edges ≥ 2.6 m as in `edgeWithDoor`), label `{name}` + `{area} ตร.ม.` (`shapeArea` from `plan-geometry.ts`; 2 decimals when not whole). Tint by `areaType` with the modern mockup tints (office `#DCE3FF`, meeting_room `#D9F0E4`, pantry / other `#FDE5D4`; floor `#F3F5F9`); no purple (D-070). Desks only in 4-point rectangular rooms with the size rule in 1360–1366.
+- `floor 1` uses the same room data (its rooms equal the model's zones), so the floor-1 look stays the owner's.
+- A floor with `widthM === null` or no room shapes → slab outline + `ยังไม่มีผังห้องของชั้นนี้`.
+- **Pins = open tickets per room**, not per job: one pin per room with `openCount > 0` at `roomCenter(room, rooms)` (`plan-geometry.ts`), colour by `highestPriority` (critical / high / medium tokens; low uses the medium colour — legend `ปกติ / ต่ำ`), label = count, `aria-label="{room} งานค้าง {n}"`. Click → popover listing that room's open tickets (`getTickets({ scope: "all", floorId, status: ["in_progress", "resolved"], pageSize: 100 })`, keep `t.room?.id === room.id`) → S07.
+- **Building view:** floor highlight colour from #27 `floors[].highestPriority` (no status colours from the model); a pin per floor with `openCount > 0`; hover = highlight + tooltip `ชั้น {n} · งานค้าง {n}`; click = floor view.
+- **Equipment = round icon chips** (HTML overlay, like the model's labels) at `(x, z)`; icon by `type.key` (`aircon` → lucide `AirVent`, `microphone` → `Mic`, `speaker` → `Speaker`, `tv` → `Tv`, unknown → `Box`), badge = `openTickets` when > 0, `aria-label="{type.name} {code} {name}"`. `x === null` (not placed) → at `roomCenter` with a dashed ring and tooltip `ยังไม่ได้วางจุด`. Click → popover (code, name, room, open tickets; admin: `แก้ไข` · `ปิดใช้งาน`).
+- **Render on demand**: no permanent `requestAnimationFrame` loop and no pulsing. Render on: controls `change`, tweens running, resize, data change. Drop `EffectComposer` / `GTAOPass` / the quality button / the HUD. Shadows static (`shadowMap.autoUpdate = false`, `needsUpdate` after a rebuild). Respect `prefers-reduced-motion` for camera tweens.
+- Drop: B2 / B3, `curtainFloor`, site props (trees, cars, parking, hedges — keep only a plain ground + paving under อาคาร 1), `STATUS` / `JOBS` / filters / KPI / charts / table / CSV / drawers / asset localStorage, `window.facility` / `window.dashboard`.
+- Controls: drag = rotate, wheel + `+` `−` = zoom, `⟲` = reset (S29). Floor picker chips `6 … 1` on the left (roving tabindex, ↑ ↓ keys), `‹ ภาพอาคาร` back.
+
+### Edit mode (admin only; `executive` never sees the toggle, palette or edit actions)
+
+- Building view + edit mode → hint `เลือกชั้นก่อนจัดวางอุปกรณ์`.
+- Palette (from #29, order as returned): drag a type over the plan → raycast to the floor plane → plan coords (`x = p.x + W/2`, `z = p.z + D/2`) → `roomAt(x, z, rooms)` (`plan-geometry.ts`, the same rule as the server) → highlight that room; outside every room = red outline + `วางในห้องเท่านั้น`, drop refused. Drop → dialog `เพิ่มอุปกรณ์` with the type chip, code from `suggestAssetCode(typeId, floorId)` (editable), name, room (prefilled; changing the room puts the point at `roomCenter`), then `createAsset({ assetTypeId, code, name, roomId, x, z })`. Round x / z to 2 decimals.
+- `เพิ่มอุปกรณ์` button (no pointer): same dialog with a type `ChoiceField` and the room list; saves without `x` / `z` (F31 step 5).
+- Drag an existing chip → move at once (optimistic), `updateAsset(id, { code, name, roomId: roomAt(...), x, z })`; toast `ย้าย {code} ไป{ห้อง}แล้ว` + `เลิกทำ` (sends the previous room / x / z back); on error roll back + `errorMessage(err)`.
+- `แก้ไข` → same dialog (title `แก้ไขอุปกรณ์`, no type change) → `updateAsset`. `ปิดใช้งาน` → `AlertDialog` (S29 copy) → `deactivateAsset` → toast `ปิดใช้งาน {code} แล้ว`.
+- Errors: field errors via `fieldErrors(err, assetFieldMessages)` from `errors.ts` (code / name / room / x / z); `ASSET_CODE_TAKEN` → under รหัสอุปกรณ์ `รหัสนี้มีอุปกรณ์อื่นใช้แล้ว`; `POINT_OUTSIDE_ROOM` / `MASTER_DATA_CHANGED` → toast + reload the plan. Toasts `เพิ่ม {code} แล้ว` / `บันทึกแล้ว`. After every write reload #30 (and #27 for counts).
+
+### Data — `modules/repair/api.ts`
+
+| Function | # | Used for |
+|---|---|---|
+| `getOverview()` | 27 | band, แจ้งซ่อม rows + sub-lines, attention (≤ 4 shown), buildings → floors (pins, floor list) |
+| `getAssetTypes()` | 29 | palette, add dialog |
+| `getFloorPlan(floorId)` | 30 | floor view, phone floor sheet |
+| `createAsset` · `updateAsset` · `deactivateAsset` · `suggestAssetCode` | 31–34 | edit mode |
+| `getTickets(...)` | 6 | room pin popover / phone floor sheet ticket list |
+| `SAMPLE_SERVICES` (`service-samples.ts`) | — | รถออกวันนี้ / ห้องประชุมใช้อยู่ tiles and the บริการอื่น blocks, always with `ข้อมูลตัวอย่าง` |
+
+- Number → copy / link mapping: S29 spec "Content" rows "Row sub-lines" and "Row / tile links" (S11 tabs `assess` · `repair` · `rating` · `closed`).
+- Attention row: title + place with the existing helpers in `ticket-presentation.ts` (`placeLine` / ticket title as S06 / S11), chip `เลยกำหนด` (in progress, `expectedDoneOn` before today), `ส่งกลับ` (`step === "reworking"`), `ฉุกเฉิน` (`priority === "critical"`); a high-priority row without one of these shows the existing `PriorityIndicator`. Empty → `ไม่มีงานที่ต้องติดตาม` + mascot `face` 64 px.
+- Geometry helpers (`plan-geometry.ts`): `roomAt`, `pointInShape`, `shapeArea`, `roomCenter` — use them; do not re-implement.
+- Errors: `errorMessage(err)`; #27 fails → inline Alert `โหลดภาพรวมไม่สำเร็จ` + retry; #30 fails → inside the 3D card + retry.
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`)
+
+- อาคาร 1 uses the migration ids and the real outlines of floors 1–6; tickets 160–165 sit in its rooms (floor 1 HR 3 overdue + high, floor 4 อ.1 ห้อง 401 critical, floor 5 บัญชี reworking, floor 3 / 6 …). Equipment: 5 on floor 1, 2 on floor 4, 1 on floor 6; `AC-1-004` is inactive (code taken).
+- Roles via the role switcher: ปวีณา (admin) edits, ผู้บริหาร reads, พนักงาน / ช่าง get the normal Home.
+- Scenarios (`?mock=`): `normal`, `empty` (zeros, no pins, no equipment), `error` (reads fail, writes fail with network), `forbidden` (#27 / #30 → 403), `slow` (skeletons).
+
+### You may edit (Stage 3D)
+
+- `frontend/src/app/(app)/page.tsx` — the role switch only (this stage)
+- `frontend/src/modules/repair/components/dashboard/**` (new)
+- `frontend/src/components/ui/**` only via `npx shadcn@latest add`
+- This file: Stage 3D checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,plan-geometry,service-samples}.ts`, `package.json` (need another package → Open questions), `components/shared/**`, `src/lib/**`, backend, other docs.
+
+### Done when (Codex fills the Stage 3D checklist below)
+
+- [ ] S29 acceptance checklist (spec) at 1440 and 390 px; no horizontal scroll at 390
+- [ ] อาคาร 1 looks like the owner's model (building + floor 1 plan); floors 2–6 show their rooms from #30
+- [ ] Building → floor → room pin popover → S07 → back; floor picker with the keyboard
+- [ ] Edit mode: drag-add, drop outside a room refused, drag-move + undo, edit, deactivate, add without dragging, duplicate code message
+- [ ] Executive: no edit controls; employee / technician: old Home unchanged
+- [ ] Mock scenarios normal / empty / error / forbidden / slow
+- [ ] three.js only in the dashboard chunk (not in other routes), no render loop when idle, nothing left after unmount
+- [ ] `npm run lint && npm run typecheck` pass
+
+### Stage 3D checklist results (Claude, 2026-10-20 — real API on a scratch Postgres)
+
+| Item | Pass? | Notes |
+|---|---|---|
+| S29 at 1440 / 390, no horizontal scroll at 390 | Yes | screenshots checked; phone = floor list + bottom sheet, 16 px gutter |
+| อาคาร 1 = owner's model; floors 2–6 rooms from #30 | Yes | building, ground floor, balconies, roof + billboard, site around อาคาร 1 (other buildings dropped); floor 1 and 5 plans checked |
+| building → floor → room pin popover → S07 → back; keyboard floor picker | Yes | e2e F23 AC2 (↑ ↓) |
+| edit mode: drag-add, drop outside refused, drag-move + undo, edit, deactivate, add without dragging, duplicate code | Yes | e2e F31 (3 / 3 runs) + manual probes |
+| executive read-only; employee / technician keep the old Home | Yes | e2e F23 AC5 |
+| three.js only in the dashboard chunk; no loop when idle; disposed on unmount | Yes | one lazy 570 KB chunk (~150 KB gz), not referenced by any prerendered page; render on demand |
+| lint + typecheck + build | Yes | |
+
+### Differences from the brief / mockup (Claude)
+
+- Site props around อาคาร 1 (lawns, hedges, parking + cars, trees) were kept from the owner's model (only the other buildings were dropped) — they are cheap and make the model read as the real place
+- The 3D card is sticky and fits the viewport (`100dvh − 7.5rem`, min 560 px) instead of stretching to the right column, so the palette and the whole plan are on screen together on 800 px-tall laptops
+- Room pins show a wrench + count (the room name is already the plan label; the full name is in the aria-label); the move toast stays 8 s so `เลิกทำ` can be reached
+- After an equipment write only the HTML overlays reload; the 3D floor is rebuilt only when the floor changes
+
+
+## Stage 3 (2026-10-19) — built by Claude
+
+S11 re-spec (banner at the top of `screens/S11-admin-queue.md`), S07 admin `ปิดงาน`, S09 oldest first. Files (Claude owns): `app/(app)/repair/admin/queue/page.tsx`, `modules/repair/components/{admin-tickets,ticket-actions,ticket-detail,ticket-navigation,technician-work}.tsx`, `modules/repair/{types,api,mocks,priority}.ts`, `e2e/repair/F22-admin-tickets.spec.ts`. Codex has nothing to build.
 
 ## CR-014 (approved 2026-10-19) — Stage 2M, built by Claude 2026-10-19
 

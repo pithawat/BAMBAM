@@ -22,7 +22,7 @@ import { TicketProgressMini, TicketThumb } from "./ticket-progress";
 import { TicketLink } from "./ticket-navigation";
 
 // S09 งานซ่อม — the one in-house technician sees every open ticket (CR-005, BR-F21-1):
-// most urgent first, then oldest; tabs by step; building filter.
+// oldest report first (CR-015: no priority ordering); tabs by step; building filter.
 
 type Tab = "assess" | "repair" | "rating";
 const TABS: Record<Tab, { label: string; steps: TicketStep[]; count: (c: TicketCounts) => number; empty: string }> = {
@@ -46,7 +46,7 @@ export function TechnicianWorkScreen() {
   }, []);
   if (me.role !== "technician") return <><PageHeader title="งานซ่อม" variant="bar" /><ForbiddenState reason="หน้านี้สำหรับช่างเท่านั้น" /></>;
   return <>
-    <PageHeader title="งานซ่อม" variant="service" service="repair" subtitle="ทุกงานที่ยังไม่ปิด เรียงตามความเร่งด่วน"
+    <PageHeader title="งานซ่อม" variant="service" service="repair" subtitle="ทุกงานที่ยังไม่ปิด เรียงตามเวลาแจ้ง (เก่าก่อน)"
       action={<Button asChild variant="outline" size="sm"><Link href="/repair/contractors"><HardHat aria-hidden />ช่างภายนอก</Link></Button>} />
     <WorkBoard key={`${tab}|${buildingId}`} tab={tab} buildingId={buildingId} buildings={buildings} change={change} />
   </>;
@@ -66,7 +66,7 @@ function WorkBoard({ tab, buildingId, buildings, change }: { tab: Tab; buildingI
     page.current = 1;
     Promise.all([
       getTicketCounts({ scope: "all", buildingId: building }),
-      getTickets({ scope: "all", step: TABS[tab].steps, buildingId: building, sort: "priority:asc", page: 1, pageSize: PAGE_SIZE }),
+      getTickets({ scope: "all", step: TABS[tab].steps, buildingId: building, sort: "createdAt:asc", page: 1, pageSize: PAGE_SIZE }),
     ]).then(([c, list]) => { if (active) { setCounts(c); setItems(list.items); setTotal(list.meta.total); setError(undefined); } },
       (err: unknown) => { if (active) setError(err); });
     return () => { active = false; };
@@ -79,7 +79,7 @@ function WorkBoard({ tab, buildingId, buildings, change }: { tab: Tab; buildingI
   async function more() {
     setMoreBusy(true);
     try {
-      const next = await getTickets({ scope: "all", step: TABS[tab].steps, buildingId: building, sort: "priority:asc", page: page.current + 1, pageSize: PAGE_SIZE });
+      const next = await getTickets({ scope: "all", step: TABS[tab].steps, buildingId: building, sort: "createdAt:asc", page: page.current + 1, pageSize: PAGE_SIZE });
       page.current += 1;
       setItems((old) => [...(old ?? []), ...next.items.filter((t) => !old?.some((o) => o.id === t.id))]);
       setTotal(next.meta.total);
