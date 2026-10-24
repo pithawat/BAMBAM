@@ -17,7 +17,7 @@ type EmptyStateProps = {
   className?: string;
 };
 
-/** Soft card + mascot `full` ~120px + H3 title + one-line hint + one small button. */
+/** Soft card + mascot `guide` ~120px + H3 title + one-line hint + one small button. */
 export function EmptyState({ title, hint, action, className }: EmptyStateProps) {
   return (
     <div
@@ -26,7 +26,7 @@ export function EmptyState({ title, hint, action, className }: EmptyStateProps) 
         className,
       )}
     >
-      <Mascot pose="full" size={120} />
+      <Mascot pose="guide" size={120} />
       <h3 className="mt-3 font-heading text-base font-semibold">{title}</h3>
       {hint && <p className="mt-1 text-[13.5px] text-muted-foreground">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -68,7 +68,7 @@ export function ErrorState({
   }
   return (
     <div role="alert" className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
-      <Mascot pose="bust" size={140} />
+      <Mascot pose="loading" size={140} />
       <h2 className="mt-4 font-heading text-lg font-semibold">{title}</h2>
       <p className="mt-1 text-[13.5px] text-muted-foreground">{hint}</p>
       {onRetry && (
@@ -87,11 +87,11 @@ type ForbiddenStateProps = {
   className?: string;
 };
 
-/** Mascot `bust` + "คุณไม่มีสิทธิ์เข้าหน้านี้" + reason + "กลับหน้าแรก". Never show partial data. */
+/** Mascot `review` + "คุณไม่มีสิทธิ์เข้าหน้านี้" + reason + "กลับหน้าแรก". Never show partial data. */
 export function ForbiddenState({ reason, title = "คุณไม่มีสิทธิ์เข้าหน้านี้", className }: ForbiddenStateProps) {
   return (
     <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
-      <Mascot pose="bust" size={140} />
+      <Mascot pose="review" size={140} />
       <h2 className="mt-4 font-heading text-lg font-semibold">{title}</h2>
       {reason && <p className="mt-1 text-[13.5px] text-muted-foreground">{reason}</p>}
       <Button asChild className="mt-5">

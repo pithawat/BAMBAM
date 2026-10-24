@@ -239,7 +239,7 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
   const tipFloor = tip ? building.floors.find((f) => f.level === tip.level) : null;
   const mountOf = (key: string) => MOUNT_Y[types.find((t) => t.key === key)?.mount ?? "wall"] ?? 1.6;
 
-  return <section aria-label={`${building.name} แบบ 3 มิติ`} className="relative h-full min-h-140 overflow-hidden rounded-xl border bg-muted">
+  return <section aria-label={`${building.name} แบบ 3 มิติ`} className="relative h-full min-h-140 overflow-hidden rounded-xl border bg-muted shadow-card">
     <div ref={hostRef} className="absolute inset-0" />
     <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-10">
       {engine && !floorId && floors.filter((f) => f.openCount > 0).map((f) =>

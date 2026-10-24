@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Building2, Check, ChevronRight, Move } from "lucide-react";
+import { Building2, Check, ChevronRight, Clock, FileText, Move, Wrench, type LucideIcon } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { Picker } from "@/components/shared/picker";
@@ -25,7 +25,8 @@ import { FloorList } from "./floor-list";
 // S29 หน้าแรก Admin / ผู้บริหาร (CR-016, layout = ui/mockups/S29-admin-dashboard-modern.html, D-082):
 // ภาพรวมวันนี้ band · 3D อาคาร 1 (desktop + WebGL) or the floor list · แจ้งซ่อม counts · งานที่ควรติดตาม ·
 // car / room services shown as "not open yet" without numbers (CR-017: every number comes from the API).
-// Admin toggles จัดวางอุปกรณ์; the executive reads only (BR-F23-2).
+// Admin toggles จัดวางอุปกรณ์; the executive reads only (BR-F23-2). CR-019 polish: welcome mascot heading, tiles with an
+// icon, card headers with a sub-line and count chip, soft card shadows.
 
 const BuildingCard = dynamic(() => import("./building-card"), {
   ssr: false,
@@ -63,10 +64,15 @@ export function AdminDashboard() {
   if (state === "forbidden") return <ForbiddenState />;
 
   return <div className="px-4 pb-8 lg:px-0">
-    <div className="mt-2 mb-6 flex flex-wrap items-center gap-2.5">
-      <div className="min-w-60 flex-1">
-        <h1 className="font-heading text-2xl leading-normal font-semibold tracking-tight">{greeting()} คุณ{firstName}</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">{formatLongDate(new Date())} · ภาพรวมวันนี้</p>
+    <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="flex min-w-60 flex-1 items-center gap-4">
+        <Mascot pose="welcome" size={104} className="hidden shrink-0 sm:block" priority />
+        <Mascot pose="welcome" size={76} className="shrink-0 sm:hidden" priority />
+        <div className="min-w-0">
+          <p className="text-[11px] leading-5 font-semibold tracking-[0.16em] text-primary uppercase">Workplace overview</p>
+          <h1 className="font-heading text-2xl leading-normal font-semibold tracking-tight">{greeting()} คุณ{firstName}</h1>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{formatLongDate(new Date())} · ภาพรวมวันนี้</p>
+        </div>
       </div>
       {buildings.length > 0 && <div className="w-full sm:w-60">
         <Picker title="อาคาร" placeholder="เลือกอาคาร" icon={Building2} value={building?.id ?? ""} onValueChange={(v) => { setBuildingId(v); setEditing(false); }}
@@ -83,9 +89,9 @@ export function AdminDashboard() {
       <h2 id="band-title" className="mb-3 text-sm font-medium text-muted-foreground">ภาพรวมวันนี้</h2>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:gap-3">
         {!overview ? [...Array(3)].map((_, i) => <Skeleton key={i} className={cn("h-29 rounded-xl", i === 0 && "col-span-2 sm:col-span-1")} />) : <>
-          <Tile href={`${QUEUE}?tab=assess`} value={overview.counts.reportedToday} label="แจ้งซ่อมวันนี้" className="col-span-2 sm:col-span-1" />
-          <Tile href={QUEUE} value={overview.counts.open} label="งานค้างทั้งหมด" tone="primary" />
-          <Tile href={`${QUEUE}?tab=repair`} value={overview.counts.overdue} label="เลยกำหนดเสร็จ" tone={overview.counts.overdue > 0 ? "attention" : undefined} />
+          <Tile href={`${QUEUE}?tab=assess`} value={overview.counts.reportedToday} label="แจ้งซ่อมวันนี้" icon={FileText} className="col-span-2 sm:col-span-1" />
+          <Tile href={QUEUE} value={overview.counts.open} label="งานค้างทั้งหมด" icon={Wrench} tone="primary" />
+          <Tile href={`${QUEUE}?tab=repair`} value={overview.counts.overdue} label="เลยกำหนดเสร็จ" icon={Clock} tone={overview.counts.overdue > 0 ? "attention" : undefined} />
         </>}
       </div>
     </section>
@@ -108,23 +114,35 @@ export function AdminDashboard() {
   </div>;
 }
 
-function Tile({ href, value, label, tone, className }: {
-  href: string; value: number; label: string; tone?: "primary" | "attention"; className?: string;
+/** Label + icon tile on top, the number below (prototype KPI tile); the tone colours the number and the icon. */
+function Tile({ href, value, label, icon: Icon, tone, className }: {
+  href: string; value: number; label: string; icon: LucideIcon; tone?: "primary" | "attention"; className?: string;
 }) {
-  const body = <>
-    <span className={cn("text-[32px] leading-tight font-semibold tracking-tight tabular-nums", tone === "primary" && "text-primary", tone === "attention" && "text-attention")}>
-      {value}
+  const tint = tone === "attention" ? "bg-attention/10 text-attention" : "bg-secondary text-primary";
+  return <Link href={href} className={cn("flex min-h-29 flex-col justify-between gap-3 rounded-xl border bg-card p-5 shadow-card outline-none transition-colors hover:border-primary/30 focus-visible:ring-3 focus-visible:ring-ring/40", className)}>
+    <span className="flex items-start justify-between gap-3">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
+      <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-lg", tint)}><Icon className="size-4" /></span>
     </span>
-    <span className="text-[13px] text-muted-foreground">{label}</span>
-  </>;
-  const cls = cn("flex min-h-29 flex-col justify-between gap-3 rounded-xl border p-5",
-    tone === "primary" ? "border-primary/15 bg-secondary" : tone === "attention" ? "border-attention/20 bg-attention/5" : "bg-card", className);
-  return <Link href={href} className={cn(cls, "outline-none hover:border-primary/30 focus-visible:ring-3 focus-visible:ring-ring/40")}>{body}</Link>;
+    <span className="flex items-baseline gap-1.5">
+      <span className={cn("text-[32px] leading-tight font-semibold tracking-tight tabular-nums", tone === "primary" && "text-primary", tone === "attention" && "text-attention")}>{value}</span>
+      <span className="text-[13px] text-muted-foreground">งาน</span>
+    </span>
+  </Link>;
 }
 
-function Panel({ title, icon, children, className, labelledBy }: { title: string; icon?: ReactNode; children: ReactNode; className?: string; labelledBy: string }) {
-  return <section aria-labelledby={labelledBy} className={cn("overflow-hidden rounded-xl border bg-card", className)}>
-    <h2 id={labelledBy} className="flex items-center gap-2 px-5 pt-4.5 pb-3.5 font-heading text-[15px] font-semibold">{icon}{title}</h2>
+function Panel({ title, sub, count, icon, children, className, labelledBy }: {
+  title: string; sub?: string; count?: number; icon?: ReactNode; children: ReactNode; className?: string; labelledBy: string;
+}) {
+  return <section aria-labelledby={labelledBy} className={cn("overflow-hidden rounded-xl border bg-card shadow-card", className)}>
+    <div className="flex items-start gap-2.5 px-5 pt-4.5 pb-3.5">
+      {icon}
+      <div className="min-w-0 flex-1">
+        <h2 id={labelledBy} className="font-heading text-[15px] leading-7 font-semibold">{title}</h2>
+        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      </div>
+      {count !== undefined && <span className="mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-muted px-1.5 text-xs font-semibold text-muted-foreground tabular-nums">{count}</span>}
+    </div>
     {children}
   </section>;
 }
@@ -143,7 +161,7 @@ function RepairPanel({ overview }: { overview: Overview | null }) {
     { href: `${QUEUE}?tab=rating`, n: c.awaitingRating, label: "รอประเมินตรวจงาน", sub: autoCloseSoonest(c), dot: "bg-status-resolved" },
     { href: `${QUEUE}?tab=closed`, n: c.closedLast7Days, label: "ปิดแล้ว 7 วัน", sub: c.ratingAvgLast7Days !== null ? `คะแนนเฉลี่ย ${c.ratingAvgLast7Days.toFixed(1)}` : "ยังไม่มีคะแนน", dot: "bg-status-closed" },
   ] : [];
-  return <Panel title="แจ้งซ่อม" icon={<ServiceBadge service="repair" />} labelledBy="repair-title">
+  return <Panel title="แจ้งซ่อม" sub="งานตามขั้นตอน กดเพื่อดูรายการ" count={c?.open} icon={<ServiceBadge service="repair" />} labelledBy="repair-title">
     {!c ? <div className="space-y-2 px-5 pb-5">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
       : rows.map((r) => <Link key={r.label} href={r.href} className="flex items-center gap-2.5 border-t px-5 py-3.25 outline-none hover:bg-muted/50 focus-visible:bg-muted">
           <span aria-hidden className={cn("size-2 shrink-0 rounded-full", r.dot)} />
@@ -156,10 +174,10 @@ function RepairPanel({ overview }: { overview: Overview | null }) {
 
 function AttentionPanel({ overview }: { overview: Overview | null }) {
   const list = overview?.attention.slice(0, 4);
-  return <Panel title="งานที่ควรติดตาม" labelledBy="attention-title" className="flex flex-col">
+  return <Panel title="งานที่ควรติดตาม" sub="เลยกำหนด ส่งกลับ หรือเร่งด่วน" count={overview?.attention.length} labelledBy="attention-title" className="flex flex-col">
     {!list ? <div className="space-y-2 px-5 pb-5">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
       : list.length === 0 ? <div className="flex flex-col items-center gap-2 border-t px-5 py-6 text-center">
-          <Mascot pose="face" size={64} />
+          <Mascot pose="review" size={72} />
           <p className="text-sm text-muted-foreground">ไม่มีงานที่ต้องติดตาม</p>
         </div>
       : list.map((t) => {
@@ -188,7 +206,7 @@ function ServicesPanel({ className }: { className?: string }) {
       </span>
       <span className="inline-flex h-6 items-center rounded-full bg-muted px-2.5 text-xs font-medium whitespace-nowrap text-muted-foreground">ยังไม่เปิดใช้งาน</span>
     </div>;
-  return <section aria-label="บริการอื่น" className={cn("grid divide-y overflow-hidden rounded-xl border bg-card sm:grid-cols-2 sm:divide-x sm:divide-y-0", className)}>
+  return <section aria-label="บริการอื่น" className={cn("grid divide-y overflow-hidden rounded-xl border bg-card shadow-card sm:grid-cols-2 sm:divide-x sm:divide-y-0", className)}>
     {block("car", "จองรถ", "ระบบจองรถยังไม่เปิดใช้งาน")}
     {block("room", "จองห้องประชุม", "ระบบจองห้องประชุมยังไม่เปิดใช้งาน")}
   </section>;

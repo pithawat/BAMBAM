@@ -1,6 +1,8 @@
 # S03 — ฟอร์มแจ้งซ่อม
 
-Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19)
+Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19) · page layout changed by CR-019 (approved 2026-10-24)
+
+> **CR-019 (approved 2026-10-24) — page layout only; steps, fields and rules unchanged.** Heading: breadcrumb `หน้าแรก › แจ้งซ่อม › แจ้งซ่อมใหม่` · `guide` mascot · eyebrow `NEW REQUEST` · H1 · intro line · `ล้างแบบฟอร์ม` (when dirty). The phone top bar is removed. Step strip = numbered circles with `ขั้นตอนที่ n` + label (done = check). Footer: `ยกเลิก` (step 1, guarded leave) / `ย้อนกลับ` · `ขั้นตอน n จาก 3` · `ถัดไป` / `ยืนยันส่งแจ้งซ่อม`. Desktop: a right column `สรุปการแจ้งซ่อม` (ปัญหาที่พบ · ความเร่งด่วน (once known) · สถานที่ · ผู้แจ้ง; `แก้ไข` → step) + note `ส่งแล้วติดตามได้ตลอด`; step 3's `ตรวจสอบก่อนส่ง` shows on phone / tablet only. The frame keeps one size on every step; its width follows the shell (no longer fixed 880 px).
 
 > **CR-014 (approved 2026-10-19) — replaces the step list, category, location and frame parts of CR-008 below.** Visual reference: `../../changes/CR-014/form-steps.html` (sample data).
 > - **3 steps, one frame:** `ปัญหาที่พบ → สถานที่ → รูปภาพและส่ง`. Desktop frame 880px wide on every step, body height = the tallest step, fixed for all steps (progress strip, card edge and footer never move). Phone / tablet: one column, frame = viewport between header and sticky footer.

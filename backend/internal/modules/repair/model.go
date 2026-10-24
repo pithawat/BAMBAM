@@ -177,6 +177,7 @@ type TicketSummary struct {
 	Priority         string
 	PrioritySource   string
 	Category         *Ref    // nil only on tickets from CR-008 to CR-014 where the reporter typed "อื่นๆ"
+	CategoryIcon     *string // lucide name of Category (CR-019: S06 / S07 tiles without loading the master)
 	CategoryOther    *string // typed category name (under the "อื่น ๆ" category since CR-014)
 	Symptoms         []Ref
 	SymptomOther     *string // typed symptom
@@ -207,20 +208,47 @@ type TicketSummary struct {
 }
 
 // Step derives the progress step (CR-005).
-func (s TicketSummary) Step() string {
+func (s TicketSummary) Step() string { return stepOf(s.Status, s.ExpectedDoneOn, s.SendBackCount) }
+
+func stepOf(status string, expectedDoneOn *time.Time, sendBackCount int32) string {
 	switch {
-	case s.Status == StatusClosed:
+	case status == StatusClosed:
 		return StepClosed
-	case s.Status == StatusResolved:
+	case status == StatusResolved:
 		return StepAwaitingRating
-	case s.ExpectedDoneOn == nil:
+	case expectedDoneOn == nil:
 		return StepAwaitingAssessment
-	case s.SendBackCount > 0:
+	case sendBackCount > 0:
 		return StepReworking
 	default:
 		return StepInRepair
 	}
 }
+
+// MyTicket is one S06 table row (#35, CR-019): only what the table shows, so a page stays small.
+type MyTicket struct {
+	ID             uuid.UUID
+	TicketNo       string
+	Status         string
+	ClosedReason   *string
+	Category       *Ref
+	CategoryIcon   *string
+	CategoryOther  *string
+	Title          string // symptom names, then the typed symptom, joined with " · "
+	Building       Ref
+	Floor          Ref
+	Room           *Ref
+	LocationDetail *string
+	IsReporter     bool // false = in the list because the viewer follows it
+	Rating         *int16
+	SendBackCount  int32
+	ExpectedDoneOn *time.Time // date only
+	AutoCloseAt    *time.Time
+	ResolvedAt     *time.Time
+	UpdatedAt      time.Time
+}
+
+func (t MyTicket) Step() string { return stepOf(t.Status, t.ExpectedDoneOn, t.SendBackCount) }
 
 type TicketResult struct {
 	Note                    string

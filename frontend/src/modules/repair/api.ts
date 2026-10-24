@@ -12,6 +12,7 @@ import {
   mockErrors,
   mockFloorPlan,
   mockGetAssetTypes,
+  mockListMyTickets,
   mockListTickets,
   mockOverview,
   mockRecentPlaces,
@@ -38,6 +39,8 @@ import type {
   CreateAssetRequest,
   CreateTicketRequest,
   FloorPlan,
+  MyTicketPage,
+  MyTicketsQuery,
   Overview,
   Photo,
   RecentPlace,
@@ -153,6 +156,13 @@ export async function createTicket(req: CreateTicketRequest): Promise<TicketDeta
 export async function getTickets(query: TicketListQuery = {}): Promise<TicketPage> {
   if (env.useMocks) return mock(() => mockListTickets(query, mockViewer()), { read: true });
   const res = await http.list<TicketPage["items"][number]>(`${BASE}/tickets${toQuery(query)}`);
+  return { items: res.data, meta: res.meta ?? { page: 1, pageSize: res.data.length, total: res.data.length } };
+}
+
+/** #35 S06 table (CR-019): one page of slim rows — only the columns S06 shows. */
+export async function getMyTickets(query: MyTicketsQuery = {}): Promise<MyTicketPage> {
+  if (env.useMocks) return mock(() => mockListMyTickets(query, mockViewer()), { read: true });
+  const res = await http.list<MyTicketPage["items"][number]>(`${BASE}/tickets/mine${toQuery(query)}`);
   return { items: res.data, meta: res.meta ?? { page: 1, pageSize: res.data.length, total: res.data.length } };
 }
 

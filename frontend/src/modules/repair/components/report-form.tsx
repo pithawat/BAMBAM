@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
-  AlertCircle, Armchair, Building2, Camera, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, DoorOpen, Droplets, Ellipsis,
-  History, Lightbulb, Loader2, MapPin, Presentation, RotateCcw, Send, Snowflake, Sparkles, SquareParking, Upload, Wrench, X, Zap,
-  type LucideIcon,
+  AlertCircle, ArrowLeft, Bell, Building2, Camera, Check, ChevronDown, ChevronRight, CircleCheck, DoorOpen, FileText, History, Loader2, MapPin, RotateCcw, Send,
+  SquareParking, Upload,
 } from "lucide-react";
-import { PageHeader } from "@/components/shared/page-header";
+import { Mascot } from "@/components/shared/mascot";
 import { Picker } from "@/components/shared/picker";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
@@ -19,11 +19,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
+import { initials } from "@/lib/platform/roles";
 import { cn } from "@/lib/utils";
 import { createTicket, getBuildings, getCategories, getRecentPlaces, MAX_PHOTOS } from "../api";
 import { createTicketFieldErrors, errorCode, errorMessage } from "../errors";
 import { priorityReason, ticketPriority, type PriorityResult } from "../priority";
 import type { AreaType, Building, Category, Floor, Photo, RecentPlace, Room } from "../types";
+import { CategoryTile, categoryIcon } from "./category-icon";
 import { PhotoLightbox } from "./photo-gallery";
 import { PhotoTile, usePhotoUploads, type PhotoItem } from "./photo-picker";
 import { floorLabel, listDate, timeOf } from "./ticket-presentation";
@@ -79,13 +81,6 @@ const FIELD_STEP: Record<string, StepKey> = {
 /** v1 drafts (CR-008, 4 steps, no room) are read too; their steps map onto the 3 CR-014 steps. */
 type Draft = { v: 1; savedAt: number; step: string; values: Partial<Values>; photos: Photo[] };
 const draftStep = (s: string): StepKey => (s === "location" ? "location" : s === "photo" || s === "review" || s === "send" ? "send" : "problem");
-
-// CR-014 master icons + the sample ones older drafts / tickets may still name.
-const ICONS: Record<string, LucideIcon> = {
-  zap: Zap, snowflake: Snowflake, droplets: Droplets, presentation: Presentation, "building-2": Building2,
-  "square-parking": SquareParking, ellipsis: Ellipsis, lightbulb: Lightbulb, armchair: Armchair, sparkles: Sparkles,
-};
-const categoryIcon = (c?: Category) => (c ? ICONS[c.icon] ?? Wrench : Wrench);
 
 const AREA_LABELS: Record<AreaType, string> = {
   meeting_room: "ห้องประชุม", restroom: "ห้องน้ำ", office: "สำนักงาน", pantry: "Pantry",
@@ -307,12 +302,29 @@ export function ReportForm() {
     focusStep("problem");
   }
 
-  const topBar = <div className="sticky top-0 z-20 flex h-14 items-center border-b bg-card px-2 lg:hidden">
-    <Button type="button" variant="ghost" size="icon" aria-label={index > 0 ? "ย้อนกลับ" : "ออกจากหน้าแจ้งซ่อม"} disabled={busy} onClick={() => index > 0 ? go(STEPS[index - 1].key) : guard.leave()}><ChevronLeft /></Button>
-    <p className="flex-1 text-center text-base font-semibold">แจ้งซ่อมใหม่</p>
-    <Button type="button" variant="ghost" size="icon" aria-label="ปิดฟอร์ม" disabled={busy} onClick={() => guard.leave()}><X /></Button>
-  </div>;
-  const header = <><PageHeader title="แจ้งซ่อมใหม่" variant="none" />{topBar}</>;
+  // CR-019 heading (prototype v4): breadcrumb, guide mascot, eyebrow, title, ล้างแบบฟอร์ม. Leaving stays guarded
+  // (useDiscardGuard catches link clicks); the footer's ยกเลิก on step 1 replaces the old phone top bar.
+  const header = <header className="px-4 pt-3 lg:px-0 lg:pt-0">
+    <nav aria-label="เส้นทางหน้า">
+      <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted-foreground">
+        <li><Link href="/" className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">หน้าแรก</Link></li>
+        <li aria-hidden><ChevronRight className="size-3.5" /></li>
+        <li><Link href="/repair/my" className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">แจ้งซ่อม</Link></li>
+        <li aria-hidden><ChevronRight className="size-3.5" /></li>
+        <li aria-current="page" className="text-foreground">แจ้งซ่อมใหม่</li>
+      </ol>
+    </nav>
+    <div className="mt-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 lg:mb-5">
+      <Mascot pose="guide" size={120} className="hidden shrink-0 sm:block" priority />
+      <Mascot pose="guide" size={88} className="shrink-0 sm:hidden" priority />
+      <div className="min-w-0 flex-1 basis-48">
+        <p className="text-[11px] leading-5 font-semibold tracking-[0.16em] text-primary uppercase">New request</p>
+        <h1 className="text-2xl leading-9 font-semibold lg:text-[28px] lg:leading-10">แจ้งซ่อมใหม่</h1>
+        <p className="text-sm text-muted-foreground">กรอกทีละขั้น แล้วตรวจข้อมูลก่อนส่งให้ช่าง <span className="whitespace-nowrap">· ช่องที่มี <span className="text-destructive">*</span> จำเป็นต้องกรอก</span></p>
+      </div>
+      {dirty && master && <Button type="button" variant="link" className="h-9 px-0 max-sm:basis-full max-sm:justify-start" disabled={busy} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}
+    </div>
+  </header>;
   const discard = <AlertDialog open={guard.open} onOpenChange={guard.setOpen}><AlertDialogContent className="top-auto bottom-0 w-full max-w-none translate-y-0 rounded-b-none rounded-t-xl lg:top-1/2 lg:bottom-auto lg:max-w-lg lg:-translate-y-1/2 lg:rounded-xl"><AlertDialogHeader><AlertDialogTitle>ทิ้งข้อมูลที่กรอกไว้?</AlertDialogTitle><AlertDialogDescription>ข้อมูลและรูปที่แนบในหน้านี้จะหายไป</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>กรอกต่อ</AlertDialogCancel><Button variant="destructive" onClick={() => { clearDraft(storageKey); guard.discard(); }}>ทิ้งข้อมูล</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 
   if (masterError && !master) return <>{header}<ErrorState onRetry={() => { setMasterError(false); setRevision((r) => r + 1); }} />{discard}</>;
@@ -337,11 +349,8 @@ export function ReportForm() {
   </div>;
 
   return <>{header}
-    <form onSubmit={submit} noValidate className="mx-auto w-full max-w-220 px-3 pt-3 sm:px-4 lg:px-0 lg:pt-0">
-      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <p className="mr-auto text-sm text-muted-foreground">กรอกทีละขั้น แล้วตรวจข้อมูลก่อนส่งให้ช่าง <span className="whitespace-nowrap">· ช่องที่มี <span className="text-destructive">*</span> จำเป็นต้องกรอก</span></p>
-        {dirty && <Button type="button" variant="link" className="h-9 px-0" disabled={busy} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}
-      </div>
+    <form onSubmit={submit} noValidate className="grid w-full items-start gap-4 px-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:px-0">
+      <div className="min-w-0">
 
       {restoredAt && <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/15 bg-secondary px-4 py-3 text-sm text-secondary-foreground" role="status">
         <RotateCcw className="size-4.5 shrink-0" aria-hidden />
@@ -353,16 +362,19 @@ export function ReportForm() {
       {masterError && <div className="mb-3"><ErrorState variant="inline" onRetry={() => setRevision((r) => r + 1)} /></div>}
 
       <div ref={frame} data-testid="report-frame" className="lg:overflow-hidden lg:rounded-xl lg:border lg:bg-card lg:shadow-card">
-        <nav id="report-progress" aria-label="ขั้นตอนแจ้งซ่อม" className="mb-3 scroll-mt-16 lg:mb-0 lg:border-b lg:px-6 lg:pt-4.5 lg:pb-3">
-          <div className="mb-2 flex justify-between gap-3 text-sm text-muted-foreground" aria-live="polite">
-            <b className="font-medium text-foreground">ขั้นตอน {index + 1} จาก {STEPS.length}</b>
-            <span>{last ? "ขั้นสุดท้าย ตรวจข้อมูลแล้วกดส่งได้เลย" : `เหลืออีก ${STEPS.length - index - 1} ขั้นตอน`}</span>
-          </div>
-          <ol className="flex gap-1.5 sm:gap-2">{STEPS.map((s, n) => <li key={s.key} className="min-w-0 flex-1">
+        <nav id="report-progress" aria-label="ขั้นตอนแจ้งซ่อม" className="mb-3 scroll-mt-16 rounded-xl border bg-card px-3 py-3 shadow-card lg:mb-0 lg:rounded-none lg:border-0 lg:border-b lg:px-6 lg:py-4 lg:shadow-none">
+          <p className="sr-only" aria-live="polite">ขั้นตอน {index + 1} จาก {STEPS.length} · {STEPS[index].label}</p>
+          <ol className="grid grid-cols-3 gap-2">{STEPS.map((s, n) => <li key={s.key} className="min-w-0">
             <button type="button" disabled={n > index || busy} aria-current={n === index ? "step" : undefined} onClick={() => go(s.key)}
-              className={cn("w-full rounded-sm pb-1 text-left text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default sm:text-sm", n === index ? "font-semibold text-primary" : "text-muted-foreground")}>
-              <span aria-hidden className={cn("mb-2 block h-1 rounded-full", n < index ? "bg-primary/45" : n === index ? "bg-primary" : "bg-border")} />
-              {n + 1}. {s.label}
+              className="flex w-full min-w-0 items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default sm:gap-2.5">
+              <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-full border text-sm font-semibold",
+                n < index ? "border-primary bg-primary text-primary-foreground" : n === index ? "border-primary bg-primary text-primary-foreground ring-4 ring-primary/15" : "bg-card text-muted-foreground")}>
+                {n < index ? <Check className="size-4" /> : n + 1}
+              </span>
+              <span className="min-w-0 leading-tight">
+                <span className={cn("block text-[11px] sm:text-xs", n <= index ? "text-primary" : "text-muted-foreground")}>ขั้นตอนที่ {n + 1}</span>
+                <span className={cn("block truncate text-xs sm:text-sm", n === index ? "font-semibold text-foreground" : "text-muted-foreground")}>{s.label}</span>
+              </span>
             </button>
           </li>)}</ol>
         </nav>
@@ -388,16 +400,19 @@ export function ReportForm() {
         </fieldset>
 
         <div className="sticky bottom-0 z-20 -mx-3 mt-3 flex items-center gap-3 border-t bg-background px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-4 sm:px-4 lg:static lg:mx-0 lg:mt-0 lg:bg-muted/40 lg:px-6 lg:py-3">
-          <Button type="button" variant="outline" className="h-11 min-w-24 bg-card" disabled={index === 0 || busy} onClick={() => go(STEPS[index - 1].key)}>ย้อนกลับ</Button>
-          <span className="ml-auto hidden text-xs text-muted-foreground sm:inline lg:mr-auto lg:ml-0 lg:flex-1 lg:text-[13px]">ข้อมูลที่กรอกไว้จะอยู่เมื่อย้อนกลับ</span>
-          <Button type="submit" className="ml-auto h-11 max-w-60 flex-1 sm:ml-0 sm:min-w-45 sm:flex-none" disabled={busy || masterReloading}>
+          <Button type="button" variant="outline" className="h-11 min-w-24 bg-card" disabled={busy} onClick={() => index > 0 ? go(STEPS[index - 1].key) : guard.leave()}>
+            <ArrowLeft aria-hidden />{index > 0 ? "ย้อนกลับ" : "ยกเลิก"}</Button>
+          <span className="flex-1 text-center text-xs text-muted-foreground lg:text-[13px]">ขั้นตอน {index + 1} จาก {STEPS.length}</span>
+          <Button type="submit" className="h-11 sm:min-w-45" disabled={busy || masterReloading}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
             {last ? "ยืนยันส่งแจ้งซ่อม" : "ถัดไป"}
             {!busy && (last ? <Send aria-hidden /> : <ChevronRight aria-hidden />)}
           </Button>
         </div>
       </div>
-      <div className="h-4" aria-hidden />
+      </div>
+      <Summary category={category} values={values} priority={priority} building={building} floor={floor} room={room} me={me} onEdit={(key) => go(key)} />
+      <div className="h-4 lg:hidden" aria-hidden />
     </form>
     <AlertDialog open={resetOpen} onOpenChange={setResetOpen}><AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>ล้างข้อมูลในแบบฟอร์ม?</AlertDialogTitle><AlertDialogDescription>ข้อมูลที่กรอกและรูปที่เลือกจะถูกล้าง</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>เก็บไว้ก่อน</AlertDialogCancel><Button onClick={resetForm}>ล้างแบบฟอร์ม</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>
     {discard}
@@ -655,7 +670,7 @@ function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails
         <Textarea id="details" value={details} maxLength={MAX_DETAILS} rows={4} onChange={(e) => onDetails(e.target.value)} placeholder="เช่น เริ่มเป็นตั้งแต่เมื่อไร เป็นตลอดหรือเป็นๆ หายๆ" aria-invalid={!!errors.details} aria-describedby="details-count details-error" className="min-h-30 rounded-sm bg-card px-3.5 py-2.5 text-base" />
         <FieldError id="details-error" message={errors.details} />
       </div>
-      <div>
+      <div className="lg:hidden">
         <h3 className="mb-2 text-sm leading-6 font-semibold">ตรวจสอบก่อนส่ง</h3>
         {summary}
       </div>
@@ -683,4 +698,45 @@ function ReviewList({ category, values, priority, building, floor, room, onEdit 
     {row("ความเร่งด่วน", priority ? <span className="flex flex-wrap items-center gap-1.5"><PriorityBadge priority={priority.priority} /><span className="text-muted-foreground">{priority.source === "symptom" ? "จากอาการ" : "ระดับเริ่มต้นของหมวด"}</span></span> : dash)}
     {row("สถานที่", building && floor ? <>{building.name} · {floorLabel(floor.name)}<span className="block">{room ? <b className="font-semibold">{room.name}</b> : dash}{values.locationDetail.trim() && <span className="text-muted-foreground"> · {values.locationDetail.trim()}</span>}</span></> : dash, "location")}
   </dl>;
+}
+
+/** สรุปการแจ้งซ่อม (CR-019, desktop): live on every step; แก้ไข jumps back to that step. */
+function Summary({ category, values, priority, building, floor, room, me, onEdit }: {
+  category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room;
+  me: { name: string; department: string | null }; onEdit: (step: StepKey) => void;
+}) {
+  const symptoms = [
+    ...(category?.symptoms.filter((s) => values.symptomIds.includes(s.id)).map((s) => s.name) ?? []),
+    ...(values.symptomOtherOn && values.symptomOther.trim() ? [values.symptomOther.trim()] : []),
+  ];
+  const categoryLabel = category ? [category.name, category.isOther ? values.categoryOther.trim() : ""].filter(Boolean).join(" · ") : "";
+  const dash = <span className="text-muted-foreground">ยังไม่ได้เลือก</span>;
+  const row = (label: string, tile: ReactNode, body: ReactNode, step?: StepKey) => <div className="flex items-start gap-3 border-t px-5 py-4 first:border-0">
+    {tile}
+    <div className="min-w-0 flex-1">
+      <dt className="text-xs leading-5 text-muted-foreground">{label}</dt>
+      <dd className="text-sm leading-6 wrap-break-word">{body}</dd>
+    </div>
+    {step && <Button type="button" variant="link" className="h-6 px-0 text-[13px]" onClick={() => onEdit(step)} aria-label={`แก้ไข${label}`}>แก้ไข</Button>}
+  </div>;
+  const soft = "grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-primary";
+  return <aside aria-labelledby="summary-title" className="hidden space-y-4 lg:sticky lg:top-26 lg:block">
+    <section className="overflow-hidden rounded-xl border bg-card shadow-card">
+      <h2 id="summary-title" className="flex items-center justify-between border-b px-5 py-4 text-base leading-6 font-semibold">สรุปการแจ้งซ่อม<FileText className="size-4.5 text-muted-foreground" aria-hidden /></h2>
+      <dl>
+        {row("ปัญหาที่พบ", <CategoryTile icon={category?.icon} />,
+          category ? <><b className="font-semibold">{categoryLabel}</b>{symptoms.length > 0 && <span className="block text-muted-foreground">{symptoms.join(" · ")}</span>}</> : dash, "problem")}
+        {priority && row("ความเร่งด่วน", <span aria-hidden className={soft}><AlertCircle className="size-4.5" /></span>,
+          <span className="flex flex-wrap items-center gap-1.5"><PriorityBadge priority={priority.priority} /><span className="text-muted-foreground">{priority.source === "symptom" ? "จากอาการ" : "ระดับเริ่มต้นของหมวด"}</span></span>)}
+        {row("สถานที่", <span aria-hidden className={soft}><MapPin className="size-4.5" /></span>,
+          building && floor ? <><b className="font-semibold">{building.name} · {floorLabel(floor.name)}</b><span className="block text-muted-foreground">{room ? room.name : "ยังไม่ได้เลือกห้อง"}{values.locationDetail.trim() && ` · ${values.locationDetail.trim()}`}</span></> : dash, "location")}
+        {row("ผู้แจ้ง", <span aria-hidden className={cn(soft, "rounded-full text-xs font-semibold")}>{initials(me.name)}</span>,
+          <><b className="font-semibold">{me.name}</b>{me.department && <span className="block text-muted-foreground">{me.department}</span>}</>)}
+      </dl>
+    </section>
+    <div className="flex gap-3 px-5 text-[13px] leading-5 text-muted-foreground">
+      <Bell className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+      <p><b className="block text-sm font-semibold text-foreground">ส่งแล้วติดตามได้ตลอด</b>ดูความคืบหน้าได้ที่หน้าติดตามงานซ่อม ตั้งแต่รับเรื่องจนปิดงาน</p>
+    </div>
+  </aside>;
 }

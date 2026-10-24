@@ -16,6 +16,13 @@ type RefDTO struct {
 	Name string    `json:"name"`
 }
 
+// CategoryRefDTO is a ticket's category with its lucide icon (CR-019), so lists draw the tile without the master.
+type CategoryRefDTO struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Icon string    `json:"icon"`
+}
+
 type PersonRefDTO struct {
 	ID         uuid.UUID `json:"id"`
 	Name       string    `json:"name"`
@@ -92,38 +99,38 @@ type CreateTicketRequest struct {
 }
 
 type TicketSummaryDTO struct {
-	ID                     uuid.UUID     `json:"id"`
-	TicketNo               string        `json:"ticketNo"`
-	Status                 string        `json:"status"`
-	Step                   string        `json:"step"`
-	ClosedReason           *string       `json:"closedReason"`
-	Priority               string        `json:"priority"`
-	PrioritySource         string        `json:"prioritySource"`
-	Category               *RefDTO       `json:"category"`
-	CategoryOther          *string       `json:"categoryOther"`
-	Symptoms               []RefDTO      `json:"symptoms"`
-	SymptomOther           *string       `json:"symptomOther"`
-	Building               RefDTO        `json:"building"`
-	Floor                  RefDTO        `json:"floor"`
-	Room                   *RefDTO       `json:"room"` // CR-014; null on older tickets
-	LocationDetail         *string       `json:"locationDetail"`
-	ThumbURL               *string       `json:"thumbUrl"`
-	Reporter               PersonRefDTO  `json:"reporter"`
-	Technician             *PersonRefDTO `json:"technician"`
-	ViewerRelation         string        `json:"viewerRelation"`
-	AwaitingMyConfirmation bool          `json:"awaitingMyConfirmation"`
-	ExpectedDoneOn         *string       `json:"expectedDoneOn"`
-	WorkBy                 *string       `json:"workBy"`
-	Contractor             *RefDTO       `json:"contractor"`
-	ContractorTypes        []string      `json:"contractorTypes"`
-	AutoCloseAt            *time.Time    `json:"autoCloseAt"`
-	SendBackCount          int32         `json:"sendBackCount"`
-	Rating                 *int16        `json:"rating"`
-	CreatedAt              time.Time     `json:"createdAt"`
-	AssessedAt             *time.Time    `json:"assessedAt"`
-	ResolvedAt             *time.Time    `json:"resolvedAt"`
-	ClosedAt               *time.Time    `json:"closedAt"`
-	UpdatedAt              time.Time     `json:"updatedAt"`
+	ID                     uuid.UUID       `json:"id"`
+	TicketNo               string          `json:"ticketNo"`
+	Status                 string          `json:"status"`
+	Step                   string          `json:"step"`
+	ClosedReason           *string         `json:"closedReason"`
+	Priority               string          `json:"priority"`
+	PrioritySource         string          `json:"prioritySource"`
+	Category               *CategoryRefDTO `json:"category"`
+	CategoryOther          *string         `json:"categoryOther"`
+	Symptoms               []RefDTO        `json:"symptoms"`
+	SymptomOther           *string         `json:"symptomOther"`
+	Building               RefDTO          `json:"building"`
+	Floor                  RefDTO          `json:"floor"`
+	Room                   *RefDTO         `json:"room"` // CR-014; null on older tickets
+	LocationDetail         *string         `json:"locationDetail"`
+	ThumbURL               *string         `json:"thumbUrl"`
+	Reporter               PersonRefDTO    `json:"reporter"`
+	Technician             *PersonRefDTO   `json:"technician"`
+	ViewerRelation         string          `json:"viewerRelation"`
+	AwaitingMyConfirmation bool            `json:"awaitingMyConfirmation"`
+	ExpectedDoneOn         *string         `json:"expectedDoneOn"`
+	WorkBy                 *string         `json:"workBy"`
+	Contractor             *RefDTO         `json:"contractor"`
+	ContractorTypes        []string        `json:"contractorTypes"`
+	AutoCloseAt            *time.Time      `json:"autoCloseAt"`
+	SendBackCount          int32           `json:"sendBackCount"`
+	Rating                 *int16          `json:"rating"`
+	CreatedAt              time.Time       `json:"createdAt"`
+	AssessedAt             *time.Time      `json:"assessedAt"`
+	ResolvedAt             *time.Time      `json:"resolvedAt"`
+	ClosedAt               *time.Time      `json:"closedAt"`
+	UpdatedAt              time.Time       `json:"updatedAt"`
 }
 
 type AssetDTO struct {
@@ -338,7 +345,10 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 		d.ExpectedDoneOn = &day
 	}
 	if s.Category != nil {
-		c := RefDTO(*s.Category)
+		c := CategoryRefDTO{ID: s.Category.ID, Name: s.Category.Name, Icon: "wrench"}
+		if s.CategoryIcon != nil {
+			c.Icon = *s.CategoryIcon
+		}
 		d.Category = &c
 	}
 	if s.Room != nil {
@@ -360,6 +370,62 @@ func toSummaryDTOs(list []TicketSummary) []TicketSummaryDTO {
 	out := make([]TicketSummaryDTO, 0, len(list))
 	for _, s := range list {
 		out = append(out, toSummaryDTO(s))
+	}
+	return out
+}
+
+// MyTicketDTO is one S06 row (#35, CR-019).
+type MyTicketDTO struct {
+	ID                     uuid.UUID       `json:"id"`
+	TicketNo               string          `json:"ticketNo"`
+	Status                 string          `json:"status"`
+	Step                   string          `json:"step"`
+	ClosedReason           *string         `json:"closedReason"`
+	Category               *CategoryRefDTO `json:"category"`
+	CategoryOther          *string         `json:"categoryOther"`
+	Title                  string          `json:"title"`
+	Building               RefDTO          `json:"building"`
+	Floor                  RefDTO          `json:"floor"`
+	Room                   *RefDTO         `json:"room"`
+	LocationDetail         *string         `json:"locationDetail"`
+	ViewerRelation         string          `json:"viewerRelation"`
+	AwaitingMyConfirmation bool            `json:"awaitingMyConfirmation"`
+	ExpectedDoneOn         *string         `json:"expectedDoneOn"`
+	AutoCloseAt            *time.Time      `json:"autoCloseAt"`
+	Rating                 *int16          `json:"rating"`
+	ResolvedAt             *time.Time      `json:"resolvedAt"`
+	UpdatedAt              time.Time       `json:"updatedAt"`
+}
+
+func toMyTicketDTOs(list []MyTicket) []MyTicketDTO {
+	out := make([]MyTicketDTO, 0, len(list))
+	for _, t := range list {
+		d := MyTicketDTO{
+			ID: t.ID, TicketNo: t.TicketNo, Status: t.Status, Step: t.Step(), ClosedReason: t.ClosedReason,
+			CategoryOther: t.CategoryOther, Title: t.Title,
+			Building: RefDTO(t.Building), Floor: RefDTO(t.Floor), LocationDetail: t.LocationDetail,
+			ViewerRelation: RelationSubscriber, AwaitingMyConfirmation: t.IsReporter && t.Status == StatusResolved,
+			AutoCloseAt: utcPtr(t.AutoCloseAt), Rating: t.Rating, ResolvedAt: utcPtr(t.ResolvedAt), UpdatedAt: t.UpdatedAt.UTC(),
+		}
+		if t.IsReporter {
+			d.ViewerRelation = RelationReporter
+		}
+		if t.ExpectedDoneOn != nil {
+			day := t.ExpectedDoneOn.Format(time.DateOnly)
+			d.ExpectedDoneOn = &day
+		}
+		if t.Category != nil {
+			c := CategoryRefDTO{ID: t.Category.ID, Name: t.Category.Name, Icon: "wrench"}
+			if t.CategoryIcon != nil {
+				c.Icon = *t.CategoryIcon
+			}
+			d.Category = &c
+		}
+		if t.Room != nil {
+			r := RefDTO(*t.Room)
+			d.Room = &r
+		}
+		out = append(out, d)
 	}
 	return out
 }

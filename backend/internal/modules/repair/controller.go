@@ -195,6 +195,33 @@ func (ctl *Controller) Tickets(c *gin.Context) {
 	httpx.List(c, toSummaryDTOs(list), httpx.Meta{Page: f.Page, PageSize: f.PageSize, Total: total})
 }
 
+// MyTickets handles #35 GET /repair/tickets/mine — the S06 table (CR-019): one page of slim rows.
+// Filters are #6's mine filters (relation, status, step, q, sort); staff-only filters are ignored.
+func (ctl *Controller) MyTickets(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	f, err := parseFilter(c, true)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	f = TicketFilter{Relation: f.Relation, Statuses: f.Statuses, Steps: f.Steps, Q: f.Q, Sort: f.Sort, Page: f.Page, PageSize: f.PageSize}
+	if c.Query("pageSize") == "" {
+		f.PageSize = myTicketsPageSize
+	}
+	list, total, err := ctl.svc.MyTickets(c.Request.Context(), v, f)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	httpx.List(c, toMyTicketDTOs(list), httpx.Meta{Page: f.Page, PageSize: f.PageSize, Total: total})
+}
+
+// myTicketsPageSize is the S06 page (owner, 2026-10-24).
+const myTicketsPageSize = 10
+
 // TicketCounts handles #7 GET /repair/tickets/counts.
 func (ctl *Controller) TicketCounts(c *gin.Context) {
 	v, ok := viewer(c)

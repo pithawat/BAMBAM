@@ -2,7 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element -- Authenticated API paths and mock data URLs require plain images (HANDOFF). */
 import Link from "next/link";
-import { useState, type ComponentProps, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Tabs } from "radix-ui";
 import {
   ArrowLeft, CalendarClock, Camera, Check, ChevronRight, CircleCheck, CircleX, ClipboardList, Clock, Copy, FileText, FolderCheck, Hourglass,
   Image as ImageIcon, List, MapPin, Printer, RotateCcw, Star, UserRound, Wrench, X, type LucideIcon,
@@ -12,9 +13,11 @@ import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Mascot } from "@/components/shared/mascot";
 import { cn } from "@/lib/utils";
 import { GENERIC_ERROR } from "../errors";
 import type { Photo, TicketDetail, TicketStep } from "../types";
+import { CategoryTile } from "./category-icon";
 import { PhotoLightbox } from "./photo-gallery";
 import { useTicketActions } from "./ticket-actions";
 import { ticketReturnHref } from "./ticket-navigation";
@@ -41,67 +44,83 @@ export function TicketDetailScreen({ id }: { id: string }) {
   const [backHref] = useState(() => (technician ? "/repair/work" : ticketReturnHref(id, staff ? "/repair/admin/queue" : "/repair/my")));
   const { ticket, loading, error, reload, replace } = useTicket(id);
   const listLabel = technician ? "งานซ่อม" : backHref.startsWith("/repair/admin/queue") ? "งานทั้งหมด" : "ติดตามงานซ่อม";
-  return <div className="mx-auto w-full max-w-290 px-4 pt-4 pb-8 lg:px-0 lg:pt-1 print:max-w-none print:p-0">
-    <nav aria-label="เส้นทางหน้า" className="print:hidden">
-      <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted-foreground">
-        <li><Link href="/" className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">หน้าแรก</Link></li>
-        <li aria-hidden><ChevronRight className="size-3.5" /></li>
-        <li><Link href={backHref} className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">แจ้งซ่อม · {listLabel}</Link></li>
-        <li aria-hidden><ChevronRight className="size-3.5" /></li>
-        <li aria-current="page" className="text-foreground">รายละเอียดงาน</li>
-      </ol>
-    </nav>
-    <div className="mt-2 mb-3 flex items-center gap-2 print:hidden">
-      <Link href={backHref} className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-        <ArrowLeft className="size-4" aria-hidden />กลับไป{listLabel}
-      </Link>
-      {ticket && <Button type="button" variant="ghost" className="h-11 px-3" onClick={() => window.print()}><Printer aria-hidden />พิมพ์งานนี้</Button>}
-    </div>
-    {loading ? <TicketSkeleton /> : error ? <TicketFailure error={error} onRetry={reload} /> : ticket && <TicketBody ticket={ticket} onChanged={replace} />}
+  // CR-019: one container as wide as the navbar (the shell is max-w-7xl), back link and print inside it.
+  return <div className="w-full px-4 pt-4 pb-8 lg:px-0 lg:pt-1 print:p-0">
+    {loading ? <TicketSkeleton /> : error ? <TicketFailure error={error} onRetry={reload} />
+      : ticket && <TicketBody ticket={ticket} onChanged={replace} back={{ href: backHref, label: listLabel }} />}
   </div>;
 }
 
-function TicketBody({ ticket, onChanged }: { ticket: TicketDetail; onChanged: (t: TicketDetail) => void }) {
+type Tab = "info" | "result";
+
+function TicketBody({ ticket, onChanged, back }: { ticket: TicketDetail; onChanged: (t: TicketDetail) => void; back: { href: string; label: string } }) {
   const me = useCurrentUser();
   const viewer = storyViewer(ticket, me.role);
   const story = ticketStory(ticket, viewer, me.id);
   const actions = useTicketActions(ticket, onChanged, { awaitingReaccept: story.awaitingReaccept });
-  // The reporter rates from the card (CR-012); everyone else reads what happens now.
+  // The reporter rates from the band (CR-012); everyone else reads what happens now.
   const review = viewer === "reporter" && ticket.step === "awaiting_rating" && actions.allowed.has("confirm");
+  // Once there is a result to check, the result tab opens first (CR-019).
+  const [tab, setTab] = useState<Tab>(() => ticket.step === "awaiting_rating" || (ticket.status === "closed" && ticket.result) ? "result" : "info");
   return <>
-    <Heading ticket={ticket} />
-    <div className="mb-3 lg:mb-5">
-      {review ? <ReviewCard ticket={ticket} actions={actions} />
-        : <NextAction ticket={ticket} viewer={viewer} story={story} meId={me.id} executive={me.role === "executive"} actions={actions} />}
-    </div>
-    <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-5 print:block">
-      <div className="grid min-w-0 gap-3 lg:gap-5 print:gap-4">
-        <JobInfo ticket={ticket} viewer={viewer} story={story} />
-        <Evidence ticket={ticket} viewer={viewer} story={story} />
+    <article aria-labelledby="ticket-title" className="overflow-hidden rounded-xl border bg-card shadow-card print:overflow-visible print:border-0 print:shadow-none">
+      <Heading ticket={ticket} back={back} />
+      <div className="border-t">
+        {review ? <ReviewBand ticket={ticket} actions={actions} />
+          : <NextAction ticket={ticket} viewer={viewer} story={story} meId={me.id} executive={me.role === "executive"} actions={actions} />}
       </div>
-      <Progress ticket={ticket} story={story} />
-    </div>
+      <div className="grid border-t lg:grid-cols-[minmax(0,1fr)_22rem] print:block">
+        <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)} className="min-w-0">
+          <Tabs.List aria-label="รายละเอียดงาน" className="flex gap-1 border-b px-4 sm:px-7 print:hidden">
+            {([["info", "ข้อมูลแจ้งซ่อม", FileText], ["result", "ผลการซ่อม", Wrench]] as const).map(([value, label, Icon]) => <Tabs.Trigger key={value} value={value}
+              className="-mb-px flex min-h-12 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-2.5 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:text-primary sm:px-3">
+              <Icon className="size-4" aria-hidden />{label}
+            </Tabs.Trigger>)}
+          </Tabs.List>
+          {/* Both panels stay mounted so print shows both (CR-019). */}
+          <Tabs.Content value="info" forceMount className="outline-none data-[state=inactive]:hidden print:block!">
+            <InfoTab ticket={ticket} viewer={viewer} story={story} />
+          </Tabs.Content>
+          <Tabs.Content value="result" forceMount className="outline-none data-[state=inactive]:hidden print:block! print:border-t">
+            <ResultTab ticket={ticket} viewer={viewer} story={story} />
+          </Tabs.Content>
+        </Tabs.Root>
+        <Progress ticket={ticket} story={story} />
+      </div>
+    </article>
     <PrintHistory ticket={ticket} story={story} />
     {actions.dialogs}
   </>;
 }
 
-// ---- heading: number · status · what · when it was reported ----
+// ---- heading: back / print · number · status · what · when and by whom ----
 
-function Heading({ ticket }: { ticket: TicketDetail }) {
+function Heading({ ticket, back }: { ticket: TicketDetail; back: { href: string; label: string } }) {
   async function copy() {
     try { await navigator.clipboard.writeText(ticket.ticketNo); toast.success("คัดลอกเลขงานแล้ว"); }
     catch { toast.error(GENERIC_ERROR); }
   }
-  return <header className="mb-4 sm:mb-5">
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+  return <header className="px-4 pt-3 pb-5 sm:px-7 sm:pb-6">
+    <div className="flex items-center gap-2 print:hidden">
+      <Link href={back.href} className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ArrowLeft className="size-4" aria-hidden />กลับไป{back.label}
+      </Link>
+      <Button type="button" variant="outline" className="h-10 px-3" onClick={() => window.print()}><Printer aria-hidden />พิมพ์งานนี้</Button>
+    </div>
+    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="flex items-center text-[13.5px] font-medium tracking-wide text-muted-foreground">{ticket.ticketNo}
         <button type="button" onClick={copy} aria-label="คัดลอกเลขงาน" className="grid size-10 place-items-center rounded-sm outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring print:hidden"><Copy className="size-4" aria-hidden /></button>
       </span>
       <StatusBadge ticket={ticket} />
     </div>
-    <h1 id="ticket-title" className="text-2xl leading-9 font-semibold text-balance wrap-break-word sm:text-[28px] sm:leading-10 print:text-[23px]">{ticketTitle(ticket)}</h1>
-    <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">แจ้งเมื่อ {shortDate(ticket.createdAt, true)} เวลา {timeOf(ticket.createdAt)} น.</p>
+    <div className="mt-1 flex items-start gap-3.5">
+      <CategoryTile icon={ticket.category?.icon} className="mt-1 size-12 rounded-xl print:hidden" iconClassName="size-6" />
+      <div className="min-w-0">
+        <p className="text-[13px] leading-5 text-muted-foreground">{categoryName(ticket)}</p>
+        <h1 id="ticket-title" className="text-2xl leading-9 font-semibold text-balance wrap-break-word sm:text-[28px] sm:leading-10 print:text-[23px]">{ticketTitle(ticket)}</h1>
+        <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">แจ้งเมื่อ {shortDate(ticket.createdAt, true)} เวลา {timeOf(ticket.createdAt)} น. · โดย {ticket.reporter.name}</p>
+      </div>
+    </div>
   </header>;
 }
 
@@ -116,16 +135,17 @@ function Sub({ children, inline }: { children: ReactNode; inline?: boolean }) {
   return <small className={cn("text-[13px] leading-5 font-normal text-muted-foreground", inline ? "ml-2" : "block")}>{children}</small>;
 }
 
-// ---- the reporter's review card (CR-012): a tapped star opens S08 with that draft score; nothing submits here ----
+// ---- the reporter's review band (CR-012, CR-019): a tapped star opens S08 with that draft score; nothing submits here ----
 
 type Actions = ReturnType<typeof useTicketActions>;
 
-function ReviewCard({ ticket, actions }: { ticket: TicketDetail; actions: Actions }) {
+function ReviewBand({ ticket, actions }: { ticket: TicketDetail; actions: Actions }) {
   const autoClose = ticket.autoCloseAt ? `${shortDate(ticket.autoCloseAt, true)} เวลา ${timeOf(ticket.autoCloseAt)} น.` : "";
-  return <section aria-labelledby="review-title" className="rounded-xl border bg-card px-4 pt-4 shadow-card sm:px-6 sm:pt-5 print:hidden">
+  return <section aria-labelledby="review-title" className="bg-muted/40 px-4 pt-4 sm:px-7 sm:pt-5 print:hidden">
     <div className="grid gap-x-8 gap-y-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-      <div className="flex items-center gap-3.5">
-        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><CircleCheck className="size-5" /></span>
+      <div className="flex items-center gap-4">
+        <Mascot pose="review" size={96} className="hidden shrink-0 sm:block" />
+        <Mascot pose="review" size={72} className="shrink-0 sm:hidden" />
         <div className="min-w-0">
           <h2 id="review-title" className="text-lg leading-7 font-semibold">ซ่อมเสร็จแล้ว งานซ่อมเป็นอย่างไรบ้าง?</h2>
           <p className="text-[13px] leading-5 text-muted-foreground">ตรวจผลซ่อมด้านล่าง แล้วให้คะแนนความพึงพอใจ</p>
@@ -247,7 +267,7 @@ function NextAction({ ticket, viewer, story, meId, executive, actions }: { ticke
   const tone = ticket.step === "closed" ? "closed" : ticket.step === "reworking" ? "rework" : "open";
   const Icon = icon;
   return <div aria-live="polite" role="region" aria-label="สิ่งที่เกิดขึ้นตอนนี้"
-    className="flex gap-3.5 rounded-xl border bg-card p-4 shadow-card sm:px-6 sm:py-5 print:break-inside-avoid print:shadow-none">
+    className="flex gap-3.5 bg-muted/40 px-4 py-4 sm:px-7 sm:py-5 print:break-inside-avoid print:bg-transparent">
     <span aria-hidden className={cn("grid size-11 shrink-0 place-items-center rounded-lg",
       tone === "closed" ? "bg-success/10 text-success" : tone === "rework" ? "bg-status-rework/10 text-status-rework" : "bg-secondary text-primary")}><Icon className="size-5" /></span>
     <div className="min-w-0 flex-1">
@@ -268,15 +288,26 @@ function closedLine(ticket: TicketDetail) {
   }
 }
 
-// ---- ข้อมูลงาน (CR-012): where · category · symptoms · date · reporter / fixer ----
+// ---- ข้อมูลแจ้งซ่อม tab (CR-012, CR-019): where · facts on two columns · reporter / fixer on the same columns · photos ----
 
-function Panel({ className, children, ...props }: { className?: string; children: ReactNode } & ComponentProps<"section">) {
-  return <section {...props} className={cn("min-w-0 overflow-hidden rounded-xl border bg-card shadow-card print:break-inside-avoid print:shadow-none", className)}>{children}</section>;
+function Section({ className, children }: { className?: string; children: ReactNode }) {
+  return <div className={cn("border-b px-4 py-4 last:border-0 sm:px-7 sm:py-5", className)}>{children}</div>;
 }
 
-function JobInfo({ ticket, viewer, story }: { ticket: TicketDetail; viewer: StoryViewer; story: Story }) {
+function Fact({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
+  return <div className={cn("min-w-0", wide && "sm:col-span-2")}>
+    <dt className="text-[13px] leading-5 text-muted-foreground">{label}</dt>
+    <dd className="mt-0.5 min-w-0 text-[15px] leading-6 font-medium wrap-break-word">{children}</dd>
+  </div>;
+}
+
+/** Shared by the facts and the people, so both line up vertically (CR-019). */
+const TWO_COLUMNS = "grid gap-x-8 gap-y-4 sm:grid-cols-2";
+
+function InfoTab({ ticket, viewer, story }: { ticket: TicketDetail; viewer: StoryViewer; story: Story }) {
   const staff = viewer === "technician" || viewer === "staff";
   const reason = usePriorityReason(ticket);
+  const [lightbox, setLightbox] = useState<number | null>(null);
   const muted = (t: string) => <span className="font-normal text-muted-foreground">{t}</span>;
   // A replaced date never reads as the current promise: after a send back it waits for the new one.
   const when: [string, ReactNode] = ticket.status === "in_progress"
@@ -284,39 +315,48 @@ function JobInfo({ ticket, viewer, story }: { ticket: TicketDetail; viewer: Stor
     : ticket.status === "closed" && !ticket.resolvedAt ? ["ปิดงานเมื่อ", ticket.closedAt ? <>{shortDate(ticket.closedAt, true)}<Sub inline>เวลา {timeOf(ticket.closedAt)} น.</Sub></> : muted("—")]
       : ["ซ่อมเสร็จเมื่อ", ticket.resolvedAt ? <>{shortDate(ticket.resolvedAt, true)}<Sub inline>เวลา {timeOf(ticket.resolvedAt)} น.</Sub></> : muted("—")];
   const symptoms = [...ticket.symptoms.map((s) => s.name), ...(ticket.symptomOther ? [ticket.symptomOther] : [])];
-  // Priority stays staff-only; everyone sees the symptoms instead (owner, 2026-10-19, CR-012).
-  const rows: [string, ReactNode][] = [
-    ["หมวดงาน", categoryName(ticket)],
-    ["อาการ", symptoms.length ? <span className="flex flex-wrap gap-1.5">{symptoms.map((s) => <span key={s} className="rounded-[5px] bg-muted px-2 text-sm leading-6 font-medium wrap-break-word">{s}</span>)}</span> : muted("—")],
-    ...(ticket.asset ? [["อุปกรณ์", <>{ticket.asset.code}<Sub inline>{ticket.asset.name}</Sub></>] as [string, ReactNode]] : []),
-    ...(staff ? [["ความเร่งด่วน", <><PriorityBadge priority={ticket.priority} className="align-middle" /><Sub inline>{reason}</Sub></>] as [string, ReactNode]] : []),
-    when,
-    ...(staff && ticket.result?.contractorRating ? [["คะแนนช่างภายนอก", <>{ticket.result.contractorRating}/5 · {RATING_LABELS[ticket.result.contractorRating]}{ticket.result.contractorRatingComment && <Sub inline>{ticket.result.contractorRatingComment}</Sub>}</>] as [string, ReactNode]] : []),
-  ];
   const others = ticket.subscriberCount > 0 ? `ผู้ติดตาม ${ticket.subscriberCount} คน` : "";
   const fixer = ticket.technician && ticket.workBy ? ticket.technician : null;
-  return <Panel aria-labelledby="job-title">
-    <h2 id="job-title" className="px-4 pt-4 text-lg leading-7 font-semibold sm:px-6 sm:pt-5">ข้อมูลงาน</h2>
-    <div className="flex items-center gap-3 px-4 pt-3 pb-4 sm:px-6">
+  return <div>
+    <Section className="flex items-center gap-3">
       <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><MapPin className="size-5" /></span>
       <div className="min-w-0">
-        <h3 className="text-xl leading-7 font-medium wrap-break-word">{ticket.building.name}</h3>
+        <h2 className="text-xl leading-7 font-medium wrap-break-word">{ticket.building.name}</h2>
         <p className="text-sm leading-5.5 text-muted-foreground wrap-break-word">{placeLine(ticket)}</p>
       </div>
-    </div>
-    <dl className="border-t px-4 sm:px-6">
-      {rows.map(([k, v]) => <div key={k} className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-3 border-b py-2.5 last:border-0 sm:grid-cols-[7rem_minmax(0,1fr)]">
-        <dt className="text-[13px] leading-5 text-muted-foreground">{k}</dt>
-        <dd className="min-w-0 text-[15px] leading-6 font-medium wrap-break-word">{v}</dd>
-      </div>)}
-    </dl>
-    <div className="grid gap-4 border-t bg-muted/30 px-4 py-4 sm:grid-cols-2 sm:px-6 print:grid-cols-2">
+    </Section>
+    <Section>
+      {/* Priority stays staff-only; everyone sees the symptoms instead (owner, 2026-10-19, CR-012). */}
+      <dl className={TWO_COLUMNS}>
+        <Fact label="หมวดงาน">{categoryName(ticket)}</Fact>
+        <Fact label={when[0]}>{when[1]}</Fact>
+        <Fact label="อาการ">{symptoms.length ? <span className="flex flex-wrap gap-1.5">{symptoms.map((s) => <span key={s} className="rounded-[5px] bg-muted px-2 text-sm leading-6 font-medium wrap-break-word">{s}</span>)}</span> : muted("—")}</Fact>
+        {staff ? <Fact label="ความเร่งด่วน"><PriorityBadge priority={ticket.priority} className="align-middle" /><Sub inline>{reason}</Sub></Fact>
+          : ticket.asset ? <Fact label="อุปกรณ์">{ticket.asset.code}<Sub inline>{ticket.asset.name}</Sub></Fact> : null}
+        {staff && ticket.asset && <Fact label="อุปกรณ์">{ticket.asset.code}<Sub inline>{ticket.asset.name}</Sub></Fact>}
+        {staff && ticket.result?.contractorRating && <Fact label="คะแนนช่างภายนอก">{ticket.result.contractorRating}/5 · {RATING_LABELS[ticket.result.contractorRating]}{ticket.result.contractorRatingComment && <Sub inline>{ticket.result.contractorRatingComment}</Sub>}</Fact>}
+        <Fact label="รายละเอียดที่แจ้ง" wide><span className="block font-normal whitespace-pre-wrap">{ticket.details || muted("ไม่มีรายละเอียดเพิ่มเติม")}</span></Fact>
+      </dl>
+    </Section>
+    <Section className={TWO_COLUMNS}>
       <Person label="ผู้แจ้ง" name={viewer === "reporter" ? `${ticket.reporter.name} (คุณ)` : ticket.reporter.name} initialsOf={ticket.reporter.name}
         sub={[ticket.reporter.department, others].filter(Boolean).join(" · ")} />
       {fixer ? <Person label="ผู้ซ่อม" name={fixer.name} initialsOf={fixer.name} sub={workByText(ticket)} />
         : <Person label="ผู้ซ่อม" name={ticket.status === "in_progress" ? "รอช่างรับงาน" : "—"} sub={ticket.status === "in_progress" ? "จะแสดงเมื่อช่างเริ่มดำเนินการ" : ""} />}
-    </div>
-  </Panel>;
+    </Section>
+    <Section className="flex items-start gap-3">
+      <ImageIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+      <div className="min-w-0">
+        <h3 className="text-sm leading-6 font-semibold">รูปภาพประกอบการแจ้ง</h3>
+        {ticket.photos.length === 0 ? <p className="text-[13px] text-muted-foreground">ไม่มีรูปแนบ</p>
+          : <div className="mt-2 flex flex-wrap gap-2">{ticket.photos.map((p, k) => <button key={p.id} type="button" onClick={() => setLightbox(k)} aria-label={`ขยายรูปที่แจ้ง ${k + 1} จาก ${ticket.photos.length}`}
+            className="size-20 cursor-zoom-in overflow-hidden rounded-lg border bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-24">
+            <img src={p.thumbUrl} alt="" className="size-full object-cover" />
+          </button>)}</div>}
+      </div>
+      <PhotoLightbox photos={ticket.photos} index={lightbox} onIndexChange={setLightbox} />
+    </Section>
+  </div>;
 }
 
 /** First letters of the first two words, skipping Thai leading vowels ("วรรณา สุขประเสริฐ" → "วส"). */
@@ -337,9 +377,9 @@ function Person({ label, name, sub, initialsOf }: { label: string; name: string;
   </div>;
 }
 
-// ---- รายละเอียดการซ่อม (CR-012): what the technician did → before / after photos → the report ----
+// ---- ผลการซ่อม tab (CR-012, CR-019): what the technician did → before / after photos → the rating ----
 
-function Evidence({ ticket, viewer, story }: { ticket: TicketDetail; viewer: StoryViewer; story: Story }) {
+function ResultTab({ ticket, viewer, story }: { ticket: TicketDetail; viewer: StoryViewer; story: Story }) {
   const you = viewer === "reporter" ? "คุณ" : "ผู้แจ้ง";
   // The previous result stays readable during a rework.
   const result = ticket.result && (ticket.status !== "in_progress" || ticket.step === "reworking") ? ticket.result : null;
@@ -349,12 +389,12 @@ function Evidence({ ticket, viewer, story }: { ticket: TicketDetail; viewer: Sto
     : result ? [CircleCheck, "บันทึกผลแล้ว", "text-success"]
       : closed ? [FolderCheck, "ไม่มีบันทึกผลซ่อม", "text-muted-foreground"] : [Clock, "รอผลการซ่อม", "text-muted-foreground"];
   const waiting = viewer === "technician" ? "ผู้แจ้ง" : you;
-  return <Panel aria-labelledby="evidence-title">
-    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 pt-4 sm:px-6 sm:pt-5">
+  return <div>
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 pt-4 sm:px-7 sm:pt-5">
       <h2 id="evidence-title" className="text-lg leading-7 font-semibold">{rework && result ? "ผลซ่อมครั้งก่อน" : "รายละเอียดการซ่อม"}</h2>
       <span className="inline-flex items-center gap-1.5 text-xs leading-5 text-muted-foreground"><StatusIcon className={cn("size-4", statusTone)} aria-hidden />{statusText}</span>
     </div>
-    <div className="mx-4 mt-4 flex items-start gap-3 rounded-lg bg-muted/60 p-4 sm:mx-6">
+    <div className="mx-4 mt-4 flex items-start gap-3 rounded-lg bg-muted/60 p-4 sm:mx-7">
       <Wrench className="mt-0.5 size-4.5 shrink-0 text-muted-foreground max-sm:hidden" aria-hidden />
       <div className="min-w-0">
         {result ? <>
@@ -370,24 +410,19 @@ function Evidence({ ticket, viewer, story }: { ticket: TicketDetail; viewer: Sto
         </>}
       </div>
     </div>
-    {rework && story.sendBackReason && <div className="mx-4 mt-3 rounded-lg border border-status-rework/20 bg-status-rework/6 px-4 py-3 text-sm sm:mx-6">
+    {rework && story.sendBackReason && <div className="mx-4 mt-3 rounded-lg border border-status-rework/20 bg-status-rework/6 px-4 py-3 text-sm sm:mx-7">
       <b className="font-semibold text-status-rework">เหตุผลที่ส่งกลับให้แก้</b><p className="mt-1 wrap-break-word">{story.sendBackReason}</p>
     </div>}
-    <div className="grid gap-5 px-4 py-5 sm:grid-cols-2 sm:gap-4 sm:px-6 print:grid-cols-2">
+    <div className="grid gap-5 px-4 py-5 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-4 sm:px-7 print:grid-cols-2">
       <PhotoSet title="ก่อนซ่อม" from={`จาก${you}`} photos={ticket.photos} empty="ไม่มีรูปแนบ" />
       <PhotoSet title={rework ? "หลังซ่อมครั้งก่อน" : "หลังซ่อม"} from="จากช่าง" photos={result?.photos ?? []}
         empty={result || closed ? "ไม่มีรูปหลังซ่อม" : "รอช่างบันทึกผลการซ่อม"} pending={!result && !closed} />
     </div>
-    <div className="mx-4 border-t pt-4 pb-5 sm:mx-6">
-      <h3 className="flex items-center gap-1.5 text-sm leading-6 font-semibold"><FileText className="size-4 text-muted-foreground" aria-hidden />รายละเอียดที่แจ้ง</h3>
-      <p className="mt-1 text-[15px] leading-relaxed whitespace-pre-wrap wrap-break-word">{ticket.details || "ไม่มีรายละเอียดเพิ่มเติม"}</p>
-      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">แจ้งโดย{viewer === "reporter" ? "คุณ" : ` ${ticket.reporter.name}`} · {shortDate(ticket.createdAt, true)} เวลา {timeOf(ticket.createdAt)} น.</p>
-    </div>
-    {closed && ticket.closedReason === "confirmed" && ticket.rating && <div className="mx-4 mb-5 rounded-lg bg-muted/60 px-4 py-3 text-sm sm:mx-6">
+    {closed && ticket.closedReason === "confirmed" && ticket.rating && <div className="mx-4 mb-5 rounded-lg bg-muted/60 px-4 py-3 text-sm sm:mx-7">
       <p className="font-semibold">คะแนนจาก{you} <span className="tabular-nums">{ticket.rating}/5</span> · {RATING_LABELS[ticket.rating]}</p>
       <p className="mt-0.5 text-muted-foreground wrap-break-word">{ticket.ratingComment || "ไม่มีความคิดเห็นเพิ่มเติม"}</p>
     </div>}
-  </Panel>;
+  </div>;
 }
 
 /** One large photo, a thumbnail strip to switch it, and the full-screen lightbox. */
@@ -427,7 +462,7 @@ function Progress({ ticket, story }: { ticket: TicketDetail; story: Story }) {
   const [history, setHistory] = useState(false);
   // A planned date on the next "เสร็จ" stage tells everyone when to expect it.
   const planned = (s: Stage) => s.key === "done" && s.state === "later" && ticket.expectedDoneOn && !story.awaitingReaccept ? `คาดว่า ${dayLabel(ticket.expectedDoneOn, true)}` : undefined;
-  return <Panel aria-labelledby="progress-title" className="p-4 sm:p-5 lg:sticky lg:top-26 print:hidden">
+  return <section aria-labelledby="progress-title" className="min-w-0 border-t px-4 py-5 sm:px-7 lg:border-t-0 lg:border-l lg:px-6 print:hidden">
     <h2 id="progress-title" className="text-lg leading-7 font-semibold">ความคืบหน้าของงาน</h2>
     <p className="text-[13px] text-muted-foreground">ตั้งแต่แจ้งเรื่อง จนถึงปิดงาน</p>
     <ol className="mt-5">{story.stages.map((s, i) => <StageItem key={s.key} stage={s} planned={planned(s)} next={story.stages[i + 1]} />)}</ol>
@@ -440,7 +475,7 @@ function Progress({ ticket, story }: { ticket: TicketDetail; story: Story }) {
         <HistoryTable story={story} ticketNo={ticket.ticketNo} />
       </DialogContent>
     </Dialog>
-  </Panel>;
+  </section>;
 }
 
 function StageItem({ stage: s, planned, next }: { stage: Stage; planned?: string; next?: Stage }) {
@@ -452,10 +487,10 @@ function StageItem({ stage: s, planned, next }: { stage: Stage; planned?: string
     {/* One SVG per marker: circle, halo and icon share one coordinate system, so they stay concentric at any
         display scaling (separate boxes snapped to device pixels apart at 125% / 150%). */}
     <svg aria-hidden viewBox="0 0 28 28" className={cn("relative size-7 overflow-visible", s.state === "later" ? "text-muted-foreground/70" : "text-primary")}>
-      {s.state === "now" && <circle cx={14} cy={14} r={18} className="fill-primary/10" />}
-      {s.state === "done"
-        ? <circle cx={14} cy={14} r={14} className="fill-primary" />
-        : <circle cx={14} cy={14} r={13} strokeWidth={2} className={cn("fill-card", s.state === "now" ? "stroke-primary" : "stroke-border")} />}
+      {/* "now": the blue ring sits on the edge of the soft halo, not inset inside it (owner, 2026-10-24). */}
+      {s.state === "done" ? <circle cx={14} cy={14} r={14} className="fill-primary" />
+        : s.state === "now" ? <circle cx={14} cy={14} r={17} strokeWidth={2} className="fill-secondary stroke-primary" />
+          : <circle cx={14} cy={14} r={13} strokeWidth={2} className="fill-card stroke-border" />}
       {s.state === "done" ? <Check x={6} y={6} size={16} strokeWidth={3} className="text-white" />
         : rework ? <RotateCcw x={7} y={7} size={14} strokeWidth={2.5} /> : <Clock x={7} y={7} size={14} strokeWidth={2.5} />}
     </svg>

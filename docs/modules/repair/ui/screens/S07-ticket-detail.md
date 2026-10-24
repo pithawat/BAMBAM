@@ -1,6 +1,8 @@
 # S07 — รายละเอียดงาน
 
-Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14) · layout replaced by CR-011 (approved 2026-10-18) · **refined by CR-012 (approved 2026-10-19)**
+Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14) · layout replaced by CR-011 (approved 2026-10-18) · **refined by CR-012 (approved 2026-10-19)** · **layout replaced by CR-019 (approved 2026-10-24)**
+
+> **CR-019 (approved 2026-10-24) — layout only, content and actions unchanged; overrides the layout parts below.** One container as wide as the navbar: back link + `พิมพ์งานนี้` · ticket no + status · category tile + category + title + `แจ้งเมื่อ … · โดย {ผู้แจ้ง}` · full-width band (reporter awaiting rating: review band with the `review` mascot, stars, `ประเมินพร้อมความคิดเห็น`, send back; everyone else: next-action band) · tabs `ข้อมูลแจ้งซ่อม` (location · two-column facts: หมวดงาน / กำหนด-เสร็จเมื่อ, อาการ / ความเร่งด่วน (staff) or อุปกรณ์, รายละเอียดที่แจ้ง full width · ผู้แจ้ง / ผู้ซ่อม on the same two columns · รูปภาพประกอบการแจ้ง) and `ผลการซ่อม` (technician note, before / after photos, send-back reason, rating) — opens on ผลการซ่อม when awaiting the rating or closed with a result · timeline on the right (below on phones). Breadcrumb removed. Print shows both tabs. No message box.
 
 > **CR-015 (approved 2026-10-19):** no priority `Select` / change-priority dialog / toast / `priority_changed` event for anyone, including admin; priority stays a read-only row for staff. Overrides any text below.
 

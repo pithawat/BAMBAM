@@ -15,7 +15,7 @@
 
 | Key | Name (TH) | Purpose | Main users | Phase | Stage | Status |
 |---|---|---|---|---|---|---|
-| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 3D of 8 (next: 4) | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stage 2M (CR-014) accepted 2026-10-19 (`repair-stage-2M`); Stage 3D (CR-016–CR-018: S29 dashboard + 3D อาคาร 1 + equipment) accepted 2026-10-20 (`repair-stage-3D`); Stages 1 / 2 / 2R / 2N / 3 built, waiting acceptance |
+| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 3U of 8 (next: 4) | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stage 2M (CR-014) accepted 2026-10-19 (`repair-stage-2M`); Stage 3D (CR-016–CR-018: S29 dashboard + 3D อาคาร 1 + equipment) accepted 2026-10-20 (`repair-stage-3D`); Stage 3U (CR-019: UI refresh + tiger mascot + S06 slim paging #35) accepted 2026-10-24 (`repair-stage-3U`); Stages 1 / 2 / 2R / 2N / 3 built, waiting acceptance |
 | `car_booking` | ระบบจองรถ | จองรถส่วนกลาง | ✏️ | – | – | brief needed |
 | `room_booking` | ระบบจองห้องประชุม | จองห้องประชุม | ✏️ | – | – | brief needed |
 | `settings` | ตั้งค่าระบบ (Superadmin) | ตั้งค่า master ผังอาคาร role / สิทธิ์ และผู้ใช้ ใช้ร่วมทั้ง 3 ระบบ | `super_admin` | P5 | 0 of 6 | screens + plan + CR-007 approved 2026-10-16; Stage 1 next |

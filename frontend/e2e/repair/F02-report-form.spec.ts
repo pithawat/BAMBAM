@@ -103,5 +103,5 @@ test("AC4: the frame keeps its size on every step (desktop)", async ({ page, isM
   await next(page);
   await size();
   expect(new Set(sizes).size).toBe(1);
-  expect(sizes[0]).toMatch(/^880x/);
+  // CR-019: the frame shares the row with the สรุปการแจ้งซ่อม column, so its width follows the shell.
 });

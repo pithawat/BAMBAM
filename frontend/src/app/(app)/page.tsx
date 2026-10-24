@@ -54,7 +54,7 @@ function EmployeeHome() {
         </header>
 
         <section className="relative mx-4 -mt-13.5 rounded-[26px] bg-card p-4.5 shadow-float">
-          <Mascot pose="bust" size={96} className="absolute -top-23 right-3" />
+          <Mascot pose="welcome" size={104} className="absolute -top-25 right-3" />
           <h2 className="font-heading text-lg font-semibold">เจออะไรเสีย บอก BAMBAM</h2>
           <p className="mt-0.5 mb-3.5 text-[13.5px] text-muted-foreground">ถ่ายรูป เลือกอาการ ส่งถึงช่างในหมวดนั้นทันที</p>
           <div className="flex gap-2.5">
@@ -118,7 +118,7 @@ function EmployeeHome() {
               <Link href="/repair/my">ติดตามงานซ่อม</Link>
             </Button>
           </div>
-          <Mascot pose="full" size={208} className="absolute right-17 -bottom-1.5" />
+          <Mascot pose="welcome" size={208} className="absolute right-17 -bottom-1.5" />
         </section>
 
         <div className="my-5 grid grid-cols-3 gap-4.5">

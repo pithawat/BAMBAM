@@ -9,6 +9,7 @@ import type {
   AssetType,
   Building,
   Category,
+  CategoryRef,
   CreateAssetRequest,
   FloorPlan,
   Overview,
@@ -25,6 +26,8 @@ import type {
   TicketCounts,
   TicketCountsQuery,
   TicketDetail,
+  MyTicketPage,
+  MyTicketsQuery,
   TicketListQuery,
   TicketPage,
   TicketStatus,
@@ -263,7 +266,7 @@ export const mockBuildings: Building[] = [
   },
 ];
 
-const cat = (n: number): Ref => ({ id: mockCategories[n - 1].id, name: mockCategories[n - 1].name });
+const cat = (n: number): CategoryRef => ({ id: mockCategories[n - 1].id, name: mockCategories[n - 1].name, icon: mockCategories[n - 1].icon });
 const sym = (c: number, ...s: number[]): Ref[] => s.map((n) => {
   const { id, name } = mockCategories[c - 1].symptoms[n - 1];
   return { id, name };
@@ -281,9 +284,9 @@ const room = (b: number, level: number, name: string): Ref => {
 
 /** Sample categories switched off by CR-014 — older tickets still point at them. */
 const legacy = {
-  furniture: { category: { id: "6f1c2a90-0000-4000-8000-000000000004", name: "อาคารและเฟอร์นิเจอร์" }, symptoms: [{ id: "11a00000-0000-4000-8000-000000040003", name: "เก้าอี้ชำรุด" }] },
-  cleaning: { category: { id: "6f1c2a90-0000-4000-8000-000000000005", name: "ความสะอาด" }, symptoms: [{ id: "11a00000-0000-4000-8000-000000050001", name: "พื้นเปียก" }] },
-} satisfies Record<string, { category: Ref; symptoms: Ref[] }>;
+  furniture: { category: { id: "6f1c2a90-0000-4000-8000-000000000004", name: "อาคารและเฟอร์นิเจอร์", icon: "armchair" }, symptoms: [{ id: "11a00000-0000-4000-8000-000000040003", name: "เก้าอี้ชำรุด" }] },
+  cleaning: { category: { id: "6f1c2a90-0000-4000-8000-000000000005", name: "ความสะอาด", icon: "sparkles" }, symptoms: [{ id: "11a00000-0000-4000-8000-000000050001", name: "พื้นเปียก" }] },
+} satisfies Record<string, { category: CategoryRef; symptoms: Ref[] }>;
 
 // ---- people (ids match lib/platform/mocks where the person is a demo user) ----
 
@@ -342,7 +345,7 @@ type Seed = {
   categoryOther?: string;
   symptoms: number[];
   /** A switched-off sample category (tickets before CR-014). */
-  legacy?: { category: Ref; symptoms: Ref[] };
+  legacy?: { category: CategoryRef; symptoms: Ref[] };
   symptomOther?: string;
   building: number;
   floor: number;
@@ -765,6 +768,23 @@ export function mockListTickets(q: TicketListQuery, v: Viewer): TicketPage {
   return { items: all.slice((page - 1) * pageSize, page * pageSize), meta: { page, pageSize, total: all.length } };
 }
 
+/** #35: #6 mine, then cut down to the S06 row (default 10 per page). */
+export function mockListMyTickets(q: MyTicketsQuery, v: Viewer): MyTicketPage {
+  const { items, meta } = mockListTickets({ ...q, scope: "mine", pageSize: q.pageSize ?? 10 }, v);
+  return {
+    meta,
+    items: items.map((t) => ({
+      id: t.id, ticketNo: t.ticketNo, status: t.status, step: t.step, closedReason: t.closedReason,
+      category: t.category, categoryOther: t.categoryOther,
+      title: [...t.symptoms.map((s) => s.name), ...(t.symptomOther ? [t.symptomOther] : [])].join(" · "),
+      building: t.building, floor: t.floor, room: t.room, locationDetail: t.locationDetail,
+      viewerRelation: t.viewerRelation === "reporter" ? "reporter" : "subscriber",
+      awaitingMyConfirmation: t.awaitingMyConfirmation, expectedDoneOn: t.expectedDoneOn, autoCloseAt: t.autoCloseAt,
+      rating: t.rating, resolvedAt: t.resolvedAt, updatedAt: t.updatedAt,
+    })),
+  };
+}
+
 export function mockTicketCounts(q: TicketCountsQuery, v: Viewer): TicketCounts {
   const list = store.tickets.map(toSummary).filter((t) => matches(t, q, v));
   const count = (s: TicketStatus) => list.filter((t) => t.status === s).length;
@@ -837,7 +857,7 @@ export function mockCreateTicket(
     closedReason: null,
     priority,
     prioritySource: source,
-    category: { id: category.id, name: category.name },
+    category: { id: category.id, name: category.name, icon: category.icon },
     categoryOther: req.categoryOther?.trim() || null,
     symptoms,
     symptomOther: req.symptomOther?.trim() || null,

@@ -3,6 +3,9 @@
 
 import type { Ref } from "@/lib/platform/types";
 
+/** A ticket's category with its lucide icon (`wrench` when the category has none), so lists draw the tile without the master (CR-019). */
+export type CategoryRef = Ref & { icon: string };
+
 export type { Ref };
 
 // ---- enums ----
@@ -71,7 +74,7 @@ export type TicketSummary = {
   priority: Priority;
   prioritySource: PrioritySource;
   /** `null` only on tickets from CR-008 to CR-014 where the reporter typed the category → `categoryOther`. */
-  category: Ref | null;
+  category: CategoryRef | null;
   /** CR-014: the optional typed name under the "อื่น ๆ" category (shown `อื่น ๆ · {categoryOther}`). */
   categoryOther: string | null;
   /** Title = symptom names, then `symptomOther`, joined with " · " (_common.md §3). */
@@ -243,6 +246,25 @@ export type TicketListQuery = {
 };
 
 export type TicketCountsQuery = Omit<TicketListQuery, "status" | "step" | "page" | "pageSize" | "sort">;
+
+// ---- #35 GET /repair/tickets/mine (S06 table, CR-019) ----
+
+export type MyTicketsQuery = Pick<TicketListQuery, "relation" | "status" | "step" | "q" | "page" | "pageSize" | "sort">;
+
+/** One S06 row: only what the table shows (title joined by the API). */
+export type MyTicket = Pick<TicketSummary,
+  "id" | "ticketNo" | "status" | "step" | "closedReason" | "category" | "categoryOther" | "building" | "floor" | "room"
+  | "locationDetail" | "awaitingMyConfirmation" | "expectedDoneOn" | "autoCloseAt" | "rating" | "resolvedAt" | "updatedAt"> & {
+  /** Symptom names, then the typed symptom, joined with " · " (same as `ticketTitle`). */
+  title: string;
+  /** Mine only, so never `technician` / `none`. */
+  viewerRelation: "reporter" | "subscriber";
+};
+
+export type MyTicketPage = {
+  items: MyTicket[];
+  meta: { page: number; pageSize: number; total: number };
+};
 
 export type TicketPage = {
   items: TicketSummary[];

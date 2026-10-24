@@ -173,7 +173,7 @@ func (r *PgRepository) GetTicket(ctx context.Context, id, viewerID uuid.UUID) (T
 		TicketSummary: TicketSummary{
 			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason, Priority: row.Priority,
 			PrioritySource: row.PrioritySource,
-			Category:       ref(row.CategoryID, row.CategoryName), CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
+			Category:       ref(row.CategoryID, row.CategoryName), CategoryIcon: row.CategoryIcon, CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
 			Room:             ref(row.RoomID, row.RoomName),
@@ -295,7 +295,7 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 		s := TicketSummary{
 			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason, Priority: row.Priority,
 			PrioritySource: row.PrioritySource,
-			Category:       ref(row.CategoryID, row.CategoryName), CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
+			Category:       ref(row.CategoryID, row.CategoryName), CategoryIcon: row.CategoryIcon, CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
 			Symptoms:         nonNil(symsBy[row.ID]),
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
@@ -320,6 +320,36 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 	}
 	if err := r.fillContractorTypes(ctx, ptrs); err != nil {
 		return nil, 0, err
+	}
+	return out, total, nil
+}
+
+// ListMyTickets is #35: one S06 page in one query, plus the shared count (scope mine, no staff filters).
+func (r *PgRepository) ListMyTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]MyTicket, int64, error) {
+	rows, err := r.q.ListMyTickets(ctx, repairdb.ListMyTicketsParams{
+		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), Q: f.Q, Sort: f.Sort,
+		PageLimit: int32(f.PageSize), PageOffset: int32((f.Page - 1) * f.PageSize), // #nosec G115 -- page size ≤ 100, page bounded by the controller
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.q.CountTickets(ctx, repairdb.CountTicketsParams{
+		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), Q: f.Q,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]MyTicket, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, MyTicket{
+			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason,
+			Category: ref(row.CategoryID, row.CategoryName), CategoryIcon: row.CategoryIcon, CategoryOther: row.CategoryOther,
+			Title:    row.Title,
+			Building: Ref{ID: row.BuildingID, Name: row.BuildingName}, Floor: Ref{ID: row.FloorID, Name: row.FloorName},
+			Room: ref(row.RoomID, row.RoomName), LocationDetail: row.LocationDetail, IsReporter: row.IsReporter,
+			Rating: row.Rating, SendBackCount: row.SendBackCount, ExpectedDoneOn: dateOf(row.ExpectedDoneOn),
+			AutoCloseAt: row.AutoCloseAt, ResolvedAt: row.ResolvedAt, UpdatedAt: row.UpdatedAt,
+		})
 	}
 	return out, total, nil
 }

@@ -28,6 +28,7 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | 4 | GET | `/api/v1/repair/photos/{id}` | photo file (`?size=thumb\|full`) | all (who can see the ticket / the uploader) | 1 |
 | 5 | POST | `/api/v1/repair/tickets` | create ticket → `in_progress`, waiting for assessment (CR-005); priority set by the system (CR-008) | all (team handled: leads) | 1 (team: 4) |
 | 6 | GET | `/api/v1/repair/tickets` | list tickets (`scope=mine\|all`, `status`, `step`, filters) | mine: all · all: technician, admin, executive (CR-005) | 1 |
+| 35 | GET | `/api/v1/repair/tickets/mine` | S06 table: one page of slim rows (CR-019) | all (own tickets only) | 3U (CR-019) |
 | 7 | GET | `/api/v1/repair/tickets/counts` | counts per status / step | mine: all · all: technician, admin, executive | 1 |
 | 8 | GET | `/api/v1/repair/tickets/{id}` | ticket detail + timeline + allowed actions | who can see it (BR-F06-1) | 1 |
 | 9 | POST | `/api/v1/repair/tickets/{id}/assess` | set / change the expected finish date + who does the work (CR-005, CR-006) + optional reason for a change (CR-008) | technician | 2 |
@@ -93,7 +94,7 @@ S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,res
   "step": "awaiting_rating",
   "closedReason": null,
   "priority": "high",
-  "category": { "id": "6f1c2a90-4d1e-4b7a-9c55-0e2b7f3a1d01", "name": "ระบบปรับอากาศ" },
+  "category": { "id": "6f1c2a90-4d1e-4b7a-9c55-0e2b7f3a1d01", "name": "ระบบปรับอากาศ", "icon": "snowflake" },
   "categoryOther": null,
   "symptoms": [ { "id": "11a0…", "name": "แอร์ไม่เย็น" }, { "id": "11a1…", "name": "มีน้ำหยด" } ],
   "symptomOther": null,
@@ -275,7 +276,9 @@ Response 201 `{ "data": <TicketDetail> }`.
 ### 6. GET /api/v1/repair/tickets
 Query: `scope=mine|all` (default `mine`) · `status` (comma list of statuses) · `step` (comma list of steps, CR-005) · `closedReason` · `q` (ticket no or location text) · `createdFrom`, `createdTo` (RFC 3339) · `relation=all|reported|following` (mine only) · `categoryId`, `buildingId`, `floorId`, `priority` (all only) · `page`, `pageSize` · `sort`: `updatedAt:desc` (default) · `createdAt:desc` · `createdAt:asc` · `closedAt:desc` (default for `status=closed`). ~~`priority:asc`~~ removed (CR-015): S09 / S11 open lists use `createdAt:asc`; an unknown sort → 400.
 
-- `mine` = tickets I reported or follow (BR-F06-1). In `status=resolved`, tickets awaiting my confirmation come first (BR-F06-2).
+- `mine` = tickets I reported or follow (BR-F06-1). Tickets awaiting my confirmation come first for any status set (BR-F06-2).
+- Paging is server-side (CR-019): `LIMIT pageSize OFFSET (page-1)*pageSize` plus one `count(*)` with the same filters; `pageSize` default 20, max 100; `page` max 10 000; a page past the end returns `data: []` with the real `total`. Clients fetch one page at a time — never the whole list.
+- `category.icon` (CR-019, additive, also on #8 / #27 attention rows): the category's lucide icon, `wrench` when unset, so lists draw the category tile without loading the master (#1).
 - `all` = every ticket (technician, admin, executive — CR-005).
 
 ```json
@@ -286,6 +289,26 @@ Query: `scope=mine|all` (default `mine`) · `status` (comma list of statuses) ·
 |---|---|---|
 | 403 | `FORBIDDEN` | `scope=all` by other roles |
 | 400 | `VALIDATION_FAILED` | bad filter value |
+
+### 35. GET /api/v1/repair/tickets/mine (CR-019)
+The S06 table's own paging endpoint: one page, only the columns S06 shows. Query: `relation`, `status`, `step`, `q`, `sort` as #6 mine (other #6 filters are ignored) · `page` · `pageSize` default **10** (max 100).
+
+- Always the caller's tickets (reported or followed, BR-F06-1); awaiting my confirmation first (BR-F06-2); same `total` as #6 mine with the same filters.
+- One list query (tickets + category / building / floor / room; the title is joined in SQL) plus one `count(*)` — no people, contractor, photo or symptom-row lookups.
+
+```json
+{ "data": [ {
+  "id": "0b9c…", "ticketNo": "RP-2569-000142", "status": "resolved", "step": "awaiting_rating", "closedReason": null,
+  "category": { "id": "6f1c…", "name": "ระบบปรับอากาศ", "icon": "snowflake" }, "categoryOther": null,
+  "title": "แอร์ไม่เย็น · มีน้ำหยด",
+  "building": { "id": "b1…", "name": "อาคารหลัก" }, "floor": { "id": "f5…", "name": "5" },
+  "room": { "id": "r5b…", "name": "ห้องประชุม 5B" }, "locationDetail": "ฝั่งหน้าต่าง",
+  "viewerRelation": "reporter", "awaitingMyConfirmation": true,
+  "expectedDoneOn": "2026-10-15", "autoCloseAt": "2026-10-17T02:10:00Z", "rating": null,
+  "resolvedAt": "2026-10-14T02:10:00Z", "updatedAt": "2026-10-14T02:10:00Z"
+} ], "meta": { "page": 1, "pageSize": 10, "total": 3 } }
+```
+`title` = symptom names (report order), then `symptomOther`, joined with ` · `. `viewerRelation`: `reporter` · `subscriber` only. Errors as #6 (`VALIDATION_FAILED` for a bad filter value).
 
 ### 7. GET /api/v1/repair/tickets/counts
 Query: `scope`, `q` and the same filters as #6 except `status`.

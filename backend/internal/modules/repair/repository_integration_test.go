@@ -177,6 +177,15 @@ func TestPgListCountsAndVisibility(t *testing.T) {
 		t.Fatalf("search by ticket number: total=%d", total)
 	}
 
+	// #35 (CR-019): the S06 page — slim rows, same total, page size honoured, title joined in SQL.
+	rows, total, err := p.svc.MyTickets(ctx, reporter, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 1})
+	if err != nil || total != 2 || len(rows) != 1 || rows[0].Title != mine[0].Symptoms[0].Name || !rows[0].IsReporter || rows[0].Step() != StepAwaitingAssessment {
+		t.Fatalf("my tickets page 1: total=%d rows=%+v err=%v", total, rows, err)
+	}
+	if rows, total, _ := p.svc.MyTickets(ctx, other, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 10}); total != 0 || len(rows) != 0 {
+		t.Fatalf("other user sees %d of my tickets", total)
+	}
+
 	counts, err := p.svc.TicketCounts(ctx, reporter, TicketFilter{Relation: "all", Q: &q})
 	if err != nil || counts.AwaitingAssessment != 2 || counts.InProgress != 2 {
 		t.Fatalf("counts: %+v err=%v", counts, err)

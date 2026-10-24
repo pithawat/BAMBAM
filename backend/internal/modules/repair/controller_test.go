@@ -158,6 +158,13 @@ func TestControllerReportFlow(t *testing.T) {
 	if w.Code != 200 || len(list.Data) != 1 || list.Meta["pageSize"] != float64(20) {
 		t.Fatalf("list: %d %s", w.Code, w.Body.String())
 	}
+
+	// #35 (CR-019): the S06 route answers with a page of 10 by default (the fake repo returns no rows).
+	w, _ = do(t, r, "GET", "/api/v1/repair/tickets/mine?status=closed", nil, "")
+	_ = json.Unmarshal(w.Body.Bytes(), &list)
+	if w.Code != 200 || list.Meta["pageSize"] != float64(10) {
+		t.Fatalf("mine: %d %s", w.Code, w.Body.String())
+	}
 }
 
 // Stage 3 AC3: the executive is read-only — every write except reporting returns 403.

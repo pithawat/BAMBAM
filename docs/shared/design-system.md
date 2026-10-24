@@ -10,7 +10,7 @@ Status: APPROVED (2026-10-14) · pickers / filters updated by CR-002 (repair, ap
 
 - **Clean workplace app**: light gray canvas, white panels with thin borders, blue `#2741FA` as the one action colour, violet for highlights, strong solid colours only where a status needs attention. Calm, readable, no decoration that repeats information.
 - **Read from top to bottom.** One column of content per screen on phones, and on desktop for forms and detail pages (max 800–1040px). Sections are stacked; no "left column then right column" reading order inside a form or a detail page. Dashboards and lists may use grids.
-- Light mode only. No gradient headers, no 3D service icons. The BAMBAM logo and the mascot stay (mascot only on success, empty and forbidden screens, plus the white leopard bust beside the S06 heading — CR-011, D-066; never in the navbar).
+- Light mode only. No gradient headers, no 3D service icons. The BAMBAM logo and the mascot stay. Mascot = the BAM tiger, 5 poses (D-094, CR-019): page headings of S06 / S03 / S29, the S07 review band, login / signed-out, Home / S05 cards, empty / error / forbidden states; never in the navbar.
 - Navigation (CR-010, D-064): one white top navbar (floating on desktop), three services with equal weight, no sidebar, no bottom nav — `docs/modules/repair/ui/screens/_common.md` §1.
 - Never ship third-party images, icons or logos from the references.
 

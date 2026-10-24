@@ -37,8 +37,10 @@ export function AppNavbar({ me }: { me: Me }) {
   const links = serviceLinks(me);
   const home = pathname === "/";
 
+  // Desktop: the wrapper sticks at the very top and paints the page background above and below the bar, so content
+  // scrolling underneath never shows in the gap (owner, 2026-10-24).
   return (
-    <div className="print:hidden lg:sticky lg:top-3 lg:z-30 lg:mt-3 lg:px-8">
+    <div className="print:hidden lg:sticky lg:top-0 lg:z-30 lg:bg-background lg:px-8 lg:pt-3 lg:pb-3">
       <header className="mx-auto w-full border-b bg-card lg:max-w-7xl lg:rounded-2xl lg:border lg:shadow-card">
         <div className="flex h-15 items-center gap-2 px-4 lg:h-19 lg:gap-6 lg:px-5">
           <Link href="/" aria-label="BAMBAM หน้าแรก" className="shrink-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">

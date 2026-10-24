@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — Build plan
 
-Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19) · Stage 3 reduced + S09 sort rework by CR-015 (2026-10-19) · Stage 3D added, Stage 7 replaced by CR-016 (2026-10-19)
+Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19) · Stage 3 reduced + S09 sort rework by CR-015 (2026-10-19) · Stage 3D added, Stage 7 replaced by CR-016 (2026-10-19) · Stage 3U (UI refresh) added by CR-019 (2026-10-24)
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -20,6 +20,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 2M | **CR-014 rework:** หมวดงาน / อาการจริงตามเอกสาร (เก็บใน DB) · ฟอร์ม 3 ขั้น กรอบเท่ากันทุกขั้น · ห้องหรือจุดที่เกิดบังคับ เลือกจากรายการห้อง ผูกกับหมวด | F02, F06 | S03, location line on S05 / S06 / S07 / S09 | done (2026-10-19, `repair-stage-2M`) |
 | 3 | Admin เห็นทุกงาน ปิดงานได้ (CR-015: ไม่ปรับความเร่งด่วน); ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | built 2026-10-19 — waiting acceptance |
 | 3D | **CR-016:** หน้าแรก Admin / ผู้บริหาร = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
+| 3U | **CR-019 rework:** หน้าตาใหม่ตามต้นแบบ `bam-workplace-mascot-v4-refined.html` — S06 ตารางเดียว + ตัวกรองสถานะ · S07 กล่องเดียว + แท็บ · S03 สองคอลัมน์ + สรุป · S29 ขัดเกลา · มาสคอตเสือทั้งแอป | F02, F06, F07, F23 | S03, S06, S07, S29, S01, shared states | done (2026-10-24, `repair-stage-3U`) |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over) | pending |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin / ผู้บริหารทำแล้วใน 3D) และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง | F01 (Home), F19-B | S02, S13, bell | pending |
@@ -77,9 +78,9 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 **Acceptance criteria**
 - [ ] AC1: As demo `employee`, submit the S03 form with 2 photos → S05 shows `RP-2569-000001` (or next number) and the ticket appears under S06 "กำลังดำเนินการ"
 - [ ] AC2: Each S03 validation message appears with the exact copy when its field is missing; data stays after a failed submit (API stopped)
-- [ ] AC3: S07 shows details, photos (lightbox works), category, priority, location and the `แจ้งซ่อม` timeline event
-- [ ] AC4: Demo `housekeeper_lead` opening the employee's ticket URL sees the S07 forbidden state; demo `admin` can open it
-- [ ] AC5: Changing the prefix in `repair.settings` changes the next ticket number only (old numbers unchanged)
+- [x] AC3: S07 shows details, photos (lightbox works), category, priority, location and the `แจ้งซ่อม` timeline event
+- [x] AC4: Demo `housekeeper_lead` opening the employee's ticket URL sees the S07 forbidden state; demo `admin` can open it
+- [x] AC5: Changing the prefix in `repair.settings` changes the next ticket number only (old numbers unchanged)
 - [ ] AC6: lint, typecheck, Go tests and e2e pass
 
 **Demo script**
@@ -157,7 +158,7 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 
 **Acceptance criteria**
 - [ ] AC1: Picking มีน้ำหยด + แอร์ไม่เย็น shows `ความเร่งด่วนของงานนี้: สูง` and the created ticket has priority สูง (`prioritySource = symptom`); category อื่นๆ with typed text creates a ticket with priority ปกติ
-- [ ] AC2: S03 moves step by step; ถัดไป blocks an incomplete step with its message; ตรวจสอบก่อนส่ง shows every value with แก้ไข; reloading the page restores the draft
+- [x] AC2: S03 moves step by step; ถัดไป blocks an incomplete step with its message; ตรวจสอบก่อนส่ง shows every value with แก้ไข; reloading the page restores the draft
 - [ ] AC3: A reporter with earlier tickets sees up to 3 ที่เคยแจ้ง places; tapping one fills building / floor / location
 - [ ] AC4: S07 shows the step-coloured header and action card per viewer (reporter, follower, technician), the 4-stage timeline with nested date changes / send backs, and prints on A4
 - [ ] AC5: The rating dialog opens with no score (or the tapped star), 1–2 stars offer ส่งกลับให้แก้แทน
@@ -311,6 +312,35 @@ Status: done — accepted 2026-10-19, tag `repair-stage-2M`
 1. Admin → หน้าแรก → numbers → click อาคาร 1 ชั้น 1 → room pin → ticket
 2. จัดวางอุปกรณ์ → drag แอร์ into HR → `AC-1-001` / `แอร์ห้อง HR` → save → move it → ปิดใช้งาน
 3. Switch to ผู้บริหาร; open on a phone
+
+---
+
+## Stage 3U — CR-019 UI refresh + new mascot (CR-019)
+
+Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). Source: `changes/CR-019.md`.
+
+**Tasks**
+- [x] Mascot: 5 tiger poses as trimmed WebP, `Mascot` poses `welcome / guide / review / tracking / loading`, every old pose replaced (D-094)
+- [x] S06: hero + CTA cards, one paged table (10 per page from #35 `GET /tickets/mine`, D-096) with category icons, status dropdown, sort, page numbers; banner, groups and date filter removed
+- [x] S07: one navbar-wide container, review band with mascot, tabs ข้อมูลแจ้งซ่อม / ผลการซ่อม, two-column facts + people, timeline right
+- [x] S03: heading with breadcrumb + mascot, numbered step strip, footer ยกเลิก / ขั้นตอน n จาก 3 / ถัดไป, live สรุปการแจ้งซ่อม (desktop)
+- [x] S29: welcome mascot heading, tiles with icons, card sub-lines + count chips, card shadows
+- [x] e2e F02 AC4: the frame width follows the shell (880 px check dropped); size still equal on every step
+- [x] S01 login: full-page layout from `bam-workplace-login-v7.html`, help dialog, `login` mascot pose (owner, 2026-10-24)
+- [ ] Re-run e2e F01 / F02 / F23 on the test stack (open after acceptance, D-097)
+
+**Acceptance criteria**
+- [x] AC1: S06 shows one table with the category icon per row, filters by status, pages by 10 (CR-019), the reporter's awaiting tickets first with ตรวจงาน; no review banner, no ภาพรวมงานคงค้าง
+- [x] AC2: S07 is one container as wide as the navbar; ผู้แจ้ง / ผู้ซ่อม line up with the fact columns; the result tab opens first while waiting for the rating; print shows both tabs
+- [x] AC3: S03 desktop shows the summary beside the steps and แก้ไข jumps to the step; phone keeps one column; a draft still survives a reload
+- [x] AC4: The tiger mascot replaces the leopard everywhere (login, signed-out, Home, S05, empty / error / forbidden, S06, S07, S03, S29); no broken images
+- [x] AC5: 1440 and 390 px: no horizontal scroll on S03 / S06 / S07 / S29
+
+**Demo script**
+1. Employee → แจ้งซ่อม: hero + CTA, filter "รอประเมินตรวจงาน", sort, page 2 (if > 20)
+2. Open a ticket waiting for the rating → result tab + review band → switch to ข้อมูลแจ้งซ่อม → print preview
+3. แจ้งซ่อมใหม่ → pick category / room → summary updates → แก้ไข สถานที่
+4. Admin → หน้าแรก (S29); phone width for all of the above
 
 ---
 

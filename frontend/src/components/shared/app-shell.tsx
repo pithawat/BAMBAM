@@ -36,7 +36,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
     <div className="min-h-svh bg-background">
       <RoleSwitcher />
       <AppNavbar me={state.me} />
-      <main className="min-w-0 pb-6 lg:px-8 lg:pt-5 lg:pb-8 print:p-0">
+      <main className="min-w-0 pb-6 lg:px-8 lg:pt-2 lg:pb-8 print:p-0">
         <div className="mx-auto w-full max-w-140 lg:max-w-7xl print:max-w-none">{children}</div>
       </main>
     </div>

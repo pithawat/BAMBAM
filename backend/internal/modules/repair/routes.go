@@ -12,6 +12,7 @@ func RegisterRoutes(rg *gin.RouterGroup, c *Controller) {
 	rg.POST("/tickets", c.CreateTicket)
 	rg.GET("/tickets", c.Tickets)
 	rg.GET("/tickets/counts", c.TicketCounts)
+	rg.GET("/tickets/mine", c.MyTickets)
 	rg.GET("/tickets/:id", c.Ticket)
 	rg.POST("/tickets/:id/assess", c.Assess)
 	rg.POST("/tickets/:id/resolve", c.Resolve)

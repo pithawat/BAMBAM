@@ -34,7 +34,7 @@ export function ReportSuccessScreen() {
   return <><PageHeader title="แจ้งซ่อมใหม่" variant="none" />
     {loading ? <TicketSkeleton success /> : error ? <TicketFailure error={error} onRetry={reload} success /> : ticket && (ticket.viewerRelation !== "reporter" ? <ForbiddenState reason="หน้านี้แสดงเฉพาะงานที่คุณแจ้ง" /> :
       <section aria-live="polite" className="mx-3 my-4 max-w-150 rounded-xl border bg-card px-4 py-6 text-center shadow-raised sm:mx-auto sm:px-8">
-        <div className="flex justify-center"><Mascot pose="full" size={120} priority /></div>
+        <div className="flex justify-center"><Mascot pose="welcome" size={120} priority /></div>
         <h1 ref={heading} tabIndex={-1} className="mt-2 text-2xl leading-9 font-semibold outline-none">รับเรื่องแล้ว</h1>
         <p className="mt-1 text-sm text-muted-foreground">เลขงานของคุณ</p>
         <CopyTicketNumber value={ticket.ticketNo} large />

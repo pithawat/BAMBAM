@@ -1,6 +1,12 @@
 # S06 — ติดตามงานซ่อม
 
-Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068)
+Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068) · **layout replaced again by CR-019 (approved 2026-10-24)**
+
+> **CR-019 (approved 2026-10-24) — replaces items 1–5 of the CR-011 block below; visual source `bam-workplace-mascot-v4-refined.html` (layout only, fonts / colours unchanged).**
+> 1. **Top:** hero card (tracking mascot · eyebrow `MAINTENANCE CENTER` · H1 `ติดตามงานซ่อม` · sub-line) beside a primary CTA card (`พบปัญหาในที่ทำงาน?` / `แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล` / white `แจ้งซ่อมใหม่` → `/repair/new`); stacked on phones. No review banner, no "ภาพรวมงานคงค้าง" strip.
+> 2. **Filters:** relation tabs (unchanged) · search · status dropdown `ทุกสถานะ · รับเรื่องแล้ว (awaiting_assessment) · กำลังดำเนินการ (in_repair + reworking) · รอประเมินตรวจงาน (resolved) · ปิดงานแล้ว (closed)` (`?status=`) · `เรียงลำดับ` (3 sorts, `?sort=`). Date-range filter removed. `แสดง {n} งาน` + `อัปเดตล่าสุด {time}`.
+> 3. **One table** (no status groups): category icon tile + title + `{ticket no} · {category}` · สถานที่ · สถานะล่าสุด · กำหนด / อัปเดต · รายละเอียด (chevron; violet-tinted row + `ตรวจงาน` for the reporter's awaiting ticket, first in the list — BR-F06-2 by the API). Column names unchanged. Phone: title + place side by side, status / dates below.
+> 4. **Paging:** 10 per page from #35 `GET /tickets/mine` (CR-019 follow-up 2026-10-24), `แสดง {a}–{b} จาก {n} งาน` + page numbers (`?page=`).
 
 > **Polish 2026-10-19 (owner, D-068, no flow change):** desktop rows two lines tall (title one line, full text on hover; `{ticket no} · คุณติดตามงานนี้` on one line; 36px row link); closed caption `ประเมินตรวจงานแล้ว · {n}/5` (no star icon); `ปิดงานแล้ว` group icon = folder-check; status tags radius 5px.
 

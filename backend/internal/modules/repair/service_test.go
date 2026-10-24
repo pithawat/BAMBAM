@@ -123,6 +123,10 @@ func (f *fakeRepo) ListTickets(_ context.Context, viewerID uuid.UUID, flt Ticket
 	return out, int64(len(out)), nil
 }
 
+func (f *fakeRepo) ListMyTickets(context.Context, uuid.UUID, TicketFilter) ([]MyTicket, int64, error) {
+	return nil, 0, nil
+}
+
 func (f *fakeRepo) CountTickets(context.Context, uuid.UUID, TicketFilter) (TicketCounts, error) {
 	return TicketCounts{}, nil
 }

@@ -2,12 +2,12 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 3D accepted 2026-10-20 (`repair-stage-3D`); Stage 3 waiting for acceptance · of 8   **Updated:** 2026-10-20 (CR-018)
+**Phase:** P5 Build   **Stage:** 3U accepted 2026-10-24 (`repair-stage-3U`); Stage 3 waiting for acceptance · of 8   **Updated:** 2026-10-24 (Stage 3U accepted)
 
 ## Now
 
 - **Stage 3 built 2026-10-19 — waiting for user acceptance** (branch `repair/stage-3`; report below). S11 re-spec (D-077) needs the owner's OK at acceptance
-- **Stage 3D accepted 2026-10-20** (owner), committed on `repair/stage-3D` together with the Stage 3 work, tag `repair-stage-3D`, pushed. Next stage: 4
+- **Stage 3U accepted 2026-10-24** (owner, CR-019), branch `repair/stage-3U`, tag `repair-stage-3U` (not pushed). Stage 3D accepted 2026-10-20 (`repair-stage-3D`). Next stage: 4
 - **CR-017 built 2026-10-20 (S, D-086 / D-087):** ticket status by step on the model, 1 pin per ticket, repair-map lift transition, floors + footprint from #27, no sample numbers; migration `20261020000002` moves sample-building tickets to อาคาร 1 and deletes duplicates
 - **CR-018 built 2026-10-20 (S, D-088 / D-089):** รับเรื่อง = deep yellow app-wide; ฉุกเฉิน marker on the model (red halo, ⚠, #27 `criticalCount`); sample buildings off (migration `20261020000003`) and sample seeding removed
 - **CR-015 APPROVED 2026-10-19 (M, D-076):** priority is policy only — never changed after creation, lists oldest first; built in Stage 3
@@ -42,6 +42,9 @@
 
 ## Open issues / questions
 
+- Stage 3U (D-097): re-run `npx playwright test e2e/repair/F02-report-form.spec.ts e2e/repair/F23-dashboard.spec.ts e2e/platform` on the test stack (not run after the CR-019 relayout)
+- CR-019: S07 message box ("การติดตามงาน") and the S02 employee Home layout from the prototype are out of scope (separate CR if wanted); the S03 note says "ติดตามได้ตลอด" without promising notifications (Stage 6)
+- Next.js 16.4.0 prints a security-vulnerability notice on `next dev` / `next build` (stops the first run) — upgrade to be planned
 - Mock mode (`NEXT_PUBLIC_USE_MOCKS=true`, off by default) still has the old sample buildings in `mocks.ts` — never shown with the real API
 
 - **3D rooms (D-084), owner to check:** names numbered where a floor repeats one (HR 1–3, Call center 1–2, RMC METRO - ท่าหลวง 1–3, RMC Excellence พี่จร 1–3, RMC Network 1–2) · unlabeled 12 m² rooms on floors 1 and 5 = `ห้องย่อย` · floor 2 has both "RMC METRO - ท่าหลวง" and "RRC METRO - ท่าหลวง" (typo?) · floor 5 CCM drawn 6 × 6 m = 36 m² but labelled 48 m² (traced as drawn) · ห้องน้ำ (one room, x 12–16 m) on floors 1–5, gender not recorded, none on floor 6 · is อาคาร 1 the sample "อาคารฝั่ง Office"? (it is a new building; the samples stay for dev)
@@ -77,6 +80,7 @@
 
 ## Stage log
 
+- 2026-10-24: Stage 3U accepted (CR-019: S06 / S07 / S03 relayout, S29 polish, tiger mascot, S01 login from `bam-workplace-login-v7.html`, S06 = 10 per page from slim #35 `GET /tickets/mine`), tag `repair-stage-3U`; e2e F01 / F02 / F23 re-run still open (D-097)
 - 2026-10-20: Stage 3D accepted (CR-016–CR-018), tag `repair-stage-3D`
 
 - 2026-10-20: CR-017 — e2e F23 (incl. step badges = #27, 1 pin per open ticket → S07) + F31 + F01 pass on the real API; backend lint 0 / tests pass; FE lint / typecheck / build pass

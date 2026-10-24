@@ -25,7 +25,7 @@ VALUES (@id, @ticket_id, @type, @actor_id, @note, @data, @created_at);
 -- name: GetTicket :one
 SELECT
     t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
-    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
+    t.category_id, c.name AS category_name, c.icon AS category_icon, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.room_id, rm.name AS room_name,
@@ -55,7 +55,7 @@ WHERE t.id = @id;
 -- Filters are shared with CountTickets and CountTicketsByStatus; keep the WHERE clauses identical.
 SELECT
     t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
-    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
+    t.category_id, c.name AS category_name, c.icon AS category_icon, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.room_id, rm.name AS room_name,
@@ -99,6 +99,51 @@ WHERE (@scope_all::boolean OR (
 ORDER BY
     -- BR-F06-2: resolved tickets awaiting the viewer's rating first
     (@awaiting_first::boolean AND t.status = 'resolved' AND t.reporter_id = @viewer_id) DESC,
+    CASE WHEN @sort::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
+    CASE WHEN @sort::text = 'createdAt:desc' THEN t.created_at END DESC,
+    CASE WHEN @sort::text = 'createdAt:asc' THEN t.created_at END ASC,
+    t.updated_at DESC, t.id
+LIMIT @page_limit OFFSET @page_offset;
+
+-- name: ListMyTickets :many
+-- #35 (S06, CR-019): one page of the viewer's own tickets with only the table's columns — no people, contractor,
+-- photo or symptom-row lookups; the title is joined here. Same WHERE as CountTickets with scope_all = false.
+SELECT
+    t.id, t.ticket_no, t.status, t.closed_reason,
+    t.category_id, c.name AS category_name, c.icon AS category_icon, t.category_other,
+    concat_ws(' · ',
+        (SELECT string_agg(sy.name, ' · ' ORDER BY ts.sort_order)
+         FROM repair.ticket_symptoms ts JOIN repair.symptoms sy ON sy.id = ts.symptom_id
+         WHERE ts.ticket_id = t.id),
+        t.symptom_other)::text AS title,
+    t.building_id, b.name AS building_name,
+    t.floor_id, f.name AS floor_name,
+    t.room_id, rm.name AS room_name,
+    t.location_detail,
+    (t.reporter_id = @viewer_id)::boolean AS is_reporter,
+    t.rating, t.send_back_count, t.expected_done_on,
+    t.auto_close_at, t.resolved_at, t.updated_at
+FROM repair.tickets t
+LEFT JOIN repair.categories c ON c.id = t.category_id
+JOIN repair.buildings b ON b.id = t.building_id
+JOIN repair.floors f ON f.id = t.floor_id
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
+WHERE ((@relation::text IN ('all', 'reported') AND t.reporter_id = @viewer_id)
+     OR (@relation::text IN ('all', 'following') AND EXISTS (
+            SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = @viewer_id)))
+  AND (cardinality(@statuses::text[]) = 0 OR t.status = ANY(@statuses::text[]))
+  AND (cardinality(@steps::text[]) = 0 OR (CASE
+        WHEN t.status = 'closed' THEN 'closed'
+        WHEN t.status = 'resolved' THEN 'awaiting_rating'
+        WHEN t.expected_done_on IS NULL THEN 'awaiting_assessment'
+        WHEN t.send_back_count > 0 THEN 'reworking'
+        ELSE 'in_repair' END) = ANY(@steps::text[]))
+  AND (sqlc.narg('q')::text IS NULL OR t.ticket_no ILIKE '%' || sqlc.narg('q')::text || '%'
+       OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%'
+       OR rm.name ILIKE '%' || sqlc.narg('q')::text || '%')
+ORDER BY
+    -- BR-F06-2: resolved tickets awaiting the viewer's rating first
+    (t.status = 'resolved' AND t.reporter_id = @viewer_id) DESC,
     CASE WHEN @sort::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
     CASE WHEN @sort::text = 'createdAt:desc' THEN t.created_at END DESC,
     CASE WHEN @sort::text = 'createdAt:asc' THEN t.created_at END ASC,

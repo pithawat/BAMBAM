@@ -28,6 +28,7 @@ type Repository interface {
 	GetTicketAccess(ctx context.Context, id, viewerID uuid.UUID) (ticketAccess, error)
 	GetTicket(ctx context.Context, id, viewerID uuid.UUID) (TicketDetail, error)
 	ListTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]TicketSummary, int64, error)
+	ListMyTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]MyTicket, int64, error)
 	CountTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) (TicketCounts, error)
 	// AutoCloseDue closes resolved tickets whose auto_close_at has passed and writes their events.
 	AutoCloseDue(ctx context.Context, now time.Time) (int, error)
@@ -364,6 +365,11 @@ func (s *Service) Tickets(ctx context.Context, v Viewer, f TicketFilter) ([]Tick
 		decorate(v, &list[i])
 	}
 	return list, total, nil
+}
+
+// MyTickets implements endpoint #35 (S06 table, CR-019): always the viewer's own tickets (BR-F06-1).
+func (s *Service) MyTickets(ctx context.Context, v Viewer, f TicketFilter) ([]MyTicket, int64, error) {
+	return s.repo.ListMyTickets(ctx, v.ID, f)
 }
 
 // TicketCounts implements endpoint #7.
