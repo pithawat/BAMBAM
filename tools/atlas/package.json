@@ -1,0 +1,14 @@
+{
+  "name": "system-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Living map of a project: features, roles, swimlane flows, timeline, notes — and real-app walkthroughs driven by Playwright.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node cli.mjs serve",
+    "check": "node cli.mjs check",
+    "capture": "node cli.mjs capture",
+    "export": "node cli.mjs export"
+  }
+}

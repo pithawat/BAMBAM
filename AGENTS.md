@@ -19,6 +19,8 @@ docs/shared/                 cross-module: platform stage, architecture, style, 
 docs/modules/<module>/       one folder per module (system): brief → users → flows → ui → plan → progress
 backend/                     Go + Gin API        (rules: backend/AGENTS.md)
 frontend/                    Next.js app         (rules: frontend/AGENTS.md)
+docs/atlas/                  System Atlas data (features, flows, tours, timeline, notes) — mirrors approved docs
+tools/atlas/                 System Atlas engine + UI, project-agnostic (README.md, SPEC.md); do not edit per project
 ```
 
 ## 2. Workflow and gates
@@ -49,6 +51,7 @@ Hard rules:
 | UI, styling, components | `docs/shared/design-system.md` + the screen spec in `docs/modules/<m>/ui/screens/` |
 | Data exchanged between FE and BE | `docs/modules/<m>/04-api-contract.md` |
 | DB schema, migrations, API conventions, env/config/deploy | `docs/shared/architecture.md` |
+| e2e, System Atlas, test database / test stack | `docs/shared/test-stack.md` |
 
 Do not scan the whole repo. Do not read other modules' docs unless the task crosses modules.
 

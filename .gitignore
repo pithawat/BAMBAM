@@ -37,3 +37,6 @@ backend/data/
 
 # building model prototype
 docs/modules/repair/attachments/building-model/node_modules/
+
+# system atlas (exported file is rebuilt locally)
+docs/atlas/dist/

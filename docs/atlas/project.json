@@ -1,0 +1,25 @@
+{
+  "name": "BAMBAM",
+  "summary": "ศูนย์รวมบริการที่ทำงานของพนักงาน: แจ้งซ่อม จองรถ และจองห้องประชุม",
+  "modules": ["repair"],
+  "theme": { "primary": "#2741FA", "primaryDark": "#6B7FFF" },
+  "actors": {
+    "user":  { "name": "พนักงาน",     "lane": "ผู้แจ้ง / พนักงาน", "sub": "ทุก role",          "color": "#2741FA", "dark": "#8C9BFF" },
+    "lead":  { "name": "หัวหน้าทีม",   "lane": "หัวหน้าทีม",        "sub": "แม่บ้าน · รปภ.",     "color": "#0F766E", "dark": "#3CC7B5" },
+    "sys":   { "name": "ระบบ",        "lane": "ระบบ BAMBAM",       "sub": "ทำให้อัตโนมัติ",      "color": "#536780", "dark": "#A3B3C5" },
+    "tech":  { "name": "ช่าง",         "lane": "ช่างเทคนิค",         "sub": "ช่างในระบบ 1 คน",    "color": "#C2410C", "dark": "#FB923C" },
+    "admin": { "name": "Admin",       "lane": "Admin",             "sub": "admin",              "color": "#0369A1", "dark": "#5BB8F0" },
+    "exec":  { "name": "ผู้บริหาร",     "lane": "ผู้บริหาร",           "sub": "อ่านอย่างเดียว",       "color": "#475467", "dark": "#A3B3C5" },
+    "ext":   { "name": "ระบบภายนอก",  "lane": "RMC SSO",           "sub": "ระบบภายนอก",         "color": "#8A5A12", "dark": "#D9B44A" },
+    "dev":   { "name": "ผู้ทดสอบ",     "lane": "ผู้ทดสอบ",           "sub": "dev / UAT เท่านั้น",   "color": "#475467", "dark": "#A3B3C5" },
+    "all":   { "name": "ทุก role" }
+  },
+  "sessionRoles": {
+    "employee": "พนักงาน",
+    "housekeeper_lead": "หัวหน้าแม่บ้าน",
+    "security_lead": "หัวหน้ารปภ.",
+    "technician": "ช่าง",
+    "admin": "Admin",
+    "executive": "ผู้บริหาร"
+  }
+}

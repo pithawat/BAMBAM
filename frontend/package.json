@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:db": "node e2e/test-stack.cjs prepare",
+    "test:browse": "node e2e/test-stack.cjs browse",
+    "atlas": "node ../tools/atlas/cli.mjs serve"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

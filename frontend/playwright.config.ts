@@ -1,13 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
+import stack from "./e2e/test-stack.cjs";
 
-// E2E runs against the real Go API (NEXT_PUBLIC_USE_MOCKS=false) and a local
-// Postgres (`docker compose up -d db` + `make migrate-up` in backend/).
+// E2E runs against the real Go API (NEXT_PUBLIC_USE_MOCKS=false) on its own local test stack
+// (e2e/test-stack.cjs, D-092): the docker Postgres from docker-compose.yml, database bambam_e2e
+// (created + migrated when the API starts), API :8090, web :3100 — never the dev servers or their database.
 // Real RMC SSO cannot be automated: e2e/global-setup.ts creates a demo-user
-// session through `go run ./cmd/devsession` (dev/UAT only, no HTTP backdoor).
-
-// E2E_PORT / E2E_API_URL point the run at another local stack (defaults: 3000 / 8080).
-const PORT = Number(process.env.E2E_PORT ?? 3000);
-const API_URL = (process.env.E2E_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
+// session through `go run ./cmd/devsession` (dev/UAT only, no HTTP backdoor) in the same database.
+// E2E_DATABASE_URL / E2E_PORT / E2E_API_URL override the stack; the System Atlas runner uses the same one.
 
 export default defineConfig({
   testDir: "./e2e",
@@ -17,7 +16,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   globalSetup: "./e2e/global-setup.ts",
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: stack.BASE_URL,
     trace: "retain-on-failure",
     locale: "th-TH",
     timezoneId: "Asia/Bangkok",
@@ -34,21 +33,6 @@ export default defineConfig({
     },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
-  webServer: [
-    {
-      command: "go run ./cmd/api",
-      cwd: "../backend",
-      url: `${API_URL}/api/v1/health`,
-      env: { APP_ENV: "development" },
-      reuseExistingServer: !process.env.CI,
-      timeout: 180_000,
-    },
-    {
-      command: `npx next dev --port ${PORT}`,
-      url: `http://localhost:${PORT}/login`,
-      env: { NEXT_PUBLIC_USE_MOCKS: "false", NEXT_PUBLIC_ROLE_SWITCHER: "true" },
-      reuseExistingServer: !process.env.CI,
-      timeout: 180_000,
-    },
-  ],
+  // reused when already up (e.g. started by the Atlas runner) — both use the same ports and database
+  webServer: stack.servers.map((s) => ({ ...s, reuseExistingServer: !process.env.CI })),
 });

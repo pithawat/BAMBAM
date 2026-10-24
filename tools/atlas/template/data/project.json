@@ -1,0 +1,13 @@
+{
+  "name": "Example",
+  "summary": "ตัวอย่างโปรเจค — แทนที่ด้วยของจริง",
+  "modules": ["example"],
+  "theme": { "primary": "#2741FA", "primaryDark": "#6B7FFF" },
+  "actors": {
+    "user":  { "name": "ผู้ใช้",  "lane": "ผู้ใช้",       "sub": "ทุก role",      "color": "#2741FA", "dark": "#8C9BFF" },
+    "admin": { "name": "Admin", "lane": "Admin",       "sub": "admin",         "color": "#0369A1", "dark": "#5BB8F0" },
+    "sys":   { "name": "ระบบ",  "lane": "ระบบ",        "sub": "ทำให้อัตโนมัติ", "color": "#536780", "dark": "#A3B3C5" },
+    "all":   { "name": "ทุก role" }
+  },
+  "sessionRoles": { "member": "ผู้ใช้", "admin": "Admin" }
+}

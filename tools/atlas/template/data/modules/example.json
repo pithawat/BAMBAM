@@ -1,0 +1,77 @@
+{
+  "key": "example",
+  "name": "ระบบตัวอย่าง",
+  "summary": "ผู้ใช้ส่งคำขอ → Admin อนุมัติ → ผู้ใช้เห็นผล",
+  "sources": ["docs/modules/example/01-users.md", "docs/modules/example/02-flows.md", "docs/modules/example/03-plan.md"],
+  "roleCount": 2,
+  "overviewFlow": "OV",
+  "roles": [
+    { "actor": "user", "name": "ผู้ใช้", "code": "member", "can": ["ส่งคำขอ", "ติดตามคำขอของตัวเอง"] },
+    { "actor": "admin", "name": "Admin", "code": "admin", "can": ["อนุมัติหรือปฏิเสธคำขอ"] }
+  ],
+  "matrix": {
+    "cols": ["user", "admin"],
+    "rows": [
+      { "label": "ส่งคำขอ", "flows": "F01", "cells": { "user": true, "admin": true } },
+      { "label": "อนุมัติคำขอ", "flows": "F02", "cells": { "admin": true } }
+    ]
+  },
+  "lifecycle": { "title": "สถานะของคำขอ", "steps": [{ "label": "รออนุมัติ", "tone": "progress" }, { "label": "อนุมัติแล้ว", "tone": "accepted" }], "note": "Admin ปฏิเสธได้พร้อมเหตุผล" },
+  "stages": [
+    { "id": "1", "short": "ส่งคำขอ", "name": "ผู้ใช้ส่งคำขอและติดตามได้", "status": "accepted", "date": "2026-01-15", "flows": ["F01"] },
+    { "id": "2", "short": "อนุมัติ", "name": "Admin อนุมัติหรือปฏิเสธ", "status": "pending", "flows": ["F02"] }
+  ],
+  "crs": [],
+  "features": [
+    { "id": "F01-1", "name": "ฟอร์มส่งคำขอ", "desc": "กรอกหัวข้อและรายละเอียด แล้วส่ง", "flow": "F01", "screens": "S01", "roles": ["all"], "stage": "1", "status": "accepted", "e2e": "pass", "group": "คำขอ" },
+    { "id": "F02-1", "name": "อนุมัติคำขอ", "desc": "Admin เห็นคำขอที่รอ และอนุมัติหรือปฏิเสธ", "flow": "F02", "screens": "S02", "roles": ["admin"], "stage": "2", "status": "pending", "e2e": "none", "group": "คำขอ" }
+  ],
+  "flows": [
+    {
+      "id": "OV", "name": "ภาพรวม", "actors": ["user", "admin"], "screens": ["S01", "S02"], "stages": ["1", "2"],
+      "why": "เส้นทางหลักของระบบ",
+      "lanes": [{ "id": "user" }, { "id": "sys" }, { "id": "admin" }],
+      "nodes": [
+        { "i": "s",  "l": "user",  "r": 0, "t": "start", "x": "ส่งคำขอ", "ln": ["F01"] },
+        { "i": "a1", "l": "sys",   "r": 1, "t": "act",   "x": "บันทึก สถานะ รออนุมัติ" },
+        { "i": "d1", "l": "admin", "r": 2, "t": "dec",   "x": "อนุมัติ?", "ln": ["F02"] },
+        { "i": "e1", "l": "user",  "r": 3, "t": "end",   "x": "เห็นผลอนุมัติ" }
+      ],
+      "edges": [{ "f": "s", "t": "a1" }, { "f": "a1", "t": "d1" }, { "f": "d1", "t": "e1", "lb": "ใช่", "m": "v" }]
+    },
+    {
+      "id": "F01", "name": "ส่งคำขอ", "actors": ["all"], "screens": ["S01"],
+      "lanes": [{ "id": "user" }, { "id": "sys" }],
+      "nodes": [
+        { "i": "s",  "l": "user", "r": 0, "t": "start", "x": "กด ส่งคำขอ" },
+        { "i": "a1", "l": "user", "r": 1, "t": "act",   "x": "กรอกหัวข้อ\nและรายละเอียด" },
+        { "i": "a2", "l": "sys",  "r": 2, "t": "act",   "x": "บันทึกคำขอ" },
+        { "i": "e1", "l": "user", "r": 3, "t": "end",   "x": "เห็นคำขอในรายการ" }
+      ],
+      "edges": [{ "f": "s", "t": "a1" }, { "f": "a1", "t": "a2" }, { "f": "a2", "t": "e1" }],
+      "tour": {
+        "from": { "spec": "frontend/e2e/example/F01-request.spec.ts", "tests": ["member sends a request"] },
+        "steps": [
+          { "node": "s", "role": "member", "goto": "/", "title": "เปิดหน้าแรก", "desc": "กด ส่งคำขอ", "expect": "ฟอร์มส่งคำขอเปิด",
+            "highlight": { "role": "link", "name": "ส่งคำขอ" } },
+          { "node": "a1", "title": "กรอกฟอร์ม", "desc": "ระบบกรอกหัวข้อให้ แล้วกด ส่ง", "expect": "ปุ่ม ส่ง กดได้เมื่อกรอกครบ",
+            "do": [{ "fill": { "label": "หัวข้อ" }, "text": "คำขอทดสอบ {{run}}" }],
+            "highlight": { "role": "button", "name": "ส่ง", "exact": true } },
+          { "node": "e1", "title": "ส่งแล้ว", "desc": "คำขอขึ้นในรายการ", "expect": "สถานะ รออนุมัติ",
+            "highlight": { "text": "คำขอทดสอบ {{run}}" }, "next": false }
+        ]
+      }
+    },
+    {
+      "id": "F02", "name": "อนุมัติคำขอ", "actors": ["admin"], "screens": ["S02"],
+      "lanes": [{ "id": "admin" }, { "id": "sys" }],
+      "nodes": [
+        { "i": "s",  "l": "admin", "r": 0, "t": "start", "x": "เปิด คำขอที่รอ" },
+        { "i": "d1", "l": "admin", "r": 1, "t": "dec",   "x": "อนุมัติ?" },
+        { "i": "a1", "l": "sys",   "r": 2, "t": "act",   "x": "บันทึกผล แจ้งผู้ใช้" },
+        { "i": "e1", "l": "admin", "r": 3, "t": "end",   "x": "คำขอหายจากรายการรอ" }
+      ],
+      "edges": [{ "f": "s", "t": "d1" }, { "f": "d1", "t": "a1", "lb": "ใช่ / ไม่" }, { "f": "a1", "t": "e1" }]
+    }
+  ]
+}

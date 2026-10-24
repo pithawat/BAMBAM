@@ -1,15 +1,19 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ROLES } from "../src/lib/platform/types";
+import stack from "./test-stack.cjs";
 
 // Creates one session per demo role through the backend CLI and stores a
 // Playwright storageState per role in e2e/.auth/<role>.json.
 export const AUTH_DIR = path.join(__dirname, ".auth");
 
-export default function globalSetup() {
+export default async function globalSetup() {
+  // Where this run goes, and proof that it is the test stack (D-092): never the dev database,
+  // and the API under test accepts a session created in the test database.
+  console.log(`e2e → ${stack.describe()}`);
+  stack.assertNotDevDb();
+  await stack.assertApiUsesTestDb();
   mkdirSync(AUTH_DIR, { recursive: true });
-  const backend = path.join(__dirname, "..", "..", "backend");
   // Each role gets a shared session; the role switch test gets its own per project,
   // because switching replaces (deletes) the session it runs on.
   const sessions: [string, string][] = [
@@ -18,11 +22,7 @@ export default function globalSetup() {
     ["switch-mobile", "employee"],
   ];
   for (const [file, role] of sessions) {
-    const token = execFileSync("go", ["run", "./cmd/devsession", "-role", role], {
-      cwd: backend,
-      env: { ...process.env, APP_ENV: "development" },
-      encoding: "utf8",
-    }).trim();
+    const token = stack.sessionToken(role); // test database (e2e/test-stack.cjs), same as the API under test
     const state = {
       cookies: [
         {
