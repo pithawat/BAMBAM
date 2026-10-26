@@ -160,7 +160,7 @@ type assetFixture struct {
 	plan    floorOne
 	aircon  uuid.UUID
 	admin   Viewer
-	exec    Viewer
+	reader  Viewer    // a custom role with repair.overview.view only
 	noPlan  uuid.UUID // a room on a floor without a plan
 	offRoom uuid.UUID // an inactive room
 }
@@ -168,7 +168,7 @@ type assetFixture struct {
 func newAssetFixture(t *testing.T) *assetFixture {
 	t.Helper()
 	a := &assetFixture{fixture: newFixture(t), plan: newFloorOne(), aircon: uuid.New(), noPlan: uuid.New(), offRoom: uuid.New(),
-		admin: Viewer{ID: uuid.New(), Role: users.RoleAdmin}, exec: Viewer{ID: uuid.New(), Role: users.RoleExecutive}}
+		admin: viewerAs(users.RoleAdmin, uuid.New()), reader: Viewer{ID: uuid.New(), Permissions: []string{PermOverviewView}}}
 	d := a.repo.dash
 	d.types[a.aircon] = AssetType{ID: a.aircon, Key: "aircon", CodePrefix: "AC"}
 	d.floorNames[a.plan.floor] = "1"
@@ -282,7 +282,7 @@ func TestDashboardAndAssetPermissions(t *testing.T) {
 	ctx := context.Background()
 	someAsset := uuid.New()
 	for _, role := range []string{users.RoleEmployee, users.RoleTechnician, users.RoleHousekeeperLead, users.RoleSecurityLead} {
-		v := Viewer{ID: uuid.New(), Role: role}
+		v := viewerAs(role, uuid.New())
 		if _, err := a.svc.Overview(ctx, v); !forbidden(err) {
 			t.Errorf("%s overview: %v", role, err)
 		}
@@ -293,24 +293,24 @@ func TestDashboardAndAssetPermissions(t *testing.T) {
 			t.Errorf("%s floor plan: %v", role, err)
 		}
 	}
-	// The executive reads everything but writes nothing.
-	if _, err := a.svc.Overview(ctx, a.exec); err != nil {
-		t.Errorf("executive overview: %v", err)
+	// overview.view reads the dashboard; writing equipment needs settings.assets.manage (CR-001).
+	if _, err := a.svc.Overview(ctx, a.reader); err != nil {
+		t.Errorf("reader overview: %v", err)
 	}
-	if _, err := a.svc.FloorPlan(ctx, a.exec, a.plan.floor); err != nil {
-		t.Errorf("executive floor plan: %v", err)
+	if _, err := a.svc.FloorPlan(ctx, a.reader, a.plan.floor); err != nil {
+		t.Errorf("reader floor plan: %v", err)
 	}
-	if _, err := a.svc.CreateAsset(ctx, a.exec, a.input("AC-1-001", a.plan.hr3, 28, 12)); !forbidden(err) {
-		t.Errorf("executive create: %v", err)
+	if _, err := a.svc.CreateAsset(ctx, a.reader, a.input("AC-1-001", a.plan.hr3, 28, 12)); !forbidden(err) {
+		t.Errorf("reader create: %v", err)
 	}
-	if _, err := a.svc.UpdateAsset(ctx, a.exec, someAsset, a.input("AC-1-001", a.plan.hr3, 28, 12)); !forbidden(err) {
-		t.Errorf("executive update: %v", err)
+	if _, err := a.svc.UpdateAsset(ctx, a.reader, someAsset, a.input("AC-1-001", a.plan.hr3, 28, 12)); !forbidden(err) {
+		t.Errorf("reader update: %v", err)
 	}
-	if err := a.svc.DeactivateAsset(ctx, a.exec, someAsset); !forbidden(err) {
-		t.Errorf("executive deactivate: %v", err)
+	if err := a.svc.DeactivateAsset(ctx, a.reader, someAsset); !forbidden(err) {
+		t.Errorf("reader deactivate: %v", err)
 	}
-	if _, err := a.svc.SuggestAssetCode(ctx, a.exec, a.aircon, a.plan.floor); !forbidden(err) {
-		t.Errorf("executive suggest: %v", err)
+	if _, err := a.svc.SuggestAssetCode(ctx, a.reader, a.aircon, a.plan.floor); !forbidden(err) {
+		t.Errorf("reader suggest: %v", err)
 	}
 	if len(a.repo.dash.assets) != 0 || len(a.repo.dash.audit) != 0 {
 		t.Error("a refused write changed data")

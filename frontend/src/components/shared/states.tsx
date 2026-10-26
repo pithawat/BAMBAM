@@ -84,18 +84,25 @@ type ForbiddenStateProps = {
   /** Short reason, per screen spec. */
   reason?: string;
   title?: string;
+  /** The button; default "กลับหน้าแรก" → `/` (settings pages may point to another page, settings _common.md §1). */
+  action?: { label: string; href: string };
   className?: string;
 };
 
 /** Mascot `review` + "คุณไม่มีสิทธิ์เข้าหน้านี้" + reason + "กลับหน้าแรก". Never show partial data. */
-export function ForbiddenState({ reason, title = "คุณไม่มีสิทธิ์เข้าหน้านี้", className }: ForbiddenStateProps) {
+export function ForbiddenState({
+  reason,
+  title = "คุณไม่มีสิทธิ์เข้าหน้านี้",
+  action = { label: "กลับหน้าแรก", href: "/" },
+  className,
+}: ForbiddenStateProps) {
   return (
     <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
       <Mascot pose="review" size={140} />
       <h2 className="mt-4 font-heading text-lg font-semibold">{title}</h2>
       {reason && <p className="mt-1 text-[13.5px] text-muted-foreground">{reason}</p>}
       <Button asChild className="mt-5">
-        <Link href="/">กลับหน้าแรก</Link>
+        <Link href={action.href}>{action.label}</Link>
       </Button>
     </div>
   );

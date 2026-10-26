@@ -3,31 +3,22 @@
 package users
 
 import (
-	"strings"
-
 	"github.com/google/uuid"
+
+	"github.com/pithawat/BAMBAM/backend/internal/platform/people"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/permissions"
 )
 
+// Keys of the seeded roles (glossary). Roles are data (settings Stage 1): other keys exist too.
+// repair CR-024: there is no `executive` role.
 const (
+	RoleSuperAdmin      = permissions.SuperAdminRole
 	RoleEmployee        = "employee"
 	RoleHousekeeperLead = "housekeeper_lead"
 	RoleSecurityLead    = "security_lead"
 	RoleTechnician      = "technician"
 	RoleAdmin           = "admin"
-	RoleExecutive       = "executive"
 )
-
-// Roles in display order (role switcher list).
-var Roles = []string{RoleEmployee, RoleHousekeeperLead, RoleSecurityLead, RoleTechnician, RoleAdmin, RoleExecutive}
-
-func ValidRole(r string) bool {
-	for _, v := range Roles {
-		if v == r {
-			return true
-		}
-	}
-	return false
-}
 
 type User struct {
 	ID           uuid.UUID
@@ -41,28 +32,15 @@ type User struct {
 	Division     *string
 	PositionTH   *string
 	IsDemo       bool
-	Role         string
+	Role         string // role key
+	RoleName     string
+	// Permissions is the effective set: stored + fixed keys of the role (super_admin = all).
+	Permissions []string
 }
 
 // DisplayName is the Thai full name, falling back to English, then the employee code.
 func (u User) DisplayName() string {
-	if n := joinName(u.FirstNameTH, u.LastNameTH); n != "" {
-		return n
-	}
-	if n := joinName(u.FirstNameEN, u.LastNameEN); n != "" {
-		return n
-	}
-	return u.EmployeeCode
-}
-
-func joinName(first, last *string) string {
-	var parts []string
-	for _, p := range []*string{first, last} {
-		if p != nil && strings.TrimSpace(*p) != "" {
-			parts = append(parts, strings.TrimSpace(*p))
-		}
-	}
-	return strings.Join(parts, " ")
+	return people.DisplayName(u.EmployeeCode, u.FirstNameTH, u.LastNameTH, u.FirstNameEN, u.LastNameEN)
 }
 
 // SSOClaims are the RMC SSO claims BAMBAM stores (docs/shared/integrations/sso.md "Claims → app user").
@@ -86,8 +64,9 @@ type Ref struct {
 	Name string    `json:"name"`
 }
 
-// demoUser is one seeded user per role for the role switcher. Names from
-// docs/modules/repair/ui/screens/_common.md §8 (fictional).
+// demoUser is one seeded user per seeded role for the role switcher. Names from
+// docs/modules/repair/ui/screens/_common.md §8 (fictional). Other roles get a generated demo user
+// on the first switch (settings P3).
 type demoUser struct {
 	EmployeeCode string
 	Role         string
@@ -103,5 +82,5 @@ var demoUsers = []demoUser{
 	{"DEMO-SECURITY-LEAD", RoleSecurityLead, "สมศักดิ์", "แก้วกล้า", "ฝ่ายอาคารสถานที่", ""},
 	{"DEMO-TECHNICIAN", RoleTechnician, "ธนากร", "พึ่งบุญ", "ฝ่ายอาคารสถานที่", ""},
 	{"DEMO-ADMIN", RoleAdmin, "ปวีณา", "ศรีสุข", "ศูนย์จัดการงานอาคาร", ""},
-	{"DEMO-EXECUTIVE", RoleExecutive, "ประเสริฐ", "วงศ์ไทย", "ผู้อำนวยการฝ่ายอาคารสถานที่", ""},
+	{"DEMO-SUPER-ADMIN", RoleSuperAdmin, "ณัฐพล", "อินทรวงศ์", "ฝ่ายเทคโนโลยีสารสนเทศ", "เจ้าหน้าที่ระบบ"},
 }

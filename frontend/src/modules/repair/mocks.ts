@@ -1,5 +1,6 @@
 import { ApiError } from "@/lib/http";
 import { mockMeByRole } from "@/lib/platform/mocks";
+import { can, PERM } from "@/lib/platform/permissions";
 import { roomAt } from "./plan-geometry";
 import { ticketPriority } from "./priority";
 import type { Role } from "@/lib/platform/types";
@@ -71,7 +72,7 @@ import type {
 // its rooms (160 overdue, 161 reworking, 162 critical). #27 / #30 follow the scenarios: `empty` → no
 // tickets and no equipment, `error` → reads fail, `forbidden` → 403, `slow` → skeletons. Equipment
 // writes keep the backend rules (AC-1-004 is inactive, so its code is taken). Switch role with the
-// role switcher: admin edits, executive reads, other roles get 403 (S02 Home).
+// role switcher: `settings.assets.manage` edits, `repair.overview.view` reads, other roles get 403 (S02 Home).
 
 export const MOCK_SCENARIOS = [
   "normal",
@@ -668,17 +669,17 @@ const store = {
   nextNo: 170,
 };
 
-// ---- visibility + decoration (mirrors the backend rules, BR-F06-1/2/3) ----
+// ---- visibility + decoration (mirrors the backend rules, BR-F06-1/2/3; permissions, repair CR-007 A) ----
 
-type Viewer = { id: string; role: Role };
+type Viewer = { id: string; role: Role; permissions: string[] };
 
-const seesAll = (v: Viewer) => v.role === "admin" || v.role === "executive" || v.role === "technician";
+const seesAll = (v: Viewer) => can(v, PERM.ticketViewAll);
 const isSubscriber = (t: TicketSummary, v: Viewer) => (store.subscribers.get(t.id) ?? []).includes(v.id);
 
 function relation(t: TicketSummary, v: Viewer): TicketSummary["viewerRelation"] {
   if (t.reporter.id === v.id) return "reporter";
   if (isSubscriber(t, v)) return "subscriber";
-  if (v.role === "technician") return "technician";
+  if (can(v, PERM.ticketWork)) return "technician";
   return "none";
 }
 
@@ -724,33 +725,34 @@ export function mockTicketDetail(id: string, v: Viewer): TicketDetail {
 function withActions(t: TicketDetail, v: Viewer): TicketDetail {
   const allowedActions: TicketDetail["allowedActions"] = [];
   const blockedActions: TicketDetail["blockedActions"] = {};
-  if (t.status === "in_progress" && v.role === "technician") {
+  if (t.status === "in_progress" && can(v, PERM.ticketWork)) {
     allowedActions.push("assess");
     if (t.expectedDoneOn && t.workBy) allowedActions.push("resolve");
     else blockedActions.resolve = "ASSESSMENT_REQUIRED";
   }
   if (t.status === "resolved" && t.reporter.id === v.id) allowedActions.push("confirm", "send_back");
-  if (v.role === "admin" && t.status !== "closed") allowedActions.push("close");
+  if (can(v, PERM.ticketCloseAny) && t.status !== "closed") allowedActions.push("close");
   if (canHandOver(t, v)) allowedActions.push("handover");
   return { ...t, allowedActions, blockedActions };
 }
 
-const isLead = (v: Viewer) => v.role === "housekeeper_lead" || v.role === "security_lead";
+const isLead = (v: Viewer) => can(v, PERM.ticketTeamHandle);
+const handsOverAny = (v: Viewer) => can(v, PERM.ticketHandoverAny);
 
-/** BR-F05-1/2: a team-handled ticket, by the lead who recorded it or by admin. */
+/** BR-F05-1/2: a team-handled ticket, by the lead who recorded it or by `handover_any` (admin). */
 function canHandOver(t: TicketSummary, v: Viewer) {
-  return t.status === "closed" && t.closedReason === "team_handled" && (v.role === "admin" || (isLead(v) && t.reporter.id === v.id));
+  return t.status === "closed" && t.closedReason === "team_handled" && (handsOverAny(v) || (isLead(v) && t.reporter.id === v.id));
 }
 
 function actorOf(v: Viewer): PersonRef {
   return Object.values(mockPeople).find((p) => p.id === v.id) ?? person(v.role);
 }
 
-/** #21 (Stage 3): same rules as `Service.Close` — admin only, reason 1–500, closed → 409. */
+/** #21 (Stage 3): same rules as `Service.Close` — `close_any` only, reason 1–500, closed → 409. */
 export function mockCloseTicket(id: string, reason: string, v: Viewer): TicketDetail {
   const t = store.tickets.find((x) => x.id === id);
   if (!t) throw mockErrors.notFound();
-  if (v.role !== "admin") throw mockErrors.forbidden();
+  if (!can(v, PERM.ticketCloseAny)) throw mockErrors.forbidden();
   const text = reason.trim();
   if (!text || text.length > 500) {
     throw new ApiError(400, "VALIDATION_FAILED", "mock: reason", { reason: text ? "TOO_LONG" : "REQUIRED" });
@@ -913,14 +915,14 @@ export function mockFollowTicket(id: string, req: FollowRequest, v: Viewer): Tic
 
 /** #24: same rules as `Service.HandOver`. */
 export function mockHandoverTicket(id: string, reason: string, v: Viewer): TicketDetail {
-  if (v.role !== "admin" && !isLead(v)) throw mockErrors.forbidden();
+  if (!handsOverAny(v) && !isLead(v)) throw mockErrors.forbidden();
   const text = reason.trim();
   if (!text || text.length > 500) {
     throw new ApiError(400, "VALIDATION_FAILED", "mock: reason", { reason: text ? "TOO_LONG" : "REQUIRED" });
   }
   const t = store.tickets.find((x) => x.id === id);
   if (!t) throw mockErrors.notFound();
-  if (v.role !== "admin" && t.reporter.id !== v.id) throw mockErrors.forbidden();
+  if (!handsOverAny(v) && t.reporter.id !== v.id) throw mockErrors.forbidden();
   if (t.status !== "closed" || t.closedReason !== "team_handled") throw new ApiError(422, "NOT_TEAM_HANDLED", "mock: not team handled");
   const now = new Date().toISOString();
   Object.assign(t, { status: "in_progress", step: "awaiting_assessment", closedReason: null, closedAt: null, updatedAt: now });
@@ -1020,7 +1022,7 @@ export function mockCreateTicket(req: CreateTicketRequest, reporter: PersonRef, 
 }
 
 // ---- Stage 3D (CR-016): #27 overview, #29 asset types, #30 floor plan, #31–#34 assets ----
-// Same rules as the backend (service_dashboard.go): admin / executive read, admin writes; unique code
+// Same rules as the backend (service_dashboard.go): `overview.view` reads, `settings.assets.manage` writes; unique code
 // ignoring case (inactive included); a placed asset must lie in its room (smallest room wins).
 
 export const mockAssetTypes: AssetType[] = [
@@ -1054,7 +1056,8 @@ const assetStore: { items: MockAsset[]; seq: number } = {
 /** Open tickets reported from an asset (`tickets.asset_id`, Stage 5 QR); 160 = the leaking HR air conditioner. */
 const ticketAsset = new Map<string, string>([[ticketId(160), assetId(3)]]);
 
-const readsDashboard = (v: Viewer) => v.role === "admin" || v.role === "executive";
+const readsDashboard = (v: Viewer) => can(v, PERM.overviewView);
+const managesAssets = (v: Viewer) => can(v, PERM.settingsAssets);
 const isOpen = (t: TicketSummary) => t.status !== "closed";
 
 function highest(list: TicketSummary[]): Priority | null {
@@ -1214,7 +1217,7 @@ function checkRoomAndCode(req: UpdateAssetRequest, code: string, self?: string) 
 
 /** #31 (admin). */
 export function mockCreateAsset(req: CreateAssetRequest, v: Viewer): Asset {
-  if (v.role !== "admin") throw mockErrors.forbidden();
+  if (!managesAssets(v)) throw mockErrors.forbidden();
   const { code, name } = assetFields(req);
   if (!mockAssetTypes.some((t) => t.id === req.assetTypeId)) throw mockErrors.masterChanged();
   checkRoomAndCode(req, code);
@@ -1228,7 +1231,7 @@ export function mockCreateAsset(req: CreateAssetRequest, v: Viewer): Asset {
 
 /** #32 (admin): edit or move; the type never changes. */
 export function mockUpdateAsset(id: string, req: UpdateAssetRequest, v: Viewer): Asset {
-  if (v.role !== "admin") throw mockErrors.forbidden();
+  if (!managesAssets(v)) throw mockErrors.forbidden();
   const { code, name } = assetFields(req);
   const a = assetStore.items.find((x) => x.id === id && x.isActive);
   if (!a) throw new ApiError(404, "ASSET_NOT_FOUND", "mock: asset not found");
@@ -1239,7 +1242,7 @@ export function mockUpdateAsset(id: string, req: UpdateAssetRequest, v: Viewer):
 
 /** #33 (admin): deactivate only. */
 export function mockDeactivateAsset(id: string, v: Viewer): void {
-  if (v.role !== "admin") throw mockErrors.forbidden();
+  if (!managesAssets(v)) throw mockErrors.forbidden();
   const a = assetStore.items.find((x) => x.id === id && x.isActive);
   if (!a) throw new ApiError(404, "ASSET_NOT_FOUND", "mock: asset not found");
   a.isActive = false;
@@ -1247,7 +1250,7 @@ export function mockDeactivateAsset(id: string, v: Viewer): void {
 
 /** #34 (admin): `{prefix}-{floor}-{lowest free nnn}`; inactive codes stay taken. */
 export function mockSuggestAssetCode(assetTypeId: string, floorId: string, v: Viewer): string {
-  if (v.role !== "admin") throw mockErrors.forbidden();
+  if (!managesAssets(v)) throw mockErrors.forbidden();
   const type = mockAssetTypes.find((t) => t.id === assetTypeId);
   if (!type) throw mockErrors.masterChanged();
   const found = findFloor(floorId);

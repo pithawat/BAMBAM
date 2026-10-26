@@ -70,7 +70,9 @@ func (s *SessionStore) Resolve(c *gin.Context) (middleware.Principal, error) {
 	if err != nil {
 		return middleware.Principal{}, err
 	}
-	return middleware.Principal{UserID: u.ID, Role: u.Role, IsDemo: u.IsDemo, OriginUserID: sess.OriginUserID}, nil
+	return middleware.Principal{
+		UserID: u.ID, Role: u.Role, Permissions: u.Permissions, IsDemo: u.IsDemo, OriginUserID: sess.OriginUserID,
+	}, nil
 }
 
 // PurgeExpired deletes expired sessions; main.go runs it periodically.

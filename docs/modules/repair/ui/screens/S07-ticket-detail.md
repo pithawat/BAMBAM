@@ -1,6 +1,8 @@
 # S07 — รายละเอียดงาน
 
-Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14) · layout replaced by CR-011 (approved 2026-10-18) · **refined by CR-012 (approved 2026-10-19)** · **layout replaced by CR-019 (approved 2026-10-24)**
+Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14) · layout replaced by CR-011 (approved 2026-10-18) · **refined by CR-012 (approved 2026-10-19)** · **layout replaced by CR-019 (approved 2026-10-24)** · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** no executive row / note / read-only variant; every card text and dialog that promised a notification uses `_common.md` §9.
 
 > **CR-019 (approved 2026-10-24) — layout only, content and actions unchanged; overrides the layout parts below.** One container as wide as the navbar: back link + `พิมพ์งานนี้` · ticket no + status · category tile + category + title + `แจ้งเมื่อ … · โดย {ผู้แจ้ง}` · full-width band (reporter awaiting rating: review band with the `review` mascot, stars, `ประเมินพร้อมความคิดเห็น`, send back; everyone else: next-action band) · tabs `ข้อมูลแจ้งซ่อม` (location · two-column facts: หมวดงาน / กำหนด-เสร็จเมื่อ, อาการ / ความเร่งด่วน (staff) or อุปกรณ์, รายละเอียดที่แจ้ง full width · ผู้แจ้ง / ผู้ซ่อม on the same two columns · รูปภาพประกอบการแจ้ง) and `ผลการซ่อม` (technician note, before / after photos, send-back reason, rating) — opens on ผลการซ่อม when awaiting the rating or closed with a result · timeline on the right (below on phones). Breadcrumb removed. Print shows both tabs. No message box.
 
@@ -156,7 +158,7 @@ Each event shows actor and full date-time (`14 ต.ค. 2569 10:15`). Photos in 
 | No details | ไม่มีรายละเอียดเพิ่มเติม |
 | Buttons | ตรวจรับงาน · ส่งกลับให้แก้ · รับงาน · เริ่มงาน · บันทึกผลซ่อม · คืนงาน · ส่งต่อให้ช่าง · ปิดงาน |
 | Holding helper | จบงานปัจจุบันก่อน (บันทึกผล หรือ คืนงาน) · link ไปที่งานปัจจุบัน |
-| Executive note | ผู้บริหารดูได้อย่างเดียว |
+| ~~Executive note~~ | ~~ผู้บริหารดูได้อย่างเดียว~~ removed (CR-024) |
 | Info card labels (desktop) | สถานะ · ความเร่งด่วน · หมวดงาน · สถานที่ · อุปกรณ์ · ผู้แจ้ง · ช่างผู้รับผิดชอบ · ผู้ติดตาม · ส่งกลับให้แก้ · อัปเดตล่าสุด |
 | Info values | ผู้ติดตาม {n} คน · ส่งกลับให้แก้ {n} ครั้ง · ช่างผู้รับผิดชอบ none: ยังไม่มี |
 | Toasts | รับงานแล้ว · เริ่มงานแล้ว · คืนงานแล้ว · ส่งต่อให้ช่างแล้ว · ปิดงานแล้ว · เปลี่ยนความเร่งด่วนแล้ว · คัดลอกเลขงานแล้ว |

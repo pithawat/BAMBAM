@@ -178,7 +178,7 @@ test("API: technician only; date today or later; an active contractor; its stars
   const post = (api: typeof technician, action: string, data: object) => api.post(`${API}/tickets/${ticket.id}/${action}`, { data });
   const err = async (res: Awaited<ReturnType<typeof post>>) => [res.status(), (await res.json()).error] as const;
 
-  for (const role of ["employee", "admin", "executive", "housekeeper_lead"]) {
+  for (const role of ["employee", "admin", "housekeeper_lead"]) {
     const [status, error] = await err(await post(await as(role, baseURL), "assess", { expectedDoneOn: bangkokToday(), workBy: "in_house" }));
     expect([status, error.code], role).toEqual([403, "NOT_TECHNICIAN"]);
   }

@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/stat
 import { FilterPill } from "@/components/shared/filter-pill";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM } from "@/lib/platform/permissions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,7 +45,7 @@ export function TechnicianWorkScreen() {
     for (const [k, v] of Object.entries(values)) { if (v === null) url.searchParams.delete(k); else url.searchParams.set(k, v); }
     window.history.replaceState(null, "", url.pathname + url.search);
   }, []);
-  if (me.role !== "technician") return <><PageHeader title="งานซ่อม" variant="bar" /><ForbiddenState reason="หน้านี้สำหรับช่างเท่านั้น" /></>;
+  if (!can(me, PERM.ticketWork)) return <><PageHeader title="งานซ่อม" variant="bar" /><ForbiddenState reason="หน้านี้สำหรับช่างเท่านั้น" /></>;
   // PageHeader shows `action` on phones and `search` on desktop: the same link in both.
   const contractors = <Button asChild variant="outline" size="sm"><Link href="/repair/contractors"><HardHat aria-hidden />ช่างภายนอก</Link></Button>;
   return <>

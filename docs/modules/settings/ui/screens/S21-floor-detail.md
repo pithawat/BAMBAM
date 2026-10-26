@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
+> **Removed by CR-002 (2026-10-26).** Floors, rooms and floor plans come from the building plan; settings has no floor detail page, room add / reorder / deactivate / delete, or floor-plan upload. Room renaming moved into S20 (อาคารและอุปกรณ์). The spec below is kept for history only — do not build it.
+
 - **Flows:** F26 steps 3–4 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** keep one floor's rooms / zones and its floor-plan image up to date.

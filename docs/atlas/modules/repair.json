@@ -4321,8 +4321,7 @@
         "from": {
           "spec": "frontend/e2e/repair/F22-admin-tickets.spec.ts",
           "tests": [
-            "AC1 + AC2: oldest first, priority shown but not editable, close with a reason",
-            "AC3: read-only page, direct writes return 403"
+            "AC1 + AC2: oldest first, priority shown but not editable, close with a reason"
           ]
         },
         "aliases": {
@@ -4486,17 +4485,6 @@
               "role": "button",
               "name": "/^ปิดงาน/",
               "visible": true
-            },
-            "next": false
-          },
-          {
-            "node": "n",
-            "role": "executive",
-            "title": "ผู้บริหาร: หน้าเดียวกัน อ่านอย่างเดียว",
-            "desc": "สลับเป็นผู้บริหาร",
-            "expect": "แถบ โหมดดูอย่างเดียว · ไม่มีปุ่มปิดงาน",
-            "highlight": {
-              "text": "โหมดดูอย่างเดียว"
             },
             "next": false
           },
@@ -4691,8 +4679,7 @@
           "spec": "frontend/e2e/repair/F23-dashboard.spec.ts",
           "tests": [
             "AC2: อาคาร 1 shows 6 floors, a floor opens its plan with rooms, back to the building",
-            "CR-017: floor badges show open tickets per step",
-            "AC5: same dashboard without edit controls"
+            "CR-017: floor badges show open tickets per step"
           ]
         },
         "aliases": {
@@ -4802,27 +4789,6 @@
               "name": "ภาพอาคาร",
               "within": "@card"
             }
-          },
-          {
-            "node": "s",
-            "role": "executive",
-            "goto": "/",
-            "title": "มุมของผู้บริหาร",
-            "desc": "สลับเป็นผู้บริหาร (ผู้ใช้ตัวอย่าง)",
-            "expect": "เห็น dashboard เดียวกัน แต่ไม่มีปุ่ม จัดวางอุปกรณ์",
-            "do": [
-              {
-                "notSee": {
-                  "role": "button",
-                  "name": "จัดวางอุปกรณ์"
-                }
-              }
-            ],
-            "highlight": {
-              "text": "ภาพรวมวันนี้",
-              "exact": true
-            },
-            "next": false
           }
         ]
       }

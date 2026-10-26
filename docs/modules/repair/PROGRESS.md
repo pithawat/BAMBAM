@@ -2,9 +2,11 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); next: 5 · of 8   **Updated:** 2026-10-26 (stages accepted, CR-023 done)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); next: 4R (CR-024), then 5 · of 8   **Updated:** 2026-10-26 (stages accepted, CR-023 done)
 
 ## Now
+
+- **CR-024 approved + applied to docs 2026-10-26 (M, D-112):** remove the `executive` role (existing users → `employee`) and the whole notification system (F19-B, S13, bell, P4–P7); new copy in `ui/screens/_common.md` §9. Code, unit / e2e tests and System Atlas = Stage 4R (Claude only)
 
 - **Stages 1 / 2 / 2R / 2N / 3 accepted 2026-10-26** (owner, on the e2e results), tags `repair-stage-1`, `-2`, `-2R`, `-2N`, `-3`; Stage 4 accepted 2026-10-26 (`repair-stage-4`), 3U 2026-10-24, 3D 2026-10-20, 2M 2026-10-19 — every stage up to 4 is accepted. Next stage: 5
 - **CR-023 done 2026-10-26 (M, D-105):** contractor names unique ignoring case / spaces, inactive included (re-activate instead); branch typed into the name; migration `20261026000001` (stops on existing duplicates); 409 `CONTRACTOR_NAME_TAKEN`; S18 `ดูร้านนี้` / S17 `เลือกร้านนี้`; Go unit + Pg + e2e F24 AC8
@@ -14,7 +16,9 @@
 
 ## Next
 
-0. **Next: `/build-stage repair 5 prepare`** (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
+0. **Next: Stage 4R (CR-024)** — `/build-stage repair 4R` (Claude builds: migration executive → employee, remove role + bell + notification copy, Go / e2e tests, `/atlas sync repair` + `verify`); start in a fresh session
+   - (D-113, 2026-10-26) the backend part is done in settings Stage 1 (migration executive → employee, no executive role, `Viewer.Can`, Go tests); 4R keeps FE copy / bell / toasts, e2e and the Atlas
+0. Then `/build-stage repair 5 prepare` (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
 0. Shared dev DB: run migrations up to `20261026000001` once a writable user exists (dev DB still rejects DDL)
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 

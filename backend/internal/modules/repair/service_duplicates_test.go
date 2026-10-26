@@ -47,7 +47,7 @@ func (f *fixture) setStatus(id uuid.UUID, status string) {
 	}
 }
 
-func employee() Viewer { return Viewer{ID: uuid.New(), Role: users.RoleEmployee} }
+func employee() Viewer { return viewerAs(users.RoleEmployee, uuid.New()) }
 
 // ---- F03: BR-F03-1 matching, BR-F03-2 refusal, BR-F03-4 own ticket ----
 
@@ -242,10 +242,10 @@ func (f *fixture) teamInput(t *testing.T, v Viewer) CreateTicketInput {
 
 func TestTeamHandledRoles(t *testing.T) {
 	ctx := context.Background()
-	for _, role := range []string{users.RoleEmployee, users.RoleTechnician, users.RoleAdmin, users.RoleExecutive} {
+	for _, role := range []string{users.RoleEmployee, users.RoleTechnician, users.RoleAdmin} {
 		t.Run(role, func(t *testing.T) {
 			f := newFixture(t)
-			v := Viewer{ID: uuid.New(), Role: role}
+			v := viewerAs(role, uuid.New())
 			if _, err := f.svc.CreateTicket(ctx, v, f.teamInput(t, v)); code(err) != "TEAM_HANDLED_NOT_ALLOWED" {
 				t.Fatalf("err = %v", err)
 			}
@@ -254,10 +254,10 @@ func TestTeamHandledRoles(t *testing.T) {
 			}
 		})
 	}
-	for _, role := range []string{users.RoleHousekeeperLead, users.RoleSecurityLead} {
+	for _, role := range []string{users.RoleHousekeeperLead, users.RoleSecurityLead, users.RoleSuperAdmin} {
 		t.Run(role, func(t *testing.T) {
 			f := newFixture(t)
-			v := Viewer{ID: uuid.New(), Role: role}
+			v := viewerAs(role, uuid.New())
 			in := f.teamInput(t, v)
 			d, err := f.svc.CreateTicket(ctx, v, in)
 			if err != nil {
@@ -281,7 +281,7 @@ func TestTeamHandledRoles(t *testing.T) {
 
 func TestTeamHandledValidation(t *testing.T) {
 	ctx := context.Background()
-	lead := Viewer{ID: uuid.New(), Role: users.RoleHousekeeperLead}
+	lead := viewerAs(users.RoleHousekeeperLead, uuid.New())
 	cases := []struct {
 		name  string
 		edit  func(f *fixture, in *CreateTicketInput)
@@ -325,19 +325,19 @@ func TestTeamHandledValidation(t *testing.T) {
 
 func TestHandOverPermissionMatrix(t *testing.T) {
 	ctx := context.Background()
-	lead := Viewer{ID: uuid.New(), Role: users.RoleHousekeeperLead}
+	lead := viewerAs(users.RoleHousekeeperLead, uuid.New())
 	cases := []struct {
 		name string
 		v    Viewer
 		code string
 	}{
 		{"recording lead", lead, ""},
-		{"admin", Viewer{ID: uuid.New(), Role: users.RoleAdmin}, ""},
-		{"other lead", Viewer{ID: uuid.New(), Role: users.RoleHousekeeperLead}, "FORBIDDEN"},
-		{"other team's lead", Viewer{ID: uuid.New(), Role: users.RoleSecurityLead}, "FORBIDDEN"},
+		{"admin", viewerAs(users.RoleAdmin, uuid.New()), ""},
+		{"other lead", viewerAs(users.RoleHousekeeperLead, uuid.New()), "FORBIDDEN"},
+		{"other team's lead", viewerAs(users.RoleSecurityLead, uuid.New()), "FORBIDDEN"},
 		{"employee", employee(), "FORBIDDEN"},
-		{"technician", Viewer{ID: uuid.New(), Role: users.RoleTechnician}, "FORBIDDEN"},
-		{"executive", Viewer{ID: uuid.New(), Role: users.RoleExecutive}, "FORBIDDEN"},
+		{"technician", viewerAs(users.RoleTechnician, uuid.New()), "FORBIDDEN"},
+		{"super_admin", viewerAs(users.RoleSuperAdmin, uuid.New()), ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -384,8 +384,8 @@ func TestHandOverPermissionMatrix(t *testing.T) {
 func TestHandOverRules(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
-	lead := Viewer{ID: uuid.New(), Role: users.RoleSecurityLead}
-	admin := Viewer{ID: uuid.New(), Role: users.RoleAdmin}
+	lead := viewerAs(users.RoleSecurityLead, uuid.New())
+	admin := viewerAs(users.RoleAdmin, uuid.New())
 
 	// BR-F05-1: only closed / team_handled tickets.
 	normal := f.report(t, lead)

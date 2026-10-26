@@ -7,6 +7,7 @@ import { Select as SelectPrimitive } from "radix-ui";
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Plus, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM } from "@/lib/platform/permissions";
 import { MenuContent, MenuItem, type PickerOption } from "@/components/shared/picker";
 import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ const pick = (list: { value: string }[], value: string | null) => (list.some((o)
 export function MyTicketsScreen() {
   const params = useSearchParams();
   const me = useCurrentUser();
-  const lead = me.role === "housekeeper_lead" || me.role === "security_lead";
+  const lead = can(me, PERM.ticketTeamHandle);
   const relations = lead ? [...RELATIONS, TEAM_RELATION] : RELATIONS;
   const q = (params.get("q") ?? "").slice(0, 50);
   const scope = pick(relations, params.get("scope"));

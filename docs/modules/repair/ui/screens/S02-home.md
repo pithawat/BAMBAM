@@ -1,6 +1,8 @@
 # S02 — หน้าแรก
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** no executive role — variant C / S29 is for `admin` only; no bell in the hero, no "แจ้งเตือนล่าสุด" desktop card, no notification preview; empty technician list copy per `_common.md` §9.
 
 > **CR-016 (approved 2026-10-19):** admin and executive no longer get variant C — their Home is **S29** (`S29-admin-dashboard.md`, dashboard + 3D อาคาร 1), built in Stage 3D. Variants A / B (other roles) stay for Stage 6.
 
@@ -137,7 +139,7 @@ Desktop (≥1024px):
 | Desktop banner buttons | A: แจ้งซ่อม / ติดตามงานซ่อม (CR-003) · B: ดูคิวงาน / แจ้งซ่อม · C: เปิดคิวงาน / ภาพรวมอาคาร |
 | Desktop cards | งานซ่อมที่ยังไม่ปิด (CR-003) · แจ้งเตือนล่าสุด (link ทั้งหมด) · งานฉุกเฉินและสูงที่รอช่างรับ |
 | Empty — my tickets | ยังไม่มีงานที่คุณแจ้ง / เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย หรือสแกน QR ที่ติดบนอุปกรณ์ / button แจ้งซ่อม |
-| Empty — technician queue | ยังไม่มีงานในหมวดของคุณ / งานใหม่จะแจ้งเตือนที่กระดิ่ง |
+| Empty — technician queue | ยังไม่มีงานในหมวดของคุณ / ~~งานใหม่จะแจ้งเตือนที่กระดิ่ง~~ งานใหม่จะแสดงที่หน้านี้ (CR-024) |
 | Technician without categories | ยังไม่ได้กำหนดหมวดงาน ติดต่อ Admin |
 | Empty — admin urgent table | ไม่มีงานฉุกเฉินหรือสูงที่รอช่างรับ |
 | Error — my tickets block | Alert: โหลดงานของคุณไม่สำเร็จ / ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง ยังแจ้งซ่อมใหม่ได้ตามปกติ · button ลองอีกครั้ง |

@@ -1,6 +1,8 @@
 # Common UI rules — ระบบแจ้งซ่อม
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** no `executive` role (existing users became `employee`) and **no notification system** — no bell, no `/notifications`, no S13, no unread counts. Copy that promised a notification is replaced by the table in §9 (CR-024). Roles, nav rows and sample data below are struck where they mention either.
 
 > **CR-009 (approved 2026-10-18):** wording — ขั้นตอน (CR-009): แจ้งงาน → **รับเรื่อง** (ทันทีที่ส่ง, `awaiting_assessment`) → **กำลังดำเนินการ** (`in_repair`) → **ส่งกลับให้แก้** (`reworking`, เฉพาะเมื่อถูกส่งกลับ) → **เสร็จ · รอประเมินตรวจงาน** (`awaiting_rating`; ผู้แจ้งเห็น `รอคุณประเมินตรวจงาน`) → **ปิดงานแล้ว** (`closed`). ปุ่มช่าง `เริ่มดำเนินการ` (กำหนดวันเสร็จ + ใครซ่อม) · ปุ่มผู้แจ้ง `ประเมินตรวจงาน` (ดาว 1–5). Supersedes the CR-008 wording line below (D-060).
 
@@ -14,9 +16,9 @@ Status: APPROVED (2026-10-14)
 ## 1. App shell per role
 
 > **CR-010 (approved 2026-10-18) — replaces the bottom nav, the sidebar, the desktop top bar utilities and the role switcher placement below (D-064).**
-> - **Top navbar (`AppNavbar`, every role, every page):** BAMBAM logo (→ `/`) · หน้าแรก · แจ้งซ่อม · จองรถ · จองห้องประชุม (same size, icon and padding; only the current one is active) · bell (→ `/notifications`) · account (avatar; desktop adds name + role label) → menu `โปรไฟล์` (`/profile`) · `ออกจากระบบ` (S14 confirm). No repair CTA, no mascot. Desktop (≥ `lg`): floating white bar, sticky 12px from the top, max 1280px. Phone / tablet: brand row + a full-width row of the three services; scrolls away so page sticky bars (back bar, form actions) keep the top / bottom edge. (CR-010)
+> - **Top navbar (`AppNavbar`, every role, every page):** BAMBAM logo (→ `/`) · หน้าแรก · แจ้งซ่อม · จองรถ · จองห้องประชุม (same size, icon and padding; only the current one is active) · ~~bell (→ `/notifications`)~~ (CR-024) · account (avatar; desktop adds name + role label) → menu `โปรไฟล์` (`/profile`) · `ออกจากระบบ` (S14 confirm). No repair CTA, no mascot. Desktop (≥ `lg`): floating white bar, sticky 12px from the top, max 1280px. Phone / tablet: brand row + a full-width row of the three services; scrolls away so page sticky bars (back bar, form actions) keep the top / bottom edge. (CR-010)
 > - **Service links:** แจ้งซ่อม → `/repair/my` (technician `/repair/work`), active on every `/repair/*` route · จองรถ → `/car-booking` · จองห้องประชุม → `/room-booking`; both show "เร็วๆ นี้" pages (no booking form) until their modules exist. (CR-010)
-> - **Repair section nav (`RepairNav`):** on the repair list pages, for roles with staff tools only — technician: ติดตามงานซ่อม · งานซ่อม · ช่างภายนอก; admin / executive: ติดตามงานซ่อม · งานทั้งหมด · ช่างภายนอก · ภาพรวมอาคาร (same links as the old sidebar). Employees and leads reach แจ้งซ่อมใหม่ from S06. (CR-010)
+> - **Repair section nav (`RepairNav`):** on the repair list pages, for roles with staff tools only — technician: ติดตามงานซ่อม · งานซ่อม · ช่างภายนอก; admin ~~/ executive~~ (CR-024): ติดตามงานซ่อม · งานทั้งหมด · ช่างภายนอก · ภาพรวมอาคาร (same links as the old sidebar). Employees and leads reach แจ้งซ่อมใหม่ from S06. (CR-010)
 > - **No bottom nav, no sidebar.** The สแกน shortcut returns with Stage 5 inside the repair screens. (CR-010)
 > - **Role switcher (dev / UAT only):** one 28px amber strip above the navbar on every width: `{ENV} · กำลังดูในบทบาท: {role} · เปลี่ยน` (sheet on phones, popover on desktop). (CR-010)
 > - **Page headers:** keep the mobile header variants below, but none of them carries the bell or the role switcher any more; desktop shows the H1 title (+ search / action). (CR-010)
@@ -24,7 +26,7 @@ Status: APPROVED (2026-10-14)
 Layouts switch at `lg` (1024px) — mobile app layout below, desktop web layout from it (D-008).
 
 **Mobile bottom nav (`BottomNav`) — same for every role:**
-หน้าแรก (`/`) · ติดตามงาน (`/repair/my`, CR-003) · **สแกน** (`/repair/scan`, raised center button) · แจ้งเตือน (`/notifications`, red dot when unread) · โปรไฟล์ (`/profile`)
+หน้าแรก (`/`) · ติดตามงาน (`/repair/my`, CR-003) · **สแกน** (`/repair/scan`, raised center button) · ~~แจ้งเตือน (`/notifications`, red dot when unread)~~ (CR-024) · โปรไฟล์ (`/profile`)
 
 Shown on: S02, S06, S09, S13, S14. Hidden on sub-pages and full-screen flows: S03, S05, S07, S10, S11, S12, S16.
 
@@ -34,16 +36,16 @@ Shown on: S02, S06, S09, S13, S14. Hidden on sub-pages and full-screen flows: S0
 |---|---|---|---|
 | — | หน้าแรก | `/` | all |
 | — | ติดตามงานซ่อม `n` (CR-003) | `/repair/my` | all (count = open tickets I reported or follow) |
-| — | แจ้งเตือน `n` | `/notifications` | all (count = unread) |
+| ~~—~~ | ~~แจ้งเตือน `n`~~ | ~~`/notifications`~~ | ~~all (count = unread)~~ removed (CR-024) |
 | บริการ | แจ้งซ่อม | `/repair/new` | all |
 | บริการ | จองรถ · chip "เร็วๆ นี้" | — (disabled) | all |
 | บริการ | จองห้องประชุม · chip "เร็วๆ นี้" | — (disabled) | all |
 | งานช่าง | คิวงาน `n` | `/repair/queue` | technician (count = queue items visible to me) |
-| จัดการงานซ่อม | คิวงาน | `/repair/admin/queue` | admin, executive |
-| จัดการงานซ่อม | ภาพรวมอาคาร | `/repair/admin/overview` | admin, executive |
+| จัดการงานซ่อม | คิวงาน | `/repair/admin/queue` | admin ~~, executive~~ (CR-024) |
+| จัดการงานซ่อม | ภาพรวมอาคาร | `/repair/admin/overview` | admin ~~, executive~~ (CR-024) |
 | bottom | user card (avatar, name, role label) → `/profile`; logout icon → logout confirm (S14) | | all |
 
-**Desktop top bar:** page title (H1) · search pill "ค้นหาเลขงาน หรือสถานที่" (only on S06, S11) · `RoleSwitcher` (dev/UAT) · bell with count.
+**Desktop top bar:** page title (H1) · search pill "ค้นหาเลขงาน หรือสถานที่" (only on S06, S11) · `RoleSwitcher` (dev/UAT) ~~· bell with count~~ (CR-024).
 
 **Mobile page headers — which one each screen uses:**
 
@@ -84,7 +86,7 @@ Shown on: S02, S06, S09, S13, S14. Hidden on sub-pages and full-screen flows: S0
 
 **Priority** (`PriorityIndicator`): `critical` ฉุกเฉิน · `high` สูง · `medium` ปกติ · `low` ต่ำ
 
-**Roles:** `employee` พนักงานทั่วไป · `housekeeper_lead` หัวหน้าแม่บ้าน · `security_lead` หัวหน้ารปภ. · `technician` ช่างเทคนิค · `admin` Admin · `executive` ผู้บริหาร
+**Roles:** `employee` พนักงานทั่วไป · `housekeeper_lead` หัวหน้าแม่บ้าน · `security_lead` หัวหน้ารปภ. · `technician` ช่างเทคนิค · `admin` Admin · ~~`executive` ผู้บริหาร~~ (CR-024)
 
 ## 3. Ticket display rules
 
@@ -164,7 +166,7 @@ All use `AlertDialog` (destructive or irreversible) or `Dialog`, become a bottom
 |---|---|---|---|---|---|
 | Give back (คืนงาน, F21) | S07, S09, S10 | คืนงานเข้าคิว? | งานจะกลับไปที่ตำแหน่งเดิมในคิว ให้ช่างคนอื่นรับต่อได้ | เหตุผลที่คืนงาน * (Textarea, max 500) — error: กรุณาใส่เหตุผล | ยกเลิก · **คืนงาน** |
 | Hand over (ส่งต่อให้ช่าง, F05) | S07, S11 | ส่งต่องานนี้ให้ช่าง? | งานเดิม เลขเดิม จะส่งกลับไปที่ช่าง รอช่างกำหนดวันเสร็จ (CR-020) | เหตุผลที่ส่งต่อ * (Textarea, max 500, placeholder "เช่น ทีมเช็ดแล้วแต่ยังมีน้ำซึมจากฝ้า") — error: กรุณาใส่เหตุผล | ยกเลิก · **ส่งต่อให้ช่าง** |
-| Close ticket (ปิดงาน, F08-B) | S07, S11 | ปิดงาน {ticket_no}? | งานจะปิดทันทีโดยไม่ต้องรอตรวจรับ ผู้แจ้ง ผู้ติดตาม และช่างที่ถืองานจะได้รับแจ้งเตือน | เหตุผลที่ปิดงาน * (Textarea, max 500) — error: กรุณาใส่เหตุผล | ยกเลิก · **ปิดงาน** (destructive) |
+| Close ticket (ปิดงาน, F08-B) | S07, S11 | ปิดงาน {ticket_no}? | งานจะปิดทันทีโดยไม่ต้องรอตรวจรับ ผู้แจ้ง ผู้ติดตาม และช่างจะเห็นสถานะปิดแล้วในหน้างาน (CR-024) | เหตุผลที่ปิดงาน * (Textarea, max 500) — error: กรุณาใส่เหตุผล | ยกเลิก · **ปิดงาน** (destructive) |
 | ~~Change priority (F22)~~ (removed, CR-015) | S07, S11 | เปลี่ยนความเร่งด่วนเป็น "{ระดับ}"? | ถ้างานนี้ถูกเลื่อนลำดับไว้ จะกลับไปเรียงตามความเร่งด่วนอัตโนมัติ | — | ยกเลิก · **เปลี่ยน** |
 | Claim (รับงาน, F21) | S07, S09 | รับงานนี้? | {title} · {location} — คุณถืองานได้ทีละ 1 งาน ต้องบันทึกผลหรือคืนงานก่อนรับงานใหม่ | — | ยกเลิก · **รับงาน** |
 | Discard form | S03, S10 | ทิ้งข้อมูลที่กรอกไว้? | ข้อมูลและรูปที่แนบในหน้านี้จะหายไป | — | กรอกต่อ · **ทิ้งข้อมูล** (destructive) |
@@ -195,7 +197,7 @@ Sample only — replace when the seed files arrive (`../../02-flows.md` Open que
 | technician | สุริยา ทองมา | ไฟฟ้าและแสงสว่าง |
 | technician | อนุชา ใจกล้า | อาคารและเฟอร์นิเจอร์ |
 | admin | ปวีณา ศรีสุข | ศูนย์จัดการงานอาคาร |
-| executive | ประเสริฐ วงศ์ไทย | ผู้อำนวยการฝ่ายอาคารสถานที่ |
+| ~~executive~~ | ~~ประเสริฐ วงศ์ไทย~~ | ~~ผู้อำนวยการฝ่ายอาคารสถานที่~~ removed (CR-024) |
 
 - **Asset (QR):** `AC-05-012` เครื่องปรับอากาศ ห้องประชุม 5B → ระบบปรับอากาศ · อาคารหลัก ชั้น 5 · ห้องประชุม 5B
 - **Tickets:** `RP-2569-000135` … `RP-2569-000150`, see the mockups for the full set.
@@ -204,3 +206,29 @@ Sample only — replace when the seed files arrive (`../../02-flows.md` Open que
 
 - Photo limits: max file size before resize (proposed 10 MB) and client-side resize (proposed 1920px JPEG) — confirm in `/stage-plan`.
 - How a tester leaves role-switch mode and returns to their own account (proposed: ออกจากระบบ แล้วเข้าใหม่) — S15.
+
+## 9. Copy without notifications (CR-024)
+
+There is no notification system. Every text that said someone "จะได้รับแจ้งเตือน" now says where the change is seen. Exact copy:
+
+| Where | Before | After (CR-024) |
+|---|---|---|
+| Toast after the first assessment (S17) | เริ่มดำเนินการแล้ว ผู้แจ้งจะได้รับแจ้งเตือนวันที่คาดว่าจะเสร็จ | เริ่มดำเนินการแล้ว ผู้แจ้งจะเห็นวันที่คาดว่าจะเสร็จในหน้างาน |
+| Toast after a new expected date (S17) | บันทึกวันใหม่แล้ว ผู้แจ้งจะได้รับแจ้งเตือน | บันทึกวันใหม่แล้ว ผู้แจ้งจะเห็นวันใหม่ในหน้างาน |
+| Assess dialog description, first (S17) | กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่นี้และได้รับแจ้งเตือนทันที | กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่นี้ในหน้างานทันที |
+| Assess dialog description, later (S17) | เดิม {วันที่} · ผู้แจ้งจะได้รับแจ้งเตือนวันใหม่ | เดิม {วันที่} · ผู้แจ้งจะเห็นวันใหม่ในหน้างาน |
+| Toast after resolve (S10) | ส่งผลแล้ว ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน | ส่งผลแล้ว รอผู้แจ้งตรวจรับ |
+| Toast after send back (S08) | ส่งกลับให้ช่างแล้ว ช่างจะได้รับแจ้งเตือน | ส่งกลับให้ช่างแล้ว |
+| Send-back dialog description (S08) | {ช่าง…}จะได้รับแจ้งเตือน และกลับมาแก้ในงานเดิม ไม่ต้องแจ้งใหม่ | งานจะกลับไปให้{ช่าง…}แก้ในงานเดิม ไม่ต้องแจ้งใหม่ |
+| Admin close dialog (S07, S11) | … ผู้แจ้ง ผู้ติดตาม และช่างที่ถืองานจะได้รับแจ้งเตือน | … ผู้แจ้ง ผู้ติดตาม และช่างจะเห็นสถานะปิดแล้วในหน้างาน |
+| S07 technician card, `awaiting_assessment` | ความเร่งด่วน{ระดับ} · กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม แล้วผู้แจ้งจะได้รับแจ้งเตือนทันที | ความเร่งด่วน{ระดับ} · กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่ในหน้างานทันที |
+| S07 technician card, `in_repair` | ซ่อมเสร็จแล้วถ่ายรูปหลังซ่อมและบันทึกผล ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน | ซ่อมเสร็จแล้วถ่ายรูปหลังซ่อมและบันทึกผล แล้วงานจะรอผู้แจ้งตรวจรับ |
+| S07 reporter card, `awaiting_assessment` | ตอนนี้คุณยังไม่ต้องทำอะไร เมื่อช่างกำหนดวันที่คาดว่าจะเสร็จ เราจะแจ้งเตือนคุณทันที | ตอนนี้คุณยังไม่ต้องทำอะไร เมื่อช่างกำหนดวันที่คาดว่าจะเสร็จ วันที่จะแสดงที่หน้านี้ |
+| S07 reporter card, `in_repair` | คาดว่าจะเสร็จ {วันที่} · เมื่อซ่อมเสร็จ เราจะแจ้งเตือนให้คุณมาประเมินตรวจงาน | คาดว่าจะเสร็จ {วันที่} · เมื่อซ่อมเสร็จ งานจะขึ้นใน "ติดตามงาน" ให้คุณประเมินตรวจงาน |
+| S07 reporter card, `reworking` | คาดว่าจะเสร็จ {วันที่} · เราจะแจ้งเตือนเมื่อแก้ไขเสร็จ | คาดว่าจะเสร็จ {วันที่} · ติดตามความคืบหน้าได้ที่หน้านี้ |
+| S07 follower card, `reworking` | ผู้แจ้งส่งกลับให้ช่างแก้ไข เราจะแจ้งเตือนเมื่อแก้เสร็จ | ผู้แจ้งส่งกลับให้ช่างแก้ไข |
+| S07 follower card | คุณติดตามงานนี้ เราจะแจ้งเตือนเมื่อมีความคืบหน้า · ผู้แจ้งเป็นผู้ประเมินตรวจงานหรือส่งกลับให้แก้ | คุณติดตามงานนี้ ดูความคืบหน้าได้ที่หน้านี้และใน "ติดตามงาน" · ผู้แจ้งเป็นผู้ประเมินตรวจงานหรือส่งกลับให้แก้ |
+| S05 next step | ต่อไป ช่างจะกำหนดวันที่คาดว่าจะเสร็จ แล้วเริ่มดำเนินการ เราจะแจ้งเตือนคุณที่กระดิ่งทันที | ต่อไป ช่างจะกำหนดวันที่คาดว่าจะเสร็จ แล้วเริ่มดำเนินการ ติดตามได้ที่ "ติดตามงาน" |
+| Empty technician list (S02, S09) | ยังไม่มีงานในหมวดของคุณ / งานใหม่จะแจ้งเตือนที่กระดิ่ง | ยังไม่มีงานในหมวดของคุณ / งานใหม่จะแสดงที่หน้านี้ |
+| S07 executive note | ผู้บริหารดูได้อย่างเดียว | removed (no executive role) |
+| S11 forbidden reason | หน้านี้สำหรับ Admin และผู้บริหาร | หน้านี้สำหรับ Admin เท่านั้น |

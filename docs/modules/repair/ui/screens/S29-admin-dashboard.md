@@ -1,6 +1,8 @@
-# S29 — หน้าแรก Admin / ผู้บริหาร (dashboard + อาคาร 3D) (CR-016)
+# S29 — หน้าแรก Admin ~~/ ผู้บริหาร~~ (dashboard + อาคาร 3D) (CR-016, CR-024)
 
-Status: APPROVED (2026-10-19) — owner: "go" with `../mockups/S29-admin-dashboard-modern.html` as the layout and the owner's own 3D model (D-082)
+Status: APPROVED (2026-10-19) — owner: "go" with `../mockups/S29-admin-dashboard-modern.html` as the layout and the owner's own 3D model (D-082) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** Admin Home only (no executive, no read-only variant or toggle); every Admin sees จัดวางอุปกรณ์.
 
 > **CR-019 (approved 2026-10-24) — light polish, same sections and data:** heading = `welcome` mascot · eyebrow `WORKPLACE OVERVIEW` · greeting · date line; tiles = label + icon tile on top, number + `งาน` below, white cards with shadow; panel headers with a sub-line (`งานตามขั้นตอน กดเพื่อดูรายการ` / `เลยกำหนด ส่งกลับ หรือเร่งด่วน`) and a count chip (open / attention); soft shadow on every card. Attention empty state uses the `review` mascot.
 

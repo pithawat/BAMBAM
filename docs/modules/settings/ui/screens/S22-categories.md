@@ -1,6 +1,6 @@
 # S22 — หมวดงานและอาการ
 
-Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · CR-001 applied 2026-10-26 (block below)
 
 - **Flows:** F27 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop (see ../../01-users.md)
@@ -10,6 +10,16 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 - **Data:** `listCategories`, `createCategory`, `updateCategory`, `reorderCategories`, `setCategoryActive`, `deleteCategory`, `listSymptoms`, `createSymptom`, `updateSymptom`, `reorderSymptoms`, `setSymptomActive`, `deleteSymptom`
 
 > **CR-008 (repair, approved 2026-10-16):** the category dialog adds `ความเร่งด่วนตั้งต้น *` (ฉุกเฉิน · สูง · ปกติ · ต่ำ, default ปกติ, hint `ใช้เมื่อผู้แจ้งเลือกแค่ อาการอื่นๆ`); the symptom dialog adds `ความเร่งด่วน *` (same options, hint `งานจะได้ระดับสูงสุดของอาการที่เลือก`); symptom rows show the priority badge; categories may show an examples line (`ตัวอย่างที่แสดงในฟอร์ม`, ≤ 60). Contract: category / symptom create + update get `defaultPriority` / `priority`. Built in settings Stage 5.
+
+
+> **CR-001 (2026-10-26, design `../mockups/CR-001-admin-settings.html#categories`, screenshots `categories-*.png`) — overrides Layout / Components below where they differ:**
+> - Access: Admin and Superadmin (`settings.categories.manage`).
+> - Heading: H1 "หมวดงานและอาการ", subtitle "จัดระเบียบหมวดงาน อาการ และความเร่งด่วนของงานแจ้งซ่อม", mascot, primary "เพิ่มหมวดงาน" on the heading row.
+> - Desktop: navigator panel "หมวดงาน {n}" (rows: icon tile · name · "{n} อาการ" (· ปิดใช้งาน) · `ChevronRight`; selected soft blue) with footer toggle "แสดงที่ปิดใช้งาน" + main panel: category header (icon tile, H2 name, status line "เปิดใช้งานในแบบฟอร์มแจ้งซ่อม" / "ปิดใช้งาน", row menu), meta line "ความเร่งด่วนตั้งต้น {badge} · ใช้เมื่อเลือก “อาการอื่น ๆ”", section "อาการ {n}" with small primary "เพิ่มอาการ", symptom rows = name · priority badge (`PriorityIndicator`) · row menu. Note under the panel: "เมื่อเลือกหลายอาการ งานจะใช้ระดับความเร่งด่วนสูงสุดของอาการที่เลือก / การตั้งค่านี้ใช้กับงานที่แจ้งใหม่ งานเดิมคงระดับที่ได้รับไว้". Mobile: panels stack; dialogs as bottom sheets.
+> - Category menu: แก้ไขหมวดงาน · เลื่อนขึ้น · เลื่อนลง · ปิดใช้งาน / เปิดใช้งาน · ลบ (approved rules kept: delete disabled when `inUse`; the `isOther` category cannot be deactivated / deleted). Symptom menu: แก้ไขอาการและความเร่งด่วน · เลื่อนขึ้น · เลื่อนลง · ปิดใช้งาน / เปิดใช้งาน · ลบ. Drag handles are not used (order via the menu, BR-ALL-5).
+> - Category dialog: ชื่อหมวดงาน * · ไอคอน * (12-icon picker, below) · ความเร่งด่วนตั้งต้น * (hint ใช้เมื่อผู้แจ้งเลือกแค่ “อาการอื่น ๆ”). Symptom dialog: subtitle = category name · ชื่ออาการ * · ความเร่งด่วน * (default = category default; hint งานจะได้ระดับสูงสุดของอาการที่เลือก · ใช้กับการแจ้งงานใหม่). Duplicate symptom message: ชื่อนี้มีอยู่แล้วในหมวดนี้.
+> - Empty symptoms: ยังไม่มีอาการที่เปิดใช้งาน / หมวดนี้จะไม่แสดงในแบบฟอร์มแจ้งซ่อม จนกว่าจะมีอาการที่เปิดใช้งาน · button เพิ่มอาการ. Last-active-symptom deactivate extra line: นี่คืออาการสุดท้ายที่เปิดใช้งาน หมวดนี้จะไม่แสดงในฟอร์มแจ้งซ่อม.
+> - Area types of a category (repair CR-014) are not in the design: keep them in the category dialog as an optional multi-select under ความเร่งด่วนตั้งต้น.
 
 ## Layout — mobile first
 

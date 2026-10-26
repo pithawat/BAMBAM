@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { API, as, auth, confirm, newContractor, report, resolvedTicket, tag } from "./helpers";
 
 // F24 (Stage 2 / 3, CR-005): the technician adds and edits contractors on S18 (never deleted — deactivated,
-// history kept); admin and executive read the list, scores and job history; everyone else is refused
+// history kept); admin reads the list, scores and job history; everyone else is refused
 // (BR-F24-1 / 2 / 4 / 5). Picking a contractor while assessing is covered by F21. Real API.
 
 test.describe("technician", () => {
@@ -114,7 +114,7 @@ test.describe("technician", () => {
   });
 });
 
-for (const role of ["admin", "executive"]) {
+for (const role of ["admin"]) {
   test.describe(role, () => {
     test.use({ storageState: auth(role) });
 

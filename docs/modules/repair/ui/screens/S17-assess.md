@@ -1,6 +1,8 @@
 # S17 — ประเมินงาน (CR-005)
 
-Status: built by Claude 2026-10-15 (CR-005, no separate mockup) — waiting for acceptance
+Status: built by Claude 2026-10-15 (CR-005, no separate mockup) — waiting for acceptance · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** toasts and dialog descriptions per `_common.md` §9.
 
 > **CR-009 (approved 2026-10-18):** title `เริ่มดำเนินการ` (`กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม`) · after a send back `รับแก้ไขและกำหนดวันเสร็จใหม่` · change `เลื่อนวันที่คาดว่าจะเสร็จ` · buttons `เริ่มดำเนินการ` / `บันทึกวันใหม่` · toast `เริ่มดำเนินการแล้ว ผู้แจ้งจะได้รับแจ้งเตือนวันที่คาดว่าจะเสร็จ`.
 

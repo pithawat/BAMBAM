@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — Build plan
 
-Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19) · Stage 3 reduced + S09 sort rework by CR-015 (2026-10-19) · Stage 3D added, Stage 7 replaced by CR-016 (2026-10-19) · Stage 3U (UI refresh) added by CR-019 (2026-10-24)
+Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19) · Stage 3 reduced + S09 sort rework by CR-015 (2026-10-19) · Stage 3D added, Stage 7 replaced by CR-016 (2026-10-19) · Stage 3U (UI refresh) added by CR-019 (2026-10-24) · CR-024 applied 2026-10-26 (Stage 4R added; Stage 6 without notifications)
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -18,12 +18,13 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 2 | ช่างเห็นทุกงาน ประเมิน (วันคาดเสร็จ) บันทึกผล + ผู้ดำเนินการ + คะแนนช่างภายนอก; ผู้แจ้งให้ดาว (บังคับ) หรือส่งกลับ; ปิดเองเมื่อครบ 3 วัน — วงจรหลักครบ (CR-005) | F21, F07, F24 (technician) | S09, S17, S10, S08, S07 actions, S18 | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-2` |
 | 2R | **CR-008 rework:** ระบบกำหนดความเร่งด่วนจากอาการ + "อื่นๆ" · หน้าตาใหม่ทั้งแอป (design-system CR-008) · S03 แบบทีละขั้น + ตรวจสอบก่อนส่ง + ที่เคยแจ้ง + ร่าง · S05 · S07 หน้าติดตามแนวตั้ง + การ์ดสิ่งที่ต้องทำ + พิมพ์รายงาน · S08 ให้คะแนนไม่ตั้งค่าไว้ก่อน · S17 ปุ่มวัน + เหตุผลที่เลื่อน · S10 เป็น sheet — ตรวจรับพร้อม Stage 1–2 | F02, F06, F07, F21 | S03, S05, S06, S07, S08, S09, S10, S17, shell | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-2R` |
 | 2M | **CR-014 rework:** หมวดงาน / อาการจริงตามเอกสาร (เก็บใน DB) · ฟอร์ม 3 ขั้น กรอบเท่ากันทุกขั้น · ห้องหรือจุดที่เกิดบังคับ เลือกจากรายการห้อง ผูกกับหมวด | F02, F06 | S03, location line on S05 / S06 / S07 / S09 | done (2026-10-19, `repair-stage-2M`) |
-| 3 | Admin เห็นทุกงาน ปิดงานได้ (CR-015: ไม่ปรับความเร่งด่วน); ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-3` |
-| 3D | **CR-016:** หน้าแรก Admin / ผู้บริหาร = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
+| 3 | Admin เห็นทุกงาน ปิดงานได้ (CR-015: ไม่ปรับความเร่งด่วน); ดูช่างภายนอก; ~~ผู้บริหารดูได้อย่างเดียว~~ (CR-024 → 4R) | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-3` |
+| 3D | **CR-016:** หน้าแรก Admin ~~/ ผู้บริหาร~~ (CR-024 → 4R) = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
 | 3U | **CR-019 rework:** หน้าตาใหม่ตามต้นแบบ `bam-workplace-mascot-v4-refined.html` — S06 ตารางเดียว + ตัวกรองสถานะ · S07 กล่องเดียว + แท็บ · S03 สองคอลัมน์ + สรุป · S29 ขัดเกลา · มาสคอตเสือทั้งแอป | F02, F06, F07, F23 | S03, S06, S07, S29, S01, shared states | done (2026-10-24, `repair-stage-3U`) |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over); CR-021: S03 / S04 / S06 relayout | done (2026-10-26, `repair-stage-4`) |
+| 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | pending |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
-| 6 | หน้าแรกตาม role (CR-016: admin / ผู้บริหารทำแล้วใน 3D) และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง | F01 (Home), F19-B | S02, S13, bell | pending |
+| 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
 | 8 | ตรวจสิทธิ์ทุก role, edge cases, a11y และความพร้อม UAT | all phase-1 flows | all | pending |
 
@@ -359,7 +360,7 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 - Flows: F03 (duplicate check, follow with note + photos), F04 (team-handled record), F05 (hand over by the recording lead or admin)
 - Screens: S04, S03 team card + "บันทึกงานทีม" + S05 team variant, S07 hand-over action, S11 closed tab "ส่งต่อให้ช่าง"
 - Endpoints: 22, 23, 24; #5 `teamHandled`
-- Out of this stage: notifications to subscribers (Stage 7)
+- Out of this stage: ~~notifications to subscribers (Stage 7)~~ (CR-024: no notifications)
 
 **Backend (Claude)**
 - [x] Duplicate query (same category + floor + room / spot, open statuses, BR-F03-1 CR-009; by `room_id` + old-ticket fallback, CR-014) with an index; #5 refuses a match → 409 `DUPLICATE_FOUND` / `OWN_TICKET_AWAITING_RATING` (CR-009) — migration `20261024000001`, advisory lock per key (D-099)
@@ -404,6 +405,36 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 
 ---
 
+## Stage 4R — CR-024 rework: no executive role, no notifications (CR-024)
+
+**Scope**
+- Remove the `executive` role everywhere (code, DB, mocks, tests, docs, Atlas); existing executive users become `employee` (owner 2026-10-26)
+- Remove every trace of notifications: the bell in the navbar, toast copy that promises a notification, comments; there is no notification table or endpoint to drop (never built)
+- No new UI; built by Claude (no Codex hand-off). Shared code touched: `internal/platform/users`, `components/shared` (navbar, bell), `lib/platform`
+
+**Backend (Claude)**
+- [ ] Migration `…_repair_cr024_remove_executive.sql`: `UPDATE platform.user_roles SET role = 'employee' WHERE role = 'executive'` (non-demo users), delete the executive demo user (and its sessions), replace the `user_roles` CHECK without `executive`; Down restores the CHECK only
+- [ ] `users.RoleExecutive` removed; `rules.go` (scope=all, dashboard `seesDashboard`, contractor view), `service.go` comments; role-switch accepts the 5 remaining roles
+- [ ] Unit tests: drop executive cases in `service_test.go`, `service_dashboard_test.go`, `service_duplicates_test.go`, `controller_test.go`; add "unknown role `executive` → 400" to the role-switch test; comment "get the reporter's notifications" in `service_duplicates.go` (BR-F03-3)
+
+**Frontend (Claude)**
+- [ ] `lib/platform/{types,roles,mocks}.ts`, `app/(app)/page.tsx`, `repair-nav.tsx`, `admin-tickets.tsx` (remove read-only mode and its banner; forbidden copy "หน้านี้สำหรับ Admin เท่านั้น"), `ticket-detail.tsx`, `contractors.tsx`, `admin-dashboard.tsx`, `repair/{types,mocks,api}.ts`
+- [ ] Remove `components/shared/bell-button.tsx` and its navbar slot; no `/notifications` link anywhere
+- [ ] Toasts / dialog copy without notifications (exact copy in the screen specs, CR-024): "เริ่มดำเนินการแล้ว รอดำเนินการตามวันที่กำหนด" · "บันทึกวันใหม่แล้ว" · "ส่งผลแล้ว รอผู้แจ้งตรวจรับ" · "ส่งกลับให้ช่างแล้ว" · hand-over / admin-close dialog lines without "จะได้รับแจ้งเตือน"
+
+**Tests + Atlas (Claude)**
+- [ ] e2e: ~~drop the executive blocks / loops in F05, F21, F22, F23, F24~~ (done in settings Stage 1 wire, 2026-10-26); update toast assertions in F07 / F21; `test-stack.md` browse roles
+- [ ] Atlas (`/atlas sync repair`): roles without ผู้บริหาร (`project.json`, `modules/repair.json` roles + matrix), remove flow F19-B and feature F19-1, Stage 6 name, executive steps in the F22 / F23 / F24 tours, "แจ้งเตือนช่าง" step text; rebuild `dist/atlas.html`; `cli verify` passes
+
+**Acceptance criteria**
+- [ ] AC1: The role switcher lists 5 roles (no ผู้บริหาร); `POST /dev/role-switch {"role":"executive"}` → 400; after the migration no user has `executive`
+- [ ] AC2: No bell in the navbar on any page, no text in the app says "แจ้งเตือน"; `/notifications` is 404
+- [ ] AC3: Admin pages (S11, S18, S29) behave as before for Admin; S11 has no read-only mode
+- [ ] AC4: `go vet`, `go test ./...`, `tsc`, `eslint`, `next build`, the full e2e suite and Atlas `verify` pass
+- [ ] AC5: `grep -ri "executive\|ผู้บริหาร"` finds nothing in `backend/`, `frontend/src`, `frontend/e2e`, `docs/atlas` (except migration history / this CR)
+
+---
+
 ## Stage 5 — สแกน QR เติมฟอร์ม
 
 **Scope**
@@ -440,40 +471,42 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 
 ---
 
-## Stage 6 — หน้าแรกตาม role และแจ้งเตือน
+## Stage 6 — หน้าแรกตาม role ~~และแจ้งเตือน~~ (CR-024)
+
+> **CR-024 (2026-10-26):** no notification system. Every notification item below is struck; Stage 6 builds only the Home by role (S02, endpoint 26).
 
 **Scope**
-- Flows: F01 step 3 (Home by role), F19-B (all events in its table), auto-close reminder (F07 Added by Claude)
-- Screens: S02 (3 variants), S13, bell count in hero / top bar, bottom-nav dot
-- Endpoints: 26, P4–P7
-- Shared code touched: `internal/platform` notifications table + service (`platform.notifications`), `components/shared` bell — listed in the stage report
+- Flows: F01 step 3 (Home by role) ~~, F19-B (all events in its table), auto-close reminder (F07 Added by Claude)~~ (CR-024)
+- Screens: S02 (3 variants) ~~, S13, bell count in hero / top bar, bottom-nav dot~~ (CR-024)
+- Endpoints: 26 ~~, P4–P7~~ (CR-024)
+- ~~Shared code touched: `internal/platform` notifications table + service (`platform.notifications`), `components/shared` bell — listed in the stage report~~ (CR-024)
 
 **Backend (Claude)**
-- [ ] Migration `platform.notifications` (user, type, ticket, params jsonb, read_at); platform `Notifier` interface injected into the repair service in `main.go`
-- [ ] Fan-out per the F19-B table on every event from Stages 1–4 (new → technician; assessed / date changed → reporter + subscribers; resolved → reporter / subscribers; sent back → technician; admin closed → reporter + subscribers + technician) (CR-005)
-- [ ] Auto-close reminder 24 h before `autoCloseAt` (once per ticket) and `ticket_auto_closed`
-- [ ] Endpoint 26 (role-based blocks) and P4–P7
-- [ ] Tests: recipients per event, nobody sees others' notifications (BR-F19B-1)
+- ~~[ ] Migration `platform.notifications` (user, type, ticket, params jsonb, read_at); platform `Notifier` interface injected into the repair service in `main.go`~~ (CR-024)
+- ~~[ ] Fan-out per the F19-B table on every event from Stages 1–4 (new → technician; assessed / date changed → reporter + subscribers; resolved → reporter / subscribers; sent back → technician; admin closed → reporter + subscribers + technician) (CR-005)~~ (CR-024)
+- ~~[ ] Auto-close reminder 24 h before `autoCloseAt` (once per ticket) and `ticket_auto_closed`~~ (CR-024)
+- [ ] Endpoint 26 (role-based blocks) ~~and P4–P7~~ (CR-024)
+- ~~[ ] Tests: recipients per event, nobody sees others' notifications (BR-F19B-1)~~ (CR-024)
 
 **Frontend contract (Claude)**
-- [ ] Types/mocks/api for 26, P4–P7; notification text templates (S13 table) in `modules/repair`; HANDOFF → Stage 7 with the widened edit list (`app/(app)/page.tsx`, `app/(app)/notifications/**`)
+- [ ] Types/mocks/api for 26 ~~, P4–P7; notification text templates (S13 table) in `modules/repair`~~ (CR-024); HANDOFF → Stage 6 with the widened edit list (`app/(app)/page.tsx`)
 
 **Frontend UI (Codex)**
 - [ ] S02 variants A / B / C (mobile + desktop) per spec and option-a.html
-- [ ] S13 list, groups, mark read / all
-- [ ] Bell badge + bottom-nav dot (request change in `components/shared` via Open questions if needed)
+- ~~[ ] S13 list, groups, mark read / all~~ (CR-024)
+- ~~[ ] Bell badge + bottom-nav dot (request change in `components/shared` via Open questions if needed)~~ (CR-024)
 
 **Wiring + e2e (Claude)**
-- [ ] `e2e/repair/F19B-notifications.spec.ts` (full loop: each recipient gets the right text), `F01-home-by-role.spec.ts`
+- [ ] ~~`e2e/repair/F19B-notifications.spec.ts` (full loop: each recipient gets the right text),~~ (CR-024) `F01-home-by-role.spec.ts`
 
 **Acceptance criteria**
-- [ ] AC1: Running the Stage 2 demo loop produces exactly the F19-B notifications for each role, with the exact S13 copy
-- [ ] AC2: Tapping a notification marks it read and opens S07; the bell count drops
+- ~~[ ] AC1: Running the Stage 2 demo loop produces exactly the F19-B notifications for each role, with the exact S13 copy~~ (CR-024)
+- ~~[ ] AC2: Tapping a notification marks it read and opens S07; the bell count drops~~ (CR-024)
 - [ ] AC3: Home shows the awaiting card on top for a reporter with a resolved ticket; technician Home shows รอประเมิน / กำลังซ่อม counts and the oldest open jobs (CR-015); admin Home shows counts linking to S11 tabs
-- [ ] AC4: A ticket 48 h after `resolved` produces one reminder; at 72 h the auto-closed notification
+- ~~[ ] AC4: A ticket 48 h after `resolved` produces one reminder; at 72 h the auto-closed notification~~ (CR-024)
 
 **Demo script**
-1. Repeat the main loop across roles and open the bell each time
+~~1. Repeat the main loop across roles and open the bell each time~~ (CR-024)
 2. Show the three Home variants via the role switcher (mobile + desktop)
 
 ---
@@ -549,7 +582,7 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 
 - D-021 IDs are UUIDs (not guessable in URLs; tickets are shown by `ticketNo`)
 - D-022 Photos: `PhotoStore` interface, phase 1 local directory (`PHOTO_STORAGE_DIR`, persistent volume), max 10 MB, client resize 1920px JPEG, unattached photos deleted after 24 h
-- D-023 Platform screens: S01, S14, S15 + AppShell in Stage 0; S02 Home and S13 notifications (+ `platform.notifications`) in repair Stage 7
+- D-023 Platform screens: S01, S14, S15 + AppShell in Stage 0; S02 Home ~~and S13 notifications (+ `platform.notifications`)~~ (CR-024) in repair Stage 6
 - D-024 QR content = `{FRONTEND_URL}/repair/new?asset={code}`; F13-A label printing stays outside the app in phase 1
 - D-025 Drag-and-drop library `@dnd-kit/sortable` (dropped by CR-005 — no queue); S12 rendered as data-driven SVG (no 3D library)
 - CR-005 decisions: D-038 – D-041

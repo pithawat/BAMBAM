@@ -33,9 +33,10 @@
 ### Roles (D-003, D-004)
 
 - SSO gives identity only. Roles live in `platform.user_roles`, one row per user, keyed by `employee_code` (SSO claim `USER`).
-- Exactly one role per user, shared by all modules: `employee` · `housekeeper_lead` · `security_lead` · `technician` · `admin` · `executive`.
+- Exactly one role per user, shared by all modules: `employee` · `housekeeper_lead` · `security_lead` · `technician` · `admin` ~~· `executive`~~ (repair CR-024: removed, users moved to `employee`).
 - First SSO login creates the user as `employee`. Phase 1: other roles come from a seed file (employee code → role). Later: admin edits roles in the user management screen (repair F15).
 - `GET /api/v1/me` returns the user and role; the FE builds menus from it but never relies on it for security.
+- (settings Stage 1, D-049 / D-111) Roles are data: `platform.roles` (+ `super_admin`), `platform.role_permissions`, `platform.user_roles.role_id`. Code checks permission keys (`Principal.Can`, FE `can()`), never role names; permissions load on every request. `/me` adds `roleName` and `permissions` (stored + the fixed `settings.*` keys of the role key). `super_admin` always has every key; employee codes in `SUPER_ADMIN_EMPLOYEE_CODES` are `super_admin` at API start and every login. Full rewrite of this section: settings Stage 6.
 
 ### Role switcher — dev/UAT only (D-005)
 
@@ -65,5 +66,6 @@ How dev → production switching works: **code is identical; only env vars diffe
 | `APP_SESSION_SECRET` | backend | random, `.env` only | secret from platform (not the SSO client secret) |
 | `APP_SESSION_TTL` | backend | `12h` | from platform (default `12h`) |
 | `PHOTO_STORAGE_DIR` | backend | optional, default `data/photos` (gitignored) | required: persistent volume, backed up (D-022) |
+| `SUPER_ADMIN_EMPLOYEE_CODES` | backend | optional, comma-separated employee codes (empty → warning at start) | the first Superadmin code(s) per environment (settings BR-F25-2) |
 
 Add new variables to this table, to `backend/.env.example` or `frontend/.env.*`, and to `lib/env.ts` / `platform/config` in the same change.

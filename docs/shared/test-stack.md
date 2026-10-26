@@ -77,7 +77,7 @@ node tools/atlas/cli.mjs serve
 ```powershell
 cd frontend
 npm run test:browse              # admin
-npm run test:browse -- technician   # employee | housekeeper_lead | security_lead | technician | admin | executive
+npm run test:browse -- technician   # employee | housekeeper_lead | security_lead | technician | admin  (executive removed, repair CR-024)
 ```
 
 ### คำสั่ง Atlas อื่น

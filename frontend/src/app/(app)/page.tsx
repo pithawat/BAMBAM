@@ -8,10 +8,12 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SERVICES, ServiceIcon, SoonChip, type Service } from "@/components/shared/service-icon";
 import { Button } from "@/components/ui/button";
 import { formatLongDate } from "@/lib/format";
+import { can, PERM } from "@/lib/platform/permissions";
 import { initials } from "@/lib/platform/roles";
 import { AdminDashboard } from "@/modules/repair/components/dashboard/admin-dashboard";
 
-// Home: admin / executive get the S29 dashboard (repair Stage 3D, CR-016); every other role keeps the
+// Home: whoever has `repair.overview.view` (Admin, Superadmin; settings CR-001) gets the S29 dashboard (repair
+// Stage 3D, CR-016); every other role keeps the
 // S02 Home — Stage 0 placeholder (D-023): greeting, the option-a CTA card and the services only.
 // Role widgets, "ติดตามงานซ่อม" and the bell count come in repair Stage 6. Bell, account and role
 // switcher are in the navbar (CR-010).
@@ -24,7 +26,7 @@ const SERVICE_LIST: { service: Service; href?: string; hint: string }[] = [
 
 export default function HomePage() {
   const me = useCurrentUser();
-  return me.role === "admin" || me.role === "executive" ? <AdminDashboard /> : <EmployeeHome />;
+  return can(me, PERM.overviewView) ? <AdminDashboard /> : <EmployeeHome />;
 }
 
 function EmployeeHome() {

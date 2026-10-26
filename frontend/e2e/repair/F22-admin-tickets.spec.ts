@@ -1,7 +1,7 @@
 import path from "node:path";
 import { expect, request as playwrightRequest, test, type APIRequestContext, type Page } from "@playwright/test";
 
-// F22 / F08-B (Stage 3, CR-015): S11 งานทั้งหมด for admin and executive, admin close with a reason.
+// F22 / F08-B (Stage 3, CR-015): S11 งานทั้งหมด for admin (no executive, repair CR-024), admin close with a reason.
 // Runs against the real API; each test reports its own ticket as the demo employee through the API.
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
@@ -88,26 +88,13 @@ test.describe("admin", () => {
   });
 });
 
-test.describe("executive", () => {
-  test.use({ storageState: auth("executive") });
-
-  test("AC3: read-only page, direct writes return 403", async ({ page, request, baseURL }) => {
-    const ticket = await reportTicket(await as("employee", baseURL));
-    await page.goto(`/repair/admin/queue?q=${ticket.ticketNo}`);
-    await expect(page.getByText("โหมดดูอย่างเดียว")).toBeVisible();
-    await expect(item(page, ticket.ticketNo).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /ปิดงาน/ })).toHaveCount(0);
-    expect((await request.post(`${API}/tickets/${ticket.id}/close`, { data: { reason: "x" } })).status()).toBe(403);
-    expect((await request.post(`${API}/tickets/${ticket.id}/assess`, { data: { expectedDoneOn: "2030-01-01", workBy: "in_house" } })).status()).toBe(403);
-  });
-});
 
 for (const role of ["employee", "technician"]) {
   test.describe(role, () => {
     test.use({ storageState: auth(role) });
     test(`${role} gets the forbidden state`, async ({ page }) => {
       await page.goto("/repair/admin/queue");
-      await expect(page.getByText("หน้านี้สำหรับ Admin และผู้บริหาร")).toBeVisible();
+      await expect(page.getByText("หน้านี้สำหรับ Admin เท่านั้น")).toBeVisible();
     });
   });
 }

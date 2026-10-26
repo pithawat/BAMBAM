@@ -1,6 +1,8 @@
 # S11 — คิวงาน (Admin)
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** no executive role: no read-only mode or strip, Priority shows `PriorityIndicator` only (CR-015), forbidden reason "หน้านี้สำหรับ Admin เท่านั้น", forbidden for every role except `admin` (+ `super_admin`); admin close dialog copy per `_common.md` §9.
 
 > **CR-015 (approved 2026-10-19):** admin does **not** change priority — no priority `Select`, no change-priority dialog, no toast. Priority is shown as `PriorityIndicator` + the priority filter stays (information). Default order everywhere: oldest report first (`createdAt:asc`); closed tab newest closed first. Overrides any priority text below.
 
@@ -103,7 +105,7 @@ Mobile (<1024px, secondary): white top bar "คิวงาน"; pill tabs (hori
 | Row menu | ย้ายไปบนสุด · ย้ายขึ้น · ย้ายลง · เปิดรายละเอียด · ปิดงาน |
 | Filters | ทุกหมวด · ทุกอาคาร · ทุกระดับ · ทุกเหตุผล · ตรวจรับแล้ว · ปิดอัตโนมัติ · ทีมดำเนินการเอง · Admin ปิดงาน · toggle เฉพาะงานทีมทำเอง |
 | Hand over button | ส่งต่อให้ช่าง |
-| Executive strip | โหมดดูอย่างเดียว — ผู้บริหารดูคิวได้ แต่จัดลำดับหรือแก้ไขไม่ได้ |
+| ~~Executive strip~~ | ~~โหมดดูอย่างเดียว — ผู้บริหารดูคิวได้ แต่จัดลำดับหรือแก้ไขไม่ได้~~ removed (CR-024) |
 | Search chip | ผลการค้นหา: {q} |
 | Reorder toast | เลื่อนลำดับแล้ว · action เลิกทำ |
 | Other toasts | เปลี่ยนความเร่งด่วนแล้ว · ปิดงานแล้ว · ส่งต่อให้ช่างแล้ว |
@@ -113,7 +115,7 @@ Mobile (<1024px, secondary): white top bar "คิวงาน"; pill tabs (hori
 | Error | Alert: โหลดคิวงานไม่สำเร็จ / ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง · button ลองอีกครั้ง |
 | Error — queue changed meanwhile | toast: ลำดับคิวเปลี่ยนไปแล้ว โหลดใหม่ให้แล้ว → refetch |
 | Error — ticket claimed meanwhile | toast: งานนี้มีช่างรับไปแล้ว → refetch |
-| Forbidden reason | หน้านี้สำหรับ Admin และผู้บริหาร |
+| Forbidden reason | ~~หน้านี้สำหรับ Admin และผู้บริหาร~~ หน้านี้สำหรับ Admin เท่านั้น (CR-024) |
 
 ## States
 

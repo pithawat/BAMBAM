@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
-	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
 // bangkok is Asia/Bangkok (no DST), used for the ticket-number year and dates.
@@ -55,31 +54,28 @@ type ticketAccess struct {
 	ViewerSubscribed bool
 }
 
-// canView implements BR-F06-1 for one ticket: reporter, subscribers, the technician
-// (every ticket, CR-005: one in-house technician), admin and executive.
+// canView implements BR-F06-1 for one ticket: reporter, subscribers and whoever sees every ticket
+// (`repair.ticket.view_all`: technician and admin by default, CR-005 / CR-007).
 func canView(v Viewer, t ticketAccess) bool {
-	if seesAllTickets(v.Role) {
+	if seesAllTickets(v) {
 		return true
 	}
 	return viewerRelation(v, t) != RelationNone
 }
 
-func seesAllTickets(role string) bool {
-	return role == users.RoleAdmin || role == users.RoleExecutive || role == users.RoleTechnician
-}
+func seesAllTickets(v Viewer) bool { return v.Can(PermViewAll) }
 
-// isLead: the team leads who may record a team-handled job (BR-F04-1) and hand their own over (BR-F05-2).
-// CR-007: becomes a permission check when settings Stage 1 lands.
-func isLead(role string) bool {
-	return role == users.RoleHousekeeperLead || role == users.RoleSecurityLead
-}
+// isLead: may record a team-handled job (BR-F04-1) and hand their own over (BR-F05-2) —
+// `repair.ticket.team_handle`, the team leads by default (CR-007).
+func isLead(v Viewer) bool { return v.Can(PermTeamHandle) }
 
-// canHandOver implements BR-F05-1/2: a team-handled ticket, by the lead who recorded it or by admin.
+// canHandOver implements BR-F05-1/2: a team-handled ticket, by the lead who recorded it or by
+// whoever hands over any (`repair.ticket.handover_any`, admin by default).
 func canHandOver(v Viewer, status string, closedReason *string, reporterID uuid.UUID) bool {
 	if status != StatusClosed || closedReason == nil || *closedReason != ClosedReasonTeamHandled {
 		return false
 	}
-	return v.Role == users.RoleAdmin || (isLead(v.Role) && reporterID == v.ID)
+	return v.Can(PermHandoverAny) || (isLead(v) && reporterID == v.ID)
 }
 
 // isOpenReportPhoto: a report photo of a ticket that is still open — the S04 duplicate cards show it
@@ -95,8 +91,8 @@ func normalizeSpot(s string) string {
 }
 
 // isStaff: who sees contractor names, contractor ratings and send-back counts.
-func isStaff(role string) bool {
-	return seesAllTickets(role)
+func isStaff(v Viewer) bool {
+	return seesAllTickets(v)
 }
 
 func viewerRelation(v Viewer, t ticketAccess) string {
@@ -105,7 +101,7 @@ func viewerRelation(v Viewer, t ticketAccess) string {
 		return RelationReporter
 	case t.ViewerSubscribed:
 		return RelationSubscriber
-	case v.Role == users.RoleTechnician:
+	case v.Can(PermWork):
 		return RelationTechnician
 	default:
 		return RelationNone
@@ -120,7 +116,7 @@ func decorate(v Viewer, s *TicketSummary) {
 	}
 	s.ViewerRelation = viewerRelation(v, ticketAccess{ReporterID: s.Reporter.ID, HolderID: holder, ViewerSubscribed: s.ViewerSubscribed})
 	s.AwaitingMyConfirmation = s.Status == StatusResolved && s.Reporter.ID == v.ID
-	if !isStaff(v.Role) {
+	if !isStaff(v) {
 		// Reporters see "ดำเนินการโดยช่างภายนอก · {types}" only (CR-005).
 		s.Contractor = nil
 	}
@@ -132,7 +128,7 @@ func allowedActions(v Viewer, d TicketDetail) ([]string, map[string]string) {
 	blocked := map[string]string{}
 	switch d.Status {
 	case StatusInProgress:
-		if v.Role == users.RoleTechnician {
+		if v.Can(PermWork) {
 			actions = append(actions, ActionAssess)
 			if d.ExpectedDoneOn == nil || d.WorkBy == nil {
 				blocked[ActionResolve] = "ASSESSMENT_REQUIRED"
@@ -145,8 +141,8 @@ func allowedActions(v Viewer, d TicketDetail) ([]string, map[string]string) {
 			actions = append(actions, ActionConfirm, ActionSendBack)
 		}
 	}
-	// F08-B: admin closes any open ticket; the executive is read-only (BR-F22-6).
-	if v.Role == users.RoleAdmin && d.Status != StatusClosed {
+	// F08-B: `repair.ticket.close_any` (admin by default) closes any open ticket.
+	if v.Can(PermCloseAny) && d.Status != StatusClosed {
 		actions = append(actions, ActionClose)
 	}
 	if canHandOver(v, d.Status, d.ClosedReason, d.Reporter.ID) {
@@ -353,17 +349,13 @@ func optional(s string) *string {
 
 // ---- CR-016: dashboard and equipment ----
 
-// seesDashboard: the S29 dashboard and floor plans (#27, #29, #30) are for admin and executive (BR-F23-2).
-// super_admin joins when settings Stage 1 adds it (D-079).
-func seesDashboard(role string) bool {
-	return role == users.RoleAdmin || role == users.RoleExecutive
-}
+// seesDashboard: the S29 dashboard and floor plans (#27, #29, #30) need `repair.overview.view`
+// (admin and super_admin by default, BR-F23-2, D-079).
+func seesDashboard(v Viewer) bool { return v.Can(PermOverviewView) }
 
-// managesAssets: add / move / edit / deactivate equipment (#31–#34). Admin now; super_admin and the
-// asset.manage permission when settings Stage 1 lands (D-079). The executive is read-only.
-func managesAssets(role string) bool {
-	return role == users.RoleAdmin
-}
+// managesAssets: add / move / edit / deactivate equipment (#31–#34) needs `settings.assets.manage`
+// (fixed: admin and super_admin, settings CR-001).
+func managesAssets(v Viewer) bool { return v.Can(permAssetsManage) }
 
 // validateAsset trims the input and returns field codes (BR-F31-1, contract #31).
 func validateAsset(in AssetInput) (AssetInput, map[string]string) {

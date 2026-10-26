@@ -83,7 +83,7 @@ Two themes, chosen per browser in the account menu → `ธีมสี` (stored
 ## Layout and spacing
 
 - **Adaptive (D-008):** phones `< 600px` (Tailwind `sm` and below) and tablets use the mobile layout; desktop from `lg` (1024px) adds the sidebar. Breakpoint-specific differences are listed per screen.
-- **Phone:** page padding 12–16px; white top bar (back · title · action); bottom nav (หน้าแรก · ติดตามงาน · **สแกน** solid blue raised circle · แจ้งเตือน · โปรไฟล์); primary actions in a sticky bottom footer.
+- **Phone:** page padding 12–16px; white top bar (back · title · action); bottom nav (หน้าแรก · ติดตามงาน · **สแกน** solid blue raised circle · ~~แจ้งเตือน~~ (repair CR-024: no notifications) · โปรไฟล์); primary actions in a sticky bottom footer.
 - **Desktop:** sidebar 216–240px (logo, groups, active item `bg-secondary text-primary`), top bar 60–68px (breadcrumb, env tag, bell, user), content centred.
 - **Spacing:** 4px base. Panel padding 20–24px (phone 15–16px). Gap between stacked panels 12–16px.
 - **Touch targets ≥ 44px**, buttons 44–52px (primary actions at the bottom of a step 52–56px).

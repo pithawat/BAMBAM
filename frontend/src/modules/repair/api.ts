@@ -300,7 +300,7 @@ export async function getContractorJobs(id: string, page = 1, pageSize = 20): Pr
 }
 // ---- Stage 3D (CR-016): S29 dashboard, floor plans, equipment ----
 
-/** #27 S29: key numbers, buildings → floors with open counts, attention list. 403 for roles other than admin / executive. */
+/** #27 S29: key numbers, buildings → floors with open counts, attention list. 403 without `repair.overview.view` (Admin, Superadmin). */
 export async function getOverview(): Promise<Overview> {
   if (env.useMocks) return mock(() => mockOverview(mockViewer()), { read: true });
   return http.get<Overview>(`${BASE}/admin/overview`);
@@ -370,7 +370,7 @@ function toQuery(q: Record<string, unknown>): string {
 
 function mockViewer() {
   const me = mockMeByRole[mockRole()];
-  return { id: me.id, role: me.role };
+  return { id: me.id, role: me.role, permissions: me.permissions };
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

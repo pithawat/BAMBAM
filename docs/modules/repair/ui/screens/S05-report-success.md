@@ -1,6 +1,8 @@
 # S05 — แจ้งสำเร็จ
 
-Status: APPROVED (2026-10-14) · team-variant link changed by CR-021
+Status: APPROVED (2026-10-14) · team-variant link changed by CR-021 · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** next-step line per `_common.md` §9 (no "เราจะแจ้งเตือน…").
 
 > **CR-021 (approved 2026-10-25):** team variant — `แจ้งเรื่องอื่น` opens `/repair/new?mode=team` (team mode is locked per entry point).
 
@@ -67,7 +69,7 @@ Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"); cente
 | Title | แจ้งซ่อมเรียบร้อย · team: บันทึกงานทีมเรียบร้อย |
 | Ticket label | เลขงานของคุณ |
 | Summary labels | หมวดงาน · อาการ · สถานที่ · ความเร่งด่วน · team: สถานะ |
-| Next step | งานเข้าคิวช่างหมวด{หมวดงาน}แล้ว เราจะแจ้งเตือนเมื่อช่างรับงาน |
+| Next step | งานเข้าคิวช่างหมวด{หมวดงาน}แล้ว ~~เราจะแจ้งเตือนเมื่อช่างรับงาน~~ ติดตามได้ที่ "ติดตามงาน" (CR-024) |
 | Next step (team) | งานนี้ปิดแล้วและนับเป็นผลงานของทีม หากต้องใช้ช่างภายหลัง กด "ส่งต่อให้ช่าง" ในหน้ารายละเอียดงาน |
 | Buttons | ดูงานนี้ · กลับหน้าแรก |
 | Copy toast | คัดลอกเลขงานแล้ว |

@@ -70,3 +70,17 @@ func TestPhotoStorageDir(t *testing.T) {
 		t.Fatalf("missing PHOTO_STORAGE_DIR in production not reported: %v", err)
 	}
 }
+
+func TestSuperAdminEmployeeCodes(t *testing.T) {
+	c, err := FromLookup(env(map[string]string{"SUPER_ADMIN_EMPLOYEE_CODES": " EMP0105, ,600123,EMP0105 "}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(c.SuperAdminEmployeeCodes, "|") != "EMP0105|600123" {
+		t.Fatalf("codes = %v, want trimmed, de-duplicated [EMP0105 600123]", c.SuperAdminEmployeeCodes)
+	}
+	c, err = FromLookup(env(nil))
+	if err != nil || len(c.SuperAdminEmployeeCodes) != 0 {
+		t.Fatalf("empty env: codes = %v, err = %v (optional, warning only)", c.SuperAdminEmployeeCodes, err)
+	}
+}

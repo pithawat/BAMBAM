@@ -1,6 +1,8 @@
 # S09 — คิวงานช่าง
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** empty copy per `_common.md` §9; there is no bell (the admin-close case simply disappears on the next refetch).
 
 > **CR-015 (approved 2026-10-19):** the list is ordered **oldest report first** (`sort=createdAt:asc`), not by priority; the priority chip on each row stays as information. Replaces 'most urgent first' below.
 
@@ -98,7 +100,7 @@ Desktop (≥1024px): sidebar ("คิวงาน" active) + top bar (title "ค
 | Reserved note (not holding, has reserved) | เริ่มงานที่ส่งกลับให้แก้ก่อน จึงรับงานใหม่ได้ |
 | Row | {order} · {priority} · แจ้งเมื่อ {time} · {title} · {location} · {category} · รับงาน |
 | Desktop columns | ลำดับ · เรื่อง / สถานที่ · หมวดงาน · ความเร่งด่วน · แจ้งเมื่อ |
-| Empty — queue | ยังไม่มีงานในหมวดของคุณ / งานใหม่จะแจ้งเตือนที่กระดิ่ง |
+| Empty — queue | ยังไม่มีงานในหมวดของคุณ / ~~งานใหม่จะแจ้งเตือนที่กระดิ่ง~~ งานใหม่จะแสดงที่หน้านี้ (CR-024) |
 | Empty — filter | ไม่มีงานในอาคารนี้ / button ดูทุกอาคาร |
 | No categories | ยังไม่ได้กำหนดหมวดงาน ติดต่อ Admin |
 | Error | Alert: โหลดคิวงานไม่สำเร็จ / ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง · button ลองอีกครั้ง |

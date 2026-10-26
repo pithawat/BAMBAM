@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM, seesRepairQueue } from "@/lib/platform/permissions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Mascot } from "@/components/shared/mascot";
@@ -39,8 +40,8 @@ const STEP_ICON: Record<TicketStep, LucideIcon> = {
 
 export function TicketDetailScreen({ id }: { id: string }) {
   const me = useCurrentUser();
-  const technician = me.role === "technician";
-  const staff = me.role === "admin" || me.role === "executive";
+  const technician = can(me, PERM.ticketWork);
+  const staff = seesRepairQueue(me);
   const [backHref] = useState(() => (technician ? "/repair/work" : ticketReturnHref(id, staff ? "/repair/admin/queue" : "/repair/my")));
   const { ticket, loading, error, reload, replace } = useTicket(id);
   const listLabel = technician ? "งานซ่อม" : backHref.startsWith("/repair/admin/queue") ? "งานทั้งหมด" : "ติดตามงานซ่อม";
@@ -55,7 +56,7 @@ type Tab = "info" | "result";
 
 function TicketBody({ ticket, onChanged, back }: { ticket: TicketDetail; onChanged: (t: TicketDetail) => void; back: { href: string; label: string } }) {
   const me = useCurrentUser();
-  const viewer = storyViewer(ticket, me.role);
+  const viewer = storyViewer(ticket, me);
   const story = ticketStory(ticket, viewer, me.id);
   const actions = useTicketActions(ticket, onChanged, { awaitingReaccept: story.awaitingReaccept });
   // The reporter rates from the band (CR-012); everyone else reads what happens now.
@@ -67,7 +68,7 @@ function TicketBody({ ticket, onChanged, back }: { ticket: TicketDetail; onChang
       <Heading ticket={ticket} back={back} />
       <div className="border-t">
         {review ? <ReviewBand ticket={ticket} actions={actions} />
-          : <NextAction ticket={ticket} viewer={viewer} story={story} meId={me.id} executive={me.role === "executive"} actions={actions} />}
+          : <NextAction ticket={ticket} viewer={viewer} story={story} meId={me.id} actions={actions} />}
       </div>
       <div className="grid border-t lg:grid-cols-[minmax(0,1fr)_22rem] print:block">
         <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)} className="min-w-0">
@@ -175,7 +176,7 @@ function ReviewBand({ ticket, actions }: { ticket: TicketDetail; actions: Action
 
 // ---- next action (per viewer, actions from allowedActions) ----
 
-function NextAction({ ticket, viewer, story, meId, executive, actions }: { ticket: TicketDetail; viewer: StoryViewer; story: Story; meId: string; executive: boolean; actions: Actions }) {
+function NextAction({ ticket, viewer, story, meId, actions }: { ticket: TicketDetail; viewer: StoryViewer; story: Story; meId: string; actions: Actions }) {
   const expected = ticket.expectedDoneOn ? dayLabel(ticket.expectedDoneOn, true) : "";
   const autoClose = ticket.autoCloseAt ? `${shortDate(ticket.autoCloseAt, true)} เวลา ${timeOf(ticket.autoCloseAt)} น.` : "";
   const primary = (label: string, Icon: LucideIcon, onClick: () => void) => <Button key={label} type="button" onClick={onClick} className="h-11 max-sm:w-full"><Icon aria-hidden />{label}</Button>;
@@ -246,7 +247,7 @@ function NextAction({ ticket, viewer, story, meId, executive, actions }: { ticke
         break;
     }
   } else {
-    // Follower, admin, executive: what is happening; admin closes from here (F08-B, below).
+    // Follower, staff: what is happening; `close_any` closes from here (F08-B, below).
     const line: Record<TicketStep, string> = {
       awaiting_assessment: "รับเรื่องแล้ว รอช่างกำหนดวันเสร็จ",
       in_repair: `ช่างกำลังดำเนินการ คาดว่าจะเสร็จ ${expected}`,
@@ -257,7 +258,7 @@ function NextAction({ ticket, viewer, story, meId, executive, actions }: { ticke
     if (viewer === "follower") {
       title = line[ticket.step]; desc = "คุณติดตามงานนี้ เราจะแจ้งเตือนเมื่อมีความคืบหน้า · ผู้แจ้งเป็นผู้ประเมินตรวจงานหรือส่งกลับให้แก้";
       note = ticket.step === "in_repair" ? moved : "";
-    } else { title = stepLabel(ticket); desc = line[ticket.step] + (executive ? " · ผู้บริหารดูได้อย่างเดียว" : ""); }
+    } else { title = stepLabel(ticket); desc = line[ticket.step]; }
   }
 
   // F08-B: admin can close any open ticket, whatever their relation to it (BR-F08B-1).

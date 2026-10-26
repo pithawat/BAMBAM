@@ -1,6 +1,7 @@
 "use client";
 
-import { Info, LogOut } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Info, LogOut, Settings } from "lucide-react";
 import { LogoutDialog } from "@/components/shared/logout-dialog";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { env } from "@/lib/env";
-import { initials, ROLE_LABELS } from "@/lib/platform/roles";
+import { can, canAnySettings, PERM } from "@/lib/platform/permissions";
+import { initials } from "@/lib/platform/roles";
 import type { Me } from "@/lib/platform/types";
 
 // S14 — โปรไฟล์ (read-only, BR-F01-3). Shows only the claims listed in the spec.
@@ -51,10 +53,10 @@ export default function ProfilePage() {
             <h2 className="mb-3 font-heading text-base font-semibold">บทบาทใน BAMBAM</h2>
             <div>
               <Badge variant="secondary" className="h-7 rounded-full px-3 text-[13.5px]">
-                {ROLE_LABELS[me.role]}
+                {me.roleName}
               </Badge>
             </div>
-            {me.role === "technician" && (
+            {can(me, PERM.ticketWork) && (
               <div className="mt-4">
                 <p className="text-[13.5px] font-medium text-muted-foreground">หมวดงานที่รับผิดชอบ</p>
                 {me.technicianCategories.length > 0 ? (
@@ -84,6 +86,20 @@ export default function ProfilePage() {
         <p className="pt-1 text-center text-[12.5px] text-muted-foreground lg:text-left">
           ข้อมูลอัปเดตจาก RMC SSO ทุกครั้งที่เข้าสู่ระบบ แก้ไขในแอปนี้ไม่ได้
         </p>
+
+        {/* settings CR-001: entry to the administration pages, above ออกจากระบบ (settings _common.md §2). */}
+        {canAnySettings(me) && (
+          <Card className="gap-0 rounded-xl border-0 p-0 shadow-card">
+            <Link
+              href="/settings"
+              className="flex min-h-14 items-center gap-3 rounded-xl px-4.5 font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30"
+            >
+              <Settings className="size-5 text-muted-foreground" aria-hidden />
+              <span className="flex-1">ตั้งค่าระบบ</span>
+              <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+            </Link>
+          </Card>
+        )}
 
         <div className="lg:flex lg:justify-end">
           <LogoutDialog

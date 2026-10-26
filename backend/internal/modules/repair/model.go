@@ -5,6 +5,7 @@ package repair
 
 import (
 	"math"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -175,9 +176,13 @@ type Building struct {
 
 // Viewer is the logged-in user as the repair service needs it.
 type Viewer struct {
-	ID   uuid.UUID
-	Role string
+	ID uuid.UUID
+	// Permissions is the effective permission set of the viewer's role (repair CR-007 A).
+	Permissions []string
 }
+
+// Can reports whether the viewer has the permission key (see permissions.go).
+func (v Viewer) Can(key string) bool { return slices.Contains(v.Permissions, key) }
 
 // TicketSummary is the list / card shape (04-api-contract.md TicketSummary).
 type TicketSummary struct {

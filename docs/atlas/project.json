@@ -1,7 +1,7 @@
 {
   "name": "BAMBAM",
   "summary": "ศูนย์รวมบริการที่ทำงานของพนักงาน: แจ้งซ่อม จองรถ และจองห้องประชุม",
-  "modules": ["repair"],
+  "modules": ["repair", "settings"],
   "theme": { "primary": "#2741FA", "primaryDark": "#6B7FFF" },
   "actors": {
     "user":  { "name": "พนักงาน",     "lane": "ผู้แจ้ง / พนักงาน", "sub": "ทุก role",          "color": "#2741FA", "dark": "#8C9BFF" },
@@ -12,9 +12,13 @@
     "exec":  { "name": "ผู้บริหาร",     "lane": "ผู้บริหาร",           "sub": "อ่านอย่างเดียว",       "color": "#475467", "dark": "#A3B3C5" },
     "ext":   { "name": "ระบบภายนอก",  "lane": "RMC SSO",           "sub": "ระบบภายนอก",         "color": "#8A5A12", "dark": "#D9B44A" },
     "dev":   { "name": "ผู้ทดสอบ",     "lane": "ผู้ทดสอบ",           "sub": "dev / UAT เท่านั้น",   "color": "#475467", "dark": "#A3B3C5" },
+    "super": { "name": "Superadmin",  "lane": "Superadmin",        "sub": "super_admin",        "color": "#6D28D9", "dark": "#B79CFF" },
+    "others":{ "name": "role อื่น",     "lane": "role อื่นทุก role",    "sub": "ไม่เห็นเมนูตั้งค่า",     "color": "#475467", "dark": "#A3B3C5" },
+    "ops":   { "name": "ผู้ดูแล server", "lane": "ผู้ดูแล server",      "sub": "ตั้งค่า env",          "color": "#8A5A12", "dark": "#D9B44A" },
     "all":   { "name": "ทุก role" }
   },
   "sessionRoles": {
+    "super_admin": "Superadmin",
     "employee": "พนักงาน",
     "housekeeper_lead": "หัวหน้าแม่บ้าน",
     "security_lead": "หัวหน้ารปภ.",

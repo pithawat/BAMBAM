@@ -34,7 +34,7 @@ export type PrioritySource = "symptom" | "category" | "default" | "reporter";
 /** Who did the work, recorded when the technician resolves the ticket. */
 export type WorkBy = "in_house" | "contractor";
 
-/** How the viewer relates to the ticket. `none` = admin / executive viewing. */
+/** How the viewer relates to the ticket. `none` = staff (view_all) viewing. */
 export type ViewerRelation = "reporter" | "subscriber" | "technician" | "none";
 
 /**
@@ -100,7 +100,7 @@ export type TicketSummary = {
   /** `YYYY-MM-DD` (Asia/Bangkok) once assessed. */
   expectedDoneOn: string | null;
   workBy: WorkBy | null;
-  /** Staff only (technician / admin / executive); null for others. */
+  /** Staff only (`repair.ticket.view_all`: technician, admin, super_admin); null for others. */
   contractor: Ref | null;
   /** Type names of the contractor — shown to everyone. */
   contractorTypes: string[];
@@ -235,7 +235,7 @@ export type TeamHandledRequest = { note: string; photoIds: string[] };
 export type TicketSort = "updatedAt:desc" | "createdAt:desc" | "createdAt:asc" | "closedAt:desc";
 
 export type TicketListQuery = {
-  /** `all`: technician, admin, executive. */
+  /** `all`: `repair.ticket.view_all` (technician, admin, super_admin). */
   scope?: "mine" | "all";
   status?: TicketStatus[];
   step?: TicketStep[];

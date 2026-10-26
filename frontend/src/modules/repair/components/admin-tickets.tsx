@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, ChevronLeft, ChevronRight, CircleX, Eye, Flag, FolderOpen, ListFilter, RotateCcw, Search } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, CircleX, Flag, FolderOpen, ListFilter, RotateCcw, Search } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PriorityIndicator } from "@/components/shared/priority-indicator";
 import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
 import { FilterPill } from "@/components/shared/filter-pill";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM, seesRepairQueue } from "@/lib/platform/permissions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,10 +24,11 @@ import { TicketLink } from "./ticket-navigation";
 import { autoCloseText, TicketThumb } from "./ticket-progress";
 import { categoryName, CLOSED_LABELS, dayLabel, listDate, PRIORITY_LABELS, ticketHref, ticketLocation, ticketTitle, todayBangkok } from "./ticket-presentation";
 
-// S11 งานทั้งหมด (Stage 3 re-spec, CR-005 + CR-015): admin and executive see every ticket by step, filter by
+// S11 งานทั้งหมด (Stage 3 re-spec, CR-005 + CR-015): repair managers (D-050) see every ticket by step, filter by
 // category / building / priority (information only) / closed reason, search by ticket no or place. Open tabs list
-// the oldest report first (BR-F22-1); closed lists the newest closed first. Admin closes an open ticket (F08-B);
-// the executive gets the same page read-only (BR-F22-6). Table from 1024px, card rows below.
+// the oldest report first (BR-F22-1); closed lists the newest closed first. `close_any` closes an open ticket
+// (F08-B), `handover_any` hands a team job over (F05) — permissions, not role names (CR-007 A). Table from 1024px,
+// card rows below.
 
 type Tab = "assess" | "repair" | "rating" | "closed";
 const TABS: Record<Tab, { label: string; steps: TicketStep[]; count: (c: TicketCounts) => number; empty: string }> = {
@@ -78,10 +80,10 @@ export function AdminTicketsScreen() {
     return () => window.clearTimeout(timer);
   }, [text, q, change]);
 
-  if (me.role !== "admin" && me.role !== "executive") {
-    return <><PageHeader title="งานทั้งหมด" variant="bar" /><ForbiddenState reason="หน้านี้สำหรับ Admin และผู้บริหาร" /></>;
+  if (!seesRepairQueue(me)) {
+    return <><PageHeader title="งานทั้งหมด" variant="bar" /><ForbiddenState reason="หน้านี้สำหรับ Admin เท่านั้น" /></>;
   }
-  const readOnly = me.role === "executive";
+  const allow = { close: can(me, PERM.ticketCloseAny), handover: can(me, PERM.ticketHandoverAny) };
   const filtered = filters.category !== "all" || filters.building !== "all" || filters.priority !== "all" || filters.reason !== "all" || q !== "";
   const reset = () => { setDraft({ query: q, value: "" }); change({ category: null, building: null, priority: null, reason: null, q: null }); };
   const key = [filters.tab, filters.category, filters.building, filters.priority, filters.reason, q, filters.page].join("|");
@@ -89,8 +91,6 @@ export function AdminTicketsScreen() {
   return <>
     <PageHeader title="งานทั้งหมด" variant="service" service="repair" subtitle="ทุกงานแจ้งซ่อม เรียงตามเวลาแจ้ง (เก่าก่อน)" />
     <div className="space-y-3 px-4 py-4 lg:px-0 lg:py-0">
-      {readOnly && <p role="note" className="flex items-center gap-2 rounded-lg border bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">
-        <Eye className="size-4 shrink-0" aria-hidden />โหมดดูอย่างเดียว — ผู้บริหารดูงานได้ แต่ปิดงานหรือแก้ไขไม่ได้</p>}
       <Card className="gap-3 p-3 shadow-card">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative min-w-0 lg:w-80">
@@ -113,12 +113,13 @@ export function AdminTicketsScreen() {
           </div>
         </div>
       </Card>
-      <Board key={key} filters={filters} readOnly={readOnly} filtered={filtered} change={change} reset={reset} />
+      <Board key={key} filters={filters} allow={allow} filtered={filtered} change={change} reset={reset} />
     </div>
   </>;
 }
 
-function Board({ filters, readOnly, filtered, change, reset }: { filters: Filters; readOnly: boolean; filtered: boolean; change: Change; reset: () => void }) {
+function Board({ filters, allow, filtered, change, reset }: { filters: Filters; allow: { close: boolean; handover: boolean }; filtered: boolean; change: Change; reset: () => void }) {
+  const readOnly = !allow.close && !allow.handover;
   const [counts, setCounts] = useState<TicketCounts>();
   const [items, setItems] = useState<TicketSummary[]>();
   const [total, setTotal] = useState(0);
@@ -155,7 +156,7 @@ function Board({ filters, readOnly, filtered, change, reset }: { filters: Filter
 
   const tabs = TAB_KEYS.map((t) => ({ value: t, label: counts && t !== "closed" ? `${TABS[t].label} ${TABS[t].count(counts)}` : TABS[t].label }));
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const canClose = !readOnly && tab !== "closed";
+  const canClose = allow.close && tab !== "closed";
   const from = (page - 1) * PAGE_SIZE + 1;
 
   return <>
@@ -192,13 +193,13 @@ function Board({ filters, readOnly, filtered, change, reset }: { filters: Filter
               {!readOnly && <TableCell className="pr-4 text-right align-top">
                 {canClose && <Button type="button" variant="ghost" size="sm" onClick={() => setClosing(t)} aria-label={`ปิดงาน ${t.ticketNo}`}
                   className="text-destructive hover:bg-destructive/5 hover:text-destructive"><CircleX aria-hidden />ปิดงาน</Button>}
-                {t.closedReason === "team_handled" && <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setHandingOver(t)}>ส่งต่อให้ช่าง</Button>}
+                {allow.handover && t.closedReason === "team_handled" && <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setHandingOver(t)}>ส่งต่อให้ช่าง</Button>}
               </TableCell>}
             </TableRow>)}</TableBody>
           </Table>
         </Card>
         <Card className="gap-0 divide-y py-0 shadow-card lg:hidden">{items.map((t) => <MobileRow key={t.id} ticket={t} tab={tab} onClose={canClose ? () => setClosing(t) : undefined}
-          onHandover={!readOnly && t.closedReason === "team_handled" ? () => setHandingOver(t) : undefined} />)}</Card>
+          onHandover={allow.handover && t.closedReason === "team_handled" ? () => setHandingOver(t) : undefined} />)}</Card>
         <nav aria-label="เลื่อนหน้า" className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">แสดง {from}–{from + items.length - 1} จาก {total} งาน</p>
           {pages > 1 && <div className="flex items-center gap-2">

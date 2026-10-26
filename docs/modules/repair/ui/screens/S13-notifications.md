@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-14)
 
+> **Removed by CR-024 (2026-10-26).** The system has no notifications: no S13, no `/notifications` route, no bell. Kept for history only — do not build it.
+
 - **Flows:** F19-B (recipients table, BR-F19B-1, BR-F19B-2) (see ../../02-flows.md)
 - **Persona:** every role; mobile first (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** list my own in-app notifications, newest first, and take me to the ticket each one is about.

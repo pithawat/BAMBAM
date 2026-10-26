@@ -13,6 +13,7 @@ const (
 	KindNotFound
 	KindConflict
 	KindBusinessRule
+	KindNotImplemented // a route whose stage is not built yet (501)
 )
 
 // Error carries a stable UPPER_SNAKE code (documented in 04-api-contract.md)
@@ -41,6 +42,7 @@ var (
 	ErrUnauthenticated = New(KindUnauthenticated, "UNAUTHENTICATED", "no or expired session")
 	ErrForbidden       = New(KindForbidden, "FORBIDDEN", "not allowed")
 	ErrNotFound        = New(KindNotFound, "NOT_FOUND", "not found")
+	ErrNotImplemented  = New(KindNotImplemented, "NOT_IMPLEMENTED", "not built yet")
 )
 
 func As(err error) (*Error, bool) {

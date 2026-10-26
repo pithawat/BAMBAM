@@ -1,6 +1,8 @@
 # S06 — ติดตามงานซ่อม
 
-Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068) · **layout replaced again by CR-019 (approved 2026-10-24)** · lead CTA / tabs and card heading changed by CR-021 (approved 2026-10-25)
+Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068) · **layout replaced again by CR-019 (approved 2026-10-24)** · lead CTA / tabs and card heading changed by CR-021 (approved 2026-10-25) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** no executive role; Admin sees the same page with their own tickets.
 
 > **CR-021 (approved 2026-10-25) — layout from `maintenance-demo.html`, no stats row (owner).** (1) **All roles:** the list card starts with a heading row — `รายการงานซ่อม` + count badge (total of the current filters) left, `อัปเดตล่าสุด {time}` right; the `แสดง {n} งาน` line is removed. Rows of `closedReason = team_handled` tickets add `· ทีมแก้เอง` after the ticket no. (2) **`housekeeper_lead` / `security_lead`:** CTA sub-line `เรียกช่างช่วยดูแล หรือบันทึกงานที่ทีมแก้ไขแล้ว` and two buttons — white `แจ้งซ่อมใหม่` (→ `/repair/new`) + outlined-on-blue `บันทึกงานที่ทีมแก้แล้ว` (→ `/repair/new?mode=team`); tabs `ทั้งหมด · ที่ฉันแจ้ง · ที่ฉันติดตาม · ทีมแก้เอง` (`?scope=team` → #35 `relation=reported&closedReason=team_handled`; a handed-over ticket leaves the tab). Other roles: one button, three tabs (`?scope=team` ignored).
 >

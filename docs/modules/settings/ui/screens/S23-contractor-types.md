@@ -1,6 +1,6 @@
 # S23 — ประเภทผู้รับเหมา
 
-Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · CR-001 applied 2026-10-26 (block below)
 
 - **Flows:** F28 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop (see ../../01-users.md)
@@ -8,6 +8,9 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 - **Route:** `/settings/contractor-types`
 - **Mockup:** none — `MasterList` single card (`_common.md` §4); desktop rows as in the S20 left pane, plus columns
 - **Data:** `listContractorTypes`, `createContractorType`, `updateContractorType`, `setContractorTypeActive`, `deleteContractorType`
+
+
+> **CR-001 (2026-10-26):** Superadmin only (`settings.contractor_types.manage`), reached from the sidebar group ข้อมูลกลาง (owner 2026-10-26). Visual: the administration shell and page heading (`_common.md` §1–§2) with one white panel holding the `MasterList` rows, as the CR-001 panels (`../mockups/CR-001-admin-settings.html`). Business rules, columns and copy below are unchanged.
 
 ## Layout — mobile first
 

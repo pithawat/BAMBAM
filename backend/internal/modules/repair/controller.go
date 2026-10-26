@@ -31,7 +31,7 @@ func viewer(c *gin.Context) (Viewer, bool) {
 		httpx.Error(c, apperr.ErrUnauthenticated)
 		return Viewer{}, false
 	}
-	return Viewer{ID: p.UserID, Role: p.Role}, true
+	return Viewer{ID: p.UserID, Permissions: p.Permissions}, true
 }
 
 // Categories handles #1 GET /repair/categories.

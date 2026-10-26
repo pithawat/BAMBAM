@@ -28,7 +28,7 @@ func assertNameTaken(t *testing.T, err error, owner uuid.UUID, active bool) {
 func TestContractorNameUnique(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
-	tech := Viewer{ID: uuid.New(), Role: users.RoleTechnician}
+	tech := viewerAs(users.RoleTechnician, uuid.New())
 	types := []uuid.UUID{uuid.New()}
 	create := func(name string) (Contractor, error) {
 		return f.svc.CreateContractor(ctx, tech, ContractorInput{Name: name, TypeIDs: types})

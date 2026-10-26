@@ -12,17 +12,24 @@ import (
 )
 
 const getUserWithRole = `-- name: GetUserWithRole :one
-SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, COALESCE(r.role, 'employee')::text AS role
+
+SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, r.key AS role, r.name AS role_name,
+       ARRAY(SELECT rp.permission FROM platform.role_permissions rp WHERE rp.role_id = r.id ORDER BY rp.permission)::text[] AS permissions
 FROM platform.users u
-LEFT JOIN platform.user_roles r ON r.employee_code = u.employee_code
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+JOIN platform.roles r ON r.id = ur.role_id OR (ur.role_id IS NULL AND r.key = 'employee')
 WHERE u.id = $1
 `
 
 type GetUserWithRoleRow struct {
 	PlatformUser PlatformUser
 	Role         string
+	RoleName     string
+	Permissions  []string
 }
 
+// The user's role is their user_roles row, or `employee` when there is none (D-003).
+// Stored permissions are loaded on every request so matrix changes apply at once (D-049, BR-F29-7).
 func (q *Queries) GetUserWithRole(ctx context.Context, id uuid.UUID) (GetUserWithRoleRow, error) {
 	row := q.db.QueryRow(ctx, getUserWithRole, id)
 	var i GetUserWithRoleRow
@@ -43,6 +50,8 @@ func (q *Queries) GetUserWithRole(ctx context.Context, id uuid.UUID) (GetUserWit
 		&i.PlatformUser.CreatedAt,
 		&i.PlatformUser.UpdatedAt,
 		&i.Role,
+		&i.RoleName,
+		&i.Permissions,
 	)
 	return i, err
 }
@@ -72,9 +81,10 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 }
 
 const listDemoUsers = `-- name: ListDemoUsers :many
-SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, COALESCE(r.role, 'employee')::text AS role
+SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, r.key AS role
 FROM platform.users u
-LEFT JOIN platform.user_roles r ON r.employee_code = u.employee_code
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+JOIN platform.roles r ON r.id = ur.role_id OR (ur.role_id IS NULL AND r.key = 'employee')
 WHERE u.is_demo
 ORDER BY u.employee_code
 `
@@ -241,18 +251,22 @@ func (q *Queries) UpsertSSOUser(ctx context.Context, arg UpsertSSOUserParams) (P
 	return i, err
 }
 
-const upsertUserRole = `-- name: UpsertUserRole :exec
-INSERT INTO platform.user_roles (employee_code, role)
-VALUES ($1, $2)
-ON CONFLICT (employee_code) DO UPDATE SET role = EXCLUDED.role, updated_at = now()
+const upsertUserRole = `-- name: UpsertUserRole :execrows
+INSERT INTO platform.user_roles (employee_code, role_id)
+SELECT $1, r.id FROM platform.roles r WHERE r.key = $2
+ON CONFLICT (employee_code) DO UPDATE SET role_id = EXCLUDED.role_id, updated_at = now()
 `
 
 type UpsertUserRoleParams struct {
 	EmployeeCode string
-	Role         string
+	RoleKey      string
 }
 
-func (q *Queries) UpsertUserRole(ctx context.Context, arg UpsertUserRoleParams) error {
-	_, err := q.db.Exec(ctx, upsertUserRole, arg.EmployeeCode, arg.Role)
-	return err
+// Assigns a role by key; 0 rows = unknown role key.
+func (q *Queries) UpsertUserRole(ctx context.Context, arg UpsertUserRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertUserRole, arg.EmployeeCode, arg.RoleKey)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

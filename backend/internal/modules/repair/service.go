@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
-	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
 // Repository is the data layer the service needs (implemented by PgRepository).
@@ -249,7 +248,7 @@ func (s *Service) deleteFiles(ctx context.Context, keys ...string) {
 // technician's assessment (CR-005); a lead's team-handled record starts `closed` / `team_handled`
 // (F04). Both are refused when an open ticket matches (F03, BR-F03-2, BR-F04-3).
 func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInput) (TicketDetail, error) {
-	if in.TeamHandled != nil && !isLead(v.Role) {
+	if in.TeamHandled != nil && !isLead(v) {
 		return TicketDetail{}, ErrTeamHandledNotAllowed
 	}
 	in, fields := validateCreate(in)
@@ -375,7 +374,7 @@ func (s *Service) Ticket(ctx context.Context, v Viewer, id uuid.UUID) (TicketDet
 		return TicketDetail{}, apperr.ErrForbidden
 	}
 	decorate(v, &d.TicketSummary)
-	if !isStaff(v.Role) && d.Result != nil {
+	if !isStaff(v) && d.Result != nil {
 		// The contractor's score is internal (BR-F24-4).
 		r := *d.Result
 		r.ContractorRating, r.ContractorRatingComment = nil, nil
@@ -413,9 +412,9 @@ func (s *Service) TicketCounts(ctx context.Context, v Viewer, f TicketFilter) (T
 	return s.repo.CountTickets(ctx, v.ID, f)
 }
 
-// checkScope: scope=all is for the technician, admin and executive (BR-F06-1, CR-005).
+// checkScope: scope=all needs `repair.ticket.view_all` (BR-F06-1, CR-005, CR-007).
 func (s *Service) checkScope(v Viewer, f TicketFilter) error {
-	if f.ScopeAll && !seesAllTickets(v.Role) {
+	if f.ScopeAll && !seesAllTickets(v) {
 		return apperr.ErrForbidden
 	}
 	return nil
@@ -443,7 +442,7 @@ func checkState(t LockedTicket, want string) error {
 // Assess implements endpoint #9: the technician sets (or changes) the expected finish date and
 // who does the work — in house or a contractor (BR-F21-2, CR-006).
 func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessInput) (TicketDetail, error) {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermWork) {
 		return TicketDetail{}, ErrNotTechnician
 	}
 	now := s.now()
@@ -491,7 +490,7 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 // Resolve implements endpoint #10: result note + photos and, for a contractor job, the contractor
 // rating (BR-F21-4, BR-F24-3). Who did the work was set by the assessment (CR-006).
 func (s *Service) Resolve(ctx context.Context, v Viewer, id uuid.UUID, in ResolveInput) (TicketDetail, error) {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermWork) {
 		return TicketDetail{}, ErrNotTechnician
 	}
 	now := s.now()
@@ -602,9 +601,9 @@ func (s *Service) SendBack(ctx context.Context, v Viewer, id uuid.UUID, reason s
 }
 
 // Close implements endpoint #21: admin closes any open ticket with a reason, without waiting for
-// the reporter (F08-B, BR-F08B-1). The executive sees the same screens read-only (BR-F22-6).
+// the reporter (F08-B, BR-F08B-1); needs `repair.ticket.close_any`.
 func (s *Service) Close(ctx context.Context, v Viewer, id uuid.UUID, reason string) (TicketDetail, error) {
-	if v.Role != users.RoleAdmin {
+	if !v.Can(PermCloseAny) {
 		return TicketDetail{}, apperr.ErrForbidden
 	}
 	reason = strings.TrimSpace(reason)
@@ -642,7 +641,7 @@ func (s *Service) AutoClose(ctx context.Context) (int, error) {
 // ---- contractors (F24) ----
 
 func checkStaff(v Viewer) error {
-	if !isStaff(v.Role) {
+	if !isStaff(v) {
 		return apperr.ErrForbidden
 	}
 	return nil
@@ -657,8 +656,9 @@ func (s *Service) ContractorTypes(ctx context.Context, v Viewer) ([]Ref, error) 
 }
 
 // CreateContractorType implements endpoint #14: an existing name (any case) returns that type (BR-F24-2).
+// Types are created from the assess sheet (`work`, D-041) and the contractor form (`contractor.manage`).
 func (s *Service) CreateContractorType(ctx context.Context, v Viewer, name string) (Ref, error) {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermWork) && !v.Can(PermContractorManage) {
 		return Ref{}, ErrNotTechnician
 	}
 	name = strings.Join(strings.Fields(name), " ")
@@ -724,7 +724,7 @@ func (s *Service) UpdateContractor(ctx context.Context, v Viewer, id uuid.UUID, 
 }
 
 func (s *Service) saveContractor(ctx context.Context, v Viewer, in ContractorInput, write func(TxRepository, ContractorInput) error, id uuid.UUID) error {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermContractorManage) {
 		return ErrNotTechnician
 	}
 	in, fields := validateContractor(in)

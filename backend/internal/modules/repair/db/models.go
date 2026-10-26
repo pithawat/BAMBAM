@@ -59,6 +59,33 @@ type PlatformFloorPlan struct {
 	UpdatedAt time.Time
 }
 
+type PlatformPermissionMatrix struct {
+	ID          bool
+	Version     int32
+	UpdatedByID *uuid.UUID
+	UpdatedAt   time.Time
+}
+
+type PlatformRole struct {
+	ID          uuid.UUID
+	Key         string
+	Name        string
+	Description string
+	IsSystem    bool
+	IsLocked    bool
+	SortOrder   int32
+	CreatedByID *uuid.UUID
+	UpdatedByID *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type PlatformRolePermission struct {
+	RoleID     uuid.UUID
+	Permission string
+	CreatedAt  time.Time
+}
+
 type PlatformRoom struct {
 	ID        uuid.UUID
 	FloorID   uuid.UUID
@@ -101,9 +128,9 @@ type PlatformUser struct {
 
 type PlatformUserRole struct {
 	EmployeeCode string
-	Role         string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	RoleID       uuid.UUID
 }
 
 type RepairAssetTypeCategory struct {

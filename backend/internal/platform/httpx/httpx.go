@@ -58,6 +58,8 @@ func status(k apperr.Kind) int {
 		return http.StatusConflict
 	case apperr.KindBusinessRule:
 		return http.StatusUnprocessableEntity
+	case apperr.KindNotImplemented:
+		return http.StatusNotImplemented
 	default:
 		return http.StatusInternalServerError
 	}

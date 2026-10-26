@@ -1,8 +1,8 @@
 import path from "node:path";
-import { expect, request as playwrightRequest, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-// F23 (Stage 3D, CR-016): S29 dashboard Home for admin / executive — numbers equal S11, อาคาร 1 in 3D with
-// floor drill-down, executive read-only, other roles keep the normal Home; phones get the floor list.
+// F23 (Stage 3D, CR-016): S29 dashboard Home for admin (no executive, repair CR-024) — numbers equal S11, อาคาร 1 in
+// 3D with floor drill-down, other roles keep the normal Home; phones get the floor list.
 // Runs against the real API (migration 20261020000001: อาคาร 1, 6 floors with traced rooms).
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 const API = "/api/v1/repair";
@@ -115,25 +115,6 @@ test.describe("admin", () => {
   });
 });
 
-test.describe("executive", () => {
-  test.use({ storageState: auth("executive") });
-
-  test("AC5: same dashboard without edit controls; writes are 403", async ({ page, baseURL, isMobile }) => {
-    await page.goto("/");
-    await expect(page.getByText("ภาพรวมวันนี้").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "จัดวางอุปกรณ์" })).toHaveCount(0);
-    if (!isMobile) {
-      await page.locator(CARD).getByRole("group", { name: "เลือกชั้น" }).getByRole("button", { name: /^ชั้น 1 / }).click();
-      await expect(page.locator(CARD)).toContainText("HR 3");
-      await expect(page.getByRole("button", { name: "เพิ่มอุปกรณ์" })).toHaveCount(0);
-    }
-    const api = await playwrightRequest.newContext({ baseURL, storageState: auth("executive") });
-    const types = (await (await api.get(`${API}/asset-types`)).json()).data;
-    expect(types.map((t: { key: string }) => t.key)).toEqual(["aircon", "microphone", "speaker", "tv"]);
-    const res = await api.post(`${API}/assets`, { data: { assetTypeId: types[0].id, code: "EXEC-NO", name: "x", roomId: "c016e001-0000-4000-8000-000000000001" } });
-    expect(res.status()).toBe(403);
-  });
-});
 
 for (const role of ["employee", "technician"]) {
   test.describe(role, () => {

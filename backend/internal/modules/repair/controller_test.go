@@ -23,7 +23,7 @@ func (s fixedSession) Resolve(*gin.Context) (middleware.Principal, error) { retu
 func newTestRouter(f *fixture, role string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	authed := r.Group("/api/v1", middleware.RequireAuth(fixedSession{middleware.Principal{UserID: f.reporter.ID, Role: role}}))
+	authed := r.Group("/api/v1", middleware.RequireAuth(fixedSession{middleware.Principal{UserID: f.reporter.ID, Role: role, Permissions: principalPerms(role)}}))
 	RegisterRoutes(authed.Group("/repair"), NewController(f.svc))
 	return r
 }
@@ -167,15 +167,16 @@ func TestControllerReportFlow(t *testing.T) {
 	}
 }
 
-// Stage 3 AC3: the executive is read-only — every write except reporting returns 403.
-func TestExecutiveWritesForbidden(t *testing.T) {
+// CR-007 A: a custom role with only the read permissions (view_all, overview.view) gets 403 on
+// every staff write — the checks follow permissions, not role names.
+func TestReadOnlyRoleWritesForbidden(t *testing.T) {
 	f := newFixture(t)
 	d := f.create(t)
 	f.repo.tickets[d.ID].Status = StatusResolved
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	exec := middleware.Principal{UserID: uuid.New(), Role: users.RoleExecutive}
-	RegisterRoutes(r.Group("/api/v1", middleware.RequireAuth(fixedSession{exec})).Group("/repair"), NewController(f.svc))
+	reader := middleware.Principal{UserID: uuid.New(), Role: "r_0a1b2c3d", Permissions: []string{PermViewAll, PermOverviewView}}
+	RegisterRoutes(r.Group("/api/v1", middleware.RequireAuth(fixedSession{reader})).Group("/repair"), NewController(f.svc))
 
 	ticket := "/api/v1/repair/tickets/" + d.ID.String()
 	cases := []struct{ method, path, body string }{

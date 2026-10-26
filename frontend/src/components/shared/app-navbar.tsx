@@ -4,9 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, LogOut, UserRound } from "lucide-react";
+import { Check, ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { initials, ROLE_LABELS } from "@/lib/platform/roles";
+import { canAnySettings, repairHome } from "@/lib/platform/permissions";
+import { initials } from "@/lib/platform/roles";
 import type { Me } from "@/lib/platform/types";
 import { applyTheme, currentTheme, THEMES, type ThemeId } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -14,7 +15,8 @@ import { BellButton } from "./bell-button";
 import { LogoutDialog } from "./logout-dialog";
 import { SERVICES, type Service } from "./service-icon";
 
-// Top navigation (_common.md §1, CR-010): BAMBAM · หน้าแรก · three equal services · bell · account menu.
+// Top navigation (_common.md §1, CR-010): BAMBAM · หน้าแรก · three equal services · ตั้งค่าระบบ (settings CR-001,
+// any `settings.*` permission) · bell · account menu. Settings pages use their own administration shell instead.
 // No sidebar, no bottom nav and no repair-only shortcut here; repair tracking and staff tools live in the repair
 // section nav (modules/repair/components/repair-nav.tsx). Desktop: floating sticky bar. Phone / tablet: brand row
 // + a row of the three services; it scrolls away so route-local sticky bars keep the top edge.
@@ -23,8 +25,8 @@ type ServiceLink = { service: Service; href: string; match: string };
 
 function serviceLinks(me: Me): ServiceLink[] {
   return [
-    // The technician's repair home is their work list (CR-005); everyone else tracks their own tickets.
-    { service: "repair", href: me.role === "technician" ? "/repair/work" : "/repair/my", match: "/repair" },
+    // Whoever works tickets starts at the work list (CR-005, `repair.ticket.work`); everyone else tracks their own.
+    { service: "repair", href: repairHome(me), match: "/repair" },
     { service: "car", href: "/car-booking", match: "/car-booking" },
     { service: "room", href: "/room-booking", match: "/room-booking" },
   ];
@@ -59,6 +61,12 @@ export function AppNavbar({ me }: { me: Me }) {
                 </Link>
               );
             })}
+            {canAnySettings(me) && (
+              <Link href="/settings" className={desktopItem(within(pathname, "/settings"))}>
+                <Settings className="size-4.5" aria-hidden />
+                ตั้งค่าระบบ
+              </Link>
+            )}
           </nav>
 
           <div className="ml-auto flex items-center gap-1 lg:gap-2">
@@ -132,7 +140,7 @@ function AccountMenu({ me }: { me: Me }) {
             <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-[13px] font-semibold text-secondary-foreground">{initials(me.name)}</span>
             <span className="hidden max-w-40 min-w-0 text-left leading-tight lg:block">
               <b className="block truncate text-sm font-semibold">{me.name}</b>
-              <span className="block truncate text-xs text-muted-foreground">{ROLE_LABELS[me.role]}</span>
+              <span className="block truncate text-xs text-muted-foreground">{me.roleName}</span>
             </span>
             <ChevronDown className="hidden size-4 text-muted-foreground lg:block" aria-hidden />
           </button>
@@ -147,13 +155,19 @@ function AccountMenu({ me }: { me: Me }) {
         >
           <div className="border-b px-3 pt-1.5 pb-2.5 lg:hidden">
             <b className="block truncate text-sm font-semibold">{me.name}</b>
-            <span className="block truncate text-xs text-muted-foreground">{ROLE_LABELS[me.role]}</span>
+            <span className="block truncate text-xs text-muted-foreground">{me.roleName}</span>
           </div>
           <div ref={menu} role="menu" aria-label="เมนูบัญชี" onKeyDown={onMenuKey} className="pt-1 lg:pt-0">
             <Link href="/profile" role="menuitem" className={item} onClick={() => setOpen(false)}>
               <UserRound className="size-4.5 text-muted-foreground" aria-hidden />
               โปรไฟล์
             </Link>
+            {canAnySettings(me) && (
+              <Link href="/settings" role="menuitem" className={item} onClick={() => setOpen(false)}>
+                <Settings className="size-4.5 text-muted-foreground" aria-hidden />
+                ตั้งค่าระบบ
+              </Link>
+            )}
             <div role="group" aria-labelledby="theme-label" className="my-1 border-y py-1">
               <span id="theme-label" className="block px-3 pt-1.5 pb-1 text-xs text-muted-foreground">ธีมสี</span>
               {THEMES.map((t) => (

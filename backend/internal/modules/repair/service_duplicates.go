@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
-	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
 // Stage 4: duplicate check + follow (F03), hand over a team-handled job (F05).
@@ -144,9 +143,9 @@ func (s *Service) Follow(ctx context.Context, v Viewer, id uuid.UUID, note strin
 
 // HandOver implements endpoint #24: a team-handled ticket goes back to the technician as the same
 // ticket, `in_progress` waiting for the assessment (BR-F05-1/3, CR-005). Only the lead who recorded
-// it, or admin (BR-F05-2); the reason is required.
+// it, or `repair.ticket.handover_any` (admin by default, BR-F05-2); the reason is required.
 func (s *Service) HandOver(ctx context.Context, v Viewer, id uuid.UUID, reason string) (TicketDetail, error) {
-	if v.Role != users.RoleAdmin && !isLead(v.Role) {
+	if !v.Can(PermHandoverAny) && !isLead(v) {
 		return TicketDetail{}, apperr.ErrForbidden
 	}
 	reason = strings.TrimSpace(reason)
@@ -161,7 +160,7 @@ func (s *Service) HandOver(ctx context.Context, v Viewer, id uuid.UUID, reason s
 		if err != nil {
 			return err
 		}
-		if v.Role != users.RoleAdmin && t.ReporterID != v.ID {
+		if !v.Can(PermHandoverAny) && t.ReporterID != v.ID {
 			return apperr.ErrForbidden
 		}
 		if t.Status != StatusClosed || t.ClosedReason != ClosedReasonTeamHandled {

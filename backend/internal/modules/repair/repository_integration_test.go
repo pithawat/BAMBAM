@@ -99,7 +99,7 @@ func (p *pgFixture) user(t *testing.T, role string) Viewer {
 			}
 		}
 	})
-	return Viewer{ID: id, Role: role}
+	return viewerAs(role, id)
 }
 
 // create is safe to call from goroutines (no t.Fatal).

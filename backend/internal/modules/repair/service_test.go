@@ -411,7 +411,7 @@ func newFixture(t *testing.T) *fixture {
 		now: time.Date(2026, 10, 14, 3, 15, 0, 0, time.UTC),
 		cat: uuid.New(), sym1: uuid.New(), sym2: uuid.New(), building: uuid.New(), floor: uuid.New(), room: uuid.New(),
 		other: uuid.New(), otherSym: uuid.New(),
-		reporter: Viewer{ID: uuid.New(), Role: users.RoleEmployee},
+		reporter: viewerAs(users.RoleEmployee, uuid.New()),
 	}
 	f.repo.cats[f.cat] = true
 	f.repo.catDef[f.cat] = PriorityLow
@@ -752,7 +752,7 @@ func TestCreateTicketRejectsChangedMasterData(t *testing.T) {
 
 func TestCreateTicketRejectsPhotosNotAttachable(t *testing.T) {
 	f := newFixture(t)
-	someoneElse := Viewer{ID: uuid.New(), Role: users.RoleEmployee}
+	someoneElse := viewerAs(users.RoleEmployee, uuid.New())
 	cases := map[string]func() uuid.UUID{
 		"unknown":      func() uuid.UUID { return uuid.New() },
 		"other user's": func() uuid.UUID { return f.upload(t, someoneElse) },
@@ -811,14 +811,14 @@ func TestTicketVisibilityMatrix(t *testing.T) {
 		relation string
 	}{
 		{"reporter", f.reporter, true, RelationReporter},
-		{"subscriber", Viewer{ID: subscriber, Role: users.RoleEmployee}, true, RelationSubscriber},
-		{"holder technician", Viewer{ID: holder, Role: users.RoleTechnician}, true, RelationTechnician},
-		{"admin", Viewer{ID: uuid.New(), Role: users.RoleAdmin}, true, RelationNone},
-		{"executive", Viewer{ID: uuid.New(), Role: users.RoleExecutive}, true, RelationNone},
-		{"other employee", Viewer{ID: uuid.New(), Role: users.RoleEmployee}, false, ""},
-		{"housekeeper lead", Viewer{ID: uuid.New(), Role: users.RoleHousekeeperLead}, false, ""},
-		{"security lead", Viewer{ID: uuid.New(), Role: users.RoleSecurityLead}, false, ""},
-		{"any technician (CR-005)", Viewer{ID: uuid.New(), Role: users.RoleTechnician}, true, RelationTechnician},
+		{"subscriber", viewerAs(users.RoleEmployee, subscriber), true, RelationSubscriber},
+		{"holder technician", viewerAs(users.RoleTechnician, holder), true, RelationTechnician},
+		{"admin", viewerAs(users.RoleAdmin, uuid.New()), true, RelationNone},
+		{"super_admin (has work)", viewerAs(users.RoleSuperAdmin, uuid.New()), true, RelationTechnician},
+		{"other employee", viewerAs(users.RoleEmployee, uuid.New()), false, ""},
+		{"housekeeper lead", viewerAs(users.RoleHousekeeperLead, uuid.New()), false, ""},
+		{"security lead", viewerAs(users.RoleSecurityLead, uuid.New()), false, ""},
+		{"any technician (CR-005)", viewerAs(users.RoleTechnician, uuid.New()), true, RelationTechnician},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -852,7 +852,7 @@ func TestTicketHidesContractorFromReporter(t *testing.T) {
 	if mine.Contractor != nil || mine.Result.ContractorRating != nil {
 		t.Fatalf("reporter sees contractor=%v rating=%v (BR-F24-4)", mine.Contractor, mine.Result.ContractorRating)
 	}
-	admin, _ := f.svc.Ticket(context.Background(), Viewer{ID: uuid.New(), Role: users.RoleAdmin}, d.ID)
+	admin, _ := f.svc.Ticket(context.Background(), viewerAs(users.RoleAdmin, uuid.New()), d.ID)
 	if admin.Contractor == nil || admin.Result.ContractorRating == nil {
 		t.Fatal("admin must see the contractor and its rating")
 	}
@@ -864,16 +864,16 @@ func TestListScopeAndDecoration(t *testing.T) {
 	f.repo.tickets[d.ID].Status = StatusResolved
 
 	for _, role := range []string{users.RoleEmployee, users.RoleHousekeeperLead, users.RoleSecurityLead} {
-		_, _, err := f.svc.Tickets(context.Background(), Viewer{ID: uuid.New(), Role: role}, TicketFilter{ScopeAll: true})
+		_, _, err := f.svc.Tickets(context.Background(), viewerAs(role, uuid.New()), TicketFilter{ScopeAll: true})
 		if !errors.Is(err, apperr.ErrForbidden) {
 			t.Fatalf("%s scope=all: %v", role, err)
 		}
-		if _, err := f.svc.TicketCounts(context.Background(), Viewer{ID: uuid.New(), Role: role}, TicketFilter{ScopeAll: true}); !errors.Is(err, apperr.ErrForbidden) {
+		if _, err := f.svc.TicketCounts(context.Background(), viewerAs(role, uuid.New()), TicketFilter{ScopeAll: true}); !errors.Is(err, apperr.ErrForbidden) {
 			t.Fatalf("%s counts scope=all: %v", role, err)
 		}
 	}
-	for _, role := range []string{users.RoleAdmin, users.RoleExecutive, users.RoleTechnician} {
-		if _, _, err := f.svc.Tickets(context.Background(), Viewer{ID: uuid.New(), Role: role}, TicketFilter{ScopeAll: true}); err != nil {
+	for _, role := range []string{users.RoleAdmin, users.RoleSuperAdmin, users.RoleTechnician} {
+		if _, _, err := f.svc.Tickets(context.Background(), viewerAs(role, uuid.New()), TicketFilter{ScopeAll: true}); err != nil {
 			t.Fatalf("%s scope=all: %v", role, err)
 		}
 	}
@@ -923,7 +923,7 @@ func TestUploadPhoto(t *testing.T) {
 func TestOpenPhotoPermissions(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	other := Viewer{ID: uuid.New(), Role: users.RoleEmployee}
+	other := viewerAs(users.RoleEmployee, uuid.New())
 
 	loose := f.upload(t, f.reporter)
 	if _, _, err := f.svc.OpenPhoto(ctx, other, loose, true); !errors.Is(err, apperr.ErrForbidden) {
@@ -941,7 +941,7 @@ func TestOpenPhotoPermissions(t *testing.T) {
 	if _, _, err := f.svc.OpenPhoto(ctx, other, attached, false); !errors.Is(err, apperr.ErrForbidden) {
 		t.Fatalf("attached photo by unrelated user: %v", err)
 	}
-	if _, _, err := f.svc.OpenPhoto(ctx, Viewer{ID: uuid.New(), Role: users.RoleAdmin}, attached, false); err != nil {
+	if _, _, err := f.svc.OpenPhoto(ctx, viewerAs(users.RoleAdmin, uuid.New()), attached, false); err != nil {
 		t.Fatalf("admin: %v", err)
 	}
 	if _, _, err := f.svc.OpenPhoto(ctx, f.reporter, uuid.New(), false); code(err) != "PHOTO_NOT_FOUND" {
@@ -976,11 +976,11 @@ func TestPurgeUnattachedPhotos(t *testing.T) {
 func TestAdminClose(t *testing.T) {
 	f := newFixture(t)
 	d := f.create(t)
-	admin := Viewer{ID: uuid.New(), Role: users.RoleAdmin}
+	admin := viewerAs(users.RoleAdmin, uuid.New())
 	ctx := context.Background()
 
-	for _, role := range []string{users.RoleExecutive, users.RoleTechnician, users.RoleEmployee, users.RoleHousekeeperLead} {
-		if _, err := f.svc.Close(ctx, Viewer{ID: uuid.New(), Role: role}, d.ID, "ปิด"); !errors.Is(err, apperr.ErrForbidden) {
+	for _, role := range []string{users.RoleTechnician, users.RoleEmployee, users.RoleHousekeeperLead, users.RoleSecurityLead} {
+		if _, err := f.svc.Close(ctx, viewerAs(role, uuid.New()), d.ID, "ปิด"); !errors.Is(err, apperr.ErrForbidden) {
 			t.Fatalf("%s close: %v, want FORBIDDEN", role, err)
 		}
 	}
@@ -1020,19 +1020,19 @@ func TestAdminCloseFromAnyOpenStatus(t *testing.T) {
 		f := newFixture(t)
 		d := f.create(t)
 		f.repo.tickets[d.ID].Status = status
-		if _, err := f.svc.Close(context.Background(), Viewer{ID: uuid.New(), Role: users.RoleAdmin}, d.ID, "ปิด"); err != nil {
+		if _, err := f.svc.Close(context.Background(), viewerAs(users.RoleAdmin, uuid.New()), d.ID, "ปิด"); err != nil {
 			t.Fatalf("%s: %v", status, err)
 		}
 	}
 }
 
-// BR-F22-6: the executive sees every ticket but gets no actions.
-func TestExecutiveHasNoActions(t *testing.T) {
+// CR-007 A: seeing every ticket (view_all) gives no actions by itself.
+func TestViewAllAloneHasNoActions(t *testing.T) {
 	f := newFixture(t)
 	d := f.create(t)
 	for _, status := range []string{StatusInProgress, StatusResolved, StatusClosed} {
 		f.repo.tickets[d.ID].Status = status
-		got, err := f.svc.Ticket(context.Background(), Viewer{ID: uuid.New(), Role: users.RoleExecutive}, d.ID)
+		got, err := f.svc.Ticket(context.Background(), Viewer{ID: uuid.New(), Permissions: []string{PermViewAll}}, d.ID)
 		if err != nil || len(got.AllowedActions) != 0 {
 			t.Fatalf("%s: actions=%v err=%v", status, got.AllowedActions, err)
 		}

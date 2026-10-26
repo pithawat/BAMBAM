@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { ROLES } from "../src/lib/platform/types";
+import { SEEDED_ROLES } from "../src/lib/platform/types";
 import stack from "./test-stack.cjs";
 
 // Creates one session per demo role through the backend CLI and stores a
@@ -17,7 +17,7 @@ export default async function globalSetup() {
   // Each role gets a shared session; the role switch test gets its own per project,
   // because switching replaces (deletes) the session it runs on.
   const sessions: [string, string][] = [
-    ...ROLES.map((r): [string, string] => [r, r]),
+    ...SEEDED_ROLES.map((r): [string, string] => [r, r]),
     ["switch-desktop", "employee"],
     ["switch-mobile", "employee"],
   ];

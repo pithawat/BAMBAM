@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM } from "@/lib/platform/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,9 +24,8 @@ import { Stars } from "./ticket-ui";
 import { ticketHref } from "./ticket-presentation";
 
 // S18 ช่างภายนอก (F24, CR-005): the technician adds / edits contractors and their types;
-// technician, admin and executive see job history and scores.
+// whoever sees every ticket (`repair.ticket.view_all`) sees job history and scores; `repair.contractor.manage` edits.
 
-const STAFF = ["technician", "admin", "executive"];
 
 function Score({ c }: { c: Pick<Contractor, "avgRating" | "ratedCount"> }) {
   if (c.avgRating === null) return <span className="text-xs text-muted-foreground">ยังไม่มีคะแนน</span>;
@@ -43,15 +43,15 @@ export function ContractorsScreen() {
   const [formOpen, setFormOpen] = useState(false);
   useEffect(() => { const t = window.setTimeout(() => setQuery(q.trim()), 300); return () => window.clearTimeout(t); }, [q]);
   useEffect(() => {
-    if (!STAFF.includes(me.role)) return;
+    if (!can(me, PERM.ticketViewAll)) return;
     let active = true;
     getContractors({ q: query || undefined, includeInactive: inactive, pageSize: 100 }).then(
       (page) => { if (active) { setList({ items: page.items, total: page.meta.total }); setError(undefined); } },
       (err: unknown) => { if (active) setError(err); });
     return () => { active = false; };
-  }, [query, inactive, revision, me.role]);
-  if (!STAFF.includes(me.role)) return <><PageHeader title="ช่างภายนอก" variant="bar" /><ForbiddenState /></>;
-  const canEdit = me.role === "technician";
+  }, [query, inactive, revision, me]);
+  if (!can(me, PERM.ticketViewAll)) return <><PageHeader title="ช่างภายนอก" variant="bar" /><ForbiddenState /></>;
+  const canEdit = can(me, PERM.contractorManage);
   // PageHeader shows `action` on phones and `search` on desktop: the same button in both.
   const add = canEdit ? <Button size="sm" onClick={() => setFormOpen(true)}><Plus aria-hidden />เพิ่มช่างภายนอก</Button> : undefined;
   return <>
@@ -87,13 +87,13 @@ export function ContractorDetailScreen({ id }: { id: string }) {
   const [moreBusy, setMoreBusy] = useState(false);
   const [page, setPage] = useState(1);
   useEffect(() => {
-    if (!STAFF.includes(me.role)) return;
+    if (!can(me, PERM.ticketViewAll)) return;
     let active = true;
     Promise.all([getContractor(id), getContractorJobs(id, 1, 20)]).then(([c, j]) => {
       if (active) { setContractor(c); setJobs({ items: j.items, total: j.meta.total }); setPage(1); setError(undefined); }
     }, (err: unknown) => { if (active) setError(err); });
     return () => { active = false; };
-  }, [id, revision, me.role]);
+  }, [id, revision, me]);
   async function more() {
     setMoreBusy(true);
     try { const next = await getContractorJobs(id, page + 1, 20); setPage(page + 1); setJobs((old) => ({ items: [...(old?.items ?? []), ...next.items], total: next.meta.total })); }
@@ -101,12 +101,12 @@ export function ContractorDetailScreen({ id }: { id: string }) {
     finally { setMoreBusy(false); }
   }
   const header = <PageHeader title="ช่างภายนอก" variant="bar" backHref="/repair/contractors" />;
-  if (!STAFF.includes(me.role)) return <>{header}<ForbiddenState /></>;
+  if (!can(me, PERM.ticketViewAll)) return <>{header}<ForbiddenState /></>;
   if (error !== undefined) {
     return <>{header}{errorCode(error) === "CONTRACTOR_NOT_FOUND" ? <ForbiddenState title="ไม่พบช่างภายนอกนี้" /> : errorCode(error) === "FORBIDDEN" ? <ForbiddenState /> : <ErrorState onRetry={() => setRevision((r) => r + 1)} />}</>;
   }
   if (!contractor || !jobs) return <>{header}<div className="space-y-3 px-4 py-4 lg:px-0"><Skeleton className="h-40 w-full rounded-xl" /><Skeleton className="h-60 w-full rounded-xl" /></div></>;
-  const canEdit = me.role === "technician";
+  const canEdit = can(me, PERM.contractorManage);
   return <>{header}
     <div className="space-y-3 px-4 py-4 lg:px-0 lg:py-0">
       <Card className="gap-3 p-4 shadow-card lg:p-5">

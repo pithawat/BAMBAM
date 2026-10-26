@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — API contract
 
-Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16 · CR-014 applied 2026-10-19 · CR-015, CR-016 applied 2026-10-19 · CR-020 applied 2026-10-24
+Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16 · CR-014 applied 2026-10-19 · CR-015, CR-016 applied 2026-10-19 · CR-020 applied 2026-10-24 · CR-024 applied 2026-10-26 (no `executive`, no notification endpoints)
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Single source for backend DTOs and frontend types.ts.
      Conventions (envelope, errors, dates, pagination): docs/shared/architecture.md
@@ -13,7 +13,7 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 - IDs are UUID strings (D-021). `ticketNo` is the human number (`RP-2569-000142`) and is display-only.
 - Field validation errors: `400 VALIDATION_FAILED` with `fields: { "<field>": "<FIELD_CODE>" }`. Field codes: `REQUIRED`, `TOO_LONG`, `MIN_ITEMS`, `MAX_ITEMS`, `INVALID`, `PAST` (a date before today, CR-005). The FE maps `field + code` to the message in the screen spec.
 - Every endpoint needs a session (`401 UNAUTHENTICATED` otherwise, handled by `lib/http.ts` → S01 `?reason=expired`).
-- Roles: `employee`, `housekeeper_lead`, `security_lead`, `technician`, `admin`, `executive`. "all" = every role. Permission checks are in the service layer; the FE never decides permissions (it renders `allowedActions`).
+- Roles: `employee`, `housekeeper_lead`, `security_lead`, `technician`, `admin` ~~, `executive`~~ (CR-024). "all" = every role. Permission checks are in the service layer; the FE never decides permissions (it renders `allowedActions`).
 
 ## Endpoints
 
@@ -27,21 +27,21 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | 3 | POST | `/api/v1/repair/photos` | upload one photo (S03, S08, S10, S04) | all | 1 |
 | 4 | GET | `/api/v1/repair/photos/{id}` | photo file (`?size=thumb\|full`) | all (who can see the ticket / the uploader) | 1 |
 | 5 | POST | `/api/v1/repair/tickets` | create ticket → `in_progress`, waiting for assessment (CR-005); priority set by the system (CR-008) | all (team handled: leads) | 1 (team: 4) |
-| 6 | GET | `/api/v1/repair/tickets` | list tickets (`scope=mine\|all`, `status`, `step`, filters) | mine: all · all: technician, admin, executive (CR-005) | 1 |
+| 6 | GET | `/api/v1/repair/tickets` | list tickets (`scope=mine\|all`, `status`, `step`, filters) | mine: all · all: technician, admin (CR-005, CR-024) | 1 |
 | 35 | GET | `/api/v1/repair/tickets/mine` | S06 table: one page of slim rows (CR-019) | all (own tickets only) | 3U (CR-019) |
-| 7 | GET | `/api/v1/repair/tickets/counts` | counts per status / step | mine: all · all: technician, admin, executive | 1 |
+| 7 | GET | `/api/v1/repair/tickets/counts` | counts per status / step | mine: all · all: technician, admin (CR-024) | 1 |
 | 8 | GET | `/api/v1/repair/tickets/{id}` | ticket detail + timeline + allowed actions | who can see it (BR-F06-1) | 1 |
 | 9 | POST | `/api/v1/repair/tickets/{id}/assess` | set / change the expected finish date + who does the work (CR-005, CR-006) + optional reason for a change (CR-008) | technician | 2 |
 | 10 | POST | `/api/v1/repair/tickets/{id}/resolve` | result + photos (+ contractor rating) → `resolved` (CR-005, CR-006) | technician | 2 |
 | 11 | POST | `/api/v1/repair/tickets/{id}/confirm` | reporter rates 1–5 (required) → `closed` (CR-005) | reporter | 2 |
 | 12 | POST | `/api/v1/repair/tickets/{id}/send-back` | reporter sends the work back → reworking (CR-005) | reporter | 2 |
-| 13 | GET | `/api/v1/repair/contractor-types` | contractor types (F24) | technician, admin, executive | 2 |
+| 13 | GET | `/api/v1/repair/contractor-types` | contractor types (F24) | technician, admin (CR-024) | 2 |
 | 14 | POST | `/api/v1/repair/contractor-types` | add a type (existing name → that type) | technician | 2 |
-| 15 | GET | `/api/v1/repair/contractors` | contractors with job count + average score | technician, admin, executive | 2 |
+| 15 | GET | `/api/v1/repair/contractors` | contractors with job count + average score | technician, admin (CR-024) | 2 |
 | 16 | POST | `/api/v1/repair/contractors` | add a contractor | technician | 2 |
-| 17 | GET | `/api/v1/repair/contractors/{id}` | one contractor | technician, admin, executive | 2 |
+| 17 | GET | `/api/v1/repair/contractors/{id}` | one contractor | technician, admin (CR-024) | 2 |
 | 18 | PUT | `/api/v1/repair/contractors/{id}` | edit / deactivate a contractor | technician | 2 |
-| 19 | GET | `/api/v1/repair/contractors/{id}/jobs` | job history with scores (S18) | technician, admin, executive | 2 |
+| 19 | GET | `/api/v1/repair/contractors/{id}/jobs` | job history with scores (S18) | technician, admin (CR-024) | 2 |
 | ~~20~~ | ~~PATCH~~ | ~~`/api/v1/repair/tickets/{id}/priority`~~ | ~~change priority~~ — **removed (CR-015)**: priority is policy only, never changed after creation | — | — |
 | 21 | POST | `/api/v1/repair/tickets/{id}/close` | admin closes any open ticket | admin | 3 |
 | 22 | GET | `/api/v1/repair/tickets/duplicates` | open tickets on the same floor + category + room (S04, CR-014) | all | 4 |
@@ -49,13 +49,13 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | 24 | POST | `/api/v1/repair/tickets/{id}/handover` | team-handled ticket → back to the technician (`in_progress`, CR-005) | lead who recorded it, admin | 4 |
 | 25 | GET | `/api/v1/repair/assets/{code}` | asset lookup for QR / manual code | all | 5 |
 | 26 | GET | `/api/v1/repair/home` | Home widgets per role (S02) | all | 6 |
-| P4 | GET | `/api/v1/notifications` | my notifications, newest first (platform) | all | 6 |
-| P5 | GET | `/api/v1/notifications/unread-count` | bell count (platform) | all | 6 |
-| P6 | POST | `/api/v1/notifications/{id}/read` | mark one read (platform) | all | 6 |
-| P7 | POST | `/api/v1/notifications/read-all` | mark all read (platform) | all | 6 |
-| 27 | GET | `/api/v1/repair/admin/overview` | S29 dashboard (admin / executive Home): key numbers, buildings → floors with open counts, attention list (CR-016 replaces the CR-008 S27 shape) | admin, executive | 3D (CR-016) |
-| 29 | GET | `/api/v1/repair/asset-types` | equipment types for the palette (CR-016) | admin, executive (+ super_admin) | 3D |
-| 30 | GET | `/api/v1/repair/floors/{id}/plan` | floor plan: size, rooms with outlines + open counts, active assets (CR-016) | admin, executive (+ super_admin) | 3D |
+| ~~P4~~ | ~~GET~~ | ~~`/api/v1/notifications`~~ | ~~my notifications, newest first (platform)~~ | ~~all~~ | ~~6~~ removed — no notifications (CR-024) |
+| ~~P5~~ | ~~GET~~ | ~~`/api/v1/notifications/unread-count`~~ | ~~bell count (platform)~~ | ~~all~~ | ~~6~~ removed — no notifications (CR-024) |
+| ~~P6~~ | ~~POST~~ | ~~`/api/v1/notifications/{id}/read`~~ | ~~mark one read (platform)~~ | ~~all~~ | ~~6~~ removed — no notifications (CR-024) |
+| ~~P7~~ | ~~POST~~ | ~~`/api/v1/notifications/read-all`~~ | ~~mark all read (platform)~~ | ~~all~~ | ~~6~~ removed — no notifications (CR-024) |
+| 27 | GET | `/api/v1/repair/admin/overview` | S29 dashboard (admin Home, CR-024): key numbers, buildings → floors with open counts, attention list (CR-016 replaces the CR-008 S27 shape) | admin (CR-024) | 3D (CR-016) |
+| 29 | GET | `/api/v1/repair/asset-types` | equipment types for the palette (CR-016) | admin (+ super_admin) (CR-024) | 3D |
+| 30 | GET | `/api/v1/repair/floors/{id}/plan` | floor plan: size, rooms with outlines + open counts, active assets (CR-016) | admin (+ super_admin) (CR-024) | 3D |
 | 31 | POST | `/api/v1/repair/assets` | add an asset to a room (CR-016) | admin (+ super_admin) | 3D |
 | 32 | PUT | `/api/v1/repair/assets/{id}` | edit code / name, move (room + position) (CR-016) | admin (+ super_admin) | 3D |
 | 33 | POST | `/api/v1/repair/assets/{id}/deactivate` | remove = deactivate (CR-016) | admin (+ super_admin) | 3D |
@@ -130,11 +130,11 @@ S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,res
 - `category` is `null` and `categoryOther` holds the typed category when the reporter picked "อื่นๆ" (CR-008); `symptomOther` = the typed symptom (with or without listed symptoms). Titles join the symptom names, then `symptomOther`.
 - (CR-014) New tickets always have `category`; `categoryOther` is the optional typed name under the `isOther` category (shown as `อื่น ๆ · {categoryOther}`). `category: null` remains only on tickets created before CR-014.
 - (CR-014) `room`: the picked room (`Ref`); `null` only on tickets created before CR-014. `locationDetail` is now the optional extra spot (`บอกจุดเพิ่มเติม`). Location line: `{building} ชั้น {floor} · {room}` (+ ` · {locationDetail}` when set); old tickets keep `ชั้น {floor} · {locationDetail}`.
-- `viewerRelation`: `reporter` · `subscriber` · `technician` (any technician, CR-005) · `none` (admin / executive viewing).
+- `viewerRelation`: `reporter` · `subscriber` · `technician` (any technician, CR-005) · `none` (admin viewing; CR-024).
 - `floor.name` is the display name of the floor ("5"); the FE renders `{building} ชั้น {floor}`.
 - `technician`: who assessed / resolved it (`null` before the assessment).
 - `expectedDoneOn`: `YYYY-MM-DD` (Asia/Bangkok) from the assessment, else `null`.
-- `workBy` (`in_house` · `contractor` · `null` until assessed, CR-006). `contractor` (`Ref`) is sent to technician / admin / executive only; others get `null` and see `contractorTypes` (BR-F24-4).
+- `workBy` (`in_house` · `contractor` · `null` until assessed, CR-006). `contractor` (`Ref`) is sent to technician / admin only (CR-024); others get `null` and see `contractorTypes` (BR-F24-4).
 
 ### `TicketDetail` = `TicketSummary` +
 ```json
@@ -279,7 +279,7 @@ Query: `scope=mine|all` (default `mine`) · `status` (comma list of statuses) ·
 - `mine` = tickets I reported or follow (BR-F06-1). Tickets awaiting my confirmation come first for any status set (BR-F06-2).
 - Paging is server-side (CR-019): `LIMIT pageSize OFFSET (page-1)*pageSize` plus one `count(*)` with the same filters; `pageSize` default 20, max 100; `page` max 10 000; a page past the end returns `data: []` with the real `total`. Clients fetch one page at a time — never the whole list.
 - `category.icon` (CR-019, additive, also on #8 / #27 attention rows): the category's lucide icon, `wrench` when unset, so lists draw the category tile without loading the master (#1).
-- `all` = every ticket (technician, admin, executive — CR-005).
+- `all` = every ticket (technician, admin — CR-005, CR-024).
 
 ```json
 { "data": [ <TicketSummary> ], "meta": { "page": 1, "pageSize": 20, "total": 3 } }
@@ -318,7 +318,7 @@ Query: `scope`, `q` and the same filters as #6 except `status`.
 `inProgress` = `awaitingAssessment + inRepair` (`inRepair` includes reworking). S06 "กำลังดำเนินการ" = `inProgress`; S09 tabs use `awaitingAssessment`, `inRepair`, `resolved`.
 
 ### 8. GET /api/v1/repair/tickets/{id}
-Response `{ "data": <TicketDetail> }`. Who can see it: reporter, subscribers, the technician (every ticket, CR-005), admin, executive.
+Response `{ "data": <TicketDetail> }`. Who can see it: reporter, subscribers, the technician (every ticket, CR-005), admin (CR-024).
 
 | Status | code | When | UI |
 |---|---|---|---|
@@ -375,7 +375,7 @@ Request `{ "reason": "ยังมีน้ำหยดตอนเปิดแ�
 
 Errors: 400 `VALIDATION_FAILED` (`reason` REQUIRED → กรุณาบอกสิ่งที่ยังไม่เรียบร้อย), 403 `NOT_REPORTER`, 409 `TICKET_CLOSED`, 409 `INVALID_STATE`, 422 `PHOTO_NOT_FOUND`.
 
-**Auto-close job (no endpoint):** at API start and every 15 min, `resolved` tickets with `autoCloseAt <= now` → `closed` / `auto_closed`, event `auto_closed` without actor (BR-F07-4). Stage 6 adds the reminder notification 24 h before.
+**Auto-close job (no endpoint):** at API start and every 15 min, `resolved` tickets with `autoCloseAt <= now` → `closed` / `auto_closed`, event `auto_closed` without actor (BR-F07-4). ~~Stage 6 adds the reminder notification 24 h before.~~ (CR-024)
 
 ### `Contractor` (F24)
 ```json
@@ -428,7 +428,7 @@ Not built. `priority` is set by the system at creation (BR-F02-2) and never chan
 
 ### 21. POST /api/v1/repair/tickets/{id}/close
 Request `{ "reason": "ส่งเรื่องเปลี่ยนเครื่องใหม่ผ่านฝ่ายจัดซื้อแล้ว" }` (1–500) → 200 `<TicketDetail>` (`closed` / `admin_closed`). Errors: 400 `VALIDATION_FAILED` (`reason` REQUIRED → กรุณาใส่เหตุผล, TOO_LONG), 403 `FORBIDDEN`, 404 `TICKET_NOT_FOUND`, 409 `TICKET_CLOSED`.
-Built in Stage 3: works from any open status (BR-F08B-1); writes event `admin_closed` with `note` = reason; `allowedActions` has `close` for admin on every open ticket (never for the executive).
+Built in Stage 3: works from any open status (BR-F08B-1); writes event `admin_closed` with `note` = reason; `allowedActions` has `close` for admin on every open ticket (CR-024: no executive role).
 
 ---
 
@@ -475,7 +475,7 @@ Request `{ "reason": "ทีมเช็ดแล้วแต่ยังมี�
 
 ---
 
-## Stage 6 — Home and notifications
+## Stage 6 — Home ~~and notifications~~ (CR-024)
 
 ### 26. GET /api/v1/repair/home
 Fields depend on the role; absent blocks are `null`.
@@ -488,6 +488,10 @@ Fields depend on the role; absent blocks are `null`.
   "admin": { "counts": { "inProgress": 14, "resolved": 3, "criticalOpen": 1 }, "urgent": [ <TicketSummary>, "…max 5, critical/high open" ] }
 } }
 ```
+
+~~P4–P7 notifications~~ — removed (CR-024: no notification system).
+
+<details><summary>Original P4–P7 (history)</summary>
 
 ### P4 GET /api/v1/notifications?page=&pageSize=30
 ```json
@@ -502,6 +506,8 @@ Fields depend on the role; absent blocks are `null`.
 ### P5 GET /api/v1/notifications/unread-count → `{ "data": { "count": 2 } }`
 ### P6 POST /api/v1/notifications/{id}/read → 204 · 404 `NOTIFICATION_NOT_FOUND` (also for others' notifications)
 ### P7 POST /api/v1/notifications/read-all → 204
+
+</details>
 
 ---
 

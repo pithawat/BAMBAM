@@ -1,3 +1,5 @@
+import { can, PERM } from "@/lib/platform/permissions";
+import type { Me } from "@/lib/platform/types";
 import type { Photo, TicketDetail, TimelineEvent, WorkBy } from "../types";
 import { CLOSED_LABELS, dateTime, dayLabel, PRIORITY_LABELS, RATING_LABELS } from "./ticket-presentation";
 
@@ -8,10 +10,10 @@ import { CLOSED_LABELS, dateTime, dayLabel, PRIORITY_LABELS, RATING_LABELS } fro
 /** Who is looking: drives the wording ("คุณ" vs "ผู้แจ้ง") and the next-action card. */
 export type StoryViewer = "reporter" | "follower" | "technician" | "staff";
 
-export function storyViewer(ticket: Pick<TicketDetail, "viewerRelation">, role: string): StoryViewer {
+export function storyViewer(ticket: Pick<TicketDetail, "viewerRelation">, me: Pick<Me, "permissions">): StoryViewer {
   if (ticket.viewerRelation === "reporter") return "reporter";
   if (ticket.viewerRelation === "subscriber") return "follower";
-  if (role === "technician") return "technician";
+  if (can(me, PERM.ticketWork)) return "technician";
   return "staff";
 }
 

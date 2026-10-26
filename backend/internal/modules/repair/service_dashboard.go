@@ -13,7 +13,7 @@ import (
 // Overview implements #27: key numbers, buildings → floors with open tickets, and the attention list.
 // Every number uses the same step rules as S11 (BR-F23-1).
 func (s *Service) Overview(ctx context.Context, v Viewer) (Overview, error) {
-	if !seesDashboard(v.Role) {
+	if !seesDashboard(v) {
 		return Overview{}, apperr.ErrForbidden
 	}
 	now := s.now()
@@ -46,7 +46,7 @@ func (s *Service) Overview(ctx context.Context, v Viewer) (Overview, error) {
 
 // AssetTypes implements #29 (the palette).
 func (s *Service) AssetTypes(ctx context.Context, v Viewer) ([]AssetType, error) {
-	if !seesDashboard(v.Role) {
+	if !seesDashboard(v) {
 		return nil, apperr.ErrForbidden
 	}
 	return s.repo.ListAssetTypes(ctx)
@@ -54,7 +54,7 @@ func (s *Service) AssetTypes(ctx context.Context, v Viewer) ([]AssetType, error)
 
 // FloorPlan implements #30: plan size, rooms with outlines and open tickets, active equipment.
 func (s *Service) FloorPlan(ctx context.Context, v Viewer, floorID uuid.UUID) (FloorPlan, error) {
-	if !seesDashboard(v.Role) {
+	if !seesDashboard(v) {
 		return FloorPlan{}, apperr.ErrForbidden
 	}
 	return s.repo.GetFloorPlan(ctx, floorID)
@@ -62,7 +62,7 @@ func (s *Service) FloorPlan(ctx context.Context, v Viewer, floorID uuid.UUID) (F
 
 // SuggestAssetCode implements #34: the next free `{prefix}-{floor}-{nnn}` for the add dialog.
 func (s *Service) SuggestAssetCode(ctx context.Context, v Viewer, typeID, floorID uuid.UUID) (string, error) {
-	if !managesAssets(v.Role) {
+	if !managesAssets(v) {
 		return "", apperr.ErrForbidden
 	}
 	t, ok, err := s.repo.ActiveAssetType(ctx, typeID)
@@ -102,7 +102,7 @@ func snapshotOf(a LockedAsset) assetSnapshot {
 
 // CreateAsset implements #31 (F31 steps 2 and 5): admin adds equipment to a room, optionally at a point.
 func (s *Service) CreateAsset(ctx context.Context, v Viewer, in AssetInput) (Asset, error) {
-	if !managesAssets(v.Role) {
+	if !managesAssets(v) {
 		return Asset{}, apperr.ErrForbidden
 	}
 	in, fields := validateAsset(in)
@@ -139,7 +139,7 @@ func (s *Service) CreateAsset(ctx context.Context, v Viewer, in AssetInput) (Ass
 // UpdateAsset implements #32 (F31 steps 3–4): edit code / name or move to another room / point.
 // The type never changes; a missing rotation keeps the current one.
 func (s *Service) UpdateAsset(ctx context.Context, v Viewer, id uuid.UUID, in AssetInput) (Asset, error) {
-	if !managesAssets(v.Role) {
+	if !managesAssets(v) {
 		return Asset{}, apperr.ErrForbidden
 	}
 	in, fields := validateAsset(in)
@@ -178,7 +178,7 @@ func (s *Service) UpdateAsset(ctx context.Context, v Viewer, id uuid.UUID, in As
 // DeactivateAsset implements #33: "เอาออก" = deactivate only; tickets keep pointing at it and the
 // code stays taken (BR-F31-4).
 func (s *Service) DeactivateAsset(ctx context.Context, v Viewer, id uuid.UUID) error {
-	if !managesAssets(v.Role) {
+	if !managesAssets(v) {
 		return apperr.ErrForbidden
 	}
 	return s.repo.InTx(ctx, func(tx TxRepository) error {

@@ -40,9 +40,9 @@ test.describe("recording lead", () => {
   });
 });
 
-test("AC5: another lead, the employee, the technician and the executive get 403", async ({ baseURL }, info) => {
+test("AC5: another lead, the employee and the technician get 403", async ({ baseURL }, info) => {
   const team = await teamTicket(baseURL, tag(info));
-  for (const role of ["security_lead", "employee", "technician", "executive"]) {
+  for (const role of ["security_lead", "employee", "technician"]) {
     const res = await (await as(role, baseURL)).post(`${API}/tickets/${team.id}/handover`, { data: { reason: "ขอส่งต่อ" } });
     expect(res.status(), role).toBe(403);
   }
@@ -70,14 +70,3 @@ test.describe("admin", () => {
   });
 });
 
-test.describe("executive", () => {
-  test.use({ storageState: auth("executive") });
-
-  test("S11 closed tab is read-only: no ส่งต่อให้ช่าง", async ({ page, baseURL }, info) => {
-    test.slow(); // first visits compile on `next dev`
-    const team = await teamTicket(baseURL, tag(info));
-    await page.goto(`/repair/admin/queue?tab=closed&reason=team_handled&q=${team.ticketNo}`);
-    await expect(page.getByText(team.ticketNo).filter({ visible: true }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "ส่งต่อให้ช่าง" })).toHaveCount(0);
-  });
-});

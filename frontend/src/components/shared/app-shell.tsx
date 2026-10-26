@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppNavbar } from "./app-navbar";
 import { MeProvider, useMe } from "./me-provider";
@@ -10,6 +11,8 @@ import { ErrorState } from "./states";
 /**
  * App shell for every (app) route (_common.md §1, CR-010): role switcher strip (dev/UAT only) · top navbar ·
  * content (phone / tablet max 560px, desktop max 1280px). No sidebar and no bottom nav.
+ * `/settings/**` (settings CR-001): no strip, navbar or width frame — `app/(app)/settings/layout.tsx` renders the
+ * administration shell (sidebar / drawer, role switcher in the sidebar) around the page.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -22,6 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function ShellFrame({ children }: { children: ReactNode }) {
   const state = useMe();
+  const pathname = usePathname();
 
   if (state.status === "loading") return <ShellSkeleton />;
   if (state.status === "error") {
@@ -31,6 +35,8 @@ function ShellFrame({ children }: { children: ReactNode }) {
       </main>
     );
   }
+
+  if (isSettingsPath(pathname)) return <div className="min-h-svh bg-background">{children}</div>;
 
   return (
     <div className="min-h-svh bg-background">
@@ -42,6 +48,8 @@ function ShellFrame({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+const isSettingsPath = (p: string) => p === "/settings" || p.startsWith("/settings/");
 
 function ShellSkeleton() {
   return (

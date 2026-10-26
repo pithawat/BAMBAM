@@ -11,6 +11,7 @@ import {
 import { Mascot } from "@/components/shared/mascot";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM } from "@/lib/platform/permissions";
 import { ErrorState, ForbiddenState } from "@/components/shared/states";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -154,7 +155,7 @@ function splitRooms(rooms: Room[], category?: Category): { matching: Room[]; oth
 export function ReportForm() {
   const me = useCurrentUser();
   const mode = useSearchParams().get("mode");
-  const canTeam = me.role === "housekeeper_lead" || me.role === "security_lead";
+  const canTeam = can(me, PERM.ticketTeamHandle);
   const team = canTeam && mode === "team";
   return <ReportFormBody key={team ? "team" : "repair"} team={team} canTeam={canTeam} />;
 }

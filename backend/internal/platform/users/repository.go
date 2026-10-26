@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -34,17 +35,30 @@ func (r *PgRepository) UpsertSSOUser(ctx context.Context, c SSOClaims) (uuid.UUI
 	return u.ID, err
 }
 
-func (r *PgRepository) UpsertDemoUser(ctx context.Context, d demoUser) error {
-	if _, err := r.q.UpsertDemoUser(ctx, platformdb.UpsertDemoUserParams{
+func (r *PgRepository) UpsertDemoUser(ctx context.Context, d demoUser) (uuid.UUID, error) {
+	u, err := r.q.UpsertDemoUser(ctx, platformdb.UpsertDemoUserParams{
 		EmployeeCode: d.EmployeeCode,
 		FirstNameTh:  strPtr(d.FirstNameTH),
 		LastNameTh:   strPtr(d.LastNameTH),
 		Department:   strPtr(d.Department),
 		PositionTh:   strPtr(d.PositionTH),
-	}); err != nil {
-		return err
+	})
+	if err != nil {
+		return uuid.Nil, err
 	}
-	return r.q.UpsertUserRole(ctx, platformdb.UpsertUserRoleParams{EmployeeCode: d.EmployeeCode, Role: d.Role})
+	ok, err := r.AssignRole(ctx, d.EmployeeCode, d.Role)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !ok {
+		return uuid.Nil, fmt.Errorf("role %q does not exist", d.Role)
+	}
+	return u.ID, nil
+}
+
+func (r *PgRepository) AssignRole(ctx context.Context, employeeCode, roleKey string) (bool, error) {
+	n, err := r.q.UpsertUserRole(ctx, platformdb.UpsertUserRoleParams{EmployeeCode: employeeCode, RoleKey: roleKey})
+	return n > 0, err
 }
 
 func (r *PgRepository) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -55,7 +69,10 @@ func (r *PgRepository) GetUser(ctx context.Context, id uuid.UUID) (User, error) 
 	if err != nil {
 		return User{}, err
 	}
-	return toUser(row.PlatformUser, row.Role), nil
+	u := toUser(row.PlatformUser, row.Role)
+	u.RoleName = row.RoleName
+	u.Permissions = row.Permissions // stored keys; the service adds the fixed ones
+	return u, nil
 }
 
 func (r *PgRepository) ListDemoUsers(ctx context.Context) ([]User, error) {

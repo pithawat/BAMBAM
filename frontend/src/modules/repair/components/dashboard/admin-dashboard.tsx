@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Building2, Check, ChevronRight, Clock, FileText, Move, Wrench, type LucideIcon } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM } from "@/lib/platform/permissions";
 import { Picker } from "@/components/shared/picker";
 import { PriorityIndicator } from "@/components/shared/priority-indicator";
 import { SERVICES, type Service } from "@/components/shared/service-icon";
@@ -25,7 +26,7 @@ import { FloorList } from "./floor-list";
 // S29 หน้าแรก Admin / ผู้บริหาร (CR-016, layout = ui/mockups/S29-admin-dashboard-modern.html, D-082):
 // ภาพรวมวันนี้ band · 3D อาคาร 1 (desktop + WebGL) or the floor list · แจ้งซ่อม counts · งานที่ควรติดตาม ·
 // car / room services shown as "not open yet" without numbers (CR-017: every number comes from the API).
-// Admin toggles จัดวางอุปกรณ์; the executive reads only (BR-F23-2). CR-019 polish: welcome mascot heading, tiles with an
+// `settings.assets.manage` (Admin, Superadmin; settings CR-001) toggles จัดวางอุปกรณ์; anyone else reads only (BR-F23-2). CR-019 polish: welcome mascot heading, tiles with an
 // icon, card headers with a sub-line and count chip, soft card shadows.
 
 const BuildingCard = dynamic(() => import("./building-card"), {
@@ -55,7 +56,7 @@ export function AdminDashboard() {
   }, [rev]);
   const load = () => { setState("loading"); setRev((n) => n + 1); };
 
-  const isAdmin = me.role === "admin";
+  const isAdmin = can(me, PERM.settingsAssets);
   const buildings = overview?.buildings.filter((b) => b.floors.length > 0) ?? [];
   const building = buildings.find((b) => b.id === buildingId) ?? buildings.find((b) => b.hasModel) ?? buildings[0];
   const show3D = desktop && webgl && !!building?.hasModel && building.widthM !== null && building.depthM !== null;
