@@ -9,7 +9,7 @@
 - **Stages 1 / 2 / 2R / 2N / 3 accepted 2026-10-26** (owner, on the e2e results), tags `repair-stage-1`, `-2`, `-2R`, `-2N`, `-3`; Stage 4 accepted 2026-10-26 (`repair-stage-4`), 3U 2026-10-24, 3D 2026-10-20, 2M 2026-10-19 — every stage up to 4 is accepted. Next stage: 5
 - **CR-023 done 2026-10-26 (M, D-105):** contractor names unique ignoring case / spaces, inactive included (re-activate instead); branch typed into the name; migration `20261026000001` (stops on existing duplicates); 409 `CONTRACTOR_NAME_TAKEN`; S18 `ดูร้านนี้` / S17 `เลือกร้านนี้`; Go unit + Pg + e2e F24 AC8
 - **e2e coverage round 2026-10-26:** specs F06 / F07 / F21 / F24 (+ F02 draft restore) — full run 118 passed, 0 failed (before CR-023's case); fixed S18 / S09 desktop header buttons and the empty S18 edit form; D-103 (no software WebGL on desktop, fixed the F03 AC1 "33 s" issue); Atlas `upload` action (D-104); tours F03 / F04 / F05, every runnable tour passes
-- **Atlas tours in progress:** F02, F06, F21, F22, F08-B, F24 (stages now accepted); F07 stays without a tour (F07-2 auto-close has no e2e — owner: no test case for it)
+- **Atlas tours 2026-10-26:** 12 runnable flows have tours and pass `cli verify` — F01-B, F02, F03, F04, F05, F06, F08-B, F21, F22, F23, F24, F31; F07 has none (F07-2 auto-close has no e2e — owner: no test case); OV (overview path) has no tour of its own. Full e2e after CR-023: 120 passed, 0 failed, 6 skipped
 - CR-004 (Home blocks) PROPOSED, waiting for a pick · `ui/HANDOFF.md`: Stage 4 built and accepted; Stage 5 not prepared yet
 
 ## Next
@@ -60,6 +60,7 @@
 
 ## Stage log
 
+- 2026-10-26: Atlas tours F02 / F06 / F08-B / F21 / F22 / F24 (all 12 tours pass); e2e 120 passed
 - 2026-10-26: Stages 1 / 2 / 2R / 2N / 3 accepted (owner, e2e all pass), tags `repair-stage-1` `-2` `-2R` `-2N` `-3`; CR-023 approved + built (D-105)
 - 2026-10-26: e2e coverage round — F06 / F07 / F21 / F24 specs + F02 draft, 118 passed; fixes S18 / S09 desktop header buttons, S18 edit form reset; D-103 (no swiftshader on desktop), D-104 (Atlas `upload`); tours F03 / F04 / F05; CR-023 proposed
 - 2026-10-26: **Stage 4 accepted**, tag `repair-stage-4` — F03 duplicates (409 + #22 `blocksReport`, CR-020 spot rule, step-2 block CR-021) + follow #23, F04 team-handled (locked `?mode=team`, S06 tab `ทีมแก้เอง`, #35 `closedReason`), F05 hand over #24; CR-021 relayout from `maintenance-demo.html`, CR-022 room cards / step heights; migration `20261024000001`; D-098–D-102; e2e F03 / F04 / F05
