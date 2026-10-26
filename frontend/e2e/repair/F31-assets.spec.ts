@@ -9,6 +9,9 @@ const API = "/api/v1/repair";
 const CARD = "section[aria-label='อาคาร 1 แบบ 3 มิติ']";
 const FLOOR = (level: number) => `c016f100-0000-4000-8000-00000000000${level}`;
 
+// The 3D card needs WebGL: Chrome's new headless keeps it on the GPU (D-103). Only the 3D specs use it.
+test.use({ channel: "chromium" });
+
 test.use({ storageState: auth("admin") });
 test.skip(({ isMobile }) => isMobile, "equipment editing is desktop only");
 
@@ -49,7 +52,7 @@ async function pick(page: Page, dialog: ReturnType<Page["getByRole"]>, label: st
 }
 
 test("AC3 + AC4: add by form, duplicate code refused, deactivate keeps the code taken", async ({ page }) => {
-  const code = `E2E-${Date.now().toString(36).toUpperCase()}`;
+    const code = `E2E-${Date.now().toString(36).toUpperCase()}`;
   await openFloor(page, 2);
   await page.getByRole("button", { name: "เพิ่มอุปกรณ์" }).click();
   const dialog = page.getByRole("dialog");
@@ -94,7 +97,7 @@ test("AC3 + AC4: add by form, duplicate code refused, deactivate keeps the code 
 });
 
 test("AC3 + AC4: drag a type into a room, drop outside refused, drag to move with undo", async ({ page }) => {
-  test.slow(); // each pointer move re-renders the plan in software WebGL (~1 min headless)
+  test.slow(); // many pointer moves, each re-renders the plan
   const code = `E2E-D${Date.now().toString(36).toUpperCase()}`;
   await openFloor(page, 3);
   const palette = await page.getByRole("button", { name: "เพิ่มลำโพง" }).boundingBox();
@@ -127,4 +130,6 @@ test("AC3 + AC4: drag a type into a room, drop outside refused, drag to move wit
   await expect.poll(async () => (await assetOnFloor(page, 3, code))?.room.name).toBe("RMC METRO - ท่าหลวง 1");
   await page.locator("[data-sonner-toast] button", { hasText: "เลิกทำ" }).first().dispatchEvent("click"); // the toast may sit under others
   await expect.poll(async () => (await assetOnFloor(page, 3, code))?.room.name).toBe("WPS ห้องพี่มีด");
+  // Deactivate it so runs do not stack chips in this room (the F31 tour drags its own chip from here).
+  expect((await page.request.post(`${API}/assets/${(await assetOnFloor(page, 3, code))!.id}/deactivate`)).status()).toBe(204);
 });

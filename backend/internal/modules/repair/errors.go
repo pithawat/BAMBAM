@@ -24,6 +24,8 @@ var (
 	ErrContractorNotFound   = apperr.New(apperr.KindNotFound, "CONTRACTOR_NOT_FOUND", "contractor not found")
 	ErrContractorInactive   = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_NOT_FOUND", "contractor unknown or inactive")
 	ErrContractorTypeAbsent = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_TYPE_NOT_FOUND", "a contractor type does not exist")
+	// ErrContractorNameTaken comes from the unique index (no details); the service answers with contractorNameTaken.
+	ErrContractorNameTaken = apperr.New(apperr.KindConflict, "CONTRACTOR_NAME_TAKEN", "another contractor has this name")
 )
 
 // Stage 4: duplicates, follow, team handled, hand over.
@@ -58,3 +60,10 @@ var (
 	ErrPointOutsideRoom = apperr.New(apperr.KindBusinessRule, "POINT_OUTSIDE_ROOM", "point is not inside the room outline")
 	ErrFloorNotFound    = apperr.New(apperr.KindNotFound, "FLOOR_NOT_FOUND", "floor not found")
 )
+
+// contractorNameTaken is 409 CONTRACTOR_NAME_TAKEN with the contractor that has the name (CR-023): the form
+// offers that one instead (re-activate it when inactive).
+func contractorNameTaken(owner NameOwner) error {
+	return &apperr.Error{Kind: apperr.KindConflict, Code: "CONTRACTOR_NAME_TAKEN", Message: "another contractor has this name",
+		Details: map[string]any{"contractorId": owner.ID, "isActive": owner.IsActive}}
+}

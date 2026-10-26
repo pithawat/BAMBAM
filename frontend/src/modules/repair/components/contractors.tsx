@@ -17,8 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { createContractor, createContractorType, getContractor, getContractorJobs, getContractors, getContractorTypes, updateContractor } from "../api";
-import { contractorFieldMessages, errorCode, errorMessage, fieldErrors } from "../errors";
-import type { Contractor, ContractorJob, Ref } from "../types";
+import { contractorFieldMessages, contractorNameTaken, errorCode, errorMessage, fieldErrors } from "../errors";
+import type { Contractor, ContractorJob, ContractorNameTakenDetails, Ref } from "../types";
 import { Stars } from "./ticket-ui";
 import { ticketHref } from "./ticket-presentation";
 
@@ -52,9 +52,10 @@ export function ContractorsScreen() {
   }, [query, inactive, revision, me.role]);
   if (!STAFF.includes(me.role)) return <><PageHeader title="ช่างภายนอก" variant="bar" /><ForbiddenState /></>;
   const canEdit = me.role === "technician";
+  // PageHeader shows `action` on phones and `search` on desktop: the same button in both.
+  const add = canEdit ? <Button size="sm" onClick={() => setFormOpen(true)}><Plus aria-hidden />เพิ่มช่างภายนอก</Button> : undefined;
   return <>
-    <PageHeader title="ช่างภายนอก" variant="service" service="repair" subtitle="ประวัติงานและคะแนนของช่างนอกระบบ"
-      action={canEdit ? <Button size="sm" onClick={() => setFormOpen(true)}><Plus aria-hidden />เพิ่มช่างภายนอก</Button> : undefined} />
+    <PageHeader title="ช่างภายนอก" variant="service" service="repair" subtitle="ประวัติงานและคะแนนของช่างนอกระบบ" action={add} search={add} />
     <div className="space-y-3 px-4 py-4 lg:px-0 lg:py-0">
       <Card className="gap-3 p-3 shadow-card sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-muted-foreground" aria-hidden />
@@ -139,24 +140,32 @@ export function ContractorDetailScreen({ id }: { id: string }) {
 
 // ---- add / edit (technician) ----
 
-export function ContractorFormDialog({ contractor, open, onOpenChange, onSaved }: {
+/** `onPickExisting` (S17 เพิ่มช่างภายนอกใหม่): a name that an active contractor has offers เลือกร้านนี้ instead of ดูร้านนี้ (CR-023). */
+export function ContractorFormDialog({ contractor, open, onOpenChange, onSaved, onPickExisting }: {
   contractor?: Contractor; open: boolean; onOpenChange: (open: boolean) => void; onSaved: (c: Contractor) => void;
+  onPickExisting?: (c: Contractor) => void;
 }) {
   const [types, setTypes] = useState<Ref[]>();
   const [values, setValues] = useState({ name: "", contactName: "", phone: "", note: "", typeIds: [] as string[], isActive: true });
   const [newType, setNewType] = useState("");
   const [addingType, setAddingType] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [taken, setTaken] = useState<ContractorNameTakenDetails | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
     getContractorTypes().then(setTypes, () => setTypes([]));
   }, [open]);
-  function reset() {
-    setValues(contractor
-      ? { name: contractor.name, contactName: contractor.contactName ?? "", phone: contractor.phone ?? "", note: contractor.note ?? "", typeIds: contractor.types.map((t) => t.id), isActive: contractor.isActive }
-      : { name: "", contactName: "", phone: "", note: "", typeIds: [], isActive: true });
-    setNewType(""); setErrors({});
+  // Reset each time the dialog opens — the parent opens it (`open`), so onOpenChange does not fire on open.
+  const [seen, setSeen] = useState(false);
+  if (open !== seen) {
+    setSeen(open);
+    if (open) {
+      setValues(contractor
+        ? { name: contractor.name, contactName: contractor.contactName ?? "", phone: contractor.phone ?? "", note: contractor.note ?? "", typeIds: contractor.types.map((t) => t.id), isActive: contractor.isActive }
+        : { name: "", contactName: "", phone: "", note: "", typeIds: [], isActive: true });
+      setNewType(""); setErrors({}); setTaken(null);
+    }
   }
   const toggle = (id: string) => setValues((v) => ({ ...v, typeIds: v.typeIds.includes(id) ? v.typeIds.filter((x) => x !== id) : [...v.typeIds, id] }));
   async function addType() {
@@ -181,19 +190,32 @@ export function ContractorFormDialog({ contractor, open, onOpenChange, onSaved }
     const req = { name: values.name.trim(), typeIds: values.typeIds, contactName: values.contactName.trim(), phone: values.phone.trim(), note: values.note.trim(), isActive: values.isActive };
     try { onSaved(contractor ? await updateContractor(contractor.id, req) : await createContractor(req)); }
     catch (err) {
-      const fields = fieldErrors(err, contractorFieldMessages);
+      // CR-023: the name belongs to another contractor — offer that one (re-activate it when inactive).
+      const owner = contractorNameTaken(err);
+      const fields = owner ? { name: owner.isActive ? "มีช่างภายนอกชื่อนี้แล้ว" : "มีร้านชื่อนี้แต่ปิดใช้งานอยู่ — เปิดใช้งานร้านเดิมแทนการเพิ่มใหม่" } : fieldErrors(err, contractorFieldMessages);
+      setTaken(owner);
       if (Object.keys(fields).length) setErrors(fields); else toast.error(errorMessage(err));
     } finally { setBusy(false); }
   }
+  async function pickExisting() {
+    if (!taken || !onPickExisting) return;
+    setBusy(true);
+    try { onPickExisting(await getContractor(taken.contractorId)); }
+    catch (err) { toast.error(errorMessage(err)); }
+    finally { setBusy(false); }
+  }
   const field = (name: "name" | "contactName" | "phone", label: string, opts: { required?: boolean; max: number; type?: string; placeholder?: string }) =>
     <div className="space-y-1.5"><label htmlFor={`contractor-${name}`} className="text-sm font-medium">{label}{opts.required && <span className="text-destructive">*</span>}</label>
-      <Input id={`contractor-${name}`} type={opts.type} value={values[name]} maxLength={opts.max} placeholder={opts.placeholder} onChange={(e) => setValues((v) => ({ ...v, [name]: e.target.value }))} aria-invalid={!!errors[name]} className="h-11" />
+      <Input id={`contractor-${name}`} type={opts.type} value={values[name]} maxLength={opts.max} placeholder={opts.placeholder} onChange={(e) => { setValues((v) => ({ ...v, [name]: e.target.value })); if (name === "name") setTaken(null); }} aria-invalid={!!errors[name]} className="h-11" />
       {errors[name] && <p role="alert" className="flex items-center gap-1 text-sm text-destructive"><AlertCircle className="size-4" aria-hidden />{errors[name]}</p>}</div>;
-  return <Dialog open={open} onOpenChange={(o) => { if (o) reset(); onOpenChange(o); }}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
       <form onSubmit={submit} noValidate className="space-y-4">
         <DialogHeader><DialogTitle>{contractor ? "แก้ไขช่างภายนอก" : "เพิ่มช่างภายนอก"}</DialogTitle><DialogDescription>ข้อมูลนี้เห็นเฉพาะช่าง Admin และผู้บริหาร</DialogDescription></DialogHeader>
-        {field("name", "ชื่อร้าน / บริษัท", { required: true, max: 100, placeholder: "เช่น ร้านแอร์เย็นฉ่ำ" })}
+        {field("name", "ชื่อร้าน / บริษัท", { required: true, max: 100, placeholder: "เช่น ร้านแอร์เย็นฉ่ำ หรือ ร้านแอร์เย็นฉ่ำ สาขาบางนา" })}
+        {taken && <div className="-mt-2">{taken.isActive && onPickExisting
+          ? <Button type="button" variant="link" className="h-9 px-0" disabled={busy} onClick={pickExisting}>เลือกร้านนี้</Button>
+          : <Button asChild variant="link" className="h-9 px-0"><Link href={`/repair/contractors/${taken.contractorId}`} onClick={() => onOpenChange(false)}>{taken.isActive ? "ดูร้านนี้" : "ไปหน้าร้านนี้"}</Link></Button>}</div>}
         <fieldset className="space-y-2"><legend className="text-sm font-medium">ประเภท<span className="text-destructive">*</span> <span className="font-normal text-muted-foreground">เลือกได้หลายประเภท</span></legend>
           {!types ? <Skeleton className="h-10 w-full" /> : <div className="flex flex-wrap gap-2">{types.map((t) => {
             const on = values.typeIds.includes(t.id);

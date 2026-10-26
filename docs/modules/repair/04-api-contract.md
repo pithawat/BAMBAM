@@ -402,11 +402,14 @@ Request `{ "name": "ร้านแอร์เย็นฉ่ำ", "typeIds": [
 | 400 | `VALIDATION_FAILED` | `name` REQUIRED/TOO_LONG (100) · `typeIds` MIN_ITEMS/INVALID · `contactName` TOO_LONG (100) · `phone` TOO_LONG (30) · `note` TOO_LONG (500) |
 | 422 | `CONTRACTOR_TYPE_NOT_FOUND` | a type id does not exist |
 | 403 | `NOT_TECHNICIAN` | |
+| 409 | `CONTRACTOR_NAME_TAKEN` | (CR-023) another contractor has this name, ignoring case and repeated spaces, inactive ones included — `details: { "contractorId": "5c0a…", "isActive": true }` |
+
+`name` is trimmed and inner spaces collapsed before it is saved and compared (CR-023).
 
 ### 17. GET /api/v1/repair/contractors/{id} → `{ "data": <Contractor> }`. 404 `CONTRACTOR_NOT_FOUND`.
 
 ### 18. PUT /api/v1/repair/contractors/{id}
-Same body as #16 plus `isActive` (default `true`) → 200 `<Contractor>`. Errors as #16 + 404 `CONTRACTOR_NOT_FOUND`.
+Same body as #16 plus `isActive` (default `true`) → 200 `<Contractor>`. Errors as #16 + 404 `CONTRACTOR_NOT_FOUND` (409 `CONTRACTOR_NAME_TAKEN` only when another contractor has the name, CR-023).
 
 ### 19. GET /api/v1/repair/contractors/{id}/jobs?page=&pageSize=
 Tickets done by the contractor, newest first:

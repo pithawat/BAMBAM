@@ -42,6 +42,8 @@ type fakeRepo struct {
 	inserted []NewTicket
 	events   []NewEvent // ticket events written by actions
 	dash     *dashFake  // CR-016 dashboard and equipment (service_dashboard_test.go)
+
+	contractors map[uuid.UUID]*Contractor // F24 (CR-023 name checks)
 }
 
 func newFakeRepo() *fakeRepo {
@@ -53,7 +55,7 @@ func newFakeRepo() *fakeRepo {
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
 		subs: map[uuid.UUID]map[uuid.UUID]bool{},
-		dash: newDashFake(),
+		dash: newDashFake(), contractors: map[uuid.UUID]*Contractor{},
 	}
 }
 
@@ -147,7 +149,10 @@ func (f *fakeRepo) EnsureContractorType(context.Context, string, uuid.UUID) (Ref
 func (f *fakeRepo) ListContractors(context.Context, ContractorFilter) ([]Contractor, int64, error) {
 	return nil, 0, nil
 }
-func (f *fakeRepo) GetContractor(context.Context, uuid.UUID) (Contractor, error) {
+func (f *fakeRepo) GetContractor(_ context.Context, id uuid.UUID) (Contractor, error) {
+	if c, ok := f.contractors[id]; ok {
+		return *c, nil
+	}
 	return Contractor{}, ErrContractorNotFound
 }
 func (f *fakeRepo) ListContractorJobs(context.Context, uuid.UUID, int, int) ([]ContractorJob, int64, error) {
@@ -247,10 +252,24 @@ func (f *fakeRepo) ActiveContractorExists(context.Context, uuid.UUID) (bool, err
 func (f *fakeRepo) CountContractorTypes(_ context.Context, ids []uuid.UUID) (int, error) {
 	return len(ids), nil
 }
-func (f *fakeRepo) InsertContractor(context.Context, uuid.UUID, ContractorInput, uuid.UUID) error {
+func (f *fakeRepo) ContractorWithName(_ context.Context, name string, excludeID uuid.UUID) (NameOwner, bool, error) {
+	for id, c := range f.contractors {
+		if id != excludeID && strings.EqualFold(c.Name, name) {
+			return NameOwner{ID: id, IsActive: c.IsActive}, true, nil
+		}
+	}
+	return NameOwner{}, false, nil
+}
+func (f *fakeRepo) InsertContractor(_ context.Context, id uuid.UUID, in ContractorInput, _ uuid.UUID) error {
+	f.contractors[id] = &Contractor{ID: id, Name: in.Name, IsActive: true}
 	return nil
 }
-func (f *fakeRepo) UpdateContractor(context.Context, uuid.UUID, ContractorInput) (bool, error) {
+func (f *fakeRepo) UpdateContractor(_ context.Context, id uuid.UUID, in ContractorInput) (bool, error) {
+	c, ok := f.contractors[id]
+	if !ok {
+		return false, nil
+	}
+	c.Name, c.IsActive = in.Name, in.IsActive
 	return true, nil
 }
 func (f *fakeRepo) SetContractorTypes(context.Context, uuid.UUID, []uuid.UUID) error { return nil }

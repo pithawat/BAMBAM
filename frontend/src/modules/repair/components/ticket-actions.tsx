@@ -174,6 +174,8 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
     </Dialog>
     <ContractorFormDialog open={adding} onOpenChange={setAdding} onSaved={(c) => {
       setAdding(false); setContractors((old) => [c, ...(old ?? [])]); setContractorId(c.id); clear("contractorId"); toast.success("เพิ่มช่างภายนอกแล้ว");
+    }} onPickExisting={(c) => {
+      setAdding(false); setContractors((old) => old?.some((x) => x.id === c.id) ? old : [c, ...(old ?? [])]); setContractorId(c.id); clear("contractorId"); toast.success(`เลือก ${c.name} แล้ว`);
     }} />
   </>;
 }

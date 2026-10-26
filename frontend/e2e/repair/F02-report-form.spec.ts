@@ -94,6 +94,29 @@ test("AC2: อื่น ๆ + ใช้งานไม่ได้ + typed ล�
   await expect(page.getByText("ใช้งานไม่ได้ · อื่น ๆ · ลิฟต์").first()).toBeVisible();
 });
 
+test("2R AC2: an unfinished report comes back after a reload with its photo; เริ่มใหม่ clears the draft", async ({ page }, info) => {
+  const spot = uniqueSpot(info, "ร่างค้าง");
+  await open(page);
+  await step(page, "problem").getByText("ระบบปรับอากาศ", { exact: true }).click();
+  await step(page, "problem").getByText("แอร์ไม่เย็น", { exact: true }).click();
+  await next(page);
+  await pickPlace(page, "อ.1 ห้อง 401", spot);
+  await next(page);
+  await step(page, "send").locator("input[type=file]").first().setInputFiles({ name: "problem.png", mimeType: "image/png", buffer: PNG });
+  await expect(step(page, "send").getByText("ครบแล้ว")).toBeVisible({ timeout: 15_000 });
+
+  await page.reload();
+  await expect(page.getByText(/กู้ข้อมูลที่กรอกค้างไว้เมื่อ .+ แล้ว/)).toBeVisible();
+  await expect(step(page, "send").locator("dl")).toContainText(`อ.1 ห้อง 401 · ${spot}`);
+  await expect(step(page, "send").getByText("ครบแล้ว")).toBeVisible();
+
+  await page.getByRole("button", { name: "เริ่มใหม่" }).click();
+  await expect(page.getByText("เลือกหมวดที่ตรงกับปัญหา").filter({ visible: true }).first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("เลือกหมวดที่ตรงกับปัญหา").filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText(/กู้ข้อมูลที่กรอกค้างไว้/)).toHaveCount(0);
+});
+
 test("AC4 (CR-022): the frame keeps its width; room cards leave no reserved gap (desktop)", async ({ page, isMobile }) => {
   test.skip(isMobile, "desktop frame only");
   await open(page);

@@ -23,6 +23,28 @@ func (q *Queries) ActiveContractorExists(ctx context.Context, id uuid.UUID) (boo
 	return exists, err
 }
 
+const contractorWithName = `-- name: ContractorWithName :one
+SELECT id, is_active FROM repair.contractors WHERE lower(name) = lower($1) AND id <> $2 LIMIT 1
+`
+
+type ContractorWithNameParams struct {
+	Name      string
+	ExcludeID uuid.UUID
+}
+
+type ContractorWithNameRow struct {
+	ID       uuid.UUID
+	IsActive bool
+}
+
+// CR-023: names are unique ignoring case (inactive included); exclude_id is the contractor being edited.
+func (q *Queries) ContractorWithName(ctx context.Context, arg ContractorWithNameParams) (ContractorWithNameRow, error) {
+	row := q.db.QueryRow(ctx, contractorWithName, arg.Name, arg.ExcludeID)
+	var i ContractorWithNameRow
+	err := row.Scan(&i.ID, &i.IsActive)
+	return i, err
+}
+
 const countContractorJobs = `-- name: CountContractorJobs :one
 SELECT count(*) FROM repair.tickets WHERE contractor_id = $1
 `

@@ -25,6 +25,9 @@ export function assertAllowedHost(config) {
 }
 
 const RX = /^\/(.*)\/([dgimsuy]*)$/s;
+// `upload` without `file`: a small grey checkered PNG, for forms that need a photo.
+const SAMPLE_PNG = { name: "atlas-photo.png", mimeType: "image/png", buffer: Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAjklEQVR4nO3PMRHAMADDwPAHUDjFVgQeOim6k2cN/vOOPWO39ee2QwHoQwHoQwHoQ78BlqOrD0D3Aeg+AN37AZajqw9A9wHoPgDd+wGWo6sPQPcB6D4A3fsBlqOrD0D3Aeg+AN37AZajqw9A9wHoPgDd+wGWo6sPQPcB6D4A3fsBlqOrD0D3Aeg+AN3rAR9Bp+HSxKfQ2wAAAABJRU5ErkJggg==", "base64") };
 
 export class TourRun {
   constructor({ root, config, project, module, flow, from = 0, mode = "live", onUpdate = () => {}, onFrame = () => {} }) {
@@ -115,6 +118,7 @@ export class TourRun {
       await this.loc(a.pick).click({ timeout: t });
       return p.getByRole("option", { name: this.sub(a.option), exact: true }).click({ timeout: t });
     }
+    if (a.upload) return this.loc(a.upload).setInputFiles(a.file ? path.resolve(this.root, this.sub(a.file)) : SAMPLE_PNG, { timeout: t });
     if (a.press) return p.keyboard.press(a.press);
     if (a.drag) return this.drag(a.drag, fast);
     if (a.see) {

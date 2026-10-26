@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/http";
-import type { DuplicateFoundDetails, DuplicateTicket, FieldCode, OwnTicketAwaitingRatingDetails, RepairErrorCode } from "./types";
+import type { ContractorNameTakenDetails, DuplicateFoundDetails, DuplicateTicket, FieldCode, OwnTicketAwaitingRatingDetails, RepairErrorCode } from "./types";
 
 // Error code → Thai copy, from docs/modules/repair/04-api-contract.md "Error codes"
 // and the screen specs. Backend `message` is never shown to users.
@@ -23,6 +23,7 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   ASSESSMENT_REQUIRED: "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และใครซ่อม) ก่อนบันทึกผล",
   CONTRACTOR_NOT_FOUND: "ไม่พบช่างภายนอกนี้ หรือถูกปิดใช้งานแล้ว",
   CONTRACTOR_TYPE_NOT_FOUND: "ประเภทช่างบางรายการไม่มีในระบบแล้ว เลือกใหม่อีกครั้ง",
+  CONTRACTOR_NAME_TAKEN: "มีช่างภายนอกชื่อนี้แล้ว",
   ALREADY_FOLLOWING: "คุณติดตามเคสนี้อยู่แล้ว",
   NOT_TEAM_HANDLED: "งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว",
   ASSET_NOT_FOUND: "ไม่พบอุปกรณ์นี้",
@@ -64,6 +65,12 @@ export function duplicateMatches(err: unknown): DuplicateTicket[] | null {
 export function ownTicketAwaitingRating(err: unknown): string | null {
   if (!(err instanceof ApiError) || err.code !== "OWN_TICKET_AWAITING_RATING") return null;
   return (err.details as OwnTicketAwaitingRatingDetails | undefined)?.ticketId ?? null;
+}
+
+/** The contractor that already has the name of a 409 `CONTRACTOR_NAME_TAKEN` (CR-023); `null` for any other error. */
+export function contractorNameTaken(err: unknown): ContractorNameTakenDetails | null {
+  if (!(err instanceof ApiError) || err.code !== "CONTRACTOR_NAME_TAKEN") return null;
+  return (err.details as ContractorNameTakenDetails | undefined) ?? null;
 }
 
 // ---- field errors (VALIDATION_FAILED) ----

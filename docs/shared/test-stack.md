@@ -120,5 +120,6 @@ npx playwright show-report                       # รายงานรอบ�
 | `E2E_DATABASE_URL points at the dev database` | ห้ามใช้ dev database — ใช้ database แยก เช่น `bambam_e2e` |
 | `Another next dev server is already running` | มี web :3100 (`.next-e2e`) ค้างอยู่ — ใช้ตัวนั้นต่อ หรือปิด PID ที่ข้อความบอก |
 | :3100 ติดหน้า Login | ปกติ (ไม่มี SSO) — ใช้ `npm run test:browse` หรือ Atlas |
+| ทุกเคส fail `ERR_CONNECTION_REFUSED … :3100` ตั้งแต่ต้น | web ที่ Playwright เปิดให้หยุดตอน Next.js แสดงคำเตือน security (16.4.0) — เปิด backend / frontend ทดสอบเองตาม "แบบเปิด backend / frontend เอง" แล้วรัน e2e ใหม่ (Playwright ใช้ตัวที่เปิดอยู่) |
 | หน้าแอพไม่มีข้อมูล | `NEXT_PUBLIC_USE_MOCKS` ต้องเป็น `false`; DB ใหม่ยังไม่มีงานซ่อมจนกว่าจะมีคนแจ้งใน stack นี้ |
 | tour หยุดกลางทาง | `node tools/atlas/cli.mjs verify <module>/<flow>` — บอกขั้นที่พังและที่อยู่ภาพหน้าจอในโฟลเดอร์ temp |

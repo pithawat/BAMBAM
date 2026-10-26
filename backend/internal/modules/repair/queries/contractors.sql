@@ -67,6 +67,10 @@ DELETE FROM repair.contractor_type_links WHERE contractor_id = @contractor_id;
 INSERT INTO repair.contractor_type_links (contractor_id, type_id)
 SELECT @contractor_id, unnest(@type_ids::uuid[]);
 
+-- name: ContractorWithName :one
+-- CR-023: names are unique ignoring case (inactive included); exclude_id is the contractor being edited.
+SELECT id, is_active FROM repair.contractors WHERE lower(name) = lower(@name) AND id <> @exclude_id LIMIT 1;
+
 -- name: ActiveContractorExists :one
 SELECT EXISTS (SELECT 1 FROM repair.contractors WHERE id = @id AND is_active);
 

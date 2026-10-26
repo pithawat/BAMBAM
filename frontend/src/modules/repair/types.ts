@@ -495,6 +495,9 @@ export type DuplicateFoundDetails = { tickets: DuplicateTicket[] };
 /** #5 409 `OWN_TICKET_AWAITING_RATING` → `error.details` (BR-F03-4: open that ticket, no new one). */
 export type OwnTicketAwaitingRatingDetails = { ticketId: string };
 
+/** #16 / #18 409 `CONTRACTOR_NAME_TAKEN` (CR-023): the contractor that has the name. */
+export type ContractorNameTakenDetails = { contractorId: string; isActive: boolean };
+
 /** #23 body: note ≤ 500 and 0–5 photos, both optional → event `subscribed`. */
 export type FollowRequest = { note?: string; photoIds: string[] };
 
@@ -515,6 +518,7 @@ export type RepairErrorCode =
   | "TEAM_HANDLED_NOT_ALLOWED"
   | "DUPLICATE_FOUND"
   | "OWN_TICKET_AWAITING_RATING"
+  | "CONTRACTOR_NAME_TAKEN"
   | "NOT_TECHNICIAN"
   | "NOT_REPORTER"
   | "TICKET_CLOSED"

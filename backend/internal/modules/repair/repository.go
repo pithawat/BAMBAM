@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -711,17 +712,37 @@ func (r *pgTxRepository) CountContractorTypes(ctx context.Context, ids []uuid.UU
 	return int(n), err
 }
 
+func (r *pgTxRepository) ContractorWithName(ctx context.Context, name string, excludeID uuid.UUID) (NameOwner, bool, error) {
+	row, err := r.q.ContractorWithName(ctx, repairdb.ContractorWithNameParams{Name: name, ExcludeID: excludeID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return NameOwner{}, false, nil
+	}
+	if err != nil {
+		return NameOwner{}, false, err
+	}
+	return NameOwner{ID: row.ID, IsActive: row.IsActive}, true, nil
+}
+
 func (r *pgTxRepository) InsertContractor(ctx context.Context, id uuid.UUID, in ContractorInput, by uuid.UUID) error {
-	return r.q.InsertContractor(ctx, repairdb.InsertContractorParams{
+	return nameTaken(r.q.InsertContractor(ctx, repairdb.InsertContractorParams{
 		ID: id, Name: in.Name, ContactName: optional(in.ContactName), Phone: optional(in.Phone), Note: optional(in.Note), CreatedByID: &by,
-	})
+	}))
 }
 
 func (r *pgTxRepository) UpdateContractor(ctx context.Context, id uuid.UUID, in ContractorInput) (bool, error) {
 	n, err := r.q.UpdateContractor(ctx, repairdb.UpdateContractorParams{
 		ID: id, Name: in.Name, ContactName: optional(in.ContactName), Phone: optional(in.Phone), Note: optional(in.Note), IsActive: in.IsActive,
 	})
-	return n > 0, err
+	return n > 0, nameTaken(err)
+}
+
+// nameTaken maps the unique index on lower(name) to CONTRACTOR_NAME_TAKEN (two technicians saving one name).
+func nameTaken(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "contractors_name_key" {
+		return ErrContractorNameTaken
+	}
+	return err
 }
 
 func (r *pgTxRepository) SetContractorTypes(ctx context.Context, id uuid.UUID, typeIDs []uuid.UUID) error {

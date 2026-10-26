@@ -45,9 +45,10 @@ export function TechnicianWorkScreen() {
     window.history.replaceState(null, "", url.pathname + url.search);
   }, []);
   if (me.role !== "technician") return <><PageHeader title="งานซ่อม" variant="bar" /><ForbiddenState reason="หน้านี้สำหรับช่างเท่านั้น" /></>;
+  // PageHeader shows `action` on phones and `search` on desktop: the same link in both.
+  const contractors = <Button asChild variant="outline" size="sm"><Link href="/repair/contractors"><HardHat aria-hidden />ช่างภายนอก</Link></Button>;
   return <>
-    <PageHeader title="งานซ่อม" variant="service" service="repair" subtitle="ทุกงานที่ยังไม่ปิด เรียงตามเวลาแจ้ง (เก่าก่อน)"
-      action={<Button asChild variant="outline" size="sm"><Link href="/repair/contractors"><HardHat aria-hidden />ช่างภายนอก</Link></Button>} />
+    <PageHeader title="งานซ่อม" variant="service" service="repair" subtitle="ทุกงานที่ยังไม่ปิด เรียงตามเวลาแจ้ง (เก่าก่อน)" action={contractors} search={contractors} />
     <WorkBoard key={`${tab}|${buildingId}`} tab={tab} buildingId={buildingId} buildings={buildings} change={change} />
   </>;
 }

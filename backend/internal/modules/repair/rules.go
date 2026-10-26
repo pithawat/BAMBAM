@@ -294,7 +294,7 @@ func validateResolve(in ResolveInput, contractorJob, needRating bool) (ResolveIn
 // validateContractor checks a contractor create / update (F24).
 func validateContractor(in ContractorInput) (ContractorInput, map[string]string) {
 	fields := map[string]string{}
-	in.Name = strings.TrimSpace(in.Name)
+	in.Name = strings.Join(strings.Fields(in.Name), " ") // CR-023: names compare ignoring repeated spaces
 	in.ContactName = strings.TrimSpace(in.ContactName)
 	in.Phone = strings.TrimSpace(in.Phone)
 	in.Note = strings.TrimSpace(in.Note)

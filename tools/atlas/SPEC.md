@@ -137,7 +137,8 @@ codes the tour creates). The first match is used unless `nth` is given.
 
 **Actions** — `{ goto }` · `{ click, dispatch?, force? }` · `{ fill, text }` (types visibly) ·
 `{ pick: combobox, option }` · `{ press: "Escape" }` · `{ drag: { from, to, dx?, dy?, at? } }` (`at: "below"` = drop `dy` px under `to`'s bottom edge) · `{ see: locator | "text" }` ·
-`{ notSee }` · `{ waitFor, timeout? }` · `{ scrollTo }` · `{ wait: ms }`.
+`{ notSee }` · `{ waitFor, timeout? }` · `{ scrollTo }` · `{ wait: ms }` ·
+`{ upload: <input type=file locator>, file? }` (`file` relative to the project root; without it a small sample PNG — for forms that need a photo).
 
 Write tours from the flow's passing e2e spec: same locators, same order, same test data rules.
 

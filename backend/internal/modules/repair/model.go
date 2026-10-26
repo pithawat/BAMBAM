@@ -486,6 +486,12 @@ type Contractor struct {
 	UpdatedAt   time.Time
 }
 
+// NameOwner is the contractor that already has a name (CR-023).
+type NameOwner struct {
+	ID       uuid.UUID
+	IsActive bool
+}
+
 type ContractorInput struct {
 	Name        string
 	TypeIDs     []uuid.UUID

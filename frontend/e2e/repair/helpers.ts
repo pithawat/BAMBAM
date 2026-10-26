@@ -1,8 +1,8 @@
 import path from "node:path";
 import { expect, request as playwrightRequest, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
 
-// Shared by the Stage 4 specs (F03 / F04 / F05): demo-role API contexts and tickets reported through
-// the real API. Every report gets its own extra spot (`tag`) so runs and projects never duplicate each
+// Shared by the repair specs (F03–F07, F21, F24): demo-role API contexts and tickets reported and worked on
+// through the real API. Every report gets its own extra spot (`tag`) so runs and projects never duplicate each
 // other (CR-020: another spot in the same room is allowed).
 export const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 export const API = "/api/v1/repair";
@@ -99,3 +99,46 @@ export async function uploadVia(page: Page, input: ReturnType<Page["locator"]>) 
 
 /** Today in Asia/Bangkok as YYYY-MM-DD (expected-date field of #9). */
 export const bangkokToday = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+/** Today + n days in Asia/Bangkok as YYYY-MM-DD. */
+export const bangkokDay = (n: number) => new Date(Date.now() + 7 * 3600_000 + n * 86_400_000).toISOString().slice(0, 10);
+
+type Detail = Record<string, unknown> & { id: string; ticketNo: string; status: string; step: string; timeline: { type: string; note: string | null; data: Record<string, unknown> }[] };
+
+/** POST an action of #9–#12 and expect 200; returns the ticket detail. */
+async function act(api: APIRequestContext, id: string, action: string, data: object): Promise<Detail> {
+  const res = await api.post(`${API}/tickets/${id}/${action}`, { data });
+  expect(res.status(), await res.text()).toBe(200);
+  return (await res.json()).data;
+}
+
+/** #9 as the technician: in house unless a contractor is given; expected today unless `on`. */
+export const assess = (technician: APIRequestContext, id: string, opts: { contractorId?: string; on?: string; reason?: string } = {}) =>
+  act(technician, id, "assess", { expectedDoneOn: opts.on ?? bangkokToday(), workBy: opts.contractorId ? "contractor" : "in_house", contractorId: opts.contractorId, reason: opts.reason });
+
+/** #10 as the technician with one after photo; `rating` = the contractor stars of a contractor job. */
+export async function resolve(technician: APIRequestContext, id: string, rating?: number) {
+  return act(technician, id, "resolve", { note: "ล้างแผงคอยล์เย็น เปลี่ยนท่อน้ำทิ้ง", photoIds: [await uploadPhoto(technician)], ...(rating ? { contractorRating: rating } : {}) });
+}
+
+/** #11 as the reporter: the stars close the ticket. */
+export const confirm = (reporter: APIRequestContext, id: string, rating = 5) => act(reporter, id, "confirm", { rating });
+
+/** #12 as the reporter. */
+export const sendBack = (reporter: APIRequestContext, id: string, reason = "ยังมีน้ำหยดตอนเปิดแอร์นาน") => act(reporter, id, "send-back", { reason, photoIds: [] });
+
+/** #14 + #16 as the technician: a contractor of type แอร์ (the type is reused when it exists, BR-F24-2). */
+export async function newContractor(technician: APIRequestContext, name: string) {
+  const type = (await (await technician.post(`${API}/contractor-types`, { data: { name: "แอร์" } })).json()).data as { id: string };
+  const res = await technician.post(`${API}/contractors`, { data: { name, typeIds: [type.id], contactName: "คุณสมชาย", phone: "081-234-5678", note: "" } });
+  expect(res.status(), await res.text()).toBe(201);
+  return (await res.json()).data as { id: string; name: string; types: Ref[] };
+}
+
+/** A ticket reported by the employee and resolved by the technician (in house, or by this contractor with 4 stars). */
+export async function resolvedTicket(baseURL: string | undefined, spot: string, contractorId?: string) {
+  const technician = await as("technician", baseURL);
+  const ticket = await report(await as("employee", baseURL), spot);
+  await assess(technician, ticket.id, { contractorId });
+  await resolve(technician, ticket.id, contractorId ? 4 : undefined);
+  return ticket;
+}

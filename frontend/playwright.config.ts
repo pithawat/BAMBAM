@@ -27,8 +27,8 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },
-        // software WebGL for the S29 3D card (CR-016) in headless Chrome
-        launchOptions: { args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
+        // The 3D specs (F23, F31) switch to Chrome's new headless for WebGL (D-103). Software WebGL
+        // (swiftshader) on the whole project delayed canvas / paint work on other pages by 10–30 s.
       },
     },
     { name: "mobile", use: { ...devices["Pixel 7"] } },

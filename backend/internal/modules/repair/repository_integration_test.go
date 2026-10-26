@@ -717,3 +717,39 @@ func containsTicket(list []TicketSummary, id uuid.UUID) bool {
 	}
 	return false
 }
+
+// CR-023 (BR-F24-6): the unique index on lower(name) backs the service check, also when two saves race.
+func TestPgContractorNameUnique(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	tech := p.user(t, users.RoleTechnician)
+	t.Cleanup(func() {
+		for _, q := range []string{
+			`DELETE FROM repair.contractors WHERE created_by_id = $1`,
+			`DELETE FROM repair.contractor_types WHERE created_by_id = $1`,
+		} {
+			if _, err := p.pool.Exec(context.Background(), q, tech.ID); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
+		}
+	})
+	typ, err := p.svc.CreateContractorType(ctx, tech, "แอร์")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "Pg Cool Air " + uuid.NewString()[:8]
+	first, err := p.svc.CreateContractor(ctx, tech, ContractorInput{Name: name, TypeIDs: []uuid.UUID{typ.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.svc.CreateContractor(ctx, tech, ContractorInput{Name: "  " + strings.ToUpper(name) + " ", TypeIDs: []uuid.UUID{typ.ID}})
+	assertNameTaken(t, err, first.ID, true)
+
+	// Past the service check (a racing save): the index refuses it with the same code.
+	err = NewRepository(p.pool).InTx(ctx, func(tx TxRepository) error {
+		return tx.InsertContractor(ctx, uuid.New(), ContractorInput{Name: strings.ToLower(name)}, tech.ID)
+	})
+	if !errors.Is(err, ErrContractorNameTaken) {
+		t.Fatalf("index: err = %v, want ErrContractorNameTaken", err)
+	}
+}

@@ -8,6 +8,9 @@ const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json
 const API = "/api/v1/repair";
 const CARD = "section[aria-label='อาคาร 1 แบบ 3 มิติ']";
 
+// The 3D card needs WebGL: Chrome's new headless keeps it on the GPU (D-103). Only the 3D specs use it.
+test.use({ channel: "chromium" });
+
 test.describe("admin", () => {
   test.use({ storageState: auth("admin") });
 
@@ -71,7 +74,7 @@ test.describe("admin", () => {
       categoryId: cat.id, symptomIds: [cat.symptoms[Date.now() % cat.symptoms.length].id], buildingId: b1.id, floorId: floor.id, roomId: room.id,
       locationDetail: `e2e ${Date.now()}`, photoIds: [(await photo.json()).data.id], teamHandled: null } });
     expect(created.status()).toBe(201);
-    const ticketNo: string = (await created.json()).data.ticketNo;
+    const { id, ticketNo } = (await created.json()).data as { id: string; ticketNo: string };
 
     await page.goto("/");
     const card = page.locator(CARD);
@@ -92,6 +95,8 @@ test.describe("admin", () => {
     await expect(pop).toContainText(room.name);
     await pop.getByRole("link", { name: "ดูรายละเอียดงาน" }).click();
     await expect(page).toHaveURL(/\/repair\/tickets\//, { timeout: 60_000 }); // dev compiles the route on first visit
+    // Close it again so runs do not pile pins into this room (the F31 tour drags into it).
+    expect((await api.post(`${API}/tickets/${id}/close`, { data: { reason: "ล้างข้อมูลทดสอบ" } })).status()).toBe(200);
   });
 
   test("AC6: phone shows the floor list, no 3D and no horizontal scroll", async ({ page, isMobile }) => {

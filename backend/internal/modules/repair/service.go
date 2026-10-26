@@ -3,6 +3,7 @@ package repair
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -92,9 +93,12 @@ type TxRepository interface {
 	// InsertEvent writes a timeline event and attaches its photos.
 	InsertEvent(ctx context.Context, e NewEvent) error
 	ActiveContractorExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// ContractorWithName finds another contractor with this name, ignoring case, inactive included (CR-023).
+	ContractorWithName(ctx context.Context, name string, excludeID uuid.UUID) (owner NameOwner, found bool, err error)
 
 	CountContractorTypes(ctx context.Context, ids []uuid.UUID) (int, error)
 	InsertContractor(ctx context.Context, id uuid.UUID, in ContractorInput, by uuid.UUID) error
+	// InsertContractor / UpdateContractor return ErrContractorNameTaken when the unique index rejects the name.
 	// UpdateContractor returns false when the contractor does not exist.
 	UpdateContractor(ctx context.Context, id uuid.UUID, in ContractorInput) (bool, error)
 	SetContractorTypes(ctx context.Context, id uuid.UUID, typeIDs []uuid.UUID) error
@@ -727,7 +731,7 @@ func (s *Service) saveContractor(ctx context.Context, v Viewer, in ContractorInp
 	if len(fields) > 0 {
 		return apperr.Validation(fields)
 	}
-	return s.repo.InTx(ctx, func(tx TxRepository) error {
+	err := s.repo.InTx(ctx, func(tx TxRepository) error {
 		n, err := tx.CountContractorTypes(ctx, in.TypeIDs)
 		if err != nil {
 			return err
@@ -735,11 +739,31 @@ func (s *Service) saveContractor(ctx context.Context, v Viewer, in ContractorInp
 		if n != len(in.TypeIDs) {
 			return ErrContractorTypeAbsent
 		}
+		if err := checkContractorName(ctx, tx, in.Name, id); err != nil {
+			return err
+		}
 		if err := write(tx, in); err != nil {
 			return err
 		}
 		return tx.SetContractorTypes(ctx, id, in.TypeIDs)
 	})
+	if errors.Is(err, ErrContractorNameTaken) {
+		// Two saves raced past the check: read who has the name now, for the details.
+		return s.repo.InTx(ctx, func(tx TxRepository) error { return checkContractorName(ctx, tx, in.Name, id) })
+	}
+	return err
+}
+
+// checkContractorName refuses a name another contractor has (BR-F24-6, CR-023).
+func checkContractorName(ctx context.Context, tx TxRepository, name string, self uuid.UUID) error {
+	owner, found, err := tx.ContractorWithName(ctx, name, self)
+	if err != nil {
+		return err
+	}
+	if found {
+		return contractorNameTaken(owner)
+	}
+	return nil
 }
 
 func mustJSON(v any) []byte {
