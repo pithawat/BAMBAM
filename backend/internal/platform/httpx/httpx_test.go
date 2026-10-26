@@ -48,3 +48,26 @@ func TestErrorEnvelope(t *testing.T) {
 		}
 	}
 }
+
+func TestErrorDetails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		err  *apperr.Error
+		want string
+	}{
+		{&apperr.Error{Kind: apperr.KindConflict, Code: "DUPLICATE_FOUND", Message: "x", Details: gin.H{"ticketId": "t1"}}, `{"ticketId":"t1"}`},
+		{apperr.ErrForbidden, ""},
+	} {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+		Error(c, tc.err)
+		var body struct {
+			Error map[string]json.RawMessage `json:"error"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &body)
+		if got := string(body.Error["details"]); got != tc.want {
+			t.Errorf("%s: details %q, want %q", tc.err.Code, got, tc.want)
+		}
+	}
+}

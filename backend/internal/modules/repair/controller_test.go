@@ -216,3 +216,54 @@ func TestCloseStatusCodes(t *testing.T) {
 		t.Fatalf("close twice: %d %s", w.Code, env.Error.Code)
 	}
 }
+
+// Stage 4: #5 409 bodies carry the matches (CR-009); #22 needs all three ids; teamHandled is parsed.
+func TestCreateDuplicateAndTeamBodies(t *testing.T) {
+	f := newFixture(t)
+	first := f.report(t, employee())
+	r := newTestRouter(f, users.RoleEmployee)
+	photo := f.upload(t, f.reporter)
+	body := func(extra string) []byte {
+		return []byte(`{"categoryId":"` + f.cat.String() + `","symptomIds":["` + f.sym1.String() + `"],"buildingId":"` + f.building.String() +
+			`","floorId":"` + f.floor.String() + `","roomId":"` + f.room.String() + `","photoIds":["` + photo.String() + `"]` + extra + `}`)
+	}
+
+	w, env := do(t, r, http.MethodPost, "/api/v1/repair/tickets", body(""), "application/json")
+	var dup struct {
+		Error struct {
+			Details struct {
+				Tickets []map[string]any `json:"tickets"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &dup)
+	if w.Code != http.StatusConflict || env.Error.Code != "DUPLICATE_FOUND" || len(dup.Error.Details.Tickets) != 1 ||
+		dup.Error.Details.Tickets[0]["id"] != first.ID.String() || dup.Error.Details.Tickets[0]["subscriberCount"] != float64(0) {
+		t.Fatalf("409 = %d %s", w.Code, w.Body.String())
+	}
+
+	f.repo.tickets[first.ID].Reporter.ID = f.reporter.ID
+	f.repo.tickets[first.ID].Status = StatusResolved
+	w, env = do(t, r, http.MethodPost, "/api/v1/repair/tickets", body(""), "application/json")
+	if w.Code != http.StatusConflict || env.Error.Code != "OWN_TICKET_AWAITING_RATING" || !strings.Contains(w.Body.String(), `"ticketId":"`+first.ID.String()) {
+		t.Fatalf("own = %d %s", w.Code, w.Body.String())
+	}
+
+	w, env = do(t, r, http.MethodPost, "/api/v1/repair/tickets", body(`,"teamHandled":{"note":"x","photoIds":["bad"]}`), "application/json")
+	if w.Code != http.StatusBadRequest || env.Error.Fields["teamHandled.photoIds"] != "INVALID" {
+		t.Fatalf("team ids = %d %s", w.Code, w.Body.String())
+	}
+	w, env = do(t, r, http.MethodPost, "/api/v1/repair/tickets", body(`,"teamHandled":{"note":"x","photoIds":["`+uuid.NewString()+`"]}`), "application/json")
+	if w.Code != http.StatusForbidden || env.Error.Code != "TEAM_HANDLED_NOT_ALLOWED" {
+		t.Fatalf("employee team = %d %s", w.Code, w.Body.String())
+	}
+
+	w, env = do(t, r, http.MethodGet, "/api/v1/repair/tickets/duplicates?categoryId="+f.cat.String()+"&floorId="+f.floor.String(), nil, "")
+	if w.Code != http.StatusBadRequest || env.Error.Fields["roomId"] != "REQUIRED" {
+		t.Fatalf("#22 without room = %d %s", w.Code, w.Body.String())
+	}
+	w, _ = do(t, r, http.MethodGet, "/api/v1/repair/tickets/duplicates?categoryId="+f.cat.String()+"&floorId="+f.floor.String()+"&roomId="+f.room.String(), nil, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"subscriberCount":0`) {
+		t.Fatalf("#22 = %d %s", w.Code, w.Body.String())
+	}
+}

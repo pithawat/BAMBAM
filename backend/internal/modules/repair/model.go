@@ -18,7 +18,9 @@ const (
 
 var Statuses = []string{StatusInProgress, StatusResolved, StatusClosed}
 
-var ClosedReasons = []string{"confirmed", "auto_closed", "team_handled", "admin_closed"}
+const ClosedReasonTeamHandled = "team_handled"
+
+var ClosedReasons = []string{"confirmed", "auto_closed", ClosedReasonTeamHandled, "admin_closed"}
 
 // Steps are the progress shown to people (CR-005), derived from status + assessment + send backs.
 const (
@@ -71,10 +73,18 @@ const (
 	EventSentBack          = "sent_back"
 	EventConfirmed         = "confirmed"
 	EventAdminClosed       = "admin_closed"
+	EventSubscribed        = "subscribed"   // F03 follow, with the follower's note and photos
+	EventTeamHandled       = "team_handled" // F04, with what the team did and the after photos
+	EventHandedOver        = "handed_over"  // F05, with the reason
 
 	PhotoKindReport   = "report"
 	PhotoKindResult   = "result"
 	PhotoKindSendBack = "send_back"
+	PhotoKindFollow   = "follow"
+	PhotoKindTeam     = "team"
+
+	// MaxDuplicates: the most open matches the duplicate check returns (#22, #5 409).
+	MaxDuplicates = 10
 
 	MaxPhotos         = 5
 	MaxLocationChars  = 100
@@ -100,6 +110,7 @@ const (
 	ActionConfirm  = "confirm"
 	ActionSendBack = "send_back"
 	ActionClose    = "close"
+	ActionHandover = "handover" // F05, Stage 4
 )
 
 // Ref is { id, name } as used across the API contract.
@@ -296,7 +307,37 @@ type CreateTicketInput struct {
 	SymptomOther   string // CR-008: typed symptom
 	PhotoIDs       []uuid.UUID
 	AssetCode      string
-	TeamHandled    bool
+	TeamHandled    *TeamHandledInput // F04: leads only (BR-F04-1); nil = a normal report
+}
+
+// TeamHandledInput is #5 `teamHandled`: what the team did and the after photos (BR-F04-2).
+type TeamHandledInput struct {
+	Note     string
+	PhotoIDs []uuid.UUID
+}
+
+// DuplicateKey is what makes two reports "the same problem" (BR-F03-1, CR-009 / CR-014): the same
+// category, floor and room; Spot (CR-020) is the reporter's extra spot, normalised by normalizeSpot.
+type DuplicateKey struct {
+	CategoryID uuid.UUID
+	FloorID    uuid.UUID
+	RoomID     uuid.UUID
+	Spot       string
+}
+
+// DuplicateMatch is an open ticket in the same category + floor + room. BlocksReport (CR-020): the
+// report is a duplicate of it (no extra spot, or the same spot); otherwise it is only similar.
+type DuplicateMatch struct {
+	ID           uuid.UUID
+	ReporterID   uuid.UUID
+	Status       string
+	BlocksReport bool
+}
+
+// Duplicate is one #22 row: the match as the viewer sees it (S04) and whether it blocks the report.
+type Duplicate struct {
+	TicketDetail
+	BlocksReport bool
 }
 
 // AssessInput is endpoint #9 after parsing: the expected finish date and who does the work (CR-006).
@@ -359,6 +400,8 @@ type Photo struct {
 	ThumbKey         string
 	ThumbContentType string
 	TicketID         *uuid.UUID
+	Kind             *string // report | result | send_back | follow | team, when attached
+	TicketStatus     *string // status of the ticket it is attached to
 }
 
 // NewPhoto is a stored upload ready to be recorded.
@@ -392,6 +435,7 @@ type NewTicket struct {
 	PhotoIDs       []uuid.UUID
 	CreatedAt      time.Time
 	CreatedEventID uuid.UUID
+	TeamHandled    bool // F04: created closed / team_handled
 }
 
 // ActiveCategory is what ticket creation reads from a locked, active category.
@@ -404,6 +448,7 @@ type ActiveCategory struct {
 type LockedTicket struct {
 	ID           uuid.UUID
 	Status       string
+	ClosedReason string // "" while open
 	ReporterID   uuid.UUID
 	Assessed     bool // expected date and work-by are both set (CR-006)
 	WorkBy       string

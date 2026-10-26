@@ -9,7 +9,7 @@ test.describe("signed out", () => {
     await page.goto("/profile");
     await expect(page).toHaveURL(/\/login\?next=%2Fprofile/);
     await expect(page.getByRole("button", { name: "เข้าสู่ระบบ" }).filter({ visible: true }).first()).toBeVisible();
-    await expect(page.getByText("ยินดีต้อนรับสู่ BAMBAM").filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /ทุกเรื่องในที่ทำงาน/ })).toBeVisible(); // D-095: S01 copy from bam-workplace-login-v7.html
   });
 
   test("login button starts the PKCE flow at RMC SSO", async ({ request }) => {

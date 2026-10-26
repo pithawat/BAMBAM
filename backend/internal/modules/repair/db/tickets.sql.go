@@ -451,6 +451,23 @@ func (q *Queries) GetTicketAccess(ctx context.Context, arg GetTicketAccessParams
 	return i, err
 }
 
+const handOverTicket = `-- name: HandOverTicket :exec
+UPDATE repair.tickets
+SET status = 'in_progress', closed_reason = NULL, closed_at = NULL, updated_at = $1
+WHERE id = $2
+`
+
+type HandOverTicketParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+// F05 (BR-F05-1/3): the same team-handled ticket goes back to the technician, waiting for the assessment.
+func (q *Queries) HandOverTicket(ctx context.Context, arg HandOverTicketParams) error {
+	_, err := q.db.Exec(ctx, handOverTicket, arg.Now, arg.ID)
+	return err
+}
+
 const insertAutoClosedEvents = `-- name: InsertAutoClosedEvents :exec
 INSERT INTO repair.ticket_events (ticket_id, type, created_at)
 SELECT unnest($1::uuid[]), 'auto_closed', $2
@@ -466,21 +483,46 @@ func (q *Queries) InsertAutoClosedEvents(ctx context.Context, arg InsertAutoClos
 	return err
 }
 
+const insertSubscriber = `-- name: InsertSubscriber :execrows
+INSERT INTO repair.ticket_subscribers (ticket_id, user_id, created_at, updated_at)
+VALUES ($1, $2, $3, $3)
+ON CONFLICT (ticket_id, user_id) DO NOTHING
+`
+
+type InsertSubscriberParams struct {
+	TicketID uuid.UUID
+	UserID   uuid.UUID
+	Now      time.Time
+}
+
+// F03: 0 rows = already following.
+func (q *Queries) InsertSubscriber(ctx context.Context, arg InsertSubscriberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertSubscriber, arg.TicketID, arg.UserID, arg.Now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertTicket = `-- name: InsertTicket :exec
 
 INSERT INTO repair.tickets (
-    id, ticket_no, status, priority, priority_source, category_id, category_other, symptom_other,
-    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id
+    id, ticket_no, status, closed_reason, closed_at, priority, priority_source, category_id, category_other, symptom_other,
+    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id, created_at, updated_at
 ) VALUES (
-    $1, $2, 'in_progress', $3, $4, $5::uuid,
-    $6::text, $7::text,
-    $8, $9, $10, $11, $12, $13, $14
+    $1, $2, $3, $4::text, $5::timestamptz,
+    $6, $7, $8::uuid,
+    $9::text, $10::text,
+    $11, $12, $13, $14, $15, $16, $17, $18, $18
 )
 `
 
 type InsertTicketParams struct {
 	ID             uuid.UUID
 	TicketNo       string
+	Status         string
+	ClosedReason   *string
+	ClosedAt       *time.Time
 	Priority       string
 	PrioritySource string
 	CategoryID     *uuid.UUID
@@ -493,6 +535,7 @@ type InsertTicketParams struct {
 	Details        *string
 	AssetCode      *string
 	ReporterID     uuid.UUID
+	CreatedAt      time.Time
 }
 
 // Step (CR-005) = the progress shown to people, derived from the row:
@@ -501,10 +544,14 @@ type InsertTicketParams struct {
 //	· in_progress after a send back → reworking · else in_repair.
 //
 // The same CASE is repeated in the list / count queries; keep them identical.
+// A team-handled record (F04) is created `closed` / `team_handled`; every other ticket `in_progress`.
 func (q *Queries) InsertTicket(ctx context.Context, arg InsertTicketParams) error {
 	_, err := q.db.Exec(ctx, insertTicket,
 		arg.ID,
 		arg.TicketNo,
+		arg.Status,
+		arg.ClosedReason,
+		arg.ClosedAt,
 		arg.Priority,
 		arg.PrioritySource,
 		arg.CategoryID,
@@ -517,6 +564,7 @@ func (q *Queries) InsertTicket(ctx context.Context, arg InsertTicketParams) erro
 		arg.Details,
 		arg.AssetCode,
 		arg.ReporterID,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -565,6 +613,73 @@ func (q *Queries) InsertTicketSymptoms(ctx context.Context, arg InsertTicketSymp
 	return err
 }
 
+const listDuplicateTickets = `-- name: ListDuplicateTickets :many
+SELECT t.id, t.reporter_id, t.status,
+       (CASE WHEN t.room_id IS NULL THEN $1::text = ''
+             ELSE $1::text = '' OR lower(regexp_replace(btrim(coalesce(t.location_detail, '')), '\s+', ' ', 'g')) = $1::text
+        END)::boolean AS blocks_report
+FROM repair.tickets t
+WHERE t.status IN ('in_progress', 'resolved')
+  AND t.category_id = $2 AND t.floor_id = $3
+  AND (t.room_id = $4
+       OR (t.room_id IS NULL AND lower(btrim(t.location_detail)) =
+           (SELECT lower(btrim(rm.name)) FROM platform.rooms rm WHERE rm.id = $4)))
+ORDER BY blocks_report DESC, t.created_at DESC, t.id
+LIMIT $5
+`
+
+type ListDuplicateTicketsParams struct {
+	Spot       string
+	CategoryID *uuid.UUID
+	FloorID    uuid.UUID
+	RoomID     *uuid.UUID
+	MaxRows    int32
+}
+
+type ListDuplicateTicketsRow struct {
+	ID           uuid.UUID
+	ReporterID   uuid.UUID
+	Status       string
+	BlocksReport bool
+}
+
+// F03 (BR-F03-1, CR-009 / CR-014): open tickets with the same category, floor and room; old tickets
+// without a room match when their location text equals the room name (trimmed, case-insensitive).
+// CR-020: `blocks_report` = the report is a duplicate of it: the reporter gave no extra spot (@spot is
+// the normalised spot, ” when empty) or the same spot. A different spot is only "similar" (allowed).
+// Old tickets have no separate spot (their text is the room name), so only an empty @spot blocks.
+// Blocking matches come first so MaxDuplicates never cuts one off.
+func (q *Queries) ListDuplicateTickets(ctx context.Context, arg ListDuplicateTicketsParams) ([]ListDuplicateTicketsRow, error) {
+	rows, err := q.db.Query(ctx, listDuplicateTickets,
+		arg.Spot,
+		arg.CategoryID,
+		arg.FloorID,
+		arg.RoomID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDuplicateTicketsRow
+	for rows.Next() {
+		var i ListDuplicateTicketsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ReporterID,
+			&i.Status,
+			&i.BlocksReport,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMyTickets = `-- name: ListMyTickets :many
 SELECT
     t.id, t.ticket_no, t.status, t.closed_reason,
@@ -596,28 +711,30 @@ WHERE (($2::text IN ('all', 'reported') AND t.reporter_id = $1)
         WHEN t.expected_done_on IS NULL THEN 'awaiting_assessment'
         WHEN t.send_back_count > 0 THEN 'reworking'
         ELSE 'in_repair' END) = ANY($4::text[]))
-  AND ($5::text IS NULL OR t.ticket_no ILIKE '%' || $5::text || '%'
-       OR t.location_detail ILIKE '%' || $5::text || '%'
-       OR rm.name ILIKE '%' || $5::text || '%')
+  AND ($5::text IS NULL OR t.closed_reason = $5::text)
+  AND ($6::text IS NULL OR t.ticket_no ILIKE '%' || $6::text || '%'
+       OR t.location_detail ILIKE '%' || $6::text || '%'
+       OR rm.name ILIKE '%' || $6::text || '%')
 ORDER BY
     -- BR-F06-2: resolved tickets awaiting the viewer's rating first
     (t.status = 'resolved' AND t.reporter_id = $1) DESC,
-    CASE WHEN $6::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
-    CASE WHEN $6::text = 'createdAt:desc' THEN t.created_at END DESC,
-    CASE WHEN $6::text = 'createdAt:asc' THEN t.created_at END ASC,
+    CASE WHEN $7::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
+    CASE WHEN $7::text = 'createdAt:desc' THEN t.created_at END DESC,
+    CASE WHEN $7::text = 'createdAt:asc' THEN t.created_at END ASC,
     t.updated_at DESC, t.id
-LIMIT $8 OFFSET $7
+LIMIT $9 OFFSET $8
 `
 
 type ListMyTicketsParams struct {
-	ViewerID   uuid.UUID
-	Relation   string
-	Statuses   []string
-	Steps      []string
-	Q          *string
-	Sort       string
-	PageOffset int32
-	PageLimit  int32
+	ViewerID     uuid.UUID
+	Relation     string
+	Statuses     []string
+	Steps        []string
+	ClosedReason *string
+	Q            *string
+	Sort         string
+	PageOffset   int32
+	PageLimit    int32
 }
 
 type ListMyTicketsRow struct {
@@ -654,6 +771,7 @@ func (q *Queries) ListMyTickets(ctx context.Context, arg ListMyTicketsParams) ([
 		arg.Relation,
 		arg.Statuses,
 		arg.Steps,
+		arg.ClosedReason,
 		arg.Q,
 		arg.Sort,
 		arg.PageOffset,
@@ -1034,8 +1152,19 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Lis
 	return items, nil
 }
 
+const lockDuplicateKey = `-- name: LockDuplicateKey :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
+`
+
+// Serialises reports on one category + floor + room, so two people sending the same problem at the
+// same moment cannot both pass the duplicate check (BR-F03-2, CR-009).
+func (q *Queries) LockDuplicateKey(ctx context.Context, key string) error {
+	_, err := q.db.Exec(ctx, lockDuplicateKey, key)
+	return err
+}
+
 const lockTicket = `-- name: LockTicket :one
-SELECT id, status, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating FROM repair.tickets
+SELECT id, status, closed_reason, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating FROM repair.tickets
 WHERE id = $1
 FOR UPDATE
 `
@@ -1043,6 +1172,7 @@ FOR UPDATE
 type LockTicketRow struct {
 	ID               uuid.UUID
 	Status           string
+	ClosedReason     *string
 	ReporterID       uuid.UUID
 	ExpectedDoneOn   pgtype.Date
 	WorkBy           *string
@@ -1057,6 +1187,7 @@ func (q *Queries) LockTicket(ctx context.Context, id uuid.UUID) (LockTicketRow, 
 	err := row.Scan(
 		&i.ID,
 		&i.Status,
+		&i.ClosedReason,
 		&i.ReporterID,
 		&i.ExpectedDoneOn,
 		&i.WorkBy,

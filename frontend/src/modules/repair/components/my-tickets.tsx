@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Select as SelectPrimitive } from "radix-ui";
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, FileText, Plus, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Plus, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
+import { useCurrentUser } from "@/components/shared/me-provider";
 import { MenuContent, MenuItem, type PickerOption } from "@/components/shared/picker";
 import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ import { TicketLink } from "./ticket-navigation";
 // and one paged table with the category icon on every row. The API puts the reporter's own tickets awaiting the
 // rating first (BR-F06-2); their row keeps the ตรวจงาน button. Priority, contractor and other staff-side
 // fields are left out on purpose.
+// CR-021 (layout from maintenance-demo.html, no stats row): the list card opens with its own heading row; leads
+// also get บันทึกงานที่ทีมแก้แล้ว (locked team form) and the ทีมแก้เอง tab.
 
 const STATUSES: (PickerOption & { query?: Pick<MyTicketsQuery, "status" | "step"> })[] = [
   { value: "all", label: "ทุกสถานะ" },
@@ -38,11 +41,14 @@ const SORTS: (PickerOption & { sort?: TicketSort })[] = [
   { value: "newest", label: "แจ้งล่าสุดก่อน", sort: "createdAt:desc" },
   { value: "oldest", label: "แจ้งเก่าสุดก่อน", sort: "createdAt:asc" },
 ];
-const RELATIONS: { value: string; label: string; icon: LucideIcon }[] = [
-  { value: "all", label: "ทั้งหมด", icon: FileText },
-  { value: "reported", label: "ที่ฉันแจ้ง", icon: Wrench },
-  { value: "following", label: "ที่ฉันติดตาม", icon: Bell },
+type Relation = { value: string; label: string; icon: LucideIcon; query: Pick<MyTicketsQuery, "relation" | "closedReason"> };
+const RELATIONS: Relation[] = [
+  { value: "all", label: "ทั้งหมด", icon: FileText, query: { relation: "all" } },
+  { value: "reported", label: "ที่ฉันแจ้ง", icon: Wrench, query: { relation: "reported" } },
+  { value: "following", label: "ที่ฉันติดตาม", icon: Bell, query: { relation: "following" } },
 ];
+/** Leads only (CR-021): their records still closed as team handled — a handed-over one moves back to ที่ฉันแจ้ง. */
+const TEAM_RELATION: Relation = { value: "team", label: "ทีมแก้เอง", icon: ClipboardCheck, query: { relation: "reported", closedReason: "team_handled" } };
 /** Server-side paging (#35 page / pageSize): one page of slim rows per request, never the whole list. */
 const PAGE_SIZE = 10;
 const FOCUS_REFRESH_MS = 30_000;
@@ -54,8 +60,11 @@ const pick = (list: { value: string }[], value: string | null) => (list.some((o)
 
 export function MyTicketsScreen() {
   const params = useSearchParams();
+  const me = useCurrentUser();
+  const lead = me.role === "housekeeper_lead" || me.role === "security_lead";
+  const relations = lead ? [...RELATIONS, TEAM_RELATION] : RELATIONS;
   const q = (params.get("q") ?? "").slice(0, 50);
-  const scope = pick(RELATIONS, params.get("scope"));
+  const scope = pick(relations, params.get("scope"));
   const status = pick(STATUSES, params.get("status"));
   const sort = pick(SORTS, params.get("sort"));
   const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1);
@@ -78,20 +87,20 @@ export function MyTicketsScreen() {
     return () => window.clearTimeout(timer);
   }, [text, q, change]);
   const filters = { q, scope, status, sort, page };
-  const filtered = q !== "" || status !== "all";
-  const reset = () => { setDraft({ query: q, value: "" }); change({ q: null, status: null }); };
+  const filtered = q !== "" || status !== "all" || scope !== "all";
+  const reset = () => { setDraft({ query: q, value: "" }); change({ q: null, status: null, scope: null }); };
 
   const toolbar = <>
     <div className="border-b px-4 lg:px-6">
       <div role="group" aria-label="งานที่แสดง" className="-mb-px flex min-w-0 gap-1 overflow-x-auto">
-        {RELATIONS.map((r) => <button key={r.value} type="button" aria-pressed={scope === r.value} onClick={() => change({ scope: r.value === "all" ? null : r.value })}
+        {relations.map((r) => <button key={r.value} type="button" aria-pressed={scope === r.value} onClick={() => change({ scope: r.value === "all" ? null : r.value })}
           className={cn("flex min-h-12 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30 sm:px-3",
             scope === r.value ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-          <r.icon className="size-4" aria-hidden />{r.label}
+          <r.icon className="hidden size-4 sm:block" aria-hidden />{r.label}
         </button>)}
       </div>
     </div>
-    <div className="grid grid-cols-2 gap-2 px-4 pt-4 sm:grid-cols-[minmax(0,1fr)_11rem_auto] lg:gap-3 lg:px-6">
+    <div className="grid grid-cols-2 gap-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_11rem_auto] lg:gap-3 lg:px-6">
       <div className="relative col-span-2 min-w-0 sm:col-span-1">
         <Search className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-muted-foreground" aria-hidden />
         <Input type="search" aria-label="ค้นหาเลขงาน หรือสถานที่" placeholder="ค้นหาเลขงาน หรือสถานที่" maxLength={50} value={text}
@@ -105,28 +114,36 @@ export function MyTicketsScreen() {
 
   return <div className="space-y-4 px-4 pt-4 pb-8 lg:space-y-5 lg:px-0 lg:pt-2">
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-5">
-      <header className="flex items-center gap-4 rounded-xl border bg-card px-4 py-4 shadow-card sm:gap-6 sm:px-8 sm:py-5">
-        <Mascot pose="tracking" size={120} className="hidden shrink-0 sm:block" priority />
+      {/* Leads' CTA card holds two buttons, so their hero scales up to fill the taller row (owner, 2026-10-26). */}
+      <header className={cn("flex items-center gap-4 rounded-xl border bg-card px-4 py-4 shadow-card sm:px-8 sm:py-5", lead ? "sm:gap-7" : "sm:gap-6")}>
+        <Mascot pose="tracking" size={lead ? 160 : 120} className="hidden shrink-0 sm:block" priority />
         <Mascot pose="tracking" size={84} className="shrink-0 sm:hidden" priority />
         <div className="min-w-0">
-          <p className="text-[11px] leading-5 font-semibold tracking-[0.16em] text-primary uppercase">Maintenance center</p>
-          <h1 className="text-2xl leading-9 font-semibold lg:text-[28px] lg:leading-10">ติดตามงานซ่อม</h1>
-          <p className="text-sm text-muted-foreground">งานที่คุณแจ้งและติดตาม · ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ</p>
+          <p className={cn("leading-5 font-semibold tracking-[0.16em] text-primary uppercase", lead ? "text-xs" : "text-[11px]")}>Maintenance center</p>
+          <h1 className={cn("text-2xl leading-9 font-semibold", lead ? "lg:mt-0.5 lg:text-[34px] lg:leading-12" : "lg:text-[28px] lg:leading-10")}>ติดตามงานซ่อม</h1>
+          <p className={cn("text-sm text-muted-foreground", lead && "lg:mt-1 lg:text-base")}>งานที่คุณแจ้งและติดตาม · ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ</p>
         </div>
       </header>
       <section aria-labelledby="request-title" className="flex flex-col justify-center gap-4 rounded-xl bg-primary px-5 py-5 text-primary-foreground shadow-card sm:px-7">
         <div>
           <h2 id="request-title" className="text-lg leading-7 font-semibold">พบปัญหาในที่ทำงาน?</h2>
-          <p className="text-sm text-primary-foreground/85">แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล</p>
+          <p className="text-sm text-primary-foreground/85">{lead ? "เรียกช่างช่วยดูแล หรือบันทึกงานที่ทีมแก้ไขแล้ว" : "แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล"}</p>
         </div>
-        <Link href="/repair/new" className="group flex h-14 items-center gap-3 rounded-lg bg-card px-3 text-base font-semibold text-primary outline-none transition-shadow hover:shadow-float focus-visible:ring-3 focus-visible:ring-white/60">
-          <span aria-hidden className="grid size-8 place-items-center rounded-md bg-secondary"><Plus className="size-4.5" /></span>
-          <span className="flex-1">แจ้งซ่อมใหม่</span>
-          <ChevronRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-        </Link>
+        <div className="grid gap-2.5">
+          <Link href="/repair/new" className={cn("group flex items-center gap-3 rounded-lg bg-card px-3 text-base font-semibold text-primary outline-none transition-shadow hover:shadow-float focus-visible:ring-3 focus-visible:ring-white/60", lead ? "h-12" : "h-14")}>
+            <span aria-hidden className="grid size-8 place-items-center rounded-md bg-secondary"><Plus className="size-4.5" /></span>
+            <span className="flex-1">แจ้งซ่อมใหม่</span>
+            <ChevronRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </Link>
+          {lead && <Link href="/repair/new?mode=team" className="group flex h-12 items-center gap-3 rounded-lg border border-primary-foreground/35 bg-primary-foreground/8 px-3 text-base font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-foreground/15 focus-visible:ring-3 focus-visible:ring-white/60">
+            <span aria-hidden className="grid size-8 place-items-center rounded-md bg-primary-foreground/15"><ClipboardCheck className="size-4.5" /></span>
+            <span className="flex-1">บันทึกงานที่ทีมแก้แล้ว</span>
+            <ChevronRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </Link>}
+        </div>
       </section>
     </div>
-    <Board key={`${q}|${scope}|${status}|${sort}|${page}`} filters={filters} filtered={filtered} onReset={reset} toolbar={toolbar} onPage={(p) => change({ page: p > 1 ? String(p) : null })} />
+    <Board key={`${q}|${scope}|${status}|${sort}|${page}`} filters={filters} relation={relations.find((r) => r.value === scope)!} filtered={filtered} onReset={reset} toolbar={toolbar} onPage={(p) => change({ page: p > 1 ? String(p) : null })} />
   </div>;
 }
 
@@ -150,7 +167,7 @@ function BoxSelect({ label, value, options, onValueChange, icon: Icon, fixedText
 
 type Data = { revision: number; page?: MyTicketPage; at?: string; error?: unknown };
 
-function useTicketPage(filters: Filters) {
+function useTicketPage(filters: Filters, relation: Relation) {
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState<Data>();
   const reload = useCallback(() => setRevision((r) => r + 1), []);
@@ -159,7 +176,7 @@ function useTicketPage(filters: Filters) {
   useEffect(() => {
     let active = true;
     const query: MyTicketsQuery = {
-      relation: scope as "all" | "reported" | "following", q: q || undefined, page, pageSize: PAGE_SIZE,
+      ...relation.query, q: q || undefined, page, pageSize: PAGE_SIZE,
       sort: SORTS.find((s) => s.value === sort)?.sort, ...STATUSES.find((s) => s.value === status)?.query,
     };
     getMyTickets(query).then(
@@ -167,7 +184,7 @@ function useTicketPage(filters: Filters) {
       (error: unknown) => { if (active) setData({ revision, error }); },
     );
     return () => { active = false; };
-  }, [q, scope, status, sort, page, revision]);
+  }, [q, scope, status, sort, page, revision, relation]);
   useEffect(() => {
     // Refresh when the tab comes back, at most once per FOCUS_REFRESH_MS (only the current page is refetched).
     let last = Date.now();
@@ -180,10 +197,10 @@ function useTicketPage(filters: Filters) {
   return { data, loading, reload };
 }
 
-type BoardProps = { filters: Filters; filtered: boolean; onReset: () => void; toolbar: ReactNode; onPage: (page: number) => void };
+type BoardProps = { filters: Filters; relation: Relation; filtered: boolean; onReset: () => void; toolbar: ReactNode; onPage: (page: number) => void };
 
-function Board({ filters, filtered, onReset, toolbar, onPage }: BoardProps) {
-  const { data, loading, reload } = useTicketPage(filters);
+function Board({ filters, relation, filtered, onReset, toolbar, onPage }: BoardProps) {
+  const { data, loading, reload } = useTicketPage(filters, relation);
   const result = data?.page;
   const failure = !loading && data?.error !== undefined
     && (errorCode(data.error) === "FORBIDDEN" ? <ForbiddenState /> : <div className="px-4 py-6 lg:px-6"><ErrorState variant="inline" title="โหลดงานของคุณไม่สำเร็จ" onRetry={reload} /></div>);
@@ -198,18 +215,23 @@ function Board({ filters, filtered, onReset, toolbar, onPage }: BoardProps) {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = (filters.page - 1) * PAGE_SIZE + 1;
   const to = Math.min(filters.page * PAGE_SIZE, total);
-  return <section aria-label="รายการงานซ่อม" className="overflow-hidden rounded-xl border bg-card shadow-card">
-    {toolbar}
-    <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-3 text-[13px] text-muted-foreground lg:px-6">
-      <p role="status">{ready ? `แสดง ${total} งาน` : " "}</p>
-      {ready && data.at && <p className="flex items-center gap-1.5"><span aria-hidden className="size-1.5 rounded-full bg-success" />อัปเดตล่าสุด {listDate(data.at)}</p>}
+  const teamEmpty = relation.value === "team" && !filters.q && filters.status === "all" && filters.page === 1;
+  return <section aria-labelledby="list-title" className="overflow-hidden rounded-xl border bg-card shadow-card">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 pt-4 pb-1 lg:px-6 lg:pt-5">
+      <h2 id="list-title" className="flex items-center gap-2.5 text-lg leading-7 font-semibold">รายการงานซ่อม
+        <span role="status" className={cn("rounded-md bg-secondary px-2 text-xs leading-6 font-semibold text-secondary-foreground tabular-nums", !ready && "invisible")}>
+          {ready ? total : 0}<span className="sr-only"> งาน</span>
+        </span>
+      </h2>
+      {ready && data.at && <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground"><span aria-hidden className="size-1.5 rounded-full bg-success" />อัปเดตล่าสุด {listDate(data.at)}</p>}
     </div>
+    {toolbar}
     <div aria-busy={loading}>
       {loading ? <ListSkeleton /> : failure ? failure : ready && result.items.length === 0
         ? <div className="flex flex-col items-center gap-3 border-t px-4 py-10 text-center">
-          <p className="text-base font-semibold">{filters.q ? `ไม่พบงานที่ตรงกับ "${filters.q}"` : filters.page > 1 ? "ไม่มีงานในหน้านี้" : "ไม่พบงานตามตัวกรองนี้"}</p>
-          <p className="text-sm text-muted-foreground">ลองเปลี่ยนคำค้นหรือสถานะ</p>
-          <Button variant="outline" onClick={filters.page > 1 ? () => onPage(1) : onReset}><RotateCcw aria-hidden />{filters.page > 1 ? "กลับหน้าแรก" : "ล้างตัวกรอง"}</Button>
+          <p className="text-base font-semibold">{teamEmpty ? "ยังไม่มีงานที่ทีมแก้เอง" : filters.q ? `ไม่พบงานที่ตรงกับ "${filters.q}"` : filters.page > 1 ? "ไม่มีงานในหน้านี้" : "ไม่พบงานตามตัวกรองนี้"}</p>
+          <p className="text-sm text-muted-foreground">{teamEmpty ? "บันทึกงานที่ทีมแก้แล้วได้จากปุ่มด้านบน" : "ลองเปลี่ยนคำค้นหรือสถานะ"}</p>
+          {!teamEmpty && <Button variant="outline" onClick={filters.page > 1 ? () => onPage(1) : onReset}><RotateCcw aria-hidden />{filters.page > 1 ? "กลับหน้าแรก" : "ล้างตัวกรอง"}</Button>}
         </div>
         : ready && <>
           {/* Desktop: table · phone / tablet: one row block per ticket. */}
@@ -314,7 +336,7 @@ function Title({ ticket, compact }: { ticket: MyTicket; compact?: boolean }) {
     <TicketLink href={ticketHref(ticket.id)} title={compact ? title : undefined}
       className={cn("block text-[15px] leading-6 font-semibold outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/30", compact ? "truncate" : "line-clamp-2")}>{title}</TicketLink>
     <span className="block truncate text-xs leading-5 text-muted-foreground">
-      <span className="tracking-wide">{ticket.ticketNo}</span> · {categoryName(ticket)}{ticket.viewerRelation === "subscriber" && " · คุณติดตามงานนี้"}
+      <span className="tracking-wide">{ticket.ticketNo}</span>{ticket.closedReason === "team_handled" && " · ทีมแก้เอง"} · {categoryName(ticket)}{ticket.viewerRelation === "subscriber" && " · คุณติดตามเคสนี้"}
     </span>
   </div>;
 }

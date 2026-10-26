@@ -133,6 +133,7 @@ func (r *PgRepository) GetPhoto(ctx context.Context, id uuid.UUID) (Photo, error
 	return Photo{
 		ID: row.ID, UploaderID: row.UploaderID, ContentType: row.ContentType, StorageKey: row.StorageKey,
 		ThumbKey: row.ThumbKey, ThumbContentType: row.ThumbContentType, TicketID: row.TicketID,
+		Kind: row.Kind, TicketStatus: row.TicketStatus,
 	}, nil
 }
 
@@ -327,14 +328,14 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 // ListMyTickets is #35: one S06 page in one query, plus the shared count (scope mine, no staff filters).
 func (r *PgRepository) ListMyTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]MyTicket, int64, error) {
 	rows, err := r.q.ListMyTickets(ctx, repairdb.ListMyTicketsParams{
-		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), Q: f.Q, Sort: f.Sort,
+		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), ClosedReason: f.ClosedReason, Q: f.Q, Sort: f.Sort,
 		PageLimit: int32(f.PageSize), PageOffset: int32((f.Page - 1) * f.PageSize), // #nosec G115 -- page size ≤ 100, page bounded by the controller
 	})
 	if err != nil {
 		return nil, 0, err
 	}
 	total, err := r.q.CountTickets(ctx, repairdb.CountTicketsParams{
-		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), Q: f.Q,
+		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), ClosedReason: f.ClosedReason, Q: f.Q,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -408,6 +409,24 @@ func (r *PgRepository) AutoCloseDue(ctx context.Context, now time.Time) (int, er
 		return q.InsertAutoClosedEvents(ctx, repairdb.InsertAutoClosedEventsParams{TicketIds: ids, Now: now})
 	})
 	return n, err
+}
+
+func (r *PgRepository) DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error) {
+	return duplicateTickets(ctx, r.q, k)
+}
+
+func duplicateTickets(ctx context.Context, q *repairdb.Queries, k DuplicateKey) ([]DuplicateMatch, error) {
+	rows, err := q.ListDuplicateTickets(ctx, repairdb.ListDuplicateTicketsParams{
+		CategoryID: &k.CategoryID, FloorID: k.FloorID, RoomID: &k.RoomID, Spot: k.Spot, MaxRows: MaxDuplicates,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]DuplicateMatch, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, DuplicateMatch{ID: row.ID, ReporterID: row.ReporterID, Status: row.Status, BlocksReport: row.BlocksReport})
+	}
+	return out, nil
 }
 
 // ---- contractors ----
@@ -570,12 +589,17 @@ func (r *pgTxRepository) NextTicketCounter(ctx context.Context, year int) (int64
 }
 
 func (r *pgTxRepository) InsertTicket(ctx context.Context, t NewTicket) error {
-	if err := r.q.InsertTicket(ctx, repairdb.InsertTicketParams{
-		ID: t.ID, TicketNo: t.TicketNo, Priority: t.Priority, PrioritySource: t.PrioritySource,
+	p := repairdb.InsertTicketParams{
+		ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority, PrioritySource: t.PrioritySource,
 		CategoryID: &t.CategoryID, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther, BuildingID: t.BuildingID,
 		FloorID: t.FloorID, RoomID: &t.RoomID, LocationDetail: t.LocationDetail, Details: t.Details, AssetCode: t.AssetCode,
-		ReporterID: t.ReporterID,
-	}); err != nil {
+		ReporterID: t.ReporterID, CreatedAt: t.CreatedAt,
+	}
+	if t.TeamHandled {
+		reason, at := ClosedReasonTeamHandled, t.CreatedAt
+		p.Status, p.ClosedReason, p.ClosedAt = StatusClosed, &reason, &at
+	}
+	if err := r.q.InsertTicket(ctx, p); err != nil {
 		return err
 	}
 	if err := r.q.InsertTicketSymptoms(ctx, repairdb.InsertTicketSymptomsParams{TicketID: t.ID, SymptomIds: t.SymptomIDs}); err != nil {
@@ -604,6 +628,9 @@ func (r *pgTxRepository) LockTicket(ctx context.Context, id uuid.UUID) (LockedTi
 	t := LockedTicket{
 		ID: row.ID, Status: row.Status, ReporterID: row.ReporterID, ContractorID: row.ContractorID,
 		Assessed: row.ExpectedDoneOn.Valid && row.WorkBy != nil, Rated: row.ContractorRating != nil,
+	}
+	if row.ClosedReason != nil {
+		t.ClosedReason = *row.ClosedReason
 	}
 	if row.WorkBy != nil {
 		t.WorkBy = *row.WorkBy
@@ -640,6 +667,23 @@ func (r *pgTxRepository) AdminCloseTicket(ctx context.Context, id uuid.UUID, now
 
 func (r *pgTxRepository) SendBackTicket(ctx context.Context, id uuid.UUID, now time.Time) error {
 	return r.q.SendBackTicket(ctx, repairdb.SendBackTicketParams{ID: id, Now: now})
+}
+
+func (r *pgTxRepository) HandOverTicket(ctx context.Context, id uuid.UUID, now time.Time) error {
+	return r.q.HandOverTicket(ctx, repairdb.HandOverTicketParams{ID: id, Now: now})
+}
+
+func (r *pgTxRepository) LockDuplicateKey(ctx context.Context, k DuplicateKey) error {
+	return r.q.LockDuplicateKey(ctx, k.CategoryID.String()+"/"+k.FloorID.String()+"/"+k.RoomID.String())
+}
+
+func (r *pgTxRepository) DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error) {
+	return duplicateTickets(ctx, r.q, k)
+}
+
+func (r *pgTxRepository) InsertSubscriber(ctx context.Context, ticketID, userID uuid.UUID, now time.Time) (bool, error) {
+	n, err := r.q.InsertSubscriber(ctx, repairdb.InsertSubscriberParams{TicketID: ticketID, UserID: userID, Now: now})
+	return n > 0, err
 }
 
 func (r *pgTxRepository) InsertEvent(ctx context.Context, e NewEvent) error {

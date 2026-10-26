@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/http";
-import type { FieldCode, RepairErrorCode } from "./types";
+import type { DuplicateFoundDetails, DuplicateTicket, FieldCode, OwnTicketAwaitingRatingDetails, RepairErrorCode } from "./types";
 
 // Error code → Thai copy, from docs/modules/repair/04-api-contract.md "Error codes"
 // and the screen specs. Backend `message` is never shown to users.
@@ -14,6 +14,8 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   PHOTO_TOO_LARGE: "รูปนี้ใหญ่เกิน 10 MB",
   MASTER_DATA_CHANGED: "ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่",
   TEAM_HANDLED_NOT_ALLOWED: "คุณไม่มีสิทธิ์ทำรายการนี้",
+  DUPLICATE_FOUND: "มีคนแจ้งเรื่องนี้ไว้แล้ว ติดตามเคสเดิมแทนได้",
+  OWN_TICKET_AWAITING_RATING: "คุณแจ้งเรื่องนี้ไว้แล้ว ช่างซ่อมเสร็จแล้ว ไปประเมินตรวจงานที่งานเดิม",
   NOT_TECHNICIAN: "เฉพาะช่างเท่านั้นที่ทำรายการนี้ได้",
   NOT_REPORTER: "เฉพาะผู้แจ้งเท่านั้นที่ประเมินตรวจงานได้",
   TICKET_CLOSED: "งานนี้ปิดไปแล้ว",
@@ -50,6 +52,20 @@ export function errorCode(err: unknown): RepairErrorCode | undefined {
   return err instanceof ApiError ? (err.code as RepairErrorCode) : undefined;
 }
 
+// ---- #5 409s (Stage 4, CR-009) ----
+
+/** The open matches of a `createTicket` refused with 409 `DUPLICATE_FOUND` (→ S04 dialog); `null` for any other error. */
+export function duplicateMatches(err: unknown): DuplicateTicket[] | null {
+  if (!(err instanceof ApiError) || err.code !== "DUPLICATE_FOUND") return null;
+  return (err.details as DuplicateFoundDetails | undefined)?.tickets ?? [];
+}
+
+/** The ticket id of a 409 `OWN_TICKET_AWAITING_RATING` (→ S07 of that ticket); `null` for any other error. */
+export function ownTicketAwaitingRating(err: unknown): string | null {
+  if (!(err instanceof ApiError) || err.code !== "OWN_TICKET_AWAITING_RATING") return null;
+  return (err.details as OwnTicketAwaitingRatingDetails | undefined)?.ticketId ?? null;
+}
+
 // ---- field errors (VALIDATION_FAILED) ----
 
 /** S03 "Validation" (CR-008, CR-014): `field` + `FieldCode` → message. */
@@ -69,7 +85,11 @@ const createTicketFieldMessages: Record<string, Partial<Record<FieldCode, string
   },
   details: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
   "teamHandled.note": { REQUIRED: "กรุณาบอกสิ่งที่ทีมทำ", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
-  "teamHandled.photoIds": { MIN_ITEMS: "แนบรูปหลังทำอย่างน้อย 1 รูป" },
+  "teamHandled.photoIds": {
+    MIN_ITEMS: "แนบรูปหลังทำอย่างน้อย 1 รูป",
+    MAX_ITEMS: "แนบได้สูงสุด 5 รูป",
+    INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น",
+  },
 };
 
 /**
@@ -117,6 +137,17 @@ export const reviewFieldMessages: FieldMessages = {
   comment: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
   reason: { REQUIRED: "กรุณาบอกสิ่งที่ยังไม่เรียบร้อย", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
   photoIds: { MAX_ITEMS: "แนบได้สูงสุด 5 รูป", INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" },
+};
+
+/** S04 follow (#23). */
+export const followFieldMessages: FieldMessages = {
+  note: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
+  photoIds: { MAX_ITEMS: "แนบได้สูงสุด 5 รูป", INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" },
+};
+
+/** Hand-over dialog (#24, `_common.md` §7). */
+export const handoverFieldMessages: FieldMessages = {
+  reason: { REQUIRED: "กรุณาใส่เหตุผล", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
 };
 
 /** S18 contractor form. */

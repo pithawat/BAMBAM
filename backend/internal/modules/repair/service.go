@@ -30,6 +30,8 @@ type Repository interface {
 	ListTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]TicketSummary, int64, error)
 	ListMyTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]MyTicket, int64, error)
 	CountTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) (TicketCounts, error)
+	// DuplicateTickets: open tickets matching the key, newest first, at most MaxDuplicates (BR-F03-1).
+	DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error)
 	// AutoCloseDue closes resolved tickets whose auto_close_at has passed and writes their events.
 	AutoCloseDue(ctx context.Context, now time.Time) (int, error)
 
@@ -81,6 +83,12 @@ type TxRepository interface {
 	ConfirmTicket(ctx context.Context, id uuid.UUID, rating int16, comment *string, now time.Time) error
 	SendBackTicket(ctx context.Context, id uuid.UUID, now time.Time) error
 	AdminCloseTicket(ctx context.Context, id uuid.UUID, now time.Time) error
+	HandOverTicket(ctx context.Context, id uuid.UUID, now time.Time) error
+	// LockDuplicateKey serialises creates on one category + floor + room until the transaction ends.
+	LockDuplicateKey(ctx context.Context, k DuplicateKey) error
+	DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error)
+	// InsertSubscriber returns false when the user already follows the ticket.
+	InsertSubscriber(ctx context.Context, ticketID, userID uuid.UUID, now time.Time) (bool, error)
 	// InsertEvent writes a timeline event and attaches its photos.
 	InsertEvent(ctx context.Context, e NewEvent) error
 	ActiveContractorExists(ctx context.Context, id uuid.UUID) (bool, error)
@@ -181,11 +189,14 @@ func (s *Service) OpenPhoto(ctx context.Context, v Viewer, id uuid.UUID, thumb b
 	if err != nil {
 		return nil, "", err
 	}
-	if p.TicketID == nil {
+	switch {
+	case p.TicketID == nil:
 		if p.UploaderID != v.ID {
 			return nil, "", apperr.ErrForbidden
 		}
-	} else {
+	case isOpenReportPhoto(p):
+		// D-098: S04 shows the report photos of open matching tickets to every reporter (F03).
+	default:
 		acc, err := s.repo.GetTicketAccess(ctx, *p.TicketID, v.ID)
 		if err != nil {
 			return nil, "", err
@@ -231,9 +242,10 @@ func (s *Service) deleteFiles(ctx context.Context, keys ...string) {
 // ---- tickets ----
 
 // CreateTicket implements endpoint #5. The ticket starts `in_progress`, waiting for the
-// technician's assessment (CR-005); team handled comes in Stage 4.
+// technician's assessment (CR-005); a lead's team-handled record starts `closed` / `team_handled`
+// (F04). Both are refused when an open ticket matches (F03, BR-F03-2, BR-F04-3).
 func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInput) (TicketDetail, error) {
-	if in.TeamHandled {
+	if in.TeamHandled != nil && !isLead(v.Role) {
 		return TicketDetail{}, ErrTeamHandledNotAllowed
 	}
 	in, fields := validateCreate(in)
@@ -248,7 +260,7 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 		BuildingID: *in.BuildingID, FloorID: *in.FloorID, RoomID: *in.RoomID,
 		LocationDetail: optional(in.LocationDetail), Details: optional(in.Details), AssetCode: optional(in.AssetCode),
 		ReporterID: v.ID, SymptomIDs: in.SymptomIDs, PhotoIDs: in.PhotoIDs,
-		CreatedAt: now, CreatedEventID: uuid.New(),
+		CreatedAt: now, CreatedEventID: uuid.New(), TeamHandled: in.TeamHandled != nil,
 	}
 
 	err := s.repo.InTx(ctx, func(tx TxRepository) error {
@@ -285,7 +297,15 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 		} else if !ok {
 			return ErrMasterDataChanged
 		}
-		if err := lockPhotos(ctx, tx, v.ID, t.PhotoIDs, now); err != nil {
+		k := DuplicateKey{CategoryID: t.CategoryID, FloorID: t.FloorID, RoomID: t.RoomID, Spot: normalizeSpot(in.LocationDetail)}
+		if err := checkDuplicates(ctx, tx, v, k); err != nil {
+			return err
+		}
+		photoIDs := t.PhotoIDs
+		if in.TeamHandled != nil {
+			photoIDs = append(append([]uuid.UUID{}, t.PhotoIDs...), in.TeamHandled.PhotoIDs...)
+		}
+		if err := lockPhotos(ctx, tx, v.ID, photoIDs, now); err != nil {
 			return err
 		}
 
@@ -301,10 +321,19 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 		if t.TicketNo, err = FormatTicketNo(format, year, seq); err != nil {
 			return err
 		}
-		return tx.InsertTicket(ctx, t)
+		if err := tx.InsertTicket(ctx, t); err != nil {
+			return err
+		}
+		if in.TeamHandled == nil {
+			return nil
+		}
+		// One microsecond after `created`, so the timeline (newest first) always lists it on top.
+		note := in.TeamHandled.Note
+		return tx.InsertEvent(ctx, NewEvent{ID: uuid.New(), TicketID: t.ID, Type: EventTeamHandled, ActorID: &v.ID,
+			At: now.Add(time.Microsecond), Note: &note, Data: []byte("{}"), PhotoKind: PhotoKindTeam, PhotoIDs: in.TeamHandled.PhotoIDs})
 	})
 	if err != nil {
-		return TicketDetail{}, err
+		return TicketDetail{}, s.withDuplicates(ctx, v, err)
 	}
 	return s.Ticket(ctx, v, t.ID)
 }

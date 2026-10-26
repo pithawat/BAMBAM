@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import {
-  AlertCircle, ArrowLeft, Bell, Building2, Camera, Check, ChevronDown, ChevronRight, CircleCheck, DoorOpen, FileText, History, Loader2, MapPin, RotateCcw, Send,
-  SquareParking, Upload,
+  AlertCircle, ArrowLeft, Bell, Building2, Camera, Check, ChevronDown, ChevronRight, CircleCheck, ClipboardCheck, DoorOpen, FileText, History, Info, Loader2, MapPin,
+  RotateCcw, Send, SquareParking, Upload, Wrench,
 } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
-import { Picker } from "@/components/shared/picker";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { ErrorState, ForbiddenState } from "@/components/shared/states";
@@ -21,28 +22,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
 import { initials } from "@/lib/platform/roles";
 import { cn } from "@/lib/utils";
-import { createTicket, getBuildings, getCategories, getRecentPlaces, MAX_PHOTOS } from "../api";
-import { createTicketFieldErrors, errorCode, errorMessage } from "../errors";
+import { createTicket, followTicket, getDuplicates, getBuildings, getCategories, getRecentPlaces, MAX_PHOTOS } from "../api";
+import { createTicketFieldErrors, duplicateMatches, ownTicketAwaitingRating, errorCode, errorMessage } from "../errors";
 import { priorityReason, ticketPriority, type PriorityResult } from "../priority";
-import type { AreaType, Building, Category, Floor, Photo, RecentPlace, Room } from "../types";
+import type { AreaType, Building, Category, DuplicateTicket, Floor, Photo, RecentPlace, Room } from "../types";
+import { DuplicateCard, DuplicateDialog } from "./duplicate-dialog";
 import { CategoryTile, categoryIcon } from "./category-icon";
 import { PhotoLightbox } from "./photo-gallery";
-import { PhotoTile, usePhotoUploads, type PhotoItem } from "./photo-picker";
+import { PhotoPicker, PhotoTile, usePhotoUploads, type PhotoItem } from "./photo-picker";
 import { floorLabel, listDate, timeOf } from "./ticket-presentation";
 import { useDiscardGuard } from "./use-discard-guard";
 
 // S03 แจ้งซ่อมใหม่ — CR-014 wizard (docs/modules/repair/ui/screens/S03-report-form.md CR-014 block, visual
 // reference docs/modules/repair/changes/CR-014/form-steps.html): 3 steps ปัญหาที่พบ → สถานที่ → รูปภาพและส่ง
-// in one frame. Desktop: the frame is 880px wide and every step sits in the same grid cell (the others are
-// invisible), so the body is as tall as the tallest step and the progress strip, card edge and footer never
-// move. Phone / tablet: one step at a time with a sticky footer. The system sets the priority (BR-F02-2).
-// Team mode, duplicate card and QR banner come with Stages 4–5.
+// in one frame. Only the current step is rendered, at its own height (CR-022: no reserved heights, the room
+// cards grow with the floor's rooms). Phone / tablet: sticky footer. The system sets the priority (BR-F02-2).
+// CR-021: the mode is fixed by the entry point (/repair/new = repair, ?mode=team = team for leads) and the duplicate
+// card sits between the room and the extra spot; a blocking duplicate stops ถัดไป at the location step.
 
 const MAX_OTHER = 100;
 const MAX_LOCATION = 100;
 const MAX_DETAILS = 500;
-/** More rooms than this on a floor → a searchable picker instead of cards (CR-014). */
-const MAX_ROOM_CARDS = 9;
 /** Unattached photos expire after 24 h (D-022); older drafts drop their photos. */
 const DRAFT_PHOTO_TTL_MS = 20 * 60 * 60 * 1000;
 
@@ -60,11 +60,13 @@ type Values = {
   roomId: string;
   /** บอกจุดเพิ่มเติม (optional extra spot). */
   locationDetail: string;
+  teamNote: string;
 };
 const initial: Values = {
   categoryId: "", categoryOther: "", symptomIds: [], symptomOtherOn: false, symptomOther: "", details: "",
-  buildingId: "", floorId: "", roomId: "", locationDetail: "",
+  buildingId: "", floorId: "", roomId: "", locationDetail: "", teamNote: "",
 };
+const SPOT_REQUIRED = "กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ";
 
 type StepKey = "problem" | "location" | "send";
 const STEPS: { key: StepKey; label: string }[] = [
@@ -76,10 +78,11 @@ const FIELD_STEP: Record<string, StepKey> = {
   categoryId: "problem", categoryOther: "problem", symptomIds: "problem", symptomOther: "problem",
   buildingId: "location", floorId: "location", roomId: "location", locationDetail: "location",
   photoIds: "send", details: "send",
+  "teamHandled.note": "send", "teamHandled.photoIds": "send",
 };
 
 /** v1 drafts (CR-008, 4 steps, no room) are read too; their steps map onto the 3 CR-014 steps. */
-type Draft = { v: 1; savedAt: number; step: string; values: Partial<Values>; photos: Photo[] };
+type Draft = { v: 1; savedAt: number; step: string; values: Partial<Values>; photos: Photo[]; teamPhotos?: Photo[] };
 const draftStep = (s: string): StepKey => (s === "location" ? "location" : s === "photo" || s === "review" || s === "send" ? "send" : "problem");
 
 const AREA_LABELS: Record<AreaType, string> = {
@@ -87,7 +90,7 @@ const AREA_LABELS: Record<AreaType, string> = {
   common_area: "พื้นที่ส่วนกลาง", parking: "ลานจอด", other: "อื่นๆ",
 };
 
-function validate(values: Values, photos: PhotoItem[]): Record<string, string> {
+function validate(values: Values, photos: PhotoItem[], teamPhotos: PhotoItem[] = [], team = false, blocked = false): Record<string, string> {
   const e: Record<string, string> = {};
   if (!values.categoryId) e.categoryId = "กรุณาเลือกหมวดงาน";
   else if (!values.symptomIds.length && !values.symptomOtherOn) e.symptomIds = "เลือกอาการอย่างน้อย 1 ข้อ";
@@ -96,10 +99,18 @@ function validate(values: Values, photos: PhotoItem[]): Record<string, string> {
   else if (!values.floorId) e.floorId = "กรุณาเลือกชั้น";
   else if (!values.roomId) e.roomId = "เลือกห้องหรือจุดที่เกิด";
   if (values.locationDetail.length > MAX_LOCATION) e.locationDetail = "ไม่เกิน 100 ตัวอักษร";
+  else if (blocked) e.locationDetail = SPOT_REQUIRED; // BR-F03-2 (CR-021): another spot, or follow the case
   if (values.details.length > MAX_DETAILS) e.details = "ไม่เกิน 500 ตัวอักษร";
   if (photos.some((p) => p.status === "uploading")) e.photoIds = "รอให้รูปอัปโหลดเสร็จก่อน";
   else if (photos.some((p) => p.status === "failed")) e.photoIds = "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น";
   else if (!photos.length) e.photoIds = "ถ่ายหรือแนบรูปปัญหาอย่างน้อย 1 รูป";
+  if (team) {
+    if (!values.teamNote.trim()) e["teamHandled.note"] = "กรุณาบอกสิ่งที่ทีมทำ";
+    else if (values.teamNote.length > MAX_DETAILS) e["teamHandled.note"] = "ไม่เกิน 500 ตัวอักษร";
+    if (teamPhotos.some(p => p.status === "uploading")) e["teamHandled.photoIds"] = "รอให้รูปอัปโหลดเสร็จก่อน";
+    else if (teamPhotos.some(p => p.status === "failed")) e["teamHandled.photoIds"] = "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น";
+    else if (!teamPhotos.length) e["teamHandled.photoIds"] = "แนบรูปหลังทำอย่างน้อย 1 รูป";
+  }
   return e;
 }
 
@@ -139,11 +150,25 @@ function splitRooms(rooms: Room[], category?: Category): { matching: Room[]; oth
   return { matching: rooms.filter((r) => areas.has(r.areaType)), others: rooms.filter((r) => !areas.has(r.areaType)) };
 }
 
+/** The route entry: the mode comes from the URL and a new mode mounts a fresh form (no state leaks between modes). */
 export function ReportForm() {
   const me = useCurrentUser();
-  const storageKey = draftKey("repair-report", me.employeeCode);
+  const mode = useSearchParams().get("mode");
+  const canTeam = me.role === "housekeeper_lead" || me.role === "security_lead";
+  const team = canTeam && mode === "team";
+  return <ReportFormBody key={team ? "team" : "repair"} team={team} canTeam={canTeam} />;
+}
+
+function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) {
+  const me = useCurrentUser();
+  // Drafts are kept per mode (CR-021).
+  const storageKey = draftKey(team ? "repair-team" : "repair-report", me.employeeCode);
   const [values, setValues] = useState<Values>(initial);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [teamPhotos, setTeamPhotos] = useState<PhotoItem[]>([]);
+  const [matches, setMatches] = useState<{ key: string; room: string; tickets: DuplicateTicket[] }>({ key: "", room: "", tickets: [] });
+  const [duplicateDialog, setDuplicateDialog] = useState<DuplicateTicket[] | null>(null);
+  const [following, setFollowing] = useState<string | null>(null);
   const [step, setStep] = useState<StepKey>("problem");
   const [attempted, setAttempted] = useState<StepKey[]>([]);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
@@ -159,8 +184,23 @@ export function ReportForm() {
   const [submitError, setSubmitError] = useState("");
   const submitting = useRef(false);
   const frame = useRef<HTMLDivElement>(null);
-  const dirty = isDirty(values, photos);
+  const formRef = useRef<HTMLFormElement>(null);
+  const dirty = isDirty(values, photos) || teamPhotos.length > 0;
   const guard = useDiscardGuard(dirty);
+  const roomKey = JSON.stringify([values.categoryId, values.floorId, values.roomId]);
+  const duplicateKey = JSON.stringify([roomKey, values.locationDetail]);
+  // The card stays while the spot is being typed (no flicker); only the check for the current spot can block.
+  const duplicates = matches.room === roomKey ? matches.tickets : [];
+  const blocked = matches.key === duplicateKey && duplicates.some((t) => t.blocksReport);
+  useEffect(() => {
+    if (!values.categoryId || !values.floorId || !values.roomId) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      getDuplicates({ categoryId: values.categoryId, floorId: values.floorId, roomId: values.roomId, locationDetail: values.locationDetail })
+        .then(tickets => { if (active) setMatches({ key: duplicateKey, room: roomKey, tickets }); }, () => { if (active) setMatches({ key: duplicateKey, room: roomKey, tickets: [] }); });
+    }, 300);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [duplicateKey, roomKey, values.categoryId, values.floorId, values.roomId, values.locationDetail]);
 
   useEffect(() => {
     let active = true;
@@ -173,6 +213,7 @@ export function ReportForm() {
         const restored = sanitizeDraft(draft, categories, buildings);
         if (isDirty(restored.values, restored.photos)) {
           setValues(restored.values); setPhotos(restored.photos); setRestoredAt(draft.savedAt); setStep(draftStep(draft.step));
+          setTeamPhotos(sanitizeDraft({ ...draft, photos: draft.teamPhotos ?? [] }, categories, buildings).photos);
         }
       }
       setReady(true);
@@ -186,6 +227,7 @@ export function ReportForm() {
   useEffect(() => () => {
     setValues(initial); setPhotos([]); setStep("problem"); setAttempted([]); setServerErrors({}); setSubmitError("");
     setMasterError(false); setReady(false); setRestoredAt(null);
+    setTeamPhotos([]); setDuplicateDialog(null); setFollowing(null); setMatches({ key: "", room: "", tickets: [] });
     submitting.current = false; setBusy(false);
   }, []);
 
@@ -194,8 +236,8 @@ export function ReportForm() {
     if (!ready || submitting.current) return;
     if (!dirty) { clearDraft(storageKey); return; }
     const done = photos.flatMap((p) => p.status === "done" && p.photo ? [p.photo] : []);
-    writeDraft(storageKey, { v: 1, savedAt: Date.now(), step, values, photos: done } satisfies Draft);
-  }, [ready, dirty, values, photos, step, storageKey]);
+    writeDraft(storageKey, { v: 1, savedAt: Date.now(), step, values, photos: done, teamPhotos: teamPhotos.flatMap(p => p.status === "done" && p.photo ? [p.photo] : []) } satisfies Draft);
+  }, [ready, dirty, values, photos, teamPhotos, step, storageKey]);
 
   const categories = master?.categories ?? [];
   const buildings = master?.buildings ?? [];
@@ -203,7 +245,7 @@ export function ReportForm() {
   const building = buildings.find((b) => b.id === values.buildingId);
   const floor = building?.floors.find((f) => f.id === values.floorId);
   const room = floor?.rooms.find((r) => r.id === values.roomId);
-  const checks = validate(values, photos);
+  const checks = validate(values, photos, teamPhotos, team, blocked);
   const shown = { ...Object.fromEntries(Object.entries(checks).filter(([k]) => attempted.includes(FIELD_STEP[k]))), ...serverErrors };
   const stepDone = (key: StepKey) => !Object.keys(checks).some((k) => FIELD_STEP[k] === key);
   const index = STEPS.findIndex((s) => s.key === step);
@@ -218,6 +260,7 @@ export function ReportForm() {
     setServerErrors((old) => {
       const next = { ...old };
       for (const k of Object.keys(patch)) delete next[k];
+      if ("teamNote" in patch) delete next["teamHandled.note"];
       if ("categoryId" in patch) { delete next.symptomIds; delete next.symptomOther; delete next.categoryOther; }
       if ("symptomIds" in patch || "symptomOtherOn" in patch) delete next.symptomIds;
       if ("buildingId" in patch) { delete next.floorId; delete next.roomId; }
@@ -265,13 +308,20 @@ export function ReportForm() {
         ...(values.locationDetail.trim() ? { locationDetail: values.locationDetail.trim() } : {}),
         ...(values.details.trim() ? { details: values.details.trim() } : {}),
         photoIds: donePhotos.map((p) => p.id),
-        teamHandled: null,
+        teamHandled: team ? { note: values.teamNote.trim(), photoIds: teamPhotos.flatMap(p => p.status === "done" && p.photo ? [p.photo.id] : []) } : null,
       });
       clearDraft(storageKey);
       // Stays busy until the route is hidden; the effect cleanup above resets the form.
       guard.finish(`/repair/new/done?id=${encodeURIComponent(ticket.id)}`);
     } catch (err: unknown) {
       const code = errorCode(err);
+      const duplicateTickets = duplicateMatches(err);
+      const ownId = ownTicketAwaitingRating(err);
+      if (duplicateTickets !== null) {
+        setDuplicateDialog(duplicateTickets); submitting.current = false; setBusy(false); return;
+      }
+      if (ownId) { toast.error(errorMessage(err)); clearDraft(storageKey); guard.finish(`/repair/tickets/${encodeURIComponent(ownId)}`); return; }
+      if (code === "TEAM_HANDLED_NOT_ALLOWED") { toast.error(errorMessage(err)); submitting.current = false; setBusy(false); return; }
       const fields = createTicketFieldErrors(err);
       setServerErrors(fields);
       setSubmitError(code === "MASTER_DATA_CHANGED" || code === "PHOTO_NOT_FOUND" || code === "FORBIDDEN" ? errorMessage(err) : "ลองอีกครั้ง ข้อมูลในฟอร์มยังอยู่ครบ");
@@ -299,8 +349,49 @@ export function ReportForm() {
     clearDraft(storageKey);
     setValues(initial); setPhotos([]); setStep("problem"); setAttempted([]); setServerErrors({}); setSubmitError("");
     setRestoredAt(null); setResetOpen(false);
+    setTeamPhotos([]); setDuplicateDialog(null);
     focusStep("problem");
   }
+
+  async function follow(ticket: DuplicateTicket) {
+    if (submitting.current) return;
+    if (photos.some(p => p.status !== "done")) {
+      toast.error(photos.some(p => p.status === "uploading") ? "รอให้รูปอัปโหลดเสร็จก่อน" : "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น"); return;
+    }
+    submitting.current = true; setFollowing(ticket.id);
+    try {
+      const result = await followTicket(ticket.id, { note: values.details.trim() || undefined, photoIds: donePhotos.map(p => p.id) });
+      toast.success(`คุณติดตามเคส ${result.ticketNo} แล้ว`);
+      clearDraft(storageKey); guard.finish(`/repair/tickets/${encodeURIComponent(result.id)}`);
+    } catch (err) {
+      const code = errorCode(err);
+      if (code === "ALREADY_FOLLOWING") {
+        toast.error(errorMessage(err)); clearDraft(storageKey); guard.finish(`/repair/tickets/${encodeURIComponent(ticket.id)}`); return;
+      }
+      if (code === "TICKET_CLOSED") {
+        toast.error(errorMessage(err, { ticketClosed: "follow" }));
+        setMatches(old => ({ ...old, tickets: old.tickets.filter(t => t.id !== ticket.id) }));
+        setDuplicateDialog(old => old === null ? null : old.filter(t => t.id !== ticket.id));
+      } else toast.error("ติดตามเคสไม่สำเร็จ ลองอีกครั้ง");
+      submitting.current = false; setFollowing(null);
+    }
+  }
+  const duplicateProps = { category: category?.name ?? "", busyId: following, disabled: busy, onFollow: follow,
+    onVisit: (ticket: DuplicateTicket) => guard.leave(`/repair/tickets/${encodeURIComponent(ticket.id)}`) };
+  const duplicateCard = duplicates.length > 0 ? <DuplicateCard {...duplicateProps} tickets={duplicates} /> : null;
+  const teamFields = canTeam ? <section hidden={!team} aria-label="งานที่ทีมทำ" className="space-y-4 rounded-lg border bg-muted/30 p-4">
+    <div data-field="teamHandled.note">
+      <Label htmlFor="team-note" required>สิ่งที่ทีมทำ</Label>
+      <Textarea id="team-note" value={values.teamNote} onChange={e => update({ teamNote: e.target.value })} maxLength={500} rows={4}
+        placeholder="เช่น เช็ดพื้นและวางป้ายระวังลื่นแล้ว" aria-invalid={!!shown["teamHandled.note"]} aria-describedby="team-note-error" />
+      <FieldError id="team-note-error" message={shown["teamHandled.note"]} />
+    </div>
+    <div data-field="teamHandled.photoIds" role="group" aria-labelledby="team-photos-label" aria-describedby="team-photos-error">
+      <Label id="team-photos-label" required>รูปหลังทำ</Label>
+      <PhotoPicker id="team-photoIds" describedBy="team-photos-error" value={teamPhotos} onChange={next => { setTeamPhotos(next); setServerErrors(old => { const result = { ...old }; delete result["teamHandled.photoIds"]; return result; }); }} disabled={busy || following !== null} invalid={!!shown["teamHandled.photoIds"]} />
+      <FieldError id="team-photos-error" message={shown["teamHandled.photoIds"]} />
+    </div>
+  </section> : null;
 
   // CR-019 heading (prototype v4): breadcrumb, guide mascot, eyebrow, title, ล้างแบบฟอร์ม. Leaving stays guarded
   // (useDiscardGuard catches link clicks); the footer's ยกเลิก on step 1 replaces the old phone top bar.
@@ -311,7 +402,7 @@ export function ReportForm() {
         <li aria-hidden><ChevronRight className="size-3.5" /></li>
         <li><Link href="/repair/my" className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">แจ้งซ่อม</Link></li>
         <li aria-hidden><ChevronRight className="size-3.5" /></li>
-        <li aria-current="page" className="text-foreground">แจ้งซ่อมใหม่</li>
+        <li aria-current="page" className="text-foreground">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</li>
       </ol>
     </nav>
     <div className="mt-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 lg:mb-5">
@@ -319,10 +410,10 @@ export function ReportForm() {
       <Mascot pose="guide" size={88} className="shrink-0 sm:hidden" priority />
       <div className="min-w-0 flex-1 basis-48">
         <p className="text-[11px] leading-5 font-semibold tracking-[0.16em] text-primary uppercase">New request</p>
-        <h1 className="text-2xl leading-9 font-semibold lg:text-[28px] lg:leading-10">แจ้งซ่อมใหม่</h1>
-        <p className="text-sm text-muted-foreground">กรอกทีละขั้น แล้วตรวจข้อมูลก่อนส่งให้ช่าง <span className="whitespace-nowrap">· ช่องที่มี <span className="text-destructive">*</span> จำเป็นต้องกรอก</span></p>
+        <h1 className="text-2xl leading-9 font-semibold lg:text-[28px] lg:leading-10">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</h1>
+        <p className="text-sm text-muted-foreground">{team ? "บันทึกปัญหาที่ทีมแก้ไขแล้ว พร้อมหลักฐานก่อนและหลังดำเนินการ งานจะปิดทันที ไม่ส่งถึงช่าง" : "กรอกทีละขั้น แล้วตรวจข้อมูลก่อนส่งให้ช่าง"} <span className="whitespace-nowrap">· ช่องที่มี <span className="text-destructive">*</span> จำเป็นต้องกรอก</span></p>
       </div>
-      {dirty && master && <Button type="button" variant="link" className="h-9 px-0 max-sm:basis-full max-sm:justify-start" disabled={busy} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}
+      {dirty && master && <Button type="button" variant="link" className="h-9 px-0 max-sm:basis-full max-sm:justify-start" disabled={busy || following !== null} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}
     </div>
   </header>;
   const discard = <AlertDialog open={guard.open} onOpenChange={guard.setOpen}><AlertDialogContent className="top-auto bottom-0 w-full max-w-none translate-y-0 rounded-b-none rounded-t-xl lg:top-1/2 lg:bottom-auto lg:max-w-lg lg:-translate-y-1/2 lg:rounded-xl"><AlertDialogHeader><AlertDialogTitle>ทิ้งข้อมูลที่กรอกไว้?</AlertDialogTitle><AlertDialogDescription>ข้อมูลและรูปที่แนบในหน้านี้จะหายไป</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>กรอกต่อ</AlertDialogCancel><Button variant="destructive" onClick={() => { clearDraft(storageKey); guard.discard(); }}>ทิ้งข้อมูล</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>;
@@ -333,9 +424,9 @@ export function ReportForm() {
 
   const panel = (key: StepKey, content: ReactNode) => {
     const on = step === key;
-    // Desktop: every step in the same grid cell (invisible when not current) → equal frame height.
+    // Only the current step shows; the frame follows its height (CR-022).
     return <section key={key} data-step={key} aria-labelledby={`step-${key}-title`} aria-hidden={!on || undefined} inert={!on}
-      className={cn("col-start-1 row-start-1 min-w-0", on ? "block" : "hidden lg:invisible lg:block")}>
+      className={cn("min-w-0", on ? "block" : "hidden")}>
       {content}
     </section>;
   };
@@ -349,9 +440,8 @@ export function ReportForm() {
   </div>;
 
   return <>{header}
-    <form onSubmit={submit} noValidate className="grid w-full items-start gap-4 px-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:px-0">
+    <form ref={formRef} onSubmit={submit} noValidate className="grid w-full items-start gap-4 px-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:px-0">
       <div className="min-w-0">
-
       {restoredAt && <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/15 bg-secondary px-4 py-3 text-sm text-secondary-foreground" role="status">
         <RotateCcw className="size-4.5 shrink-0" aria-hidden />
         <p className="min-w-0 flex-1"><b className="font-semibold">กู้ข้อมูลที่กรอกค้างไว้เมื่อ {timeOf(new Date(restoredAt).toISOString())} น. แล้ว</b><span className="block text-xs">เผื่อหน้ารีเฟรชตอนสลับไปเปิดกล้องหรือแอปอื่น</span></p>
@@ -365,7 +455,7 @@ export function ReportForm() {
         <nav id="report-progress" aria-label="ขั้นตอนแจ้งซ่อม" className="mb-3 scroll-mt-16 rounded-xl border bg-card px-3 py-3 shadow-card lg:mb-0 lg:rounded-none lg:border-0 lg:border-b lg:px-6 lg:py-4 lg:shadow-none">
           <p className="sr-only" aria-live="polite">ขั้นตอน {index + 1} จาก {STEPS.length} · {STEPS[index].label}</p>
           <ol className="grid grid-cols-3 gap-2">{STEPS.map((s, n) => <li key={s.key} className="min-w-0">
-            <button type="button" disabled={n > index || busy} aria-current={n === index ? "step" : undefined} onClick={() => go(s.key)}
+            <button type="button" disabled={n > index || busy || following !== null} aria-current={n === index ? "step" : undefined} onClick={() => go(s.key)}
               className="flex w-full min-w-0 items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default sm:gap-2.5">
               <span aria-hidden className={cn("grid size-8 shrink-0 place-items-center rounded-full border text-sm font-semibold",
                 n < index ? "border-primary bg-primary text-primary-foreground" : n === index ? "border-primary bg-primary text-primary-foreground ring-4 ring-primary/15" : "bg-card text-muted-foreground")}>
@@ -379,7 +469,7 @@ export function ReportForm() {
           </li>)}</ol>
         </nav>
 
-        <fieldset disabled={busy || masterReloading} data-testid="report-body"
+        <fieldset disabled={busy || following !== null || masterReloading} data-testid="report-body"
           className="grid min-w-0 rounded-xl border bg-card p-4 shadow-card disabled:opacity-70 sm:p-6 lg:rounded-none lg:border-0 lg:px-6 lg:py-5 lg:shadow-none">
           {panel("problem", <>
             {stepHeading("problem", "ปัญหาที่พบ", "เลือก 1 หมวด แล้วเลือกอาการที่เห็น")}
@@ -389,40 +479,48 @@ export function ReportForm() {
           </>)}
           {panel("location", <>
             {stepHeading("location", "ปัญหาเกิดขึ้นที่ไหน", "เลือกอาคาร ชั้น และห้อง", <RecentPlaces recent={recent} buildings={buildings} onPick={update} />)}
-            <LocationStep values={values} buildings={buildings} building={building} floor={floor} category={category} errors={shown} onChange={update} />
+            <LocationStep values={values} buildings={buildings} building={building} floor={floor} category={category} errors={shown} onChange={update}
+              duplicateCard={duplicateCard} spotRequired={blocked} />
           </>)}
           {panel("send", <>
             {stepHeading("send", "รูปภาพและตรวจสอบก่อนส่ง", "แนบรูปอย่างน้อย 1 รูป เล่าเพิ่มได้ถ้าต้องการ แล้วตรวจข้อมูลก่อนกดส่ง")}
             <SendStep photos={photos} onPhotosChange={(next) => { setPhotos(next); setServerErrors((old) => { const n = { ...old }; delete n.photoIds; return n; }); }}
-              disabled={busy} errors={shown} details={values.details} onDetails={(details) => update({ details })}
-              summary={<ReviewList category={category} values={values} priority={priority} building={building} floor={floor} room={room} onEdit={(key) => go(key)} />} />
+              disabled={busy || following !== null} errors={shown} details={values.details} onDetails={(details) => update({ details })} teamFields={teamFields} team={team}
+              summary={<><ReviewList category={category} values={values} priority={priority} building={building} floor={floor} room={room} team={team} onEdit={(key) => go(key)} />{duplicateCard && <div className="mt-4">{duplicateCard}</div>}</>} />
           </>)}
         </fieldset>
 
         <div className="sticky bottom-0 z-20 -mx-3 mt-3 flex items-center gap-3 border-t bg-background px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-4 sm:px-4 lg:static lg:mx-0 lg:mt-0 lg:bg-muted/40 lg:px-6 lg:py-3">
-          <Button type="button" variant="outline" className="h-11 min-w-24 bg-card" disabled={busy} onClick={() => index > 0 ? go(STEPS[index - 1].key) : guard.leave()}>
+          <Button type="button" variant="outline" className="h-11 min-w-24 bg-card" disabled={busy || following !== null} onClick={() => index > 0 ? go(STEPS[index - 1].key) : guard.leave()}>
             <ArrowLeft aria-hidden />{index > 0 ? "ย้อนกลับ" : "ยกเลิก"}</Button>
           <span className="flex-1 text-center text-xs text-muted-foreground lg:text-[13px]">ขั้นตอน {index + 1} จาก {STEPS.length}</span>
-          <Button type="submit" className="h-11 sm:min-w-45" disabled={busy || masterReloading}>
+          <Button type="submit" className="h-11 sm:min-w-45" disabled={busy || following !== null || masterReloading}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
-            {last ? "ยืนยันส่งแจ้งซ่อม" : "ถัดไป"}
+            {last ? team ? "ยืนยันบันทึกงานทีม" : "ยืนยันส่งแจ้งซ่อม" : "ถัดไป"}
             {!busy && (last ? <Send aria-hidden /> : <ChevronRight aria-hidden />)}
           </Button>
         </div>
       </div>
+      {canTeam && <p className="mt-3 flex items-start justify-center gap-2 px-1 text-center text-[13px] leading-5 text-muted-foreground lg:mt-4">
+        <Info className="mt-0.5 size-4 shrink-0" aria-hidden />ต้องการเปลี่ยนประเภทงาน? ปิดฟอร์มนี้แล้วเริ่มใหม่ ข้อมูลที่กรอกจะไม่ถูกบันทึก
+      </p>}
       </div>
-      <Summary category={category} values={values} priority={priority} building={building} floor={floor} room={room} me={me} onEdit={(key) => go(key)} />
+      <Summary category={category} values={values} priority={priority} building={building} floor={floor} room={room} me={me} team={team}
+        mode={canTeam} duplicateCard={step === "location" ? null : duplicateCard} onEdit={(key) => go(key)} />
       <div className="h-4 lg:hidden" aria-hidden />
     </form>
     <AlertDialog open={resetOpen} onOpenChange={setResetOpen}><AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>ล้างข้อมูลในแบบฟอร์ม?</AlertDialogTitle><AlertDialogDescription>ข้อมูลที่กรอกและรูปที่เลือกจะถูกล้าง</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>เก็บไว้ก่อน</AlertDialogCancel><Button onClick={resetForm}>ล้างแบบฟอร์ม</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>
     {discard}
+    <DuplicateDialog {...duplicateProps} open={duplicateDialog !== null} tickets={duplicateDialog ?? []} onOpenChange={open => { if (!open) setDuplicateDialog(null); }}
+      onCancel={() => guard.leaveBack()} submitLabel={team ? "ยืนยันบันทึกงานทีม" : "ยืนยันส่งแจ้งซ่อม"}
+      onRetry={() => { setDuplicateDialog(null); window.requestAnimationFrame(() => formRef.current?.requestSubmit()); }} />
   </>;
 }
 
 // ---- pieces ----
 
 /** Loading skeleton in the shape of the 3-step frame. */
-function FormSkeleton() {
+export function FormSkeleton() {
   return <div className="mx-auto w-full max-w-220 px-3 pt-3 sm:px-4 lg:px-0 lg:pt-0" aria-busy="true" aria-label="กำลังโหลด">
     <Skeleton className="mb-3 h-5 w-72" />
     <div className="lg:rounded-xl lg:border lg:bg-card">
@@ -486,8 +584,7 @@ function ProblemStep({ values, categories, category, errors, priority, onPickCat
 
     <div data-field="symptomIds">
       <Label id="symptom-label" required help="เลือกได้มากกว่า 1 ข้อ">อาการที่พบ</Label>
-      {/* Reserves 3 rows on desktop (the longest master list) so the frame does not grow per category. */}
-      <div className="lg:min-h-35">
+      <div>
         {category ? <div role="group" aria-labelledby="symptom-label" aria-describedby="symptomIds-error" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {category.symptoms.map((s) => <label key={s.id} className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-sm border bg-card px-3 py-2 text-sm has-checked:border-primary/40 has-checked:bg-secondary/60 focus-within:ring-2 focus-within:ring-ring">
             <input type="checkbox" className="size-4 shrink-0 accent-primary" checked={values.symptomIds.includes(s.id)}
@@ -499,7 +596,7 @@ function ProblemStep({ values, categories, category, errors, priority, onPickCat
               onChange={(e) => { onChange({ symptomOtherOn: e.target.checked, ...(e.target.checked ? {} : { symptomOther: "" }) }); if (e.target.checked) window.requestAnimationFrame(() => document.getElementById("symptomOther")?.focus()); }} />
             อาการอื่นๆ
           </label>
-        </div> : <p className="grid min-h-23 place-items-center rounded-sm border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground lg:min-h-35">เลือกหมวดงานก่อน แล้วเลือกอาการที่พบได้ที่นี่</p>}
+        </div> : <p className="grid min-h-23 place-items-center rounded-sm border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground">เลือกหมวดงานก่อน แล้วเลือกอาการที่พบได้ที่นี่</p>}
         <FieldError id="symptomIds-error" message={errors.symptomIds} />
       </div>
       {values.symptomOtherOn && <div className="mt-3" data-field="symptomOther"><Label htmlFor="symptomOther" required>ระบุอาการอื่นๆ</Label>
@@ -536,9 +633,9 @@ function RecentPlaces({ recent, buildings, onPick }: { recent: RecentPlace[]; bu
   </Popover>;
 }
 
-function LocationStep({ values, buildings, building, floor, category, errors, onChange }: {
+function LocationStep({ values, buildings, building, floor, category, errors, onChange, duplicateCard, spotRequired }: {
   values: Values; buildings: Building[]; building?: Building; floor?: Floor; category?: Category; errors: Record<string, string>;
-  onChange: (patch: Partial<Values>) => void;
+  onChange: (patch: Partial<Values>) => void; duplicateCard: ReactNode; spotRequired: boolean;
 }) {
   return <div className="space-y-4">
     <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
@@ -577,33 +674,28 @@ function LocationStep({ values, buildings, building, floor, category, errors, on
 
     <div data-field="roomId">
       <Label id="room-label" required>ห้องหรือจุดที่เกิด</Label>
-      {/* Reserves 3 rows of cards + group labels on desktop; more rooms use the picker. */}
-      <div className="lg:min-h-53">
-        {floor ? <RoomChoice rooms={floor.rooms} category={category} value={values.roomId} floor={floor} building={building!} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />
-          : <p className="grid min-h-23 place-items-center rounded-sm border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground lg:min-h-53">เลือกอาคารและชั้น แล้วเลือกห้องหรือจุดที่เกิดได้ที่นี่</p>}
+      <div>
+        {floor ? <RoomChoice rooms={floor.rooms} category={category} value={values.roomId} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />
+          : <p className="grid min-h-23 place-items-center rounded-sm border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground">เลือกอาคารและชั้น แล้วเลือกห้องหรือจุดที่เกิดได้ที่นี่</p>}
         <FieldError id="roomId-error" message={errors.roomId} />
       </div>
     </div>
 
+    {duplicateCard}
+
     <div data-field="locationDetail">
-      <Label htmlFor="locationDetail" optional>บอกจุดเพิ่มเติม</Label>
+      <Label htmlFor="locationDetail" required={spotRequired} help={spotRequired ? "จำเป็นเมื่อพบงานที่ตรงกัน" : undefined} optional={!spotRequired}>บอกจุดเพิ่มเติม</Label>
       <Input id="locationDetail" value={values.locationDetail} maxLength={MAX_LOCATION} onChange={(e) => onChange({ locationDetail: e.target.value })} placeholder="เช่น ฝั่งหน้าต่าง เครื่องที่ 2" aria-invalid={!!errors.locationDetail} aria-describedby="locationDetail-error" className="h-11 rounded-sm bg-card px-3.5 text-base" />
       <FieldError id="locationDetail-error" message={errors.locationDetail} />
     </div>
   </div>;
 }
 
-/** Room cards (matching the category first, then the rest) or a searchable picker for a big floor (CR-014). */
-function RoomChoice({ rooms, category, value, floor, building, invalid, onPick }: {
-  rooms: Room[]; category?: Category; value: string; floor: Floor; building: Building; invalid: boolean; onPick: (id: string) => void;
+/** Room cards on every floor (CR-022: no picker for big floors) — matching the category first, then the rest. */
+function RoomChoice({ rooms, category, value, invalid, onPick }: {
+  rooms: Room[]; category?: Category; value: string; invalid: boolean; onPick: (id: string) => void;
 }) {
   const { matching, others } = splitRooms(rooms, category);
-  if (rooms.length > MAX_ROOM_CARDS) {
-    return <Picker value={value} onValueChange={onPick} title="ห้องหรือจุดที่เกิด" context={`${building.name} · ${floorLabel(floor.name)}`} icon={DoorOpen}
-      placeholder="เลือกห้องหรือจุดที่เกิด" searchPlaceholder="ค้นหาห้อง" emptyText="ไม่พบห้องที่ค้นหา" invalid={invalid}
-      aria-labelledby="room-label" aria-describedby="roomId-error"
-      options={[...matching, ...others].map((r) => ({ value: r.id, label: r.name, description: matching.includes(r) ? `ตรงกับปัญหา · ${AREA_LABELS[r.areaType]}` : AREA_LABELS[r.areaType] }))} />;
-  }
   const card = (r: Room, caption: boolean) => {
     const on = value === r.id;
     return <label key={r.id} className={cn(choiceCard(on, invalid), "min-h-11 rounded-sm py-1.5")}>
@@ -623,9 +715,9 @@ function RoomChoice({ rooms, category, value, floor, building, invalid, onPick }
   </div>;
 }
 
-function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails, summary }: {
+function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails, summary, teamFields, team }: {
   photos: PhotoItem[]; onPhotosChange: React.Dispatch<React.SetStateAction<PhotoItem[]>>; disabled?: boolean; errors: Record<string, string>;
-  details: string; onDetails: (value: string) => void; summary: ReactNode;
+  details: string; onDetails: (value: string) => void; summary: ReactNode; teamFields: ReactNode; team: boolean;
 }) {
   const gallery = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
@@ -665,7 +757,8 @@ function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails
     </div>
 
     <div className="min-w-0 space-y-4">
-      <div data-field="details">
+      {teamFields}
+      <div hidden={team} data-field="details">
         <div className="flex items-baseline justify-between gap-3"><Label htmlFor="details" optional>เล่ารายละเอียดเพิ่ม</Label><span id="details-count" className="text-xs text-muted-foreground">{details.length}/{MAX_DETAILS}</span></div>
         <Textarea id="details" value={details} maxLength={MAX_DETAILS} rows={4} onChange={(e) => onDetails(e.target.value)} placeholder="เช่น เริ่มเป็นตั้งแต่เมื่อไร เป็นตลอดหรือเป็นๆ หายๆ" aria-invalid={!!errors.details} aria-describedby="details-count details-error" className="min-h-30 rounded-sm bg-card px-3.5 py-2.5 text-base" />
         <FieldError id="details-error" message={errors.details} />
@@ -679,8 +772,8 @@ function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails
 }
 
 /** ตรวจสอบก่อนส่ง: ปัญหา · ความเร่งด่วน · สถานที่, each with แก้ไข back to its step (photos are not repeated). */
-function ReviewList({ category, values, priority, building, floor, room, onEdit }: {
-  category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room; onEdit: (step: StepKey) => void;
+function ReviewList({ category, values, priority, building, floor, room, onEdit, team }: {
+  category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room; onEdit: (step: StepKey) => void; team: boolean;
 }) {
   const symptoms = [
     ...(category?.symptoms.filter((s) => values.symptomIds.includes(s.id)).map((s) => s.name) ?? []),
@@ -697,13 +790,16 @@ function ReviewList({ category, values, priority, building, floor, room, onEdit 
     {row("ปัญหา", category ? <><b className="font-semibold">{categoryLabel}</b>{symptoms.length > 0 && <span className="block">{symptoms.join(" · ")}</span>}</> : dash, "problem")}
     {row("ความเร่งด่วน", priority ? <span className="flex flex-wrap items-center gap-1.5"><PriorityBadge priority={priority.priority} /><span className="text-muted-foreground">{priority.source === "symptom" ? "จากอาการ" : "ระดับเริ่มต้นของหมวด"}</span></span> : dash)}
     {row("สถานที่", building && floor ? <>{building.name} · {floorLabel(floor.name)}<span className="block">{room ? <b className="font-semibold">{room.name}</b> : dash}{values.locationDetail.trim() && <span className="text-muted-foreground"> · {values.locationDetail.trim()}</span>}</span></> : dash, "location")}
+    {team && row("งานที่ทีมทำ", values.teamNote.trim() || <span className="text-muted-foreground">ยังไม่ได้กรอก</span>, "send")}
   </dl>;
 }
 
 /** สรุปการแจ้งซ่อม (CR-019, desktop): live on every step; แก้ไข jumps back to that step. */
-function Summary({ category, values, priority, building, floor, room, me, onEdit }: {
+function Summary({ category, values, priority, building, floor, room, me, onEdit, team, mode, duplicateCard }: {
   category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room;
   me: { name: string; department: string | null }; onEdit: (step: StepKey) => void;
+  /** `mode`: leads see which form they opened (CR-021, the mode is fixed per entry point). */
+  team: boolean; mode: boolean; duplicateCard: ReactNode;
 }) {
   const symptoms = [
     ...(category?.symptoms.filter((s) => values.symptomIds.includes(s.id)).map((s) => s.name) ?? []),
@@ -723,7 +819,12 @@ function Summary({ category, values, priority, building, floor, room, me, onEdit
   return <aside aria-labelledby="summary-title" className="hidden space-y-4 lg:sticky lg:top-26 lg:block">
     <section className="overflow-hidden rounded-xl border bg-card shadow-card">
       <h2 id="summary-title" className="flex items-center justify-between border-b px-5 py-4 text-base leading-6 font-semibold">สรุปการแจ้งซ่อม<FileText className="size-4.5 text-muted-foreground" aria-hidden /></h2>
+      {mode && <p className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-secondary px-3 py-2.5 text-sm font-medium text-secondary-foreground">
+        {team ? <ClipboardCheck className="size-4 shrink-0 text-primary" aria-hidden /> : <Wrench className="size-4 shrink-0 text-primary" aria-hidden />}
+        {team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่ · เรียกช่าง"}
+      </p>}
       <dl>
+        {team && row("งานที่ทีมทำ", <span aria-hidden className={soft}><CircleCheck className="size-4" /></span>, values.teamNote.trim() || "ยังไม่ได้กรอก", "send")}
         {row("ปัญหาที่พบ", <CategoryTile icon={category?.icon} />,
           category ? <><b className="font-semibold">{categoryLabel}</b>{symptoms.length > 0 && <span className="block text-muted-foreground">{symptoms.join(" · ")}</span>}</> : dash, "problem")}
         {priority && row("ความเร่งด่วน", <span aria-hidden className={soft}><AlertCircle className="size-4.5" /></span>,
@@ -734,6 +835,7 @@ function Summary({ category, values, priority, building, floor, room, me, onEdit
           <><b className="font-semibold">{me.name}</b>{me.department && <span className="block text-muted-foreground">{me.department}</span>}</>)}
       </dl>
     </section>
+    {duplicateCard}
     <div className="flex gap-3 px-5 text-[13px] leading-5 text-muted-foreground">
       <Bell className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
       <p><b className="block text-sm font-semibold text-foreground">ส่งแล้วติดตามได้ตลอด</b>ดูความคืบหน้าได้ที่หน้าติดตามงานซ่อม ตั้งแต่รับเรื่องจนปิดงาน</p>

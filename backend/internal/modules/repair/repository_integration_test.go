@@ -2,6 +2,7 @@ package repair
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,9 @@ type pgFixture struct {
 	cat      Category
 	other    Category // the "อื่น ๆ" category (CR-014)
 	building Building
+
+	mu    sync.Mutex
+	rooms []uuid.UUID // throwaway rooms made by createWith, removed after the test
 }
 
 func newPgFixture(t *testing.T) *pgFixture {
@@ -47,7 +51,28 @@ func newPgFixture(t *testing.T) *pgFixture {
 	if err != nil || len(blds) == 0 || len(blds[0].Floors) == 0 || len(blds[0].Floors[0].Rooms) == 0 {
 		t.Fatalf("buildings: %v", err)
 	}
-	return &pgFixture{pool: pool, png: pngBytes(t, 32, 32), svc: svc, cat: cats[0], other: cats[len(cats)-1], building: blds[0]}
+	p := &pgFixture{pool: pool, png: pngBytes(t, 32, 32), svc: svc, cat: cats[0], other: cats[len(cats)-1], building: blds[0]}
+	// Registered before any user, so it runs after their tickets are deleted.
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM platform.rooms WHERE id = ANY($1)`, p.rooms); err != nil {
+			t.Errorf("cleanup rooms: %v", err)
+		}
+	})
+	return p
+}
+
+// room adds an active room on the first floor, so tickets of one test are not duplicates of each other (F03).
+func (p *pgFixture) room() (uuid.UUID, error) {
+	var id uuid.UUID
+	err := p.pool.QueryRow(context.Background(),
+		`INSERT INTO platform.rooms (floor_id, name, area_type) VALUES ($1, $2, 'other') RETURNING id`,
+		p.building.Floors[0].ID, "ห้องทดสอบ "+uuid.NewString()[:8]).Scan(&id)
+	if err == nil {
+		p.mu.Lock()
+		p.rooms = append(p.rooms, id)
+		p.mu.Unlock()
+	}
+	return id, err
 }
 
 // user inserts a throwaway platform user; its tickets and photos are removed after the test.
@@ -63,6 +88,8 @@ func (p *pgFixture) user(t *testing.T, role string) Viewer {
 	}
 	t.Cleanup(func() {
 		for _, q := range []string{
+			`DELETE FROM repair.ticket_subscribers WHERE user_id = $1`,
+			`DELETE FROM repair.ticket_events WHERE actor_id = $1`,
 			`DELETE FROM repair.tickets WHERE reporter_id = $1`,
 			`DELETE FROM repair.photos WHERE uploader_id = $1`,
 			`DELETE FROM platform.users WHERE id = $1`,
@@ -80,7 +107,7 @@ func (p *pgFixture) create(v Viewer, location string) (TicketDetail, error) {
 	return p.createWith(v, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID}, LocationDetail: location})
 }
 
-// createWith fills the place (first room of the first floor unless set) and a fresh photo; the
+// createWith fills the place (a new room on the first floor unless set) and a fresh photo; the
 // caller sets category, symptoms and the extra spot.
 func (p *pgFixture) createWith(v Viewer, in CreateTicketInput) (TicketDetail, error) {
 	ctx := context.Background()
@@ -91,7 +118,11 @@ func (p *pgFixture) createWith(v Viewer, in CreateTicketInput) (TicketDetail, er
 	floor := p.building.Floors[0]
 	in.BuildingID, in.FloorID, in.PhotoIDs = &p.building.ID, &floor.ID, []uuid.UUID{photo}
 	if in.RoomID == nil {
-		in.RoomID = &floor.Rooms[0].ID
+		room, err := p.room()
+		if err != nil {
+			return TicketDetail{}, err
+		}
+		in.RoomID = &room
 	}
 	return p.svc.CreateTicket(ctx, v, in)
 }
@@ -197,6 +228,10 @@ func TestPgListCountsAndVisibility(t *testing.T) {
 	if _, err := p.svc.Ticket(ctx, admin, high.ID); err != nil {
 		t.Fatalf("admin: %v", err)
 	}
+	// Report photos of open tickets are shown on S04 (D-098); once closed they follow the ticket again.
+	if _, err := p.svc.Close(ctx, admin, high.ID, "ทดสอบ"); err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := p.svc.OpenPhoto(ctx, other, high.Photos[0], true); err == nil {
 		t.Fatal("unrelated lead can open the photo")
 	}
@@ -248,16 +283,16 @@ func TestPgPriorityAndOther(t *testing.T) {
 		t.Fatalf("typed name on a normal category: %v", err)
 	}
 
-	// #28: one room → one place, with the room and the newest extra spot.
+	// #28: one place per room, newest first, with the room and its extra spot.
 	places, err := p.svc.RecentPlaces(ctx, reporter)
-	if err != nil || len(places) != 1 || places[0].Building.ID != p.building.ID || places[0].Room.ID != p.building.Floors[0].Rooms[0].ID ||
+	if err != nil || len(places) != 3 || places[0].Building.ID != p.building.ID || places[0].Room.ID != other.Room.ID ||
 		places[0].LocationDetail == nil || *places[0].LocationDetail != "ฝั่งหน้าต่าง" {
 		t.Fatalf("recent places: %+v err=%v", places, err)
 	}
 
 	// #6 q matches the room name.
-	q := escapeLike(p.building.Floors[0].Rooms[0].Name)
-	if _, total, err := p.svc.Tickets(ctx, reporter, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 20}); err != nil || total != 3 {
+	q := escapeLike(other.Room.Name)
+	if _, total, err := p.svc.Tickets(ctx, reporter, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 20}); err != nil || total != 1 {
 		t.Fatalf("search by room: total=%d err=%v", total, err)
 	}
 }
@@ -494,4 +529,191 @@ func TestPgDashboardAndAssets(t *testing.T) {
 	if suggested, err := p.svc.SuggestAssetCode(ctx, admin, acType, b1Floor1); err != nil || !strings.HasPrefix(suggested, "AC-1-") {
 		t.Errorf("suggest = %s, %v", suggested, err)
 	}
+}
+
+// Stage 4: F03 duplicate check (incl. old tickets without a room and two reports at once), follow,
+// F04 team handled, F05 hand over — on the real SQL.
+func TestPgDuplicatesFollowTeamHandOver(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	reporter := p.user(t, users.RoleEmployee)
+	follower := p.user(t, users.RoleEmployee)
+	stranger := p.user(t, users.RoleEmployee)
+	lead := p.user(t, users.RoleHousekeeperLead)
+	otherLead := p.user(t, users.RoleHousekeeperLead)
+	technician := p.user(t, users.RoleTechnician)
+	floor := p.building.Floors[0]
+
+	room, err := p.room()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID}, RoomID: &room})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.createWith(follower, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "อีกอาการ", RoomID: &room})
+	var dup *DuplicateFoundError
+	if !errors.As(err, &dup) || len(dup.Tickets) != 1 || dup.Tickets[0].ID != first.ID || dup.Tickets[0].ViewerRelation != RelationNone {
+		t.Fatalf("duplicate: err = %v", err)
+	}
+	k := DuplicateKey{CategoryID: p.cat.ID, FloorID: floor.ID, RoomID: room}
+	if list, err := p.svc.Duplicates(ctx, reporter, k); err != nil || len(list) != 1 || list[0].ViewerRelation != RelationReporter {
+		t.Fatalf("#22: %v err=%v", list, err)
+	}
+	if _, err := p.createWith(follower, CreateTicketInput{CategoryID: &p.other.ID, SymptomIDs: []uuid.UUID{p.other.Symptoms[0].ID}, RoomID: &room}); err != nil {
+		t.Fatalf("other category in the same room: %v", err)
+	}
+
+	// CR-014: a ticket from before rooms matches when its spot text is the room name (trimmed, any case).
+	var roomName string
+	if err := p.pool.QueryRow(ctx, `SELECT name FROM platform.rooms WHERE id = $1`, room).Scan(&roomName); err != nil {
+		t.Fatal(err)
+	}
+	legacy := uuid.New()
+	if _, err := p.pool.Exec(ctx, `INSERT INTO repair.tickets (id, ticket_no, status, priority, priority_source, category_id,
+		building_id, floor_id, location_detail, reporter_id) VALUES ($1, $2, 'in_progress', 'medium', 'reporter', $3, $4, $5, $6, $7)`,
+		legacy, "TEST-"+legacy.String()[:8], p.cat.ID, p.building.ID, floor.ID, "  "+strings.ToUpper(roomName)+" ", reporter.ID); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := p.svc.Duplicates(ctx, stranger, k); len(list) != 2 || list[0].ID != legacy || !list[0].BlocksReport {
+		t.Fatalf("legacy match: %v", list)
+	}
+	// CR-020: another extra spot in the same room is similar, not a duplicate (SQL normalisation too).
+	k.Spot = "  แอร์ตัว   หน้าห้อง "
+	if list, _ := p.svc.Duplicates(ctx, stranger, k); len(list) != 2 || list[0].BlocksReport || list[1].BlocksReport {
+		t.Fatalf("other spot: %+v", list)
+	}
+	spotted, err := p.createWith(stranger, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "อีกตัว", RoomID: &room, LocationDetail: "แอร์ตัว หน้าห้อง"})
+	if err != nil {
+		t.Fatalf("other spot must be allowed: %v", err)
+	}
+	k.Spot = "แอร์ตัว หน้าห้อง"
+	if list, _ := p.svc.Duplicates(ctx, stranger, k); len(list) != 3 || list[0].ID != spotted.ID || !list[0].BlocksReport || list[1].BlocksReport {
+		t.Fatalf("same spot again: %+v", list)
+	}
+	k.Spot = ""
+
+	// Two reports of the same new problem at once: exactly one ticket (advisory lock).
+	race, err := p.room()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, v := range []Viewer{follower, stranger} {
+		wg.Add(1)
+		go func(v Viewer) {
+			defer wg.Done()
+			_, err := p.createWith(v, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "พร้อมกัน", RoomID: &race})
+			errs <- err
+		}(v)
+	}
+	wg.Wait()
+	close(errs)
+	created, refused := 0, 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			created++
+		case errors.As(err, &dup):
+			refused++
+		default:
+			t.Fatalf("race: %v", err)
+		}
+	}
+	if created != 1 || refused != 1 {
+		t.Fatalf("race: created=%d refused=%d", created, refused)
+	}
+
+	// F03 follow: note + photo in the old case's timeline; the follower sees it in S06.
+	photo, err := p.svc.UploadPhoto(ctx, follower, p.png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := p.svc.Follow(ctx, follower, first.ID, "น้ำหยดใส่โต๊ะประชุม", []uuid.UUID{photo})
+	if err != nil || d.ViewerRelation != RelationSubscriber || d.SubscriberCount != 1 ||
+		d.Timeline[0].Type != EventSubscribed || len(d.Timeline[0].Photos) != 1 || *d.Timeline[0].Note != "น้ำหยดใส่โต๊ะประชุม" {
+		t.Fatalf("follow: %+v err=%v", d.Timeline, err)
+	}
+	if _, err := p.svc.Follow(ctx, follower, first.ID, "", nil); code(err) != "ALREADY_FOLLOWING" {
+		t.Fatalf("follow again: %v", err)
+	}
+	rows, total, err := p.svc.MyTickets(ctx, follower, TicketFilter{Relation: "following", Sort: "updatedAt:desc", Page: 1, PageSize: 10})
+	if err != nil || total != 1 || rows[0].ID != first.ID || rows[0].IsReporter {
+		t.Fatalf("following in S06: total=%d err=%v", total, err)
+	}
+	// D-098: the report photo of an open match is visible to anyone; the follow photo is not.
+	if _, _, err := p.svc.OpenPhoto(ctx, stranger, first.Photos[0], true); err != nil {
+		t.Fatalf("report photo of an open duplicate: %v", err)
+	}
+	if _, _, err := p.svc.OpenPhoto(ctx, stranger, photo, true); code(err) != "FORBIDDEN" {
+		t.Fatalf("follow photo: %v", err)
+	}
+
+	// F04: a lead's team record is closed at once with its own event and after photo.
+	after, err := p.svc.UploadPhoto(ctx, lead, p.png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	team, err := p.createWith(lead, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "พื้นเปียก",
+		TeamHandled: &TeamHandledInput{Note: "เช็ดพื้นและวางป้ายระวังลื่นแล้ว", PhotoIDs: []uuid.UUID{after}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if team.Status != StatusClosed || team.ClosedReason == nil || *team.ClosedReason != ClosedReasonTeamHandled || team.ClosedAt == nil ||
+		len(team.Timeline) != 2 || team.Timeline[0].Type != EventTeamHandled || len(team.Timeline[0].Photos) != 1 || len(team.Photos) != 1 ||
+		!slicesContain(team.AllowedActions, ActionHandover) {
+		t.Fatalf("team handled: %+v actions=%v", team.TicketSummary, team.AllowedActions)
+	}
+	if _, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "x",
+		TeamHandled: &TeamHandledInput{Note: "x", PhotoIDs: []uuid.UUID{uuid.New()}}}); code(err) != "TEAM_HANDLED_NOT_ALLOWED" {
+		t.Fatalf("employee team record: %v", err)
+	}
+
+	// CR-021: the lead's S06 tab `ทีมแก้เอง` (#35 relation=reported + closedReason=team_handled).
+	teamReason := ClosedReasonTeamHandled
+	teamOnly := TicketFilter{Relation: "reported", ClosedReason: &teamReason, Sort: "updatedAt:desc", Page: 1, PageSize: 10}
+	if rows, total, err := p.svc.MyTickets(ctx, lead, teamOnly); err != nil || total != 1 || len(rows) != 1 || rows[0].ID != team.ID {
+		t.Fatalf("team tab: total=%d err=%v", total, err)
+	}
+
+	// F05: another lead cannot; the recording lead hands the same ticket back to the technician.
+	if _, err := p.svc.HandOver(ctx, otherLead, team.ID, "x"); code(err) != "FORBIDDEN" {
+		t.Fatalf("other lead: %v", err)
+	}
+	back, err := p.svc.HandOver(ctx, lead, team.ID, "ทีมเช็ดแล้วแต่ยังมีน้ำซึมจากฝ้า")
+	if err != nil || back.TicketNo != team.TicketNo || back.Status != StatusInProgress || back.ClosedReason != nil || back.ClosedAt != nil ||
+		back.Step() != StepAwaitingAssessment || back.Timeline[0].Type != EventHandedOver {
+		t.Fatalf("hand over: %+v err=%v", back.TicketSummary, err)
+	}
+	if _, total, err := p.svc.MyTickets(ctx, lead, teamOnly); err != nil || total != 0 {
+		t.Fatalf("handed over still in the team tab: total=%d err=%v", total, err)
+	}
+	queue, _, err := p.svc.Tickets(ctx, technician, TicketFilter{ScopeAll: true, Relation: "all", Steps: []string{StepAwaitingAssessment},
+		Sort: "createdAt:asc", Page: 1, PageSize: 100})
+	if err != nil || !containsTicket(queue, team.ID) {
+		t.Fatalf("handed-over ticket not in รอประเมิน: err=%v", err)
+	}
+	if _, err := p.svc.HandOver(ctx, lead, team.ID, "อีกครั้ง"); code(err) != "NOT_TEAM_HANDLED" {
+		t.Fatalf("second hand over: %v", err)
+	}
+}
+
+func slicesContain(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+func containsTicket(list []TicketSummary, id uuid.UUID) bool {
+	for _, t := range list {
+		if t.ID == id {
+			return true
+		}
+	}
+	return false
 }

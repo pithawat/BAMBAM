@@ -9,9 +9,12 @@ import {
   mockCreateAsset,
   mockCreateTicket,
   mockDeactivateAsset,
+  mockDuplicates,
   mockErrors,
+  mockFollowTicket,
   mockFloorPlan,
   mockGetAssetTypes,
+  mockHandoverTicket,
   mockListMyTickets,
   mockListTickets,
   mockOverview,
@@ -38,7 +41,11 @@ import type {
   ContractorRequest,
   CreateAssetRequest,
   CreateTicketRequest,
+  DuplicatesQuery,
+  DuplicateTicket,
   FloorPlan,
+  FollowRequest,
+  HandoverRequest,
   MyTicketPage,
   MyTicketsQuery,
   Overview,
@@ -136,6 +143,11 @@ async function resizeForUpload(file: File): Promise<Blob> {
 
 // ---- #5 create ticket ----
 
+/**
+ * S03 send (normal or team mode). The server refuses a duplicate (CR-009): 409 `DUPLICATE_FOUND` →
+ * `duplicateMatches(err)` (S04 dialog) · 409 `OWN_TICKET_AWAITING_RATING` → `ownTicketAwaitingRating(err)`
+ * (go to S07 of that ticket) · 403 `TEAM_HANDLED_NOT_ALLOWED` for a non-lead in team mode.
+ */
 export async function createTicket(req: CreateTicketRequest): Promise<TicketDetail> {
   if (env.useMocks) {
     const scenario = mockScenario();
@@ -216,6 +228,42 @@ export async function closeTicket(id: string, req: CloseRequest): Promise<Ticket
     return mock(() => mockCloseTicket(id, req.reason, mockViewer()), { delayMs: 500 });
   }
   return http.post<TicketDetail>(`${ticketPath(id)}/close`, req);
+}
+
+// ---- #22–#24 duplicates, follow, hand over (Stage 4, F03 / F05) ----
+
+/**
+ * #22 S03 duplicate card (สถานที่ step, once category + floor + room are known; send the extra spot too
+ * and refetch when it changes): open tickets on the same category + floor + room, blocking ones first
+ * (BR-F03-1, CR-020). Empty = no card · any `blocksReport` = duplicate card · none = "similar" card.
+ */
+export async function getDuplicates(query: DuplicatesQuery): Promise<DuplicateTicket[]> {
+  if (env.useMocks) return mock(() => mockDuplicates(query, mockViewer()), { read: true });
+  return http.get<DuplicateTicket[]>(`${BASE}/tickets/duplicates${toQuery(query)}`);
+}
+
+/**
+ * #23 S04 ติดตามเคสนี้: the viewer follows the open case; the form's details and photos go into its
+ * timeline (`subscribed`). 409 `TICKET_CLOSED` (errorMessage ctx `follow` → เคสนี้ปิดไปแล้ว) · 409 `ALREADY_FOLLOWING`.
+ */
+export async function followTicket(id: string, req: FollowRequest): Promise<TicketDetail> {
+  if (env.useMocks) {
+    if (mockScenario() === "error") return mockFail(mockErrors.network());
+    return mock(() => mockFollowTicket(id, req, mockViewer()), { delayMs: 500 });
+  }
+  return http.post<TicketDetail>(`${ticketPath(id)}/follow`, req);
+}
+
+/**
+ * #24 S07 / S11 ส่งต่อให้ช่าง (`allowedActions` has `handover`): the same team-handled ticket goes back
+ * to the technician (`in_progress`, awaiting assessment). 403 `FORBIDDEN` · 422 `NOT_TEAM_HANDLED` (refetch).
+ */
+export async function handoverTicket(id: string, req: HandoverRequest): Promise<TicketDetail> {
+  if (env.useMocks) {
+    if (mockScenario() === "error") return mockFail(mockErrors.network());
+    return mock(() => mockHandoverTicket(id, req.reason, mockViewer()), { delayMs: 500 });
+  }
+  return http.post<TicketDetail>(`${ticketPath(id)}/handover`, req);
 }
 
 // ---- #13–#19 contractors (F24) ----

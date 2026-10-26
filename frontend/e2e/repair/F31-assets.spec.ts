@@ -94,6 +94,7 @@ test("AC3 + AC4: add by form, duplicate code refused, deactivate keeps the code 
 });
 
 test("AC3 + AC4: drag a type into a room, drop outside refused, drag to move with undo", async ({ page }) => {
+  test.slow(); // each pointer move re-renders the plan in software WebGL (~1 min headless)
   const code = `E2E-D${Date.now().toString(36).toUpperCase()}`;
   await openFloor(page, 3);
   const palette = await page.getByRole("button", { name: "เพิ่มลำโพง" }).boundingBox();

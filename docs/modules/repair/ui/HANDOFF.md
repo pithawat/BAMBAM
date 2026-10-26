@@ -1,6 +1,108 @@
-# UI handoff — ระบบแจ้งซ่อม — Stages 1–2 + 2R (CR-008)
+# UI handoff — ระบบแจ้งซ่อม — Stages 1–4
 
-Status: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+Status: ACCEPTED — Stage 4 (2026-10-26, tag `repair-stage-4`; incl. CR-021 / CR-022 built by Claude). Codex has nothing to build until Stage 5 prepare. Before: BUILT BY CLAUDE — Stage 4 CR-021 rework (2026-10-25, waiting for user acceptance with Stage 4: S03 / S04 / S06 relayout, built by Claude with the Impeccable skill — Codex has nothing to build; files below are Claude-owned until this note changes). Before: WIRED — Stage 4 (2026-10-25, Claude: real API + e2e F03 / F04 / F05), waiting for user acceptance. Earlier: UI DONE — Stage 4 by Codex (2026-10-24: S03 team mode + duplicate card, S04, S05 team variant, S07 / S11 hand over — section "Stage 4" below). Earlier: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+
+## Stage 4 (2026-10-24) — UI DONE: duplicate check + follow (F03), team mode (F04), hand over (F05)
+
+Goal: `../03-plan.md` Stage 4, AC1–AC5 (AC2 reworded by **CR-020**, approved 2026-10-24 — read `../changes/CR-020.md` first: spot rule + all card / dialog copy). The backend (#5 duplicate refusal + `teamHandled`, #22, #23, #24) and `types.ts` / `api.ts` / `errors.ts` / `mocks.ts` are done; build the UI against the mocks.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md` (§7 hand-over dialog, §7 discard confirm)
+2. `../03-plan.md` Stage 4 · `../02-flows.md` F03, F04, F05 (BR-F03-1…4, BR-F04-1…3, BR-F05-1…3)
+3. Screens — read each **CR box at the top first**; a later CR overrides the body and older boxes:
+   - `S04-duplicate-found.md` (CR-020 box, then CR-009 box: only `ติดตามเคสเดิม` / `ยกเลิกการแจ้ง` in the dialog; no `ไม่ใช่เรื่องเดียวกัน …` anywhere)
+   - `S03-report-form.md` (CR-019 box = current page layout; CR-009 box = mode switch + duplicate card; CR-008 box = team fields in the รายละเอียด slot)
+   - `S05-report-success.md` (team variant), `S07-ticket-detail.md` (hand over row, timeline rows), `S11-admin-queue.md` (closed tab), `S06-my-tickets.md` (followed tag)
+4. Visual reference: `../changes/CR-008/style-and-form.html` (team section, duplicate card, mode switch) and `mockups/S03-report-form.html` frame "พบงานซ้ำ". Where they differ from CR-009: switch labels are **`เรียกช่าง | ทีมแก้เองแล้ว`**, and drop every `ไม่ใช่เรื่องเดียวกัน …` / `ส่งแจ้งใหม่` button. Keep the current CR-019 look of S03 / S07.
+5. `frontend/src/modules/repair/{types,api,errors,mocks}.ts` — data and errors (do not change)
+
+### Rules the UI must follow (the server enforces all of them)
+
+- **Duplicate** = an open ticket (`in_progress` / `resolved`) with the same category + floor + room **and** the reporter gave no extra spot (`บอกจุดเพิ่มเติม`) or the same one (BR-F03-1, CR-020). The server refuses such a report (`createTicket` → 409), so the UI can never create it. **Similar** = same room, another extra spot (`blocksReport: false`): show the card, sending is allowed. Never compare spots in the UI — use `blocksReport`.
+- **Team mode** is shown only to `housekeeper_lead` / `security_lead` (`useCurrentUser()`, BR-F04-1). The server still answers 403 `TEAM_HANDLED_NOT_ALLOWED` for anyone else.
+- **Hand over** button: S07 only when `allowedActions` includes `handover`. S11 rows have no `allowedActions`: show `ส่งต่อให้ช่าง` on `closedReason === "team_handled"` rows **for admin only** (S11 is admin / executive; the executive never gets it). The server re-checks (403 / 422).
+
+### What to build
+
+| Screen | Where | What |
+|---|---|---|
+| S03 mode switch | `components/report-form.tsx` | Leads only: `SegmentedControl` `เรียกช่าง \| ทีมแก้เองแล้ว` above step 1 (default `เรียกช่าง`) + hint `งานจะปิดทันทีและนับเป็นผลงานของทีม ไม่ส่งถึงช่าง`. Team mode: step 3 shows `สิ่งที่ทีมทำ *` (Textarea ≤ 500, placeholder `เช่น เช็ดพื้นและวางป้ายระวังลื่นแล้ว`) + `รูปหลังทำ *` (a second `PhotoPicker`, 1–5) in the รายละเอียด slot; the summary column / ตรวจสอบก่อนส่ง gets a row `งานที่ทีมทำ` with `แก้ไข`; heading / final button `บันทึกงานทีม` / `ยืนยันบันทึกงานทีม`. Send `teamHandled: { note, photoIds }` in team mode, `teamHandled: null` otherwise (switching back keeps the team fields in the draft but does not send them). Draft restore keeps the mode for leads. Field errors: `createTicketFieldErrors(err)` already maps `teamHandled.note` / `teamHandled.photoIds` |
+| S03 duplicate card | `components/report-form.tsx` | As soon as category + floor + room are known (สถานที่ step; also in the summary / ตรวจสอบ): `getDuplicates({ categoryId, floorId, roomId, locationDetail })`, refetch when one of them changes (debounce ~300 ms, ignore stale answers); a failed call shows no card (the server still checks on send). **Any `blocksReport: true` → duplicate card**, else **similar card** — headings, texts, hint and buttons exactly as `../changes/CR-020.md` "Copy". One row per ticket (thumb, ticket no, step badge, title, location line incl. its extra spot, `แจ้งเมื่อ {date} · ผู้ติดตาม {n} คน` — omit when 0). Row action by `viewerRelation` / `status`: others → `ติดตามเคสนี้` (same follow as S04) · `reporter` + `resolved` → `ไปประเมินตรวจงาน` · `reporter` other → `ดูงานของคุณ` · `subscriber` → badge `คุณติดตามเคสนี้อยู่แล้ว` + `ดูเคสนี้`. On the duplicate card show only the blocking rows; on the similar card all rows. Leaving to S07 uses the discard confirm (`_common.md` §7) |
+| S03 send | `components/report-form.tsx` | `createTicket(req)`: `duplicateMatches(err)` not null → open S04 with those tickets (nothing was created) · `ownTicketAwaitingRating(err)` not null → toast `errorMessage(err)` + go to `/repair/tickets/{id}` (draft discarded) · `TEAM_HANDLED_NOT_ALLOWED` → toast · other errors as today |
+| S04 | new `components/duplicate-dialog.tsx` (used by S03) | Opened only by a 409 `DUPLICATE_FOUND` on send. `Sheet` bottom (< 1024 px) / `Dialog` 560 px (desktop); title, text and note from `../changes/CR-020.md` "Copy" (S04 rows); case cards (the 409 tickets, newest first; tap thumb → lightbox); per case `ติดตามเคสนี้` (others) or the own / following variants above; footer **`ยกเลิกการแจ้ง`** only (outline) → discard confirm (`_common.md` §7) → `router.back()` (Home `/` when there is no history). Follow → `followTicket(id, { note: draft details, photoIds: draft report photo ids })` (team fields are not sent; nothing is closed) → toast `คุณติดตามเคส {ticket_no} แล้ว` → the normal S07 `/repair/tickets/{id}` (the follower sees progress, no rating buttons), draft discarded. Errors: `TICKET_CLOSED` → toast `errorMessage(err, { ticketClosed: "follow" })`, remove that card; no card left → `ไม่มีเคสที่ยังเปิดอยู่แล้ว` + the S03 final button (sending again is now allowed) · `ALREADY_FOLLOWING` → toast + go to S07 · others → toast `ติดตามเคสไม่สำเร็จ ลองอีกครั้ง`. Spinner on the pressed button, others disabled. ✕ / Esc / backdrop → back to S03 with all data (so the reporter can add an extra spot) |
+| S05 team variant | `components/report-success.tsx` | When the ticket has `closedReason === "team_handled"`: title `บันทึกงานทีมเรียบร้อย`, badge `ปิดงานแล้ว` + caption `ทีมดำเนินการเอง`, summary label `สถานะ` instead of ความเร่งด่วน, next-step copy `งานนี้ปิดแล้วและนับเป็นผลงานของทีม หากต้องใช้ช่างภายหลัง กด "ส่งต่อให้ช่าง" ในหน้ารายละเอียดงาน`, mini progress all done (S05 spec "Content") |
+| S07 hand over | `components/ticket-detail.tsx`, `components/ticket-actions.tsx` | `handover` in `allowedActions` → `ส่งต่อให้ช่าง` in the closed (team) next-action panel → new exported `HandoverDialog` (next to `CloseTicketDialog`; `_common.md` §7: title `ส่งต่องานนี้ให้ช่าง?`, `เหตุผลที่ส่งต่อ *` Textarea ≤ 500 with the placeholder, buttons `ยกเลิก` · `ส่งต่อให้ช่าง`; body `งานเดิม เลขเดิม จะส่งกลับไปที่ช่าง รอช่างกำหนดวันเสร็จ` (CR-020)) → `handoverTicket(id, { reason })` → toast `ส่งต่อให้ช่างแล้ว` → show the returned ticket (now รับเรื่อง). Errors: `fieldErrors(err, handoverFieldMessages)` under the field · `NOT_TEAM_HANDLED` → toast + refetch · others → toast `errorMessage(err)`. Timeline: `subscribed` / `team_handled` / `handed_over` already have labels in `ticket-story.ts` — make sure their photos show (team after photos, follower photos) |
+| S06 | `components/my-tickets.tsx` | Followed rows already say `คุณติดตามงานนี้`; spec copy is **`คุณติดตามเคสนี้`** — align it |
+| S11 closed tab | `components/admin-tickets.tsx` | Toggle pill `เฉพาะงานทีมทำเอง` (= `closedReason: "team_handled"`, kept in sync with the reason filter); `ส่งต่อให้ช่าง` outline sm on `team_handled` rows (admin only) → the same `HandoverDialog` → toast → refetch list + counts (the ticket leaves ปิดแล้ว and shows under รับเรื่อง) |
+
+### Data — `modules/repair/api.ts`
+
+| Function | # | Used for |
+|---|---|---|
+| `createTicket(req)` | 5 | S03 send; 409s via `duplicateMatches(err)` / `ownTicketAwaitingRating(err)` (`errors.ts`) |
+| `getDuplicates({ categoryId, floorId, roomId, locationDetail })` | 22 | S03 card → `DuplicateTicket[]` (`TicketSummary` + `subscriberCount` + `blocksReport`) |
+| `followTicket(id, { note?, photoIds })` | 23 | S03 card / S04 follow → `TicketDetail` |
+| `handoverTicket(id, { reason })` | 24 | S07 / S11 hand over → `TicketDetail` |
+| `getTicket(id)` | 8 | S05 team variant, S07 |
+| `getTickets({ scope: "all", status: ["closed"], closedReason: "team_handled", … })` | 6 | S11 toggle |
+
+Field copy: `createTicketFieldErrors` (team fields), `followFieldMessages`, `handoverFieldMessages` in `errors.ts`.
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`) — same rules as the backend in every scenario
+
+- Employee (วรรณา), leave `บอกจุดเพิ่มเติม` empty: ระบบปรับอากาศ · อาคารฝั่ง Office ชั้น 5 · `ห้องประชุม 5A` → someone else's case (follow); type any extra spot → similar card, sending creates a ticket (CR-020) · `ห้องประชุม 5B` → own open case (`ดูงานของคุณ`) · ประปาและสุขาภิบาล · ชั้น 2 · `ห้องน้ำหญิง` → own ticket awaiting rating (409 `OWN_TICKET_AWAITING_RATING`) · ไฟฟ้าและแสงสว่าง · ชั้น 6 · `สำนักงานชั้น 6` → already following.
+- หัวหน้าแม่บ้าน (มาลี) / หัวหน้ารปภ. see the switch; ticket 166 (ประปา ชั้น 3 ห้องน้ำหญิง) is มาลี's team record → `ส่งต่อให้ช่าง` for her and for admin (ปวีณา), not for หัวหน้ารปภ.
+- Scenarios: `normal`, `empty` (no duplicates), `error` (reads fail; follow / hand over fail with network), `slow`, `validation`, `follow_closed` (follow → 409 `TICKET_CLOSED`).
+
+### You may edit (Stage 4)
+
+- `frontend/src/modules/repair/components/**` (report-form, duplicate-dialog (new), report-success, ticket-detail, ticket-actions, ticket-story, my-tickets, admin-tickets)
+- `frontend/src/app/(app)/repair/**` only if a page needs to pass something new
+- `frontend/src/components/ui/**` only via `npx shadcn@latest add`
+- This file: Stage 4 checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,priority,plan-geometry}.ts`, `src/lib/**`, `components/shared/**` (use its `SegmentedControl`, `ChoiceField`, `FilterPill`, `PhotoPicker`), backend, other docs.
+
+### Done when (Codex fills the Stage 4 checklist below)
+
+- [x] S03: switch only for the two lead roles; team mode fields, summary row, button labels; `teamHandled` sent only in team mode
+- [x] S03: card appears / updates / disappears with category + floor + room + extra spot; duplicate vs similar card (CR-020 copy); all four row variants
+- [x] S03 send → S04 on a duplicate; own resolved ticket → S07; a similar (other spot) report is created; no way to create a duplicate
+- [x] S04: follow → toast + S07 (timeline shows the note + photos, S06 shows the case); `follow_closed` → card removed + empty state; `ยกเลิกการแจ้ง`; Esc / ✕ keep the draft; focus trap, title announced
+- [x] S05 team variant copy; S07 `ส่งต่อให้ช่าง` for มาลี and admin only → back to รับเรื่อง; S11 toggle + row button (admin, not executive)
+- [x] 390 px and 1280 px, no horizontal scroll; loading / empty / error / forbidden states
+- [x] `npm run lint && npm run typecheck` pass
+
+### Stage 4 checklist results (Codex fills)
+
+| Screen | All items pass? | Notes |
+|---|---|---|
+| S03 | Yes (UI with mocks) | Lead-only modes, retained team note/photos when toggling, separate uploads, server-driven duplicate/similar checks and four relation variants. Mock browser checks: similar creation, duplicate refusal, own/resolved/subscriber cards, 375/390/1280 px. |
+| S04 | Yes (UI with mocks) | Responsive Sheet/Dialog; follow note/photo visible in S07, Esc and discard-confirm cancellation retain the draft; follow_closed removes the row and enables retry. Radix supplies focus trapping and accessible titles. |
+| S05 | Yes (UI with mocks) | Team success variant verified at 375 and 1280 px; completed progress and closed status. |
+| S06 | Yes (UI with mocks) | Followed-case label verified in the following filter. |
+| S07 | Yes (UI with mocks) | Event photos/lightbox; handover allowed for the reporting lead/admin, absent for another lead/executive. Required reason and successful return to received verified. |
+| S11 | Yes (UI with mocks) | Team-only filter and admin-only row action verified at 390/1280 px; network retry preserves reason and success reloads list/counts. |
+
+### Verification and differences from mockup — Stage 4
+
+- Lint, typecheck and production build passed. Browser checks used an isolated mock dev server; no real API or database writes.
+- Kept the current CR-019 page layout; applied CR-020 copy instead of obsolete mockup buttons. No intentional visual deviations beyond those approved overrides.
+- Browser screenshots used fallback fonts because the sandbox could not fetch Google Fonts. The production build fetched fonts successfully outside the sandbox.
+- Fixed team-photo preview disposal when switching modes; the picker now stays mounted while hidden and uses its own field/error IDs.
+- Existing Next.js 16.4.0 emitted a security upgrade warning during build. Dependency upgrades are outside this handoff's permitted edit scope.
+- Shared code touched: none. Only repair components and this handoff were changed for Stage 4. Backend, API, types and mocks remain owned by Claude.
+- Claude wire must verify real-server concurrency/error branches (including ALREADY_FOLLOWING, NOT_TEAM_HANDLED and own-ticket redirect), durable photo URLs after reload, and end-to-end permissions. Mock blob URLs cannot survive a full reload.
+- Demo: run the frontend with NEXT_PUBLIC_USE_MOCKS=true; use /repair/new, /repair/my?scope=following and /repair/admin/queue?tab=closed. Switch mock roles via the existing DEV role selector; team fixture ticket ends in 166.
+
+### Wire review (Claude, 2026-10-25)
+
+Reviewed S03 / S04 / S05 / S06 / S07 / S11 against the specs and CR-020: no wiring or contract fixes needed, no visual differences to send back. Real API checks and e2e: see `../PROGRESS.md` "Stage 4 report".
+
+### Open questions — Stage 4 (answered by the owner 2026-10-24 → CR-020, D-100)
+
+All five are settled in `../changes/CR-020.md`: AC2 reworded (spot rule) · `ไปประเมินตรวจงาน` · `ยกเลิกการแจ้ง` → back · follow → S07 without rating, no S05 follow variant · hand-over text without queue. D-098 (report photos on the cards) confirmed. Codex: add new questions below.
 
 ## Stage 3D (2026-10-19 / 20) — BUILT BY CLAUDE (D-085): S29 dashboard Home for admin / executive + 3D อาคาร 1 + equipment (CR-016)
 

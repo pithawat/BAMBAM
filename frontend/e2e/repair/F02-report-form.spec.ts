@@ -1,7 +1,7 @@
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
-// F02 report form (CR-014, Stage 2M): 3 equal steps, the real category master, required room.
+// F02 report form (CR-014, Stage 2M; CR-022): 3 steps, each at its own height, the real category master, required room.
 // Runs against the real API with the dev/UAT sample rooms (backend seed.go).
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
@@ -19,13 +19,17 @@ async function open(page: Page) {
 const step = (page: Page, key: string) => page.locator(`[data-step="${key}"]`);
 const next = (page: Page) => page.getByRole("button", { name: "ถัดไป" }).click();
 
-async function pickPlace(page: Page, room: string) {
+async function pickPlace(page: Page, room: string, spot?: string) {
   const s = step(page, "location");
   await s.getByText("อาคาร 1", { exact: true }).click();
-  // floor 4 has 8 rooms → buttons (more than 10 → a searchable picker)
+  // room cards on every floor (CR-022)
   await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("4", { exact: true }).click();
   await s.getByText(room, { exact: true }).click();
+  if (spot) await s.getByLabel("บอกจุดเพิ่มเติม").fill(spot);
 }
+
+/** A unique extra spot: reports of other runs / projects in the same room stay "similar", not duplicates (CR-020). */
+const uniqueSpot = (info: TestInfo, base: string) => `${base} ${info.project.name}-${Date.now()}`;
 
 async function attachAndSend(page: Page) {
   await step(page, "send").locator("input[type=file]").first().setInputFiles({ name: "problem.png", mimeType: "image/png", buffer: PNG });
@@ -47,7 +51,8 @@ test("AC1: the 7 master categories, no อื่นๆ symptom rows; changing ca
   await expect(s.getByRole("checkbox", { checked: true })).toHaveCount(0);
 });
 
-test("AC3 + AC5 + demo 1: room required, matching rooms first, review, ticket shows the room", async ({ page }) => {
+test("AC3 + AC5 + demo 1: room required, matching rooms first, review, ticket shows the room", async ({ page }, info) => {
+  const spot = uniqueSpot(info, "ฝั่งหน้าต่าง");
   await open(page);
   const p = step(page, "problem");
   await p.getByText("ห้องประชุมและโสตทัศนูปกรณ์", { exact: true }).click();
@@ -61,20 +66,21 @@ test("AC3 + AC5 + demo 1: room required, matching rooms first, review, ticket sh
   await expect(s.getByText("เลือกห้องหรือจุดที่เกิด", { exact: true })).toBeVisible();
   await expect(s.getByText("ห้องที่ตรงกับปัญหา (ห้องประชุมและโสตทัศนูปกรณ์)")).toBeVisible();
   await s.getByText("อ.1 ห้อง 401", { exact: true }).click();
-  await s.getByLabel("บอกจุดเพิ่มเติม").fill("ฝั่งหน้าต่าง");
+  await s.getByLabel("บอกจุดเพิ่มเติม").fill(spot);
   await next(page);
 
   const review = step(page, "send").locator("dl");
-  await expect(review).toContainText("อ.1 ห้อง 401 · ฝั่งหน้าต่าง");
-  await review.getByRole("button", { name: "แก้ไขสถานที่" }).click();
-  await expect(page.getByRole("button", { name: "2. สถานที่" })).toHaveAttribute("aria-current", "step");
+  await expect(review).toContainText(`อ.1 ห้อง 401 · ${spot}`);
+  // CR-019: the review list shows on phones; desktop edits from the สรุปการแจ้งซ่อม column.
+  await page.getByRole("button", { name: "แก้ไขสถานที่" }).filter({ visible: true }).first().click();
+  await expect(page.getByRole("navigation", { name: "ขั้นตอนแจ้งซ่อม" }).getByRole("button", { name: /สถานที่/ })).toHaveAttribute("aria-current", "step");
   await next(page);
 
   await attachAndSend(page);
-  await expect(page.getByText("อาคาร 1 ชั้น 4 · อ.1 ห้อง 401 · ฝั่งหน้าต่าง").first()).toBeVisible();
+  await expect(page.getByText(`อาคาร 1 ชั้น 4 · อ.1 ห้อง 401 · ${spot}`).first()).toBeVisible();
 });
 
-test("AC2: อื่น ๆ + ใช้งานไม่ได้ + typed ลิฟต์ → category อื่น ๆ · ลิฟต์, priority ปกติ", async ({ page }) => {
+test("AC2: อื่น ๆ + ใช้งานไม่ได้ + typed ลิฟต์ → category อื่น ๆ · ลิฟต์, priority ปกติ", async ({ page }, info) => {
   await open(page);
   const p = step(page, "problem");
   await p.getByText("อื่น ๆ", { exact: true }).click();
@@ -82,26 +88,31 @@ test("AC2: อื่น ๆ + ใช้งานไม่ได้ + typed ล�
   await p.getByLabel("ระบุหมวดงาน").fill("ลิฟต์");
   await expect(p.getByText("ปกติ", { exact: true })).toBeVisible();
   await next(page);
-  await pickPlace(page, "พื้นที่ส่วนกลางชั้น 4");
+  await pickPlace(page, "พื้นที่ส่วนกลางชั้น 4", uniqueSpot(info, "หน้าลิฟต์"));
   await next(page);
   await attachAndSend(page);
   await expect(page.getByText("ใช้งานไม่ได้ · อื่น ๆ · ลิฟต์").first()).toBeVisible();
 });
 
-test("AC4: the frame keeps its size on every step (desktop)", async ({ page, isMobile }) => {
+test("AC4 (CR-022): the frame keeps its width; room cards leave no reserved gap (desktop)", async ({ page, isMobile }) => {
   test.skip(isMobile, "desktop frame only");
   await open(page);
   const frame = page.getByTestId("report-frame");
-  const sizes: string[] = [];
-  const size = async () => { const b = await frame.boundingBox(); sizes.push(`${Math.round(b!.width)}x${Math.round(b!.height)}`); };
-  await size();
+  const widths: number[] = [];
+  const width = async () => widths.push(Math.round((await frame.boundingBox())!.width));
+  await width();
   await step(page, "problem").getByText("ระบบปรับอากาศ", { exact: true }).click();
   await step(page, "problem").getByText("แอร์ไม่เย็น").click();
   await next(page);
-  await size();
+  await width();
   await pickPlace(page, "WPS ห้องกาแฟ");
+  // Room cards on every floor (no picker).
+  const s = step(page, "location");
+  // The wrapper is as tall as the cards (no reserved min-height under them).
+  const gap = await s.getByRole("radiogroup", { name: "ห้องหรือจุดที่เกิด" }).evaluate((el) => el.parentElement!.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom);
+  expect(gap).toBeLessThan(30);
   await next(page);
-  await size();
-  expect(new Set(sizes).size).toBe(1);
+  await width();
+  expect(new Set(widths).size).toBe(1);
   // CR-019: the frame shares the row with the สรุปการแจ้งซ่อม column, so its width follows the shell.
 });

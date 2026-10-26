@@ -2,26 +2,26 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 3U accepted 2026-10-24 (`repair-stage-3U`); Stage 3 waiting for acceptance · of 8   **Updated:** 2026-10-24 (Stage 3U accepted)
+**Phase:** P5 Build   **Stage:** 4 accepted 2026-10-26 (`repair-stage-4`); next: 5 · Stage 3 waiting for acceptance · of 8   **Updated:** 2026-10-26 (Stage 4 accepted)
 
 ## Now
 
 - **Stage 3 built 2026-10-19 — waiting for user acceptance** (branch `repair/stage-3`; report below). S11 re-spec (D-077) needs the owner's OK at acceptance
-- **Stage 3U accepted 2026-10-24** (owner, CR-019), branch `repair/stage-3U`, tag `repair-stage-3U` (not pushed). Stage 3D accepted 2026-10-20 (`repair-stage-3D`). Next stage: 4
+- **Stage 4 accepted 2026-10-26** (owner), branch `repair/stage-4`, tag `repair-stage-4` (not pushed). Stage 3U accepted 2026-10-24 (`repair-stage-3U`), 3D 2026-10-20 (`repair-stage-3D`). Next stage: 5
 - **CR-017 built 2026-10-20 (S, D-086 / D-087):** ticket status by step on the model, 1 pin per ticket, repair-map lift transition, floors + footprint from #27, no sample numbers; migration `20261020000002` moves sample-building tickets to อาคาร 1 and deletes duplicates
 - **CR-018 built 2026-10-20 (S, D-088 / D-089):** รับเรื่อง = deep yellow app-wide; ฉุกเฉิน marker on the model (red halo, ⚠, #27 `criticalCount`); sample buildings off (migration `20261020000003`) and sample seeding removed
 - **CR-015 APPROVED 2026-10-19 (M, D-076):** priority is policy only — never changed after creation, lists oldest first; built in Stage 3
 - **Still waiting for acceptance (older):** Stage 2R (CR-008 / CR-009), Stage 2N (CR-010 / CR-011 + CR-012 + D-068 S06 polish) — demos in `03-plan.md`; colour themes (D-069) and no-purple palette (D-070) built 2026-10-19. CR-004 (Home blocks) PROPOSED, waiting for a pick
-- `ui/HANDOFF.md`: `BUILT BY CLAUDE — Stage 3D`; Codex has nothing to build
+- `ui/HANDOFF.md`: Stage 4 (incl. CR-021 / CR-022) built and accepted; Stage 5 not prepared yet
 
 ## Next
 
+0. **Next: `/build-stage repair 5 prepare`** (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
 0. User: restart the local API (:8080 runs pre-Stage-3 code), run `npx playwright test e2e/repair` (F02 + F22 not run yet), try the Stage 3 demo, accept → `/accept-stage repair 3`
 0. User: try the Stage 3D demo (`03-plan.md` Stage 3D) — the API needs migrations `20261020000001` + `20261020000002` + `20261020000003` (`goose -dir db/migrations postgres "$DATABASE_URL" up`) (shared dev DB still rejects DDL → local / writable DB), then `/accept-stage repair 3D`
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 1. User runs the 2R / 2N demos (`03-plan.md`) on the real API (migration `20261016000001` needs a writable DB) and `e2e/platform/F01-login-shell.spec.ts`
 2. On acceptance: commit, tags `repair-stage-1`, `-2`, `-2r`, `-2n`, `-3`; update `docs/PROJECT.md`
-3. Stage 4 carries the CR-009 duplicate rule (409 on #5, room / spot match) and the team mode switch
 
 ## Stage 3D report (2026-10-20)
 
@@ -42,7 +42,8 @@
 
 ## Open issues / questions
 
-- Stage 3U (D-097): re-run `npx playwright test e2e/repair/F02-report-form.spec.ts e2e/repair/F23-dashboard.spec.ts e2e/platform` on the test stack (not run after the CR-019 relayout)
+- e2e F03 AC1 on desktop fails in combined runs (2026-10-25/26): after S07 the S06 page mounts ~33 s after `load` on `next dev` (API answers in ms, no requests in between); passes every time alone and on mobile — check on a production build (`next start`) before UAT
+- Stage 4: migration `20261024000001` must run on the dev DB before the demo (shared dev DB still read-only) · e2e F23 AC2 / F31 are timing-sensitive under load (3D, software WebGL)
 - CR-019: S07 message box ("การติดตามงาน") and the S02 employee Home layout from the prototype are out of scope (separate CR if wanted); the S03 note says "ติดตามได้ตลอด" without promising notifications (Stage 6)
 - Next.js 16.4.0 prints a security-vulnerability notice on `next dev` / `next build` (stops the first run) — upgrade to be planned
 - Mock mode (`NEXT_PUBLIC_USE_MOCKS=true`, off by default) still has the old sample buildings in `mocks.ts` — never shown with the real API
@@ -80,6 +81,11 @@
 
 ## Stage log
 
+- 2026-10-26: **Stage 4 accepted**, tag `repair-stage-4` — F03 duplicates (409 + #22 `blocksReport`, CR-020 spot rule, step-2 block CR-021) + follow #23, F04 team-handled (locked `?mode=team`, S06 tab `ทีมแก้เอง`, #35 `closedReason`), F05 hand over #24; CR-021 relayout from `maintenance-demo.html`, CR-022 room cards / step heights; migration `20261024000001`; D-098–D-102; e2e F03 / F04 / F05
+- 2026-10-26: CR-022 (room cards, step heights) + S06 lead hero polish — F02 / F03 / F04 26 passed, 1 skipped, F03 AC1 desktop see Open issues; tsc / eslint pass
+- 2026-10-25: CR-021 approved + built (D-101) — S03 / S04 / S06 relayout from `maintenance-demo.html`, step-2 duplicate block, locked team mode, #35 `closedReason`; e2e F03 / F04 reworked
+- 2026-10-25: Stage 4 wired — Codex UI reviewed (no changes), real API + e2e F03 / F04 / F05 pass; older specs F01 / F02 / F22 brought up to date (D-097 closed)
+- 2026-10-24: Stage 4 prepare — backend #5 duplicates + team, #22–#24, migration `20261024000001`; `golangci-lint` 0 issues, `go test ./...` pass incl. Postgres integration (scratch Pg 15, port 5499, `TestPgDuplicatesFollowTeamHandOver`); FE contract `tsc` + `eslint` pass, mock rules checked in Node (17 checks); HANDOFF ready for Codex; then CR-020 (spot rule, copy) applied — backend + Pg tests, FE contract, 21 mock checks pass
 - 2026-10-24: Stage 3U accepted (CR-019: S06 / S07 / S03 relayout, S29 polish, tiger mascot, S01 login from `bam-workplace-login-v7.html`, S06 = 10 per page from slim #35 `GET /tickets/mine`), tag `repair-stage-3U`; e2e F01 / F02 / F23 re-run still open (D-097)
 - 2026-10-20: Stage 3D accepted (CR-016–CR-018), tag `repair-stage-3D`
 

@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — API contract
 
-Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16 · CR-014 applied 2026-10-19 · CR-015, CR-016 applied 2026-10-19
+Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 2026-10-16 · CR-014 applied 2026-10-19 · CR-015, CR-016 applied 2026-10-19 · CR-020 applied 2026-10-24
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Single source for backend DTOs and frontend types.ts.
      Conventions (envelope, errors, dates, pagination): docs/shared/architecture.md
@@ -269,7 +269,7 @@ Response 201 `{ "data": <TicketDetail> }`.
 | 400 | `VALIDATION_FAILED` | fields: `categoryId` REQUIRED (no `categoryOther` either) · `categoryOther` TOO_LONG · `symptomIds` MIN_ITEMS (no `symptomOther` either) · `symptomOther` REQUIRED (category "อื่นๆ") / TOO_LONG · `buildingId` REQUIRED · `floorId` REQUIRED · `roomId` REQUIRED (CR-014) · `categoryOther` NOT_ALLOWED (not the `isOther` category, CR-014) · `locationDetail` TOO_LONG · `photoIds` MIN_ITEMS/MAX_ITEMS · `details` TOO_LONG · `teamHandled.note` REQUIRED/TOO_LONG · `teamHandled.photoIds` MIN_ITEMS (CR-008) | per field, S03 Validation |
 | 422 | `MASTER_DATA_CHANGED` | category/symptom/floor/room (CR-014) inactive or mismatched | ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่ |
 | 422 | `PHOTO_NOT_FOUND` | a photo id is unknown, expired or not the caller's | มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น |
-| 409 | `DUPLICATE_FOUND` | an open ticket matches (BR-F03-1, CR-009, Stage 4); `details.tickets` = the matches | S03 blocking dialog: ติดตามเคสเดิม / ยกเลิกการแจ้ง |
+| 409 | `DUPLICATE_FOUND` | an open ticket matches (BR-F03-1, CR-009, Stage 4) with no extra spot or the same `locationDetail` (CR-020; another spot is allowed); `details.tickets` = those matches (`DuplicateTicket`, all `blocksReport: true`, max 10) | S03 blocking dialog: ติดตามเคสเดิม / ยกเลิกการแจ้ง |
 | 409 | `OWN_TICKET_AWAITING_RATING` | the match is the caller's own ticket waiting for ประเมินตรวจงาน (BR-F03-4, CR-009, Stage 4); `details.ticketId` | คุณแจ้งเรื่องนี้ไว้แล้ว ช่างซ่อมเสร็จแล้ว ไปประเมินตรวจงานที่งานเดิม |
 | 403 | `TEAM_HANDLED_NOT_ALLOWED` | `teamHandled` sent by a non-lead | คุณไม่มีสิทธิ์ทำรายการนี้ |
 
@@ -291,7 +291,7 @@ Query: `scope=mine|all` (default `mine`) · `status` (comma list of statuses) ·
 | 400 | `VALIDATION_FAILED` | bad filter value |
 
 ### 35. GET /api/v1/repair/tickets/mine (CR-019)
-The S06 table's own paging endpoint: one page, only the columns S06 shows. Query: `relation`, `status`, `step`, `q`, `sort` as #6 mine (other #6 filters are ignored) · `page` · `pageSize` default **10** (max 100).
+The S06 table's own paging endpoint: one page, only the columns S06 shows. Query: `relation`, `status`, `step`, `closedReason` (CR-021, S06 lead tab `ทีมแก้เอง` = `relation=reported&closedReason=team_handled`), `q`, `sort` as #6 mine (other #6 filters are ignored) · `page` · `pageSize` default **10** (max 100).
 
 - Always the caller's tickets (reported or followed, BR-F06-1); awaiting my confirmation first (BR-F06-2); same `total` as #6 mine with the same filters.
 - One list query (tickets + category / building / floor / room; the title is joined in SQL) plus one `count(*)` — no people, contractor, photo or symptom-row lookups.
@@ -431,11 +431,12 @@ Built in Stage 3: works from any open status (BR-F08B-1); writes event `admin_cl
 
 ## Stage 4 — duplicates, follow, team handled, hand over
 
-### 22. GET /api/v1/repair/tickets/duplicates?categoryId=&floorId=&roomId= (CR-014: `roomId` replaces `locationDetail`)
+### 22. GET /api/v1/repair/tickets/duplicates?categoryId=&floorId=&roomId=&locationDetail= (CR-014: `roomId` replaces `locationDetail` for the match; CR-020: `locationDetail` = the form's extra spot, optional)
 Open tickets (`in_progress`, `resolved`) with the same category, floor and room / spot (BR-F03-1, CR-009: trimmed case-insensitive text; an empty spot on either side matches), newest first. (CR-014) Match by `roomId`; old tickets without a room match on the same floor only when their `locationDetail` equals the room name (trimmed, case-insensitive).
 ```json
-{ "data": [ <TicketSummary + "subscriberCount": 2> ] }
+{ "data": [ <TicketSummary + "subscriberCount": 2 + "blocksReport": true> ] }
 ```
+(CR-020) `blocksReport`: `true` = the report would be a duplicate of it (no extra spot sent, or the same spot — trimmed, spaces collapsed, any case; old tickets without a room block only an empty spot) → #5 refuses; `false` = another spot in the room, only similar → #5 accepts. Blocking matches first, then newest; max 10. `categoryId` / `floorId` / `roomId` missing → 400 `VALIDATION_FAILED` (`REQUIRED`).
 `viewerRelation` tells the FE to show "คุณแจ้งเคสนี้เอง" / "คุณติดตามเคสนี้อยู่แล้ว".
 
 ### 23. POST /api/v1/repair/tickets/{id}/follow

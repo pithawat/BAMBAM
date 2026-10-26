@@ -31,6 +31,15 @@ export function useDiscardGuard(dirty: boolean) {
     if (!dirtyRef.current) navigate(href);
     else { pending.current = () => navigate(href); setOpen(true); }
   }
+  function leaveBack() {
+    const go = () => {
+      const distance = guarded.current ? 2 : 1;
+      if (window.history.length <= distance) { navigate("/", true); return; }
+      bypass.current = true; guarded.current = false; window.history.go(-distance);
+    };
+    if (!dirtyRef.current) go();
+    else { pending.current = go; setOpen(true); }
+  }
   useEffect(() => {
     function beforeUnload(event: BeforeUnloadEvent) {
       if (dirtyRef.current && !bypass.current) { event.preventDefault(); event.returnValue = ""; }
@@ -65,5 +74,5 @@ export function useDiscardGuard(dirty: boolean) {
     document.addEventListener("click", click, true);
     return () => { window.removeEventListener("beforeunload", beforeUnload); window.removeEventListener("popstate", back, true); document.removeEventListener("click", click, true); };
   }, [router]);
-  return { open, setOpen, leave, finish: (href: string) => navigate(href, true), discard: () => { setOpen(false); pending.current?.(); pending.current = null; } };
+  return { open, setOpen, leave, leaveBack, finish: (href: string) => navigate(href, true), discard: () => { setOpen(false); pending.current?.(); pending.current = null; } };
 }

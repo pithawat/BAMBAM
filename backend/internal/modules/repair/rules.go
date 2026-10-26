@@ -68,6 +68,32 @@ func seesAllTickets(role string) bool {
 	return role == users.RoleAdmin || role == users.RoleExecutive || role == users.RoleTechnician
 }
 
+// isLead: the team leads who may record a team-handled job (BR-F04-1) and hand their own over (BR-F05-2).
+// CR-007: becomes a permission check when settings Stage 1 lands.
+func isLead(role string) bool {
+	return role == users.RoleHousekeeperLead || role == users.RoleSecurityLead
+}
+
+// canHandOver implements BR-F05-1/2: a team-handled ticket, by the lead who recorded it or by admin.
+func canHandOver(v Viewer, status string, closedReason *string, reporterID uuid.UUID) bool {
+	if status != StatusClosed || closedReason == nil || *closedReason != ClosedReasonTeamHandled {
+		return false
+	}
+	return v.Role == users.RoleAdmin || (isLead(v.Role) && reporterID == v.ID)
+}
+
+// isOpenReportPhoto: a report photo of a ticket that is still open — the S04 duplicate cards show it
+// to every reporter before they follow (F03, D-098). Result, send-back, follow and team photos stay private.
+func isOpenReportPhoto(p Photo) bool {
+	return p.Kind != nil && *p.Kind == PhotoKindReport && p.TicketStatus != nil && *p.TicketStatus != StatusClosed
+}
+
+// normalizeSpot is the extra spot as the duplicate check compares it (CR-020): trimmed, inner spaces
+// collapsed, lower case. Keep in step with ListDuplicateTickets.
+func normalizeSpot(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
 // isStaff: who sees contractor names, contractor ratings and send-back counts.
 func isStaff(role string) bool {
 	return seesAllTickets(role)
@@ -123,6 +149,9 @@ func allowedActions(v Viewer, d TicketDetail) ([]string, map[string]string) {
 	if v.Role == users.RoleAdmin && d.Status != StatusClosed {
 		actions = append(actions, ActionClose)
 	}
+	if canHandOver(v, d.Status, d.ClosedReason, d.Reporter.ID) {
+		actions = append(actions, ActionHandover)
+	}
 	return actions, blocked
 }
 
@@ -172,7 +201,28 @@ func validateCreate(in CreateTicketInput) (CreateTicketInput, map[string]string)
 	if len(in.AssetCode) > MaxAssetCodeLen {
 		fields["assetCode"] = "TOO_LONG"
 	}
+	if in.TeamHandled != nil {
+		// BR-F04-2: what the team did + >= 1 after photo; a photo belongs to one place only.
+		th := TeamHandledInput{Note: strings.TrimSpace(in.TeamHandled.Note), PhotoIDs: uniqueIDs(in.TeamHandled.PhotoIDs)}
+		checkText(fields, "teamHandled.note", th.Note, MaxNoteChars, true)
+		checkPhotos(fields, "teamHandled.photoIds", th.PhotoIDs, 1)
+		for _, id := range th.PhotoIDs {
+			if containsID(in.PhotoIDs, id) {
+				fields["teamHandled.photoIds"] = "INVALID"
+			}
+		}
+		in.TeamHandled = &th
+	}
 	return in, fields
+}
+
+func containsID(ids []uuid.UUID, id uuid.UUID) bool {
+	for _, x := range ids {
+		if x == id {
+			return true
+		}
+	}
+	return false
 }
 
 // ticketPriority applies BR-F02-2 (CR-008, CR-014): the most urgent picked symptom; with only a

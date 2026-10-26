@@ -1,4 +1,4 @@
-// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–3D endpoints, CR-005, CR-008, CR-014, CR-016).
+// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–4 endpoints, CR-005, CR-008, CR-014, CR-016).
 // Field names are fixed by the contract — change only through a CR.
 
 import type { Ref } from "@/lib/platform/types";
@@ -37,7 +37,10 @@ export type WorkBy = "in_house" | "contractor";
 /** How the viewer relates to the ticket. `none` = admin / executive viewing. */
 export type ViewerRelation = "reporter" | "subscriber" | "technician" | "none";
 
-/** `close` = admin (#21, Stage 3); `handover` comes in Stage 4. CR-015: no `change_priority`. */
+/**
+ * `close` = admin (#21, Stage 3); `handover` = the lead who recorded a team-handled ticket, or admin
+ * (#24, Stage 4, BR-F05-2). CR-015: no `change_priority`.
+ */
 export type TicketAction = "assess" | "resolve" | "confirm" | "send_back" | "handover" | "close";
 
 export type BlockedReason = "ASSESSMENT_REQUIRED";
@@ -213,9 +216,18 @@ export type CreateTicketRequest = {
   photoIds: string[];
   /** Filled from QR (Stage 5). */
   assetCode?: string;
-  /** Team handled is Stage 4 (leads only); send null until then. */
-  teamHandled: { note: string; photoIds: string[] } | null;
+  /**
+   * F04 (Stage 4): `housekeeper_lead` / `security_lead` only (others → 403 `TEAM_HANDLED_NOT_ALLOWED`);
+   * the ticket is created `closed` / `team_handled`. `null` = a normal report.
+   */
+  teamHandled: TeamHandledRequest | null;
 };
+
+/**
+ * #5 `teamHandled` (BR-F04-2): what the team did (1–500) + 1–5 after photos, never the same ids as
+ * `photoIds` (→ `teamHandled.photoIds` INVALID).
+ */
+export type TeamHandledRequest = { note: string; photoIds: string[] };
 
 // ---- #6 GET /repair/tickets, #7 GET /repair/tickets/counts ----
 
@@ -249,7 +261,8 @@ export type TicketCountsQuery = Omit<TicketListQuery, "status" | "step" | "page"
 
 // ---- #35 GET /repair/tickets/mine (S06 table, CR-019) ----
 
-export type MyTicketsQuery = Pick<TicketListQuery, "relation" | "status" | "step" | "q" | "page" | "pageSize" | "sort">;
+/** `closedReason` (CR-021): the lead tab `ทีมแก้เอง` = `relation=reported` + `team_handled`. */
+export type MyTicketsQuery = Pick<TicketListQuery, "relation" | "status" | "step" | "closedReason" | "q" | "page" | "pageSize" | "sort">;
 
 /** One S06 row: only what the table shows (title joined by the API). */
 export type MyTicket = Pick<TicketSummary,
@@ -460,6 +473,34 @@ export type CreateAssetRequest = {
 /** #32 body: edit or move (the type never changes; omitted `rotationDeg` keeps the current one). */
 export type UpdateAssetRequest = Omit<CreateAssetRequest, "assetTypeId">;
 
+// ---- Stage 4: #22 duplicates, #23 follow, #24 hand over (F03, F05) ----
+
+/**
+ * #22 query: category, floor and room are required (CR-014: the room replaces the location text);
+ * `locationDetail` = the form's extra spot (CR-020) so the server can tell a duplicate from a similar job.
+ */
+export type DuplicatesQuery = { categoryId: string; floorId: string; roomId: string; locationDetail?: string };
+
+/**
+ * An open ticket on the same category + floor + room (BR-F03-1) — #22 (blocking first, then newest)
+ * and the #5 409 (blocking only). `blocksReport` (CR-020): `true` = the report is a duplicate of it (no
+ * extra spot, or the same spot) → follow or cancel; `false` = another spot in the room, only similar →
+ * sending is allowed. `viewerRelation`: `reporter` → own case · `subscriber` → already following.
+ */
+export type DuplicateTicket = TicketSummary & { subscriberCount: number; blocksReport: boolean };
+
+/** #5 409 `DUPLICATE_FOUND` → `error.details` (CR-009: nothing was created; every ticket has `blocksReport: true`). */
+export type DuplicateFoundDetails = { tickets: DuplicateTicket[] };
+
+/** #5 409 `OWN_TICKET_AWAITING_RATING` → `error.details` (BR-F03-4: open that ticket, no new one). */
+export type OwnTicketAwaitingRatingDetails = { ticketId: string };
+
+/** #23 body: note ≤ 500 and 0–5 photos, both optional → event `subscribed`. */
+export type FollowRequest = { note?: string; photoIds: string[] };
+
+/** #24 body: reason 1–500 (required). */
+export type HandoverRequest = { reason: string };
+
 // ---- errors (04-api-contract.md "Error codes") ----
 
 export type RepairErrorCode =
@@ -472,6 +513,8 @@ export type RepairErrorCode =
   | "PHOTO_TOO_LARGE"
   | "MASTER_DATA_CHANGED"
   | "TEAM_HANDLED_NOT_ALLOWED"
+  | "DUPLICATE_FOUND"
+  | "OWN_TICKET_AWAITING_RATING"
   | "NOT_TECHNICIAN"
   | "NOT_REPORTER"
   | "TICKET_CLOSED"

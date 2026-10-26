@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, request as playwrightRequest, test, type APIRequestContext } from "@playwright/test";
+import { expect, request as playwrightRequest, test, type APIRequestContext, type Page } from "@playwright/test";
 
 // F22 / F08-B (Stage 3, CR-015): S11 งานทั้งหมด for admin and executive, admin close with a reason.
 // Runs against the real API; each test reports its own ticket as the demo employee through the API.
@@ -10,6 +10,9 @@ const API = "/api/v1/repair";
 type Ref = { id: string; name: string };
 type Category = Ref & { symptoms: Ref[] };
 type Building = Ref & { floors: (Ref & { rooms: Ref[] })[] };
+
+/** The ticket's row (desktop table) or card (phone) — `q` narrows the list to it. */
+const item = (page: Page, ticketNo: string) => page.getByText(ticketNo).filter({ visible: true });
 
 async function as(role: string, baseURL: string | undefined): Promise<APIRequestContext> {
   return playwrightRequest.newContext({ baseURL, storageState: auth(role) });
@@ -27,6 +30,8 @@ async function reportTicket(api: APIRequestContext): Promise<{ id: string; ticke
   const res = await api.post(`${API}/tickets`, {
     data: {
       categoryId: category.id, symptomIds: [category.symptoms[0].id], buildingId: building.id, floorId: floor.id, roomId: floor.rooms[0].id,
+      // a unique extra spot: never a duplicate of another run's ticket in the same room (CR-020)
+      locationDetail: `e2e ${Date.now()}${Math.floor(Math.random() * 1000)}`,
       photoIds: [(await photo.json()).data.id], teamHandled: null,
     },
   });
@@ -41,21 +46,22 @@ test.describe("admin", () => {
   test("AC1 + AC2: oldest first, priority shown but not editable, close with a reason", async ({ page, baseURL }) => {
     const ticket = await reportTicket(await as("employee", baseURL));
     await page.goto(`/repair/admin/queue?q=${ticket.ticketNo}`);
-    const row = page.getByRole("row").filter({ hasText: ticket.ticketNo });
-    await expect(row).toBeVisible();
-    await expect(row.getByRole("combobox")).toHaveCount(0); // CR-015: no priority select
+    await expect(item(page, ticket.ticketNo).first()).toBeVisible();
+    // CR-015: no priority select on the ticket (the filter bar has its own selects)
+    await expect(page.getByRole("row").filter({ hasText: ticket.ticketNo }).getByRole("combobox")).toHaveCount(0);
 
-    await row.getByRole("button", { name: `ปิดงาน ${ticket.ticketNo}` }).click();
+    await page.getByRole("button", { name: /^ปิดงาน/ }).filter({ visible: true }).first().click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "ปิดงาน", exact: true }).click();
     await expect(dialog.getByText("กรุณาใส่เหตุผล")).toBeVisible();
     await dialog.getByLabel(/เหตุผลที่ปิดงาน/).fill("ส่งเรื่องเปลี่ยนเครื่องใหม่ผ่านฝ่ายจัดซื้อแล้ว");
     await dialog.getByRole("button", { name: "ปิดงาน", exact: true }).click();
     await expect(page.getByText("ปิดงานแล้ว").first()).toBeVisible();
-    await expect(page.getByRole("row").filter({ hasText: ticket.ticketNo })).toHaveCount(0);
+    await expect(item(page, ticket.ticketNo)).toHaveCount(0);
 
     await page.goto(`/repair/admin/queue?tab=closed&reason=admin_closed&q=${ticket.ticketNo}`);
-    await expect(page.getByRole("row").filter({ hasText: ticket.ticketNo })).toContainText("Admin ปิดงาน");
+    await expect(page.getByText("Admin ปิดงาน").filter({ visible: true }).first()).toBeVisible();
+    await expect(item(page, ticket.ticketNo).first()).toBeVisible();
 
     // The reporter sees who closed it and why.
     const reporter = await (await as("employee", baseURL)).get(`${API}/tickets/${ticket.id}`);
@@ -89,7 +95,7 @@ test.describe("executive", () => {
     const ticket = await reportTicket(await as("employee", baseURL));
     await page.goto(`/repair/admin/queue?q=${ticket.ticketNo}`);
     await expect(page.getByText("โหมดดูอย่างเดียว")).toBeVisible();
-    await expect(page.getByRole("row").filter({ hasText: ticket.ticketNo })).toBeVisible();
+    await expect(item(page, ticket.ticketNo).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /ปิดงาน/ })).toHaveCount(0);
     expect((await request.post(`${API}/tickets/${ticket.id}/close`, { data: { reason: "x" } })).status()).toBe(403);
     expect((await request.post(`${API}/tickets/${ticket.id}/assess`, { data: { expectedDoneOn: "2030-01-01", workBy: "in_house" } })).status()).toBe(403);

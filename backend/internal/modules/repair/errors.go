@@ -1,6 +1,10 @@
 package repair
 
-import "github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
+import (
+	"github.com/google/uuid"
+
+	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
+)
 
 // Codes are fixed in docs/modules/repair/04-api-contract.md "Error codes".
 var (
@@ -21,6 +25,31 @@ var (
 	ErrContractorInactive   = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_NOT_FOUND", "contractor unknown or inactive")
 	ErrContractorTypeAbsent = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_TYPE_NOT_FOUND", "a contractor type does not exist")
 )
+
+// Stage 4: duplicates, follow, team handled, hand over.
+var (
+	ErrAlreadyFollowing = apperr.New(apperr.KindConflict, "ALREADY_FOLLOWING", "already the reporter or a subscriber")
+	ErrNotTeamHandled   = apperr.New(apperr.KindBusinessRule, "NOT_TEAM_HANDLED", "ticket is not closed as team handled")
+)
+
+// DuplicateFoundError: #5 refused a report because open tickets match it (BR-F03-1/2, CR-009).
+// The controller renders 409 DUPLICATE_FOUND with the matches in `details.tickets`.
+type DuplicateFoundError struct {
+	IDs     []uuid.UUID
+	Tickets []TicketDetail // decorated for the viewer, newest first
+}
+
+func (e *DuplicateFoundError) Error() string { return "DUPLICATE_FOUND: open tickets match the report" }
+
+// OwnTicketAwaitingRatingError: the match is the caller's own ticket waiting for ประเมินตรวจงาน
+// (BR-F03-4). The controller renders 409 OWN_TICKET_AWAITING_RATING with `details.ticketId`.
+type OwnTicketAwaitingRatingError struct {
+	TicketID uuid.UUID
+}
+
+func (e *OwnTicketAwaitingRatingError) Error() string {
+	return "OWN_TICKET_AWAITING_RATING: the reporter's own ticket waits for the rating"
+}
 
 // CR-016 equipment and floor plans.
 var (

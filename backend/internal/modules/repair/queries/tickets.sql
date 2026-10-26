@@ -4,13 +4,15 @@
 -- The same CASE is repeated in the list / count queries; keep them identical.
 
 -- name: InsertTicket :exec
+-- A team-handled record (F04) is created `closed` / `team_handled`; every other ticket `in_progress`.
 INSERT INTO repair.tickets (
-    id, ticket_no, status, priority, priority_source, category_id, category_other, symptom_other,
-    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id
+    id, ticket_no, status, closed_reason, closed_at, priority, priority_source, category_id, category_other, symptom_other,
+    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id, created_at, updated_at
 ) VALUES (
-    @id, @ticket_no, 'in_progress', @priority, @priority_source, sqlc.narg('category_id')::uuid,
+    @id, @ticket_no, @status, sqlc.narg('closed_reason')::text, sqlc.narg('closed_at')::timestamptz,
+    @priority, @priority_source, sqlc.narg('category_id')::uuid,
     sqlc.narg('category_other')::text, sqlc.narg('symptom_other')::text,
-    @building_id, @floor_id, @room_id, @location_detail, @details, @asset_code, @reporter_id
+    @building_id, @floor_id, @room_id, @location_detail, @details, @asset_code, @reporter_id, @created_at, @created_at
 );
 
 -- name: InsertTicketSymptoms :exec
@@ -138,6 +140,7 @@ WHERE ((@relation::text IN ('all', 'reported') AND t.reporter_id = @viewer_id)
         WHEN t.expected_done_on IS NULL THEN 'awaiting_assessment'
         WHEN t.send_back_count > 0 THEN 'reworking'
         ELSE 'in_repair' END) = ANY(@steps::text[]))
+  AND (sqlc.narg('closed_reason')::text IS NULL OR t.closed_reason = sqlc.narg('closed_reason')::text)
   AND (sqlc.narg('q')::text IS NULL OR t.ticket_no ILIKE '%' || sqlc.narg('q')::text || '%'
        OR t.location_detail ILIKE '%' || sqlc.narg('q')::text || '%'
        OR rm.name ILIKE '%' || sqlc.narg('q')::text || '%')
@@ -228,7 +231,7 @@ WHERE t.id = @id;
 
 -- name: LockTicket :one
 -- Every status change locks the row first, so concurrent actions see each other's result.
-SELECT id, status, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating FROM repair.tickets
+SELECT id, status, closed_reason, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating FROM repair.tickets
 WHERE id = @id
 FOR UPDATE;
 
@@ -270,6 +273,12 @@ UPDATE repair.tickets
 SET status = 'in_progress', send_back_count = send_back_count + 1, auto_close_at = NULL, updated_at = @now
 WHERE id = @id;
 
+-- name: HandOverTicket :exec
+-- F05 (BR-F05-1/3): the same team-handled ticket goes back to the technician, waiting for the assessment.
+UPDATE repair.tickets
+SET status = 'in_progress', closed_reason = NULL, closed_at = NULL, updated_at = @now
+WHERE id = @id;
+
 -- name: AutoCloseDueTickets :many
 -- BR-F07-4: resolved tickets nobody rated within 3 days. Idempotent: closed rows no longer match.
 UPDATE repair.tickets
@@ -299,3 +308,34 @@ FROM (
 ) p
 ORDER BY p.last_reported_at DESC
 LIMIT 3;
+
+-- name: LockDuplicateKey :exec
+-- Serialises reports on one category + floor + room, so two people sending the same problem at the
+-- same moment cannot both pass the duplicate check (BR-F03-2, CR-009).
+SELECT pg_advisory_xact_lock(hashtextextended(@key::text, 0));
+
+-- name: ListDuplicateTickets :many
+-- F03 (BR-F03-1, CR-009 / CR-014): open tickets with the same category, floor and room; old tickets
+-- without a room match when their location text equals the room name (trimmed, case-insensitive).
+-- CR-020: `blocks_report` = the report is a duplicate of it: the reporter gave no extra spot (@spot is
+-- the normalised spot, '' when empty) or the same spot. A different spot is only "similar" (allowed).
+-- Old tickets have no separate spot (their text is the room name), so only an empty @spot blocks.
+-- Blocking matches come first so MaxDuplicates never cuts one off.
+SELECT t.id, t.reporter_id, t.status,
+       (CASE WHEN t.room_id IS NULL THEN @spot::text = ''
+             ELSE @spot::text = '' OR lower(regexp_replace(btrim(coalesce(t.location_detail, '')), '\s+', ' ', 'g')) = @spot::text
+        END)::boolean AS blocks_report
+FROM repair.tickets t
+WHERE t.status IN ('in_progress', 'resolved')
+  AND t.category_id = @category_id AND t.floor_id = @floor_id
+  AND (t.room_id = @room_id
+       OR (t.room_id IS NULL AND lower(btrim(t.location_detail)) =
+           (SELECT lower(btrim(rm.name)) FROM platform.rooms rm WHERE rm.id = @room_id)))
+ORDER BY blocks_report DESC, t.created_at DESC, t.id
+LIMIT @max_rows;
+
+-- name: InsertSubscriber :execrows
+-- F03: 0 rows = already following.
+INSERT INTO repair.ticket_subscribers (ticket_id, user_id, created_at, updated_at)
+VALUES (@ticket_id, @user_id, @now, @now)
+ON CONFLICT (ticket_id, user_id) DO NOTHING;

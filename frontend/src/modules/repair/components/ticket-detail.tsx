@@ -261,6 +261,7 @@ function NextAction({ ticket, viewer, story, meId, executive, actions }: { ticke
   }
 
   // F08-B: admin can close any open ticket, whatever their relation to it (BR-F08B-1).
+  if (actions.allowed.has("handover")) buttons.push(<Button key="handover" type="button" variant="outline" className="min-h-11 max-sm:w-full" onClick={actions.handover}>ส่งต่อให้ช่าง</Button>);
   if (actions.allowed.has("close")) buttons.push(<Button key="close" type="button" variant="outline" onClick={actions.close}
     className="h-11 border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive max-sm:w-full"><CircleX aria-hidden />ปิดงาน</Button>);
 
@@ -502,17 +503,30 @@ function StageItem({ stage: s, planned, next }: { stage: Stage; planned?: string
         <span className="sr-only">{s.state === "done" ? " (เสร็จแล้ว)" : s.state === "later" ? " (ยังไม่ถึง)" : ""}</span>
       </h3>
       {s.desc && <p className={cn("mt-0.5 text-sm leading-5.5 wrap-break-word", s.state === "later" ? "text-muted-foreground/90" : "text-muted-foreground")}>{s.desc}</p>}
+      {s.photos && <EventPhotos photos={s.photos} />}
       {s.sub.length > 0 && <ul className="mt-2 grid gap-1.5 border-l border-border pl-3">{s.sub.map((e) => <li key={e.id} className={cn("text-[13px] leading-5", e.warn ? "text-status-rework" : "text-muted-foreground")}>
         <b className="font-semibold">{e.title}</b>{e.detail && ` · ${e.detail}`}<time className="block text-xs opacity-80">{dateTime(e.at)}</time>
+        {e.photos && <EventPhotos photos={e.photos} />}
       </li>)}</ul>}
     </div>
   </li>;
 }
 
+function EventPhotos({ photos }: { photos: Photo[] }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  if (!photos.length) return null;
+  return <div className="mt-2 flex flex-wrap gap-2">
+    {photos.map((photo, index) => <button key={photo.id} type="button" className="size-14 overflow-hidden rounded-lg border outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`ขยายรูปกิจกรรม ${index + 1}`} onClick={() => setSelected(index)}>
+      <img src={photo.thumbUrl} alt="" className="size-full object-cover" />
+    </button>)}
+    <PhotoLightbox photos={photos} index={selected} onIndexChange={setSelected} />
+  </div>;
+}
+
 function HistoryTable({ story, ticketNo }: { story: Story; ticketNo: string }) {
   return <table className="w-full border-collapse text-sm"><caption className="sr-only">ประวัติงาน {ticketNo}</caption><tbody>{story.history.map((e) => <tr key={e.id} className="border-b align-top last:border-0">
     <td className="w-32 py-2.5 pr-3 text-xs text-muted-foreground tabular-nums">{dateTime(e.at, true)}</td>
-    <td className="py-2.5"><b className="font-semibold">{e.title}</b>{e.detail && <small className="block text-[13px] text-muted-foreground">{e.detail}</small>}</td>
+    <td className="py-2.5"><b className="font-semibold">{e.title}</b>{e.detail && <small className="block text-[13px] text-muted-foreground">{e.detail}</small>}{e.photos && <EventPhotos photos={e.photos} />}</td>
   </tr>)}</tbody></table>;
 }
 

@@ -11,7 +11,11 @@ import type {
   Category,
   CategoryRef,
   CreateAssetRequest,
+  CreateTicketRequest,
+  DuplicatesQuery,
+  DuplicateTicket,
   FloorPlan,
+  FollowRequest,
   Overview,
   OverviewBuilding,
   OverviewCounts,
@@ -52,6 +56,15 @@ import type {
 //   validation      create returns VALIDATION_FAILED for symptoms / room / photos
 //   master_changed  create returns MASTER_DATA_CHANGED
 //   upload_error    every photo upload fails (tile "ลองใหม่")
+//   follow_closed   S04 "ติดตามเคสนี้" fails with 409 TICKET_CLOSED (case closed meanwhile)
+// Stage 4 (F03 / F04 / F05) follows the backend rules in every scenario: a report on the category +
+// floor + room of an open ticket, with no extra spot or the same one, is refused (409 DUPLICATE_FOUND
+// with the matches, or OWN_TICKET_AWAITING_RATING for the viewer's own resolved ticket); another extra
+// spot is only "similar" and can be sent (CR-020). As พนักงาน (วรรณา), no extra spot: ระบบปรับอากาศ
+// ชั้น 5 ห้องประชุม 5A → someone else's case (ติดตามเคสนี้; type any extra spot → similar, can send) ·
+// 5B → own case (its spot is "ฝั่งหน้าต่าง") · ประปา ชั้น 2 ห้องน้ำหญิง → own ticket awaiting rating ·
+// ไฟฟ้า ชั้น 6 สำนักงานชั้น 6 → already following. Team mode: หัวหน้าแม่บ้าน /
+// หัวหน้ารปภ. only; 166 is มาลี's team record (ส่งต่อให้ช่าง for her and admin).
 // Fixed ids: MOCK_IDS.forbiddenTicket is someone else's ticket (forbidden for the employee in
 // `normal`); MOCK_IDS.notFoundTicket does not exist (S07 not-found state).
 // Stage 3D (S29, CR-016): อาคาร 1 uses the migration ids and real room outlines; tickets 160–165 sit in
@@ -69,6 +82,7 @@ export const MOCK_SCENARIOS = [
   "validation",
   "master_changed",
   "upload_error",
+  "follow_closed",
 ] as const;
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];
 
@@ -369,6 +383,8 @@ type Seed = {
   /** A later `assessment_changed` (CR-008 reason) that moves the date by `days`. */
   dateChange?: { ago: number; days: number; reason: string };
   extraEvents?: TimelineEvent[];
+  /** After photos of a team-handled record (F04). */
+  teamPhotos?: Photo[];
   ticketNo?: string;
   contractor?: { id: string; name: string; types: string[]; rating?: number };
 };
@@ -435,7 +451,7 @@ function build(s: Seed): TicketDetail {
     timeline.push(ev("admin_closed", mockPeople.paweena, closedAt, { note: "ส่งเรื่องเปลี่ยนเก้าอี้ใหม่ผ่านฝ่ายจัดซื้อแล้ว" }));
   }
   if (closedAt && s.closedReason === "team_handled") {
-    timeline.push(ev("team_handled", s.reporter, closedAt, { note: "เช็ดพื้นและวางป้ายระวังลื่นแล้ว" }));
+    timeline.push(ev("team_handled", s.reporter, closedAt, { note: "เช็ดพื้นและวางป้ายระวังลื่นแล้ว", photos: s.teamPhotos ?? [] }));
   }
   timeline.sort((a, b) => b.at.localeCompare(a.at));
 
@@ -537,6 +553,17 @@ const seeds: Seed[] = [
     createdAgo: 4 * DAY, assessedAgo: 4 * DAY - 2 * HOUR, resolvedAgo: 3 * DAY, closedAgo: 2 * DAY, rating: 4,
     photos: [mockPhoto(HUE.ac, "แอร์ Data")],
     result: { note: "ล้างแผงคอยล์เย็นและเติมน้ำยา", photos: [mockPhoto(HUE.result, "หลังล้างแอร์")] },
+  },
+  // Stage 4: someone else's open case the employee can follow (S04), and a recent team record (F05).
+  {
+    n: 151, status: "in_progress", priority: "medium", category: 2, symptoms: [1], building: 1, floor: 5,
+    room: "ห้องประชุม 5A", details: "เปิดแอร์ครึ่งชั่วโมงแล้วยังร้อน", reporter: P.kittipat, subscribers: [P.somsak],
+    createdAgo: 3 * HOUR, photos: [mockPhoto(HUE.ac, "แอร์ห้อง 5A")],
+  },
+  {
+    n: 166, status: "closed", closedReason: "team_handled", priority: "high", category: 3, symptoms: [2], building: 1, floor: 3,
+    room: "ห้องน้ำหญิง", location: "หน้าอ่างล้างมือ", reporter: P.malee, createdAgo: 2 * HOUR, closedAgo: 2 * HOUR,
+    photos: [mockPhoto(HUE.water, "พื้นห้องน้ำเปียก")], teamPhotos: [mockPhoto(HUE.clean, "หลังเช็ดพื้น")],
   },
   {
     n: 150, status: "in_progress", priority: "high", category: 2, symptoms: [1, 2], building: 1, floor: 5,
@@ -704,7 +731,19 @@ function withActions(t: TicketDetail, v: Viewer): TicketDetail {
   }
   if (t.status === "resolved" && t.reporter.id === v.id) allowedActions.push("confirm", "send_back");
   if (v.role === "admin" && t.status !== "closed") allowedActions.push("close");
+  if (canHandOver(t, v)) allowedActions.push("handover");
   return { ...t, allowedActions, blockedActions };
+}
+
+const isLead = (v: Viewer) => v.role === "housekeeper_lead" || v.role === "security_lead";
+
+/** BR-F05-1/2: a team-handled ticket, by the lead who recorded it or by admin. */
+function canHandOver(t: TicketSummary, v: Viewer) {
+  return t.status === "closed" && t.closedReason === "team_handled" && (v.role === "admin" || (isLead(v) && t.reporter.id === v.id));
+}
+
+function actorOf(v: Viewer): PersonRef {
+  return Object.values(mockPeople).find((p) => p.id === v.id) ?? person(v.role);
 }
 
 /** #21 (Stage 3): same rules as `Service.Close` — admin only, reason 1–500, closed → 409. */
@@ -817,23 +856,96 @@ export function mockRecentPlaces(v: Viewer): RecentPlace[] {
   return out;
 }
 
-/** Adds a ticket the way the backend would (`in_progress` awaiting assessment, next number, `created` event). */
-export function mockCreateTicket(
-  req: {
-    categoryId: string;
-    categoryOther?: string;
-    symptomIds: string[];
-    symptomOther?: string;
-    buildingId: string;
-    floorId: string;
-    roomId: string;
-    locationDetail?: string;
-    details?: string;
-    photoIds: string[];
-  },
-  reporter: PersonRef,
-  v: Viewer,
-): TicketDetail {
+// ---- Stage 4: duplicates (F03), follow, team handled (F04), hand over (F05) ----
+
+/** BR-F03-1 (CR-009 / CR-014): same category + floor + room; an old ticket without a room matches on its spot text. */
+function sameProblem(t: TicketSummary, q: DuplicatesQuery, roomName: string): boolean {
+  if (t.status === "closed" || t.category?.id !== q.categoryId || t.floor.id !== q.floorId) return false;
+  if (t.room) return t.room.id === q.roomId;
+  return !!t.locationDetail && t.locationDetail.trim().toLowerCase() === roomName.trim().toLowerCase();
+}
+
+/** Same normalisation as the backend `normalizeSpot` (CR-020). */
+const normalizeSpot = (s: string | null | undefined) => (s ?? "").trim().split(/\s+/).filter(Boolean).join(" ").toLowerCase();
+
+/** CR-020: no extra spot, or the same one → duplicate; another spot → only similar. Old tickets have no own spot. */
+function blocksReport(t: TicketSummary, spot: string): boolean {
+  if (!spot) return true;
+  return !!t.room && normalizeSpot(t.locationDetail) === spot;
+}
+
+/** #22: open matches, blocking first, then newest (max 10), decorated for the viewer. `empty` → none. */
+export function mockDuplicates(q: DuplicatesQuery, v: Viewer): DuplicateTicket[] {
+  if (mockScenario() === "empty") return [];
+  const roomName = mockBuildings.flatMap((b) => b.floors).find((f) => f.id === q.floorId)?.rooms.find((r) => r.id === q.roomId)?.name ?? "";
+  const spot = normalizeSpot(q.locationDetail);
+  return store.tickets
+    .filter((t) => sameProblem(t, q, roomName))
+    .map((t) => ({ ...decorate(toSummary(t), v), subscriberCount: store.subscribers.get(t.id)?.length ?? 0, blocksReport: blocksReport(t, spot) }))
+    .sort((a, b) => Number(b.blocksReport) - Number(a.blocksReport) || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 10);
+}
+
+/** #23: same rules as `Service.Follow`. */
+export function mockFollowTicket(id: string, req: FollowRequest, v: Viewer): TicketDetail {
+  const t = store.tickets.find((x) => x.id === id);
+  if (!t) throw mockErrors.notFound();
+  const note = req.note?.trim() ?? "";
+  const ids = [...new Set(req.photoIds)];
+  if (note.length > 500 || ids.length > 5) {
+    throw new ApiError(400, "VALIDATION_FAILED", "mock: follow", {
+      ...(note.length > 500 ? { note: "TOO_LONG" } : {}),
+      ...(ids.length > 5 ? { photoIds: "MAX_ITEMS" } : {}),
+    });
+  }
+  if (mockScenario() === "follow_closed" || t.status === "closed") throw new ApiError(409, "TICKET_CLOSED", "mock: ticket is closed");
+  const subs = store.subscribers.get(t.id) ?? [];
+  if (t.reporter.id === v.id || subs.includes(v.id)) throw new ApiError(409, "ALREADY_FOLLOWING", "mock: already following");
+  const photos = ids.map((pid) => store.photos.get(pid));
+  if (photos.some((ph) => !ph)) throw new ApiError(422, "PHOTO_NOT_FOUND", "mock: photo not uploaded in this session");
+  const now = new Date().toISOString();
+  store.subscribers.set(t.id, [...subs, v.id]);
+  t.subscriberCount = subs.length + 1;
+  t.updatedAt = now;
+  t.timeline = [ev("subscribed", actorOf(v), now, { note: note || null, photos: photos as Photo[] }), ...t.timeline];
+  return mockTicketDetail(id, v);
+}
+
+/** #24: same rules as `Service.HandOver`. */
+export function mockHandoverTicket(id: string, reason: string, v: Viewer): TicketDetail {
+  if (v.role !== "admin" && !isLead(v)) throw mockErrors.forbidden();
+  const text = reason.trim();
+  if (!text || text.length > 500) {
+    throw new ApiError(400, "VALIDATION_FAILED", "mock: reason", { reason: text ? "TOO_LONG" : "REQUIRED" });
+  }
+  const t = store.tickets.find((x) => x.id === id);
+  if (!t) throw mockErrors.notFound();
+  if (v.role !== "admin" && t.reporter.id !== v.id) throw mockErrors.forbidden();
+  if (t.status !== "closed" || t.closedReason !== "team_handled") throw new ApiError(422, "NOT_TEAM_HANDLED", "mock: not team handled");
+  const now = new Date().toISOString();
+  Object.assign(t, { status: "in_progress", step: "awaiting_assessment", closedReason: null, closedAt: null, updatedAt: now });
+  t.timeline = [ev("handed_over", actorOf(v), now, { note: text }), ...t.timeline];
+  return mockTicketDetail(id, v);
+}
+
+/**
+ * Adds a ticket the way the backend would: `in_progress` awaiting assessment (or `closed` /
+ * `team_handled` for a lead's team record), next number, `created` (+ `team_handled`) event.
+ * Refused like #5 when an open ticket matches (CR-009).
+ */
+export function mockCreateTicket(req: CreateTicketRequest, reporter: PersonRef, v: Viewer): TicketDetail {
+  const team = req.teamHandled ?? null;
+  if (team) {
+    if (!isLead(v)) throw new ApiError(403, "TEAM_HANDLED_NOT_ALLOWED", "mock: team handled is for leads");
+    const note = team.note.trim();
+    const fields: Record<string, string> = {};
+    if (!note) fields["teamHandled.note"] = "REQUIRED";
+    else if (note.length > 500) fields["teamHandled.note"] = "TOO_LONG";
+    if (team.photoIds.length === 0) fields["teamHandled.photoIds"] = "MIN_ITEMS";
+    else if (team.photoIds.length > 5) fields["teamHandled.photoIds"] = "MAX_ITEMS";
+    else if (team.photoIds.some((id) => req.photoIds.includes(id))) fields["teamHandled.photoIds"] = "INVALID";
+    if (Object.keys(fields).length) throw new ApiError(400, "VALIDATION_FAILED", "mock: team handled", fields);
+  }
   const category = mockCategories.find((c) => c.id === req.categoryId);
   const building = mockBuildings.find((b) => b.id === req.buildingId);
   const floor = building?.floors.find((f) => f.id === req.floorId);
@@ -843,18 +955,28 @@ export function mockCreateTicket(
   if (req.categoryOther?.trim() && !category.isOther) {
     throw new ApiError(400, "VALIDATION_FAILED", "mock: categoryOther not allowed", { categoryOther: "NOT_ALLOWED" });
   }
+  const dups = mockDuplicates({ categoryId: category.id, floorId: floor.id, roomId: picked.id, locationDetail: req.locationDetail }, v)
+    .filter((d) => d.blocksReport);
+  const own = dups.find((d) => d.reporter.id === v.id && d.status === "resolved");
+  if (own) throw new ApiError(409, "OWN_TICKET_AWAITING_RATING", "mock: own ticket awaits rating", {}, { ticketId: own.id });
+  if (dups.length) throw new ApiError(409, "DUPLICATE_FOUND", "mock: open tickets match", {}, { tickets: dups });
   const { priority, source } = ticketPriority(category, req.symptomIds);
   const photos = req.photoIds.map((id) => store.photos.get(id));
-  if (photos.some((p) => !p)) throw new ApiError(422, "PHOTO_NOT_FOUND", "mock: photo not uploaded in this session");
+  const teamPhotos = (team?.photoIds ?? []).map((id) => store.photos.get(id));
+  if ([...photos, ...teamPhotos].some((p) => !p)) throw new ApiError(422, "PHOTO_NOT_FOUND", "mock: photo not uploaded in this session");
 
   const now = new Date().toISOString();
   const n = store.nextNo++;
+  const created = ev("created", reporter, now);
+  const timeline = team
+    ? [ev("team_handled", reporter, new Date(Date.now() + 1).toISOString(), { note: team.note.trim(), photos: teamPhotos as Photo[] }), created]
+    : [created];
   const detail: TicketDetail = {
     id: crypto.randomUUID(),
     ticketNo: `RP-2569-${n.toString().padStart(6, "0")}`,
-    status: "in_progress",
-    step: "awaiting_assessment",
-    closedReason: null,
+    status: team ? "closed" : "in_progress",
+    step: team ? "closed" : "awaiting_assessment",
+    closedReason: team ? "team_handled" : null,
     priority,
     prioritySource: source,
     category: { id: category.id, name: category.name, icon: category.icon },
@@ -880,7 +1002,7 @@ export function mockCreateTicket(
     createdAt: now,
     assessedAt: null,
     resolvedAt: null,
-    closedAt: null,
+    closedAt: team ? now : null,
     updatedAt: now,
     details: req.details?.trim() || null,
     photos: photos as Photo[],
@@ -888,7 +1010,7 @@ export function mockCreateTicket(
     subscriberCount: 0,
     result: null,
     ratingComment: null,
-    timeline: [ev("created", reporter, now)],
+    timeline,
     allowedActions: [],
     blockedActions: {},
   };

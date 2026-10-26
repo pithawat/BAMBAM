@@ -44,9 +44,11 @@ func (q *Queries) DeleteUnattachedPhotos(ctx context.Context, olderThan time.Tim
 }
 
 const getPhoto = `-- name: GetPhoto :one
-SELECT p.id, p.uploader_id, p.content_type, p.storage_key, p.thumb_key, p.thumb_content_type, tp.ticket_id
+SELECT p.id, p.uploader_id, p.content_type, p.storage_key, p.thumb_key, p.thumb_content_type, tp.ticket_id,
+       tp.kind, t.status AS ticket_status
 FROM repair.photos p
 LEFT JOIN repair.ticket_photos tp ON tp.photo_id = p.id
+LEFT JOIN repair.tickets t ON t.id = tp.ticket_id
 WHERE p.id = $1
 `
 
@@ -58,6 +60,8 @@ type GetPhotoRow struct {
 	ThumbKey         string
 	ThumbContentType string
 	TicketID         *uuid.UUID
+	Kind             *string
+	TicketStatus     *string
 }
 
 func (q *Queries) GetPhoto(ctx context.Context, id uuid.UUID) (GetPhotoRow, error) {
@@ -71,6 +75,8 @@ func (q *Queries) GetPhoto(ctx context.Context, id uuid.UUID) (GetPhotoRow, erro
 		&i.ThumbKey,
 		&i.ThumbContentType,
 		&i.TicketID,
+		&i.Kind,
+		&i.TicketStatus,
 	)
 	return i, err
 }

@@ -95,7 +95,13 @@ type CreateTicketRequest struct {
 	SymptomOther   string          `json:"symptomOther"`
 	PhotoIDs       []string        `json:"photoIds"`
 	AssetCode      string          `json:"assetCode"`
-	TeamHandled    json.RawMessage `json:"teamHandled"`
+	TeamHandled    json.RawMessage `json:"teamHandled"` // TeamHandledRequest or null (F04)
+}
+
+// TeamHandledRequest = #5 `teamHandled` (leads only, BR-F04-1/2).
+type TeamHandledRequest struct {
+	Note     string   `json:"note"`
+	PhotoIDs []string `json:"photoIds"`
 }
 
 type TicketSummaryDTO struct {
@@ -211,6 +217,17 @@ type SendBackRequest struct {
 
 // #21
 type CloseRequest struct {
+	Reason string `json:"reason"`
+}
+
+// #23 (F03)
+type FollowRequest struct {
+	Note     string   `json:"note"`
+	PhotoIDs []string `json:"photoIds"`
+}
+
+// #24 (F05)
+type HandoverRequest struct {
 	Reason string `json:"reason"`
 }
 
@@ -364,6 +381,31 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 		d.ThumbURL = &u
 	}
 	return d
+}
+
+// DuplicateTicketDTO is one #22 / #5 409 match: TicketSummary + subscriberCount (S04) + blocksReport (CR-020).
+type DuplicateTicketDTO struct {
+	TicketSummaryDTO
+	SubscriberCount int64 `json:"subscriberCount"`
+	BlocksReport    bool  `json:"blocksReport"`
+}
+
+func toDuplicateDTOs(list []Duplicate) []DuplicateTicketDTO {
+	out := make([]DuplicateTicketDTO, 0, len(list))
+	for _, d := range list {
+		out = append(out, DuplicateTicketDTO{TicketSummaryDTO: toSummaryDTO(d.TicketSummary), SubscriberCount: d.SubscriberCount,
+			BlocksReport: d.BlocksReport})
+	}
+	return out
+}
+
+// blockingDuplicates: the #5 409 lists only matches that block the report.
+func blockingDuplicates(list []TicketDetail) []Duplicate {
+	out := make([]Duplicate, 0, len(list))
+	for _, d := range list {
+		out = append(out, Duplicate{TicketDetail: d, BlocksReport: true})
+	}
+	return out
 }
 
 func toSummaryDTOs(list []TicketSummary) []TicketSummaryDTO {

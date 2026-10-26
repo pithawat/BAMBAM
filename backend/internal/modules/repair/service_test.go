@@ -32,6 +32,8 @@ type fakeRepo struct {
 	rooms    map[uuid.UUID]uuid.UUID          // active room → floor (CR-014)
 	photos   map[uuid.UUID]*Photo             // all photos
 	photoAt  map[uuid.UUID]time.Time          // created at
+	kinds    map[uuid.UUID]string             // attached photo → kind (report, follow, team …)
+	dupLocks []DuplicateKey                   // keys locked by the duplicate check (Stage 4)
 	format   TicketNumberFormat               // repair.settings
 	counters map[int]int64                    // year → last number
 	tickets  map[uuid.UUID]*TicketDetail      // by id
@@ -47,7 +49,7 @@ func newFakeRepo() *fakeRepo {
 		cats: map[uuid.UUID]bool{}, catDef: map[uuid.UUID]string{}, catOther: map[uuid.UUID]bool{},
 		symptoms: map[uuid.UUID]uuid.UUID{}, symPrio: map[uuid.UUID]string{},
 		floors: map[uuid.UUID]uuid.UUID{}, rooms: map[uuid.UUID]uuid.UUID{},
-		photos: map[uuid.UUID]*Photo{}, photoAt: map[uuid.UUID]time.Time{},
+		photos: map[uuid.UUID]*Photo{}, photoAt: map[uuid.UUID]time.Time{}, kinds: map[uuid.UUID]string{},
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
 		subs: map[uuid.UUID]map[uuid.UUID]bool{},
@@ -73,7 +75,12 @@ func (f *fakeRepo) GetPhoto(_ context.Context, id uuid.UUID) (Photo, error) {
 	if !ok {
 		return Photo{}, ErrPhotoNotFound
 	}
-	return *p, nil
+	out := *p
+	if p.TicketID != nil {
+		kind, status := f.kinds[id], f.tickets[*p.TicketID].Status
+		out.Kind, out.TicketStatus = &kind, &status
+	}
+	return out, nil
 }
 
 func (f *fakeRepo) DeleteUnattachedPhotos(_ context.Context, olderThan time.Time) ([]string, error) {
@@ -151,7 +158,11 @@ func (f *fakeRepo) LockTicket(_ context.Context, id uuid.UUID) (LockedTicket, er
 	if !ok {
 		return LockedTicket{}, ErrTicketNotFound
 	}
-	return LockedTicket{ID: id, Status: t.Status, ReporterID: t.Reporter.ID, Assessed: t.ExpectedDoneOn != nil}, nil
+	lt := LockedTicket{ID: id, Status: t.Status, ReporterID: t.Reporter.ID, Assessed: t.ExpectedDoneOn != nil}
+	if t.ClosedReason != nil {
+		lt.ClosedReason = *t.ClosedReason
+	}
+	return lt, nil
 }
 func (f *fakeRepo) AssessTicket(context.Context, uuid.UUID, uuid.UUID, AssessInput, time.Time) error {
 	return nil
@@ -171,7 +182,66 @@ func (f *fakeRepo) AdminCloseTicket(_ context.Context, id uuid.UUID, now time.Ti
 }
 func (f *fakeRepo) InsertEvent(_ context.Context, e NewEvent) error {
 	f.events = append(f.events, e)
+	f.attach(e.TicketID, e.PhotoKind, e.PhotoIDs)
 	return nil
+}
+
+func (f *fakeRepo) attach(ticketID uuid.UUID, kind string, ids []uuid.UUID) {
+	for _, pid := range ids {
+		tid := ticketID
+		f.photos[pid].TicketID = &tid
+		f.kinds[pid] = kind
+	}
+}
+
+func (f *fakeRepo) HandOverTicket(_ context.Context, id uuid.UUID, now time.Time) error {
+	t := f.tickets[id]
+	t.Status, t.ClosedReason, t.ClosedAt, t.UpdatedAt = StatusInProgress, nil, nil, now
+	return nil
+}
+
+func (f *fakeRepo) LockDuplicateKey(_ context.Context, k DuplicateKey) error {
+	f.dupLocks = append(f.dupLocks, k)
+	return nil
+}
+
+// DuplicateTickets: open tickets with the same category, floor and room, blocking ones first, then
+// newest first (BR-F03-1, CR-020: a different extra spot does not block).
+func (f *fakeRepo) DuplicateTickets(_ context.Context, k DuplicateKey) ([]DuplicateMatch, error) {
+	var blocking, similar []DuplicateMatch
+	for i := len(f.order) - 1; i >= 0; i-- {
+		t := f.tickets[f.order[i]]
+		if t.Status == StatusClosed || t.Category == nil || t.Category.ID != k.CategoryID || t.Floor.ID != k.FloorID ||
+			t.Room == nil || t.Room.ID != k.RoomID {
+			continue
+		}
+		spot := ""
+		if t.LocationDetail != nil {
+			spot = normalizeSpot(*t.LocationDetail)
+		}
+		m := DuplicateMatch{ID: t.ID, ReporterID: t.Reporter.ID, Status: t.Status, BlocksReport: k.Spot == "" || spot == k.Spot}
+		if m.BlocksReport {
+			blocking = append(blocking, m)
+		} else {
+			similar = append(similar, m)
+		}
+	}
+	out := append(blocking, similar...)
+	if len(out) > MaxDuplicates {
+		out = out[:MaxDuplicates]
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) InsertSubscriber(_ context.Context, ticketID, userID uuid.UUID, _ time.Time) (bool, error) {
+	if f.subs[ticketID][userID] {
+		return false, nil
+	}
+	if f.subs[ticketID] == nil {
+		f.subs[ticketID] = map[uuid.UUID]bool{}
+	}
+	f.subs[ticketID][userID] = true
+	return true, nil
 }
 func (f *fakeRepo) ActiveContractorExists(context.Context, uuid.UUID) (bool, error) { return true, nil }
 func (f *fakeRepo) CountContractorTypes(_ context.Context, ids []uuid.UUID) (int, error) {
@@ -246,16 +316,18 @@ func (f *fakeRepo) NextTicketCounter(_ context.Context, year int) (int64, error)
 
 func (f *fakeRepo) InsertTicket(_ context.Context, t NewTicket) error {
 	f.inserted = append(f.inserted, t)
-	for _, pid := range t.PhotoIDs {
-		tid := t.ID
-		f.photos[pid].TicketID = &tid
-	}
+	f.attach(t.ID, PhotoKindReport, t.PhotoIDs)
 	reporter := t.ReporterID
+	status, reason := StatusInProgress, (*string)(nil)
+	if t.TeamHandled {
+		r := ClosedReasonTeamHandled
+		status, reason = StatusClosed, &r
+	}
 	f.tickets[t.ID] = &TicketDetail{
 		TicketSummary: TicketSummary{
-			ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority, PrioritySource: t.PrioritySource,
+			ID: t.ID, TicketNo: t.TicketNo, Status: status, ClosedReason: reason, Priority: t.Priority, PrioritySource: t.PrioritySource,
 			Category: &Ref{ID: t.CategoryID}, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther,
-			Room: &Ref{ID: t.RoomID}, LocationDetail: t.LocationDetail,
+			Building: Ref{ID: t.BuildingID}, Floor: Ref{ID: t.FloorID}, Room: &Ref{ID: t.RoomID}, LocationDetail: t.LocationDetail,
 			Reporter: Person{ID: t.ReporterID}, CreatedAt: t.CreatedAt, UpdatedAt: t.CreatedAt,
 		},
 		Photos:   t.PhotoIDs,
@@ -360,10 +432,14 @@ func (f *fixture) upload(t *testing.T, v Viewer) uuid.UUID {
 	return id
 }
 
+// input is a valid report in a new room of the floor, so tickets of one test are not duplicates of
+// each other (F03); duplicate tests set RoomID to f.room.
 func (f *fixture) input(photos ...uuid.UUID) CreateTicketInput {
+	room := uuid.New()
+	f.repo.rooms[room] = f.floor
 	return CreateTicketInput{
 		CategoryID: &f.cat, SymptomIDs: []uuid.UUID{f.sym1, f.sym2}, BuildingID: &f.building, FloorID: &f.floor,
-		RoomID: &f.room, LocationDetail: " ฝั่งหน้าต่าง ", Details: "น้ำหยดใส่โต๊ะประชุม", PhotoIDs: photos,
+		RoomID: &room, LocationDetail: " ฝั่งหน้าต่าง ", Details: "น้ำหยดใส่โต๊ะประชุม", PhotoIDs: photos,
 	}
 }
 
@@ -549,9 +625,10 @@ func TestCreateTicketRoomAndOtherRules(t *testing.T) {
 	}
 
 	f := newFixture(t)
-	d := f.create(t)
-	if ins := f.repo.inserted[0]; ins.RoomID != f.room || *ins.LocationDetail != "ฝั่งหน้าต่าง" || d.Room == nil {
-		t.Fatalf("room / extra spot not stored: %+v", ins)
+	in := f.input(f.upload(t, f.reporter))
+	d, err := f.svc.CreateTicket(ctx, f.reporter, in)
+	if ins := f.repo.inserted[0]; err != nil || ins.RoomID != *in.RoomID || *ins.LocationDetail != "ฝั่งหน้าต่าง" || d.Room == nil {
+		t.Fatalf("room / extra spot not stored: %+v err=%v", ins, err)
 	}
 }
 
@@ -680,16 +757,6 @@ func TestCreateTicketRejectsPhotosNotAttachable(t *testing.T) {
 				t.Fatalf("err = %v, want 422 PHOTO_NOT_FOUND", err)
 			}
 		})
-	}
-}
-
-func TestCreateTicketTeamHandledNotInStage1(t *testing.T) {
-	f := newFixture(t)
-	in := f.input(f.upload(t, f.reporter))
-	in.TeamHandled = true
-	_, err := f.svc.CreateTicket(context.Background(), Viewer{ID: f.reporter.ID, Role: users.RoleHousekeeperLead}, in)
-	if code(err) != "TEAM_HANDLED_NOT_ALLOWED" {
-		t.Fatalf("err = %v", err)
 	}
 }
 
@@ -851,6 +918,7 @@ func TestOpenPhotoPermissions(t *testing.T) {
 
 	d := f.create(t)
 	attached := d.Photos[0]
+	f.setStatus(d.ID, StatusClosed) // open tickets' report photos are shown on S04 (D-098)
 	if _, _, err := f.svc.OpenPhoto(ctx, other, attached, false); !errors.Is(err, apperr.ErrForbidden) {
 		t.Fatalf("attached photo by unrelated user: %v", err)
 	}

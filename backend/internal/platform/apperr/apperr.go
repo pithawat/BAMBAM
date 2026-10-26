@@ -16,12 +16,14 @@ const (
 )
 
 // Error carries a stable UPPER_SNAKE code (documented in 04-api-contract.md)
-// and an English debug message that is never shown to users.
+// and an English debug message that is never shown to users. Details is optional extra data the
+// contract defines for a code (e.g. the matches of a 409); it must already be in the JSON shape.
 type Error struct {
 	Kind    Kind
 	Code    string
 	Message string
 	Fields  map[string]string
+	Details any
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }

@@ -21,7 +21,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 3 | Admin เห็นทุกงาน ปิดงานได้ (CR-015: ไม่ปรับความเร่งด่วน); ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | built 2026-10-19 — waiting acceptance |
 | 3D | **CR-016:** หน้าแรก Admin / ผู้บริหาร = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
 | 3U | **CR-019 rework:** หน้าตาใหม่ตามต้นแบบ `bam-workplace-mascot-v4-refined.html` — S06 ตารางเดียว + ตัวกรองสถานะ · S07 กล่องเดียว + แท็บ · S03 สองคอลัมน์ + สรุป · S29 ขัดเกลา · มาสคอตเสือทั้งแอป | F02, F06, F07, F23 | S03, S06, S07, S29, S01, shared states | done (2026-10-24, `repair-stage-3U`) |
-| 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over) | pending |
+| 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over); CR-021: S03 / S04 / S06 relayout | done (2026-10-26, `repair-stage-4`) |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin / ผู้บริหารทำแล้วใน 3D) และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง | F01 (Home), F19-B | S02, S13, bell | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
@@ -353,30 +353,40 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 - Out of this stage: notifications to subscribers (Stage 7)
 
 **Backend (Claude)**
-- [ ] Duplicate query (same category + floor + room / spot, open statuses, BR-F03-1 CR-009; by `room_id` + old-ticket fallback, CR-014) with an index; #5 refuses a match → 409 `DUPLICATE_FOUND` / `OWN_TICKET_AWAITING_RATING` (CR-009)
-- [ ] Follow: subscriber row + `subscribed` event with note/photos; reporter/subscriber → `ALREADY_FOLLOWING`
-- [ ] Team handled: leads only (BR-F04-1), note + ≥ 1 photo (BR-F04-2), created `closed` / `team_handled`, event `team_handled`
-- [ ] Hand over: only `team_handled` (BR-F05-1), recording lead or admin (BR-F05-2), same ticket back to `in_progress` awaiting assessment (BR-F05-3, CR-005), event `handed_over`
-- [ ] Subscribers now count in `scope=mine` and visibility
-- [ ] Tests: duplicate matching, follow permissions, team-handled role check, hand-over permission matrix
+- [x] Duplicate query (same category + floor + room / spot, open statuses, BR-F03-1 CR-009; by `room_id` + old-ticket fallback, CR-014) with an index; #5 refuses a match → 409 `DUPLICATE_FOUND` / `OWN_TICKET_AWAITING_RATING` (CR-009) — migration `20261024000001`, advisory lock per key (D-099)
+- [x] Follow: subscriber row + `subscribed` event with note/photos; reporter/subscriber → `ALREADY_FOLLOWING`
+- [x] Team handled: leads only (BR-F04-1), note + ≥ 1 photo (BR-F04-2), created `closed` / `team_handled`, event `team_handled`
+- [x] Hand over: only `team_handled` (BR-F05-1), recording lead or admin (BR-F05-2), same ticket back to `in_progress` awaiting assessment (BR-F05-3, CR-005), event `handed_over`
+- [x] Subscribers now count in `scope=mine` and visibility (already in the #6 / #35 / #8 queries)
+- [x] Tests: duplicate matching, follow permissions, team-handled role check, hand-over permission matrix (`service_duplicates_test.go`, `TestPgDuplicatesFollowTeamHandOver`, `TestCreateDuplicateAndTeamBodies`)
 
 **Frontend contract (Claude)**
-- [ ] Types/mocks/api for 22–24 + team variant of #5; HANDOFF → Stage 5
+- [x] Types/mocks/api for 22–24 + team variant of #5; HANDOFF → Stage 4 (`READY FOR CODEX — Stage 4`, 2026-10-24)
 
 **Frontend UI (Codex)**
-- [ ] S04 sheet / dialog (follow, own case, already following, closed meanwhile)
-- [ ] S03 mode switch `เรียกช่าง | ทีมแก้เองแล้ว` at the top for leads (CR-009); S03 duplicate card + blocking submit dialog (ติดตามเคสเดิม / ยกเลิกการแจ้ง only); S05 team variant
-- [ ] S07 hand-over action; S11 closed-tab button + "เฉพาะงานทีมทำเอง" toggle
+- [x] S04 sheet / dialog (follow, own case, already following, closed meanwhile)
+- [x] S03 mode switch `เรียกช่าง | ทีมแก้เองแล้ว` at the top for leads (CR-009); S03 duplicate card + blocking submit dialog (ติดตามเคสเดิม / ยกเลิกการแจ้ง only); S05 team variant — plus the CR-020 similar card
+- [x] S07 hand-over action; S11 closed-tab button + "เฉพาะงานทีมทำเอง" toggle
 
 **Wiring + e2e (Claude)**
-- [ ] `e2e/repair/F03-duplicate-follow.spec.ts`, `F04-team-handled.spec.ts`, `F05-handover.spec.ts`
+- [x] `e2e/repair/F03-duplicate-follow.spec.ts`, `F04-team-handled.spec.ts`, `F05-handover.spec.ts` (+ shared `e2e/repair/helpers.ts`; 2026-10-25 all pass on desktop + Pixel 7)
+
+**CR-021 rework (approved 2026-10-25, M — layout from `maintenance-demo.html`; Claude builds UI with the Impeccable skill)**
+- [x] Backend: #35 accepts `closedReason` (as #6) + test
+- [x] FE contract: `MyTicketsQuery.closedReason`, mocks filter
+- [x] S03: duplicate card between room and spot, blocking case stops `ถัดไป` at the location step (BR-F03-2), locked mode from `?mode=team` (no switch, form note, drafts per mode), S05 team link
+- [x] S04: card frame + count badge, horizontal case rows, hint at the bottom; dialog uses the same rows
+- [x] S06: card heading row (count + updated), `· ทีมแก้เอง` row tag; leads: two CTA buttons + `ทีมแก้เอง` tab; no stats row
+- [x] CR-022 (S, approved 2026-10-26): room cards on every floor, no reserved heights, each step at its own height; F02 AC4 updated
+- [x] e2e: F03 (block at step 2), F04 (`?mode=team` from S06, lead tab), F01 / F02 checks touched by the layout
+- [x] AC6 (CR-021): a blocking duplicate stops the form at the location step until another spot is typed or the case is followed; a lead opens a locked team form from S06 `บันทึกงานที่ทีมแก้แล้ว` and finds the record under `ทีมแก้เอง`; S06 has no stats row
 
 **Acceptance criteria**
-- [ ] AC1: Reporting on a floor + category that has an open ticket opens S04 listing it; "ติดตามเคสนี้" adds the user as subscriber, their note/photos appear in that ticket's timeline, and the ticket shows in their S06 with "คุณติดตามเคสนี้"
-- [ ] AC2: "ไม่ใช่เรื่องเดียวกัน แจ้งใหม่" creates a new ticket without asking again
-- [ ] AC3: Demo `housekeeper_lead` sees the team card; demo `employee` does not, and the API rejects `teamHandled` with 403
-- [ ] AC4: A team-handled record is closed immediately (S05 team variant, ทีมดำเนินการเอง) and never reaches the technician
-- [ ] AC5: The lead who recorded it (and admin) can hand it over; it reappears in the technician's รอประเมิน tab with the same ticket number; another lead gets 403
+- [x] AC1: Reporting on a floor + category that has an open ticket opens S04 listing it; "ติดตามเคสนี้" adds the user as subscriber, their note/photos appear in that ticket's timeline, and the ticket shows in their S06 with "คุณติดตามเคสนี้"
+- [x] AC2 (CR-020, replaces "ไม่ใช่เรื่องเดียวกัน แจ้งใหม่" removed by CR-009): the same room with no extra spot cannot be sent (S04: ติดตามเคสเดิม / ยกเลิกการแจ้ง only); with another extra spot S03 shows `มีงานคล้ายกันในห้องนี้` and the new ticket is created
+- [x] AC3: Demo `housekeeper_lead` sees the team card; demo `employee` does not, and the API rejects `teamHandled` with 403
+- [x] AC4: A team-handled record is closed immediately (S05 team variant, ทีมดำเนินการเอง) and never reaches the technician
+- [x] AC5: The lead who recorded it (and admin) can hand it over; it reappears in the technician's รอประเมิน tab with the same ticket number; another lead gets 403
 
 **Demo script**
 1. Employee reports แอร์ไม่เย็น ชั้น 5 again → S04 → ติดตามเคสนี้ → S07 of the old case

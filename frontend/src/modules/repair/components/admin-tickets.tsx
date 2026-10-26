@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { getBuildings, getCategories, getTicketCounts, getTickets } from "../api";
 import { CLOSED_REASONS, PRIORITIES, type Building, type Category, type ClosedReason, type Priority, type TicketCounts, type TicketCountsQuery, type TicketStep, type TicketSummary } from "../types";
-import { CloseTicketDialog, CLOSED_TOAST } from "./ticket-actions";
+import { CloseTicketDialog, CLOSED_TOAST, HandoverDialog } from "./ticket-actions";
 import { TicketLink } from "./ticket-navigation";
 import { autoCloseText, TicketThumb } from "./ticket-progress";
 import { categoryName, CLOSED_LABELS, dayLabel, listDate, PRIORITY_LABELS, ticketHref, ticketLocation, ticketTitle, todayBangkok } from "./ticket-presentation";
@@ -107,6 +107,8 @@ export function AdminTicketsScreen() {
               options={[{ value: "all", label: "ทุกระดับ" }, ...PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))]} onValueChange={(v) => change({ priority: v === "all" ? null : v })} />
             {filters.tab === "closed" && <FilterPill size="sm" label="เหตุผลที่ปิด" icon={ListFilter} value={filters.reason} defaultValue="all"
               options={[{ value: "all", label: "ทุกเหตุผล" }, ...CLOSED_REASONS.map((r) => ({ value: r, label: CLOSED_LABELS[r] }))]} onValueChange={(v) => change({ reason: v === "all" ? null : v })} />}
+            {filters.tab === "closed" && <Button type="button" variant={filters.reason === "team_handled" ? "secondary" : "outline"} className="min-h-11 rounded-full" aria-pressed={filters.reason === "team_handled"}
+              onClick={() => change({ reason: filters.reason === "team_handled" ? null : "team_handled" })}>เฉพาะงานทีมทำเอง</Button>}
             {filtered && <Button type="button" variant="ghost" className="h-10 px-3 text-muted-foreground" onClick={reset}><RotateCcw aria-hidden />ล้างตัวกรอง</Button>}
           </div>
         </div>
@@ -123,6 +125,7 @@ function Board({ filters, readOnly, filtered, change, reset }: { filters: Filter
   const [error, setError] = useState<unknown>();
   const [revision, setRevision] = useState(0);
   const [closing, setClosing] = useState<TicketSummary | null>(null);
+  const [handingOver, setHandingOver] = useState<TicketSummary | null>(null);
   const { tab, page } = filters;
   useEffect(() => {
     let active = true;
@@ -175,7 +178,7 @@ function Board({ filters, readOnly, filtered, change, reset }: { filters: Filter
               <TableHead>หมวดงาน</TableHead>
               {tab !== "closed" && tab !== "rating" && <TableHead>ความเร่งด่วน</TableHead>}
               {COLUMNS[tab].map((c) => <TableHead key={c}>{c}</TableHead>)}
-              {canClose && <TableHead className="w-24 pr-4"><span className="sr-only">ปิดงาน</span></TableHead>}
+              {!readOnly && <TableHead className="w-24 pr-4"><span className="sr-only">จัดการงาน</span></TableHead>}
             </TableRow></TableHeader>
             <TableBody>{items.map((t) => <TableRow key={t.id} className="group">
               <TableCell className="pl-4 align-top font-mono text-xs text-muted-foreground">{t.ticketNo}</TableCell>
@@ -186,14 +189,16 @@ function Board({ filters, readOnly, filtered, change, reset }: { filters: Filter
               <TableCell className="max-w-44 truncate align-top text-sm">{categoryName(t)}</TableCell>
               {tab !== "closed" && tab !== "rating" && <TableCell className="align-top"><PriorityIndicator priority={t.priority} /></TableCell>}
               {cells(tab, t).map((c, i) => <TableCell key={i} className="align-top text-sm">{c}</TableCell>)}
-              {canClose && <TableCell className="pr-4 text-right align-top">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setClosing(t)} aria-label={`ปิดงาน ${t.ticketNo}`}
-                  className="text-destructive hover:bg-destructive/5 hover:text-destructive"><CircleX aria-hidden />ปิดงาน</Button>
+              {!readOnly && <TableCell className="pr-4 text-right align-top">
+                {canClose && <Button type="button" variant="ghost" size="sm" onClick={() => setClosing(t)} aria-label={`ปิดงาน ${t.ticketNo}`}
+                  className="text-destructive hover:bg-destructive/5 hover:text-destructive"><CircleX aria-hidden />ปิดงาน</Button>}
+                {t.closedReason === "team_handled" && <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setHandingOver(t)}>ส่งต่อให้ช่าง</Button>}
               </TableCell>}
             </TableRow>)}</TableBody>
           </Table>
         </Card>
-        <Card className="gap-0 divide-y py-0 shadow-card lg:hidden">{items.map((t) => <MobileRow key={t.id} ticket={t} tab={tab} onClose={canClose ? () => setClosing(t) : undefined} />)}</Card>
+        <Card className="gap-0 divide-y py-0 shadow-card lg:hidden">{items.map((t) => <MobileRow key={t.id} ticket={t} tab={tab} onClose={canClose ? () => setClosing(t) : undefined}
+          onHandover={!readOnly && t.closedReason === "team_handled" ? () => setHandingOver(t) : undefined} />)}</Card>
         <nav aria-label="เลื่อนหน้า" className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">แสดง {from}–{from + items.length - 1} จาก {total} งาน</p>
           {pages > 1 && <div className="flex items-center gap-2">
@@ -205,6 +210,9 @@ function Board({ filters, readOnly, filtered, change, reset }: { filters: Filter
       </>}
     {closing && <CloseTicketDialog ticket={closing} open onOpenChange={(o) => { if (!o) setClosing(null); }}
       onDone={() => { setClosing(null); toast.success(CLOSED_TOAST); setRevision((r) => r + 1); }} />}
+    {handingOver && <HandoverDialog ticket={handingOver} open onOpenChange={open => { if (!open) setHandingOver(null); }}
+      onDone={() => { setHandingOver(null); toast.success("ส่งต่อให้ช่างแล้ว"); setRevision(r => r + 1); }}
+      onStale={() => { setHandingOver(null); setRevision(r => r + 1); }} />}
   </>;
 }
 
@@ -231,7 +239,7 @@ function Expected({ ticket }: { ticket: TicketSummary }) {
   return <span className={cn(late && "font-medium text-destructive")}>{late ? "เลยกำหนด " : ""}{dayLabel(ticket.expectedDoneOn)}</span>;
 }
 
-function MobileRow({ ticket: t, tab, onClose }: { ticket: TicketSummary; tab: Tab; onClose?: () => void }) {
+function MobileRow({ ticket: t, tab, onClose, onHandover }: { ticket: TicketSummary; tab: Tab; onClose?: () => void; onHandover?: () => void }) {
   const meta = COLUMNS[tab].map((label, i) => ({ label, value: cells(tab, t)[i] })).filter((m) => m.value !== "" && m.value !== "–");
   return <div className="flex items-start gap-3 px-3.5 py-3.5">
     <TicketThumb ticket={t} size="sm" />
@@ -243,6 +251,7 @@ function MobileRow({ ticket: t, tab, onClose }: { ticket: TicketSummary; tab: Ta
       <p className="truncate text-xs text-muted-foreground">{categoryName(t)} · {ticketLocation(t)}</p>
       <p className="text-xs text-muted-foreground">{t.ticketNo}{meta.map((m, i) => <span key={i}> · {m.label} {m.value}</span>)}</p>
       {onClose && <Button type="button" variant="ghost" size="sm" onClick={onClose} className="-ml-2 text-destructive hover:bg-destructive/5 hover:text-destructive"><CircleX aria-hidden />ปิดงาน</Button>}
+      {onHandover && <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onHandover}>ส่งต่อให้ช่าง</Button>}
     </div>
   </div>;
 }

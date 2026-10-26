@@ -2,6 +2,7 @@ package repair
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -162,7 +163,7 @@ func (ctl *Controller) CreateTicket(c *gin.Context) {
 		SymptomOther:   req.SymptomOther,
 		PhotoIDs:       parseIDs(req.PhotoIDs, "photoIds", fields),
 		AssetCode:      req.AssetCode,
-		TeamHandled:    len(req.TeamHandled) > 0 && string(req.TeamHandled) != "null",
+		TeamHandled:    parseTeamHandled(req.TeamHandled, fields),
 	}
 	if len(fields) > 0 {
 		httpx.Error(c, apperr.Validation(fields))
@@ -170,10 +171,65 @@ func (ctl *Controller) CreateTicket(c *gin.Context) {
 	}
 	t, err := ctl.svc.CreateTicket(c.Request.Context(), v, in)
 	if err != nil {
-		httpx.Error(c, err)
+		httpx.Error(c, duplicateError(err))
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": toDetailDTO(t)})
+}
+
+// parseTeamHandled reads #5 `teamHandled`; absent or null = a normal report.
+func parseTeamHandled(raw json.RawMessage, fields map[string]string) *TeamHandledInput {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var req TeamHandledRequest
+	if err := json.Unmarshal(raw, &req); err != nil {
+		fields["teamHandled"] = "INVALID"
+		return nil
+	}
+	return &TeamHandledInput{Note: req.Note, PhotoIDs: parseIDs(req.PhotoIDs, "teamHandled.photoIds", fields)}
+}
+
+// duplicateError renders the #5 409s (CR-009) with the `details` the contract defines.
+func duplicateError(err error) error {
+	var dup *DuplicateFoundError
+	if errors.As(err, &dup) {
+		return &apperr.Error{Kind: apperr.KindConflict, Code: "DUPLICATE_FOUND", Message: "open tickets match the report",
+			Details: gin.H{"tickets": toDuplicateDTOs(blockingDuplicates(dup.Tickets))}}
+	}
+	var own *OwnTicketAwaitingRatingError
+	if errors.As(err, &own) {
+		return &apperr.Error{Kind: apperr.KindConflict, Code: "OWN_TICKET_AWAITING_RATING",
+			Message: "the reporter's own ticket waits for the rating", Details: gin.H{"ticketId": own.TicketID}}
+	}
+	return err
+}
+
+// Duplicates handles #22 GET /repair/tickets/duplicates?categoryId=&floorId=&roomId=&locationDetail= (F03, CR-020).
+func (ctl *Controller) Duplicates(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	fields := map[string]string{}
+	k := DuplicateKey{Spot: c.Query("locationDetail")}
+	for name, dst := range map[string]*uuid.UUID{"categoryId": &k.CategoryID, "floorId": &k.FloorID, "roomId": &k.RoomID} {
+		if id := parseOptionalID(c.Query(name), name, fields); id != nil {
+			*dst = *id
+		} else if fields[name] == "" {
+			fields[name] = "REQUIRED"
+		}
+	}
+	if len(fields) > 0 {
+		httpx.Error(c, apperr.Validation(fields))
+		return
+	}
+	list, err := ctl.svc.Duplicates(c.Request.Context(), v, k)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	httpx.OK(c, toDuplicateDTOs(list))
 }
 
 // Tickets handles #6 GET /repair/tickets.
@@ -196,7 +252,7 @@ func (ctl *Controller) Tickets(c *gin.Context) {
 }
 
 // MyTickets handles #35 GET /repair/tickets/mine — the S06 table (CR-019): one page of slim rows.
-// Filters are #6's mine filters (relation, status, step, q, sort); staff-only filters are ignored.
+// Filters are #6's mine filters (relation, status, step, closedReason (CR-021), q, sort); staff-only filters are ignored.
 func (ctl *Controller) MyTickets(c *gin.Context) {
 	v, ok := viewer(c)
 	if !ok {
@@ -207,7 +263,7 @@ func (ctl *Controller) MyTickets(c *gin.Context) {
 		httpx.Error(c, err)
 		return
 	}
-	f = TicketFilter{Relation: f.Relation, Statuses: f.Statuses, Steps: f.Steps, Q: f.Q, Sort: f.Sort, Page: f.Page, PageSize: f.PageSize}
+	f = TicketFilter{Relation: f.Relation, Statuses: f.Statuses, Steps: f.Steps, ClosedReason: f.ClosedReason, Q: f.Q, Sort: f.Sort, Page: f.Page, PageSize: f.PageSize}
 	if c.Query("pageSize") == "" {
 		f.PageSize = myTicketsPageSize
 	}

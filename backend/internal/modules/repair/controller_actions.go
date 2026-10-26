@@ -122,6 +122,40 @@ func (ctl *Controller) Close(c *gin.Context) {
 	respondTicket(c, t, err)
 }
 
+// Follow handles #23 POST /repair/tickets/{id}/follow (F03).
+func (ctl *Controller) Follow(c *gin.Context) {
+	v, id, ok := ticketAction(c)
+	if !ok {
+		return
+	}
+	var req FollowRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	fields := map[string]string{}
+	photos := parseIDs(req.PhotoIDs, "photoIds", fields)
+	if len(fields) > 0 {
+		httpx.Error(c, apperr.Validation(fields))
+		return
+	}
+	t, err := ctl.svc.Follow(c.Request.Context(), v, id, req.Note, photos)
+	respondTicket(c, t, err)
+}
+
+// Handover handles #24 POST /repair/tickets/{id}/handover (F05).
+func (ctl *Controller) Handover(c *gin.Context) {
+	v, id, ok := ticketAction(c)
+	if !ok {
+		return
+	}
+	var req HandoverRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	t, err := ctl.svc.HandOver(c.Request.Context(), v, id, req.Reason)
+	respondTicket(c, t, err)
+}
+
 // SendBack handles #12 POST /repair/tickets/{id}/send-back.
 func (ctl *Controller) SendBack(c *gin.Context) {
 	v, id, ok := ticketAction(c)

@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { assessTicket, closeTicket, confirmTicket, getContractors, sendBackTicket } from "../api";
-import { assessFieldMessages, errorCode, errorMessage, fieldErrors, reviewFieldMessages } from "../errors";
+import { assessTicket, closeTicket, confirmTicket, getContractors, getTicket, handoverTicket, sendBackTicket } from "../api";
+import { assessFieldMessages, errorCode, errorMessage, fieldErrors, handoverFieldMessages, reviewFieldMessages } from "../errors";
 import type { Contractor, TicketDetail, WorkBy } from "../types";
 import { ContractorFormDialog } from "./contractors";
 import { PhotoPicker, type PhotoItem } from "./photo-picker";
@@ -24,7 +24,7 @@ import { addDays, dayLabel, RATING_LABELS, shortDate, ticketLocation, ticketTitl
 //                               reporter   → ประเมินตรวจงาน (S08, empty stars or the star tapped) / ส่งกลับให้แก้
 //                               admin      → ปิดงาน (F08-B, Stage 3; also on S11)
 
-type Open = { kind: "assess" } | { kind: "confirm"; score: number } | { kind: "send_back" } | { kind: "resolve" } | { kind: "close" } | null;
+type Open = { kind: "assess" } | { kind: "confirm"; score: number } | { kind: "send_back" } | { kind: "resolve" } | { kind: "close" } | { kind: "handover" } | null;
 
 export function useTicketActions(ticket: TicketDetail, onChanged: (t: TicketDetail) => void, opts: { awaitingReaccept: boolean }) {
   const [open, setOpen] = useState<Open>(null);
@@ -52,6 +52,8 @@ export function useTicketActions(ticket: TicketDetail, onChanged: (t: TicketDeta
       onSendBack={() => setOpen({ kind: "send_back" })} onDone={(t) => done(t, "ขอบคุณที่ประเมินตรวจงาน งานนี้ปิดแล้ว")} />}
     {allowed.has("send_back") && <SendBackDialog ticket={ticket} open={open?.kind === "send_back"} onOpenChange={close} onDone={(t) => done(t, "ส่งกลับให้ช่างแล้ว ช่างจะได้รับแจ้งเตือน")} />}
     {allowed.has("close") && <CloseTicketDialog ticket={ticket} open={open?.kind === "close"} onOpenChange={close} onDone={(t) => done(t, CLOSED_TOAST)} />}
+    {allowed.has("handover") && open?.kind === "handover" && <HandoverDialog ticket={ticket} open onOpenChange={close}
+      onDone={t => done(t, "ส่งต่อให้ช่างแล้ว")} onStale={() => { setOpen(null); getTicket(ticket.id).then(onChanged, err => toast.error(errorMessage(err))); }} />}
   </>;
   return {
     allowed,
@@ -60,6 +62,7 @@ export function useTicketActions(ticket: TicketDetail, onChanged: (t: TicketDeta
     confirm: (score = 0) => setOpen({ kind: "confirm", score }),
     sendBack: () => setOpen({ kind: "send_back" }),
     close: () => setOpen({ kind: "close" }),
+    handover: () => setOpen({ kind: "handover" }),
     dialogs,
   };
 }
@@ -310,6 +313,46 @@ function SendBackDialog({ ticket, open, onOpenChange, onDone }: DialogProps) {
 // ---- ปิดงาน (F08-B, _common.md §7) — admin, from S07 and S11 ----
 
 export const CLOSED_TOAST = "ปิดงานแล้ว";
+
+/** F05: the same team ticket returns to the technician, with its history intact. */
+export function HandoverDialog({ ticket, open, onOpenChange, onDone, onStale }: {
+  ticket: { id: string; ticketNo: string }; open: boolean; onOpenChange: (open: boolean) => void;
+  onDone: (ticket: TicketDetail) => void; onStale: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); event.stopPropagation();
+    if (sending.current) return;
+    if (!reason.trim()) { setError("กรุณาใส่เหตุผล"); field.current?.focus(); return; }
+    sending.current = true; setBusy(true); setError("");
+    try { onDone(await handoverTicket(ticket.id, { reason: reason.trim() })); }
+    catch (err) {
+      const errors = fieldErrors(err, handoverFieldMessages);
+      if (errors.reason) { setError(errors.reason); field.current?.focus(); }
+      else { toast.error(errorMessage(err)); if (errorCode(err) === "NOT_TEAM_HANDLED") onStale(); }
+    } finally { sending.current = false; setBusy(false); }
+  }
+  return <Dialog open={open} onOpenChange={value => { if (!sending.current) onOpenChange(value); }}>
+    <DialogContent className={sheetLike}>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <DialogHeader><DialogTitle>ส่งต่องานนี้ให้ช่าง?</DialogTitle><DialogDescription>งานเดิม เลขเดิม จะส่งกลับไปที่ช่าง รอช่างกำหนดวันเสร็จ</DialogDescription></DialogHeader>
+        <p className="text-sm text-muted-foreground">{ticket.ticketNo}</p>
+        <div className="space-y-2">
+          <label htmlFor="handover-reason" className="text-sm font-semibold">เหตุผลที่ส่งต่อ <span className="text-destructive">*</span></label>
+          <Textarea ref={field} id="handover-reason" value={reason} disabled={busy} onChange={event => { setReason(event.target.value); setError(""); }} maxLength={500} rows={4}
+            placeholder="เช่น ทีมเช็ดแล้วแต่ยังมีน้ำซึมจากฝ้า" aria-invalid={!!error} aria-describedby="handover-reason-error" />
+          <FieldError id="handover-reason-error" message={error} />
+        </div>
+        <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+          <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}ส่งต่อให้ช่าง</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
 
 /** Admin closes any open ticket with a reason (1–500). Stale ticket (already closed) → toast + close the dialog. */
 export function CloseTicketDialog({ ticket, open, onOpenChange, onDone }: { ticket: { id: string; ticketNo: string }; open: boolean; onOpenChange: (open: boolean) => void; onDone: (t: TicketDetail) => void }) {

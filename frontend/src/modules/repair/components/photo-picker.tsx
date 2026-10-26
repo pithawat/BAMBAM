@@ -83,7 +83,7 @@ export function PhotoTile({ item, index, disabled, onOpen, onRetry, onRemove, cl
 }
 
 /** Compact picker (S08 send back, S10): tiles + "เพิ่มรูป" tile. */
-export function PhotoPicker({ value, onChange, disabled, invalid, capture }: { value: PhotoItem[]; onChange: Dispatch<SetStateAction<PhotoItem[]>>; disabled?: boolean; invalid?: boolean; capture?: boolean }) {
+export function PhotoPicker({ value, onChange, disabled, invalid, capture, id = "photoIds", describedBy = "photoIds-error photo-hint" }: { value: PhotoItem[]; onChange: Dispatch<SetStateAction<PhotoItem[]>>; disabled?: boolean; invalid?: boolean; capture?: boolean; id?: string; describedBy?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const uploads = usePhotoUploads(value, onChange, disabled);
   const [opened, setOpened] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export function PhotoPicker({ value, onChange, disabled, invalid, capture }: { v
     <input ref={input} type="file" accept="image/*" capture={capture ? "environment" : undefined} multiple={!capture} className="sr-only" tabIndex={-1} aria-label="เพิ่มรูป" onChange={(e) => { uploads.choose(e.target.files); e.target.value = ""; }} disabled={disabled} />
     <div className="grid grid-cols-3 gap-2 lg:max-w-125 lg:grid-cols-5">
       {value.map((item, i) => <PhotoTile key={item.key} item={item} index={i} disabled={disabled} className="aspect-square" onOpen={() => setOpened(item.key)} onRetry={() => uploads.retry(item)} onRemove={() => uploads.remove(item)} />)}
-      {!uploads.full && <button id="photoIds" type="button" disabled={disabled} onClick={() => input.current?.click()} data-invalid={invalid} aria-describedby="photoIds-error photo-hint" className="flex aspect-square flex-col items-center justify-center gap-1 rounded-sm border-2 border-dashed border-input bg-card text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 data-[invalid=true]:border-destructive"><Camera className="size-7" aria-hidden /><span className="text-sm">{capture && value.length ? "ถ่ายเพิ่ม" : "เพิ่มรูป"}</span><span className="text-xs">{value.length}/5</span></button>}
+      {!uploads.full && <button id={id} type="button" disabled={disabled} onClick={() => input.current?.click()} data-invalid={invalid} aria-describedby={describedBy} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-sm border-2 border-dashed border-input bg-card text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 data-[invalid=true]:border-destructive"><Camera className="size-7" aria-hidden /><span className="text-sm">{capture && value.length ? "ถ่ายเพิ่ม" : "เพิ่มรูป"}</span><span className="text-xs">{value.length}/5</span></button>}
     </div>
     {uploads.message && <p role="alert" className="mt-2 flex items-center gap-1 text-sm text-destructive"><AlertCircle className="size-4" aria-hidden />{uploads.message}</p>}
     <PhotoLightbox photos={done.map((p) => p.photo!)} index={lightboxIndex < 0 ? null : lightboxIndex} onIndexChange={(i) => setOpened(i === null ? null : done[i].key)} />
