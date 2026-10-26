@@ -14,11 +14,11 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 
 | Stage | Goal (demoable) | Flows | Screens | Status |
 |---|---|---|---|---|
-| 1 | พนักงานแจ้งซ่อมพร้อมรูปได้จริง ได้เลขงาน (สถานะ "กำลังดำเนินการ · รอช่างประเมิน") และเปิดดูงานของตัวเองได้ — API จริง (CR-005) | F02 (happy path), F06 | S03, S05, S06, S07 (view) | built, rework CR-005 done — waiting acceptance |
-| 2 | ช่างเห็นทุกงาน ประเมิน (วันคาดเสร็จ) บันทึกผล + ผู้ดำเนินการ + คะแนนช่างภายนอก; ผู้แจ้งให้ดาว (บังคับ) หรือส่งกลับ; ปิดเองเมื่อครบ 3 วัน — วงจรหลักครบ (CR-005) | F21, F07, F24 (technician) | S09, S17, S10, S08, S07 actions, S18 | built — waiting acceptance (no tests, CR-005) |
-| 2R | **CR-008 rework:** ระบบกำหนดความเร่งด่วนจากอาการ + "อื่นๆ" · หน้าตาใหม่ทั้งแอป (design-system CR-008) · S03 แบบทีละขั้น + ตรวจสอบก่อนส่ง + ที่เคยแจ้ง + ร่าง · S05 · S07 หน้าติดตามแนวตั้ง + การ์ดสิ่งที่ต้องทำ + พิมพ์รายงาน · S08 ให้คะแนนไม่ตั้งค่าไว้ก่อน · S17 ปุ่มวัน + เหตุผลที่เลื่อน · S10 เป็น sheet — ตรวจรับพร้อม Stage 1–2 | F02, F06, F07, F21 | S03, S05, S06, S07, S08, S09, S10, S17, shell | in progress |
+| 1 | พนักงานแจ้งซ่อมพร้อมรูปได้จริง ได้เลขงาน (สถานะ "กำลังดำเนินการ · รอช่างประเมิน") และเปิดดูงานของตัวเองได้ — API จริง (CR-005) | F02 (happy path), F06 | S03, S05, S06, S07 (view) | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-1` |
+| 2 | ช่างเห็นทุกงาน ประเมิน (วันคาดเสร็จ) บันทึกผล + ผู้ดำเนินการ + คะแนนช่างภายนอก; ผู้แจ้งให้ดาว (บังคับ) หรือส่งกลับ; ปิดเองเมื่อครบ 3 วัน — วงจรหลักครบ (CR-005) | F21, F07, F24 (technician) | S09, S17, S10, S08, S07 actions, S18 | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-2` |
+| 2R | **CR-008 rework:** ระบบกำหนดความเร่งด่วนจากอาการ + "อื่นๆ" · หน้าตาใหม่ทั้งแอป (design-system CR-008) · S03 แบบทีละขั้น + ตรวจสอบก่อนส่ง + ที่เคยแจ้ง + ร่าง · S05 · S07 หน้าติดตามแนวตั้ง + การ์ดสิ่งที่ต้องทำ + พิมพ์รายงาน · S08 ให้คะแนนไม่ตั้งค่าไว้ก่อน · S17 ปุ่มวัน + เหตุผลที่เลื่อน · S10 เป็น sheet — ตรวจรับพร้อม Stage 1–2 | F02, F06, F07, F21 | S03, S05, S06, S07, S08, S09, S10, S17, shell | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-2R` |
 | 2M | **CR-014 rework:** หมวดงาน / อาการจริงตามเอกสาร (เก็บใน DB) · ฟอร์ม 3 ขั้น กรอบเท่ากันทุกขั้น · ห้องหรือจุดที่เกิดบังคับ เลือกจากรายการห้อง ผูกกับหมวด | F02, F06 | S03, location line on S05 / S06 / S07 / S09 | done (2026-10-19, `repair-stage-2M`) |
-| 3 | Admin เห็นทุกงาน ปิดงานได้ (CR-015: ไม่ปรับความเร่งด่วน); ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | built 2026-10-19 — waiting acceptance |
+| 3 | Admin เห็นทุกงาน ปิดงานได้ (CR-015: ไม่ปรับความเร่งด่วน); ดูช่างภายนอก; ผู้บริหารดูได้อย่างเดียว | F22 (reduced), F08-B, F24 (view) | S11, S07 (admin actions), S18 (view) | done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-3` |
 | 3D | **CR-016:** หน้าแรก Admin / ผู้บริหาร = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
 | 3U | **CR-019 rework:** หน้าตาใหม่ตามต้นแบบ `bam-workplace-mascot-v4-refined.html` — S06 ตารางเดียว + ตัวกรองสถานะ · S07 กล่องเดียว + แท็บ · S03 สองคอลัมน์ + สรุป · S29 ขัดเกลา · มาสคอตเสือทั้งแอป | F02, F06, F07, F23 | S03, S06, S07, S29, S01, shared states | done (2026-10-24, `repair-stage-3U`) |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over); CR-021: S03 / S04 / S06 relayout | done (2026-10-26, `repair-stage-4`) |
@@ -124,6 +124,13 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 - [ ] AC5: Send back adds a "ส่งกลับให้แก้" event and the tracker grows "ส่งกลับให้แก้ → แก้ไขเสร็จ"; the technician resolves again
 - [ ] AC6: A ticket resolved 72 h ago closes as ปิดอัตโนมัติ at the next worker run
 - [ ] AC7: S18 shows the contractor's job history with scores to technician / admin / executive; employee gets the forbidden state
+- [ ] AC8 (CR-023): adding or renaming a contractor to a name that exists (any case, repeated spaces, inactive included) is refused with `มีช่างภายนอกชื่อนี้แล้ว` + `ดูร้านนี้` (S18) / `เลือกร้านนี้` (from S17); a deactivated one says to re-activate it
+
+**CR-023 rework (M, approved 2026-10-26)**
+- [x] Migration: unique index `contractors_name_key` on `lower(name)` (replaces `contractors_name_idx`); stops with the duplicate names if any exist
+- [x] Backend: name trimmed + spaces collapsed; #16 / #18 → 409 `CONTRACTOR_NAME_TAKEN` `details { contractorId, isActive }`; unique-index race mapped to the same error; Go unit + Pg integration tests
+- [x] FE: `CONTRACTOR_NAME_TAKEN` → field error + `ดูร้านนี้` / `เลือกร้านนี้` / `ไปหน้าร้านนี้` (S18 form)
+- [x] e2e: one case in `F24-contractors.spec.ts`
 
 **Demo script**
 1. Employee reports แอร์ไม่เย็น → S05 → S06 "รอช่างประเมิน"
@@ -173,6 +180,8 @@ Order rationale: 1→2 is the main loop (report → assess → repair → rate),
 ---
 
 ## Stage 2N — CR-010 / CR-011 rework (top navbar, S06 groups, S07 summary) (CR-010, CR-011)
+
+Status: done — accepted 2026-10-26 (e2e all pass), tag `repair-stage-2N`
 
 **Scope**
 - Flows: entry points only (F06 reading / filtering, F07 evaluation entry, F21 progress); no business rule changes

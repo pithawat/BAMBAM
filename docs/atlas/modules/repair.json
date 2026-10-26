@@ -203,45 +203,49 @@
       "id": "1",
       "short": "แจ้งซ่อม",
       "name": "แจ้งซ่อมพร้อมรูป ได้เลขงาน และดูงานของตัวเอง",
-      "status": "built",
+      "status": "accepted",
       "flows": [
         "F02",
         "F06"
-      ]
+      ],
+      "date": "2026-10-26"
     },
     {
       "id": "2",
       "short": "วงจรหลัก",
       "name": "วงจรหลัก: ช่างเริ่มดำเนินการ บันทึกผล ผู้แจ้งประเมินตรวจงาน",
-      "status": "built",
+      "status": "accepted",
       "flows": [
         "F21",
         "F07",
         "F24"
-      ]
+      ],
+      "date": "2026-10-26"
     },
     {
       "id": "2R",
       "short": "หน้าตาใหม่",
       "name": "หน้าตาใหม่ทั้งแอพ ความเร่งด่วนจากอาการ ฟอร์มทีละขั้น",
-      "status": "built",
+      "status": "accepted",
       "flows": [
         "F02",
         "F06",
         "F07",
         "F21"
       ],
-      "cr": "CR-008"
+      "cr": "CR-008",
+      "date": "2026-10-26"
     },
     {
       "id": "2N",
       "short": "เมนูและกลุ่มงาน",
       "name": "เมนูด้านบน จัดกลุ่มงาน หน้าสรุปงาน",
-      "status": "built",
+      "status": "accepted",
       "flows": [
         "F06"
       ],
-      "cr": "CR-010 · CR-011"
+      "cr": "CR-010 · CR-011",
+      "date": "2026-10-26"
     },
     {
       "id": "2M",
@@ -259,12 +263,13 @@
       "id": "3",
       "short": "Admin งานทั้งหมด",
       "name": "Admin เห็นทุกงานและปิดงานได้ ผู้บริหารดูอย่างเดียว",
-      "status": "built",
+      "status": "accepted",
       "flows": [
         "F22",
         "F08-B",
         "F24"
-      ]
+      ],
+      "date": "2026-10-26"
     },
     {
       "id": "3D",
@@ -394,6 +399,12 @@
       "date": "2026-10-26",
       "after": "3U",
       "text": "เลือกห้องเป็นการ์ดทุกชั้น ฟอร์มสูงตามเนื้อหา"
+    },
+    {
+      "id": "CR-023",
+      "date": "2026-10-26",
+      "after": "4",
+      "text": "ชื่อร้านช่างภายนอกห้ามซ้ำ ร้านที่ปิดใช้งานให้เปิดใช้งานแทน"
     }
   ],
   "features": [
@@ -408,7 +419,7 @@
       ],
       "stage": "2M",
       "status": "accepted",
-      "e2e": "fail",
+      "e2e": "pass",
       "group": "แจ้งปัญหา"
     },
     {
@@ -450,7 +461,7 @@
       ],
       "stage": "2R",
       "status": "built",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "แจ้งปัญหา"
     },
     {
@@ -535,7 +546,7 @@
       ],
       "stage": "3U",
       "status": "accepted",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "ติดตามงาน"
     },
     {
@@ -549,7 +560,7 @@
       ],
       "stage": "2R",
       "status": "built",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "ติดตามงาน"
     },
     {
@@ -563,7 +574,7 @@
       ],
       "stage": "2",
       "status": "built",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "ติดตามงาน"
     },
     {
@@ -605,7 +616,7 @@
       ],
       "stage": "3",
       "status": "built",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "งานช่าง"
     },
     {
@@ -619,7 +630,7 @@
       ],
       "stage": "2R",
       "status": "built",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "งานช่าง"
     },
     {
@@ -633,7 +644,7 @@
       ],
       "stage": "2R",
       "status": "built",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "งานช่าง"
     },
     {
@@ -649,7 +660,7 @@
       ],
       "stage": "3",
       "status": "built",
-      "e2e": "none",
+      "e2e": "pass",
       "group": "งานช่าง"
     },
     {
@@ -664,7 +675,7 @@
       ],
       "stage": "3",
       "status": "built",
-      "e2e": "fail",
+      "e2e": "pass",
       "group": "ดูแลภาพรวม"
     },
     {
@@ -678,7 +689,7 @@
       ],
       "stage": "3",
       "status": "built",
-      "e2e": "fail",
+      "e2e": "pass",
       "group": "ดูแลภาพรวม"
     },
     {
@@ -1531,7 +1542,302 @@
           "t": "k2",
           "lb": "ระบุจุดอื่น"
         }
-      ]
+      ],
+      "tour": {
+        "from": {
+          "spec": "frontend/e2e/repair/F03-duplicate-follow.spec.ts",
+          "tests": [
+            "AC6 (CR-021): same spot → card between room and spot, ถัดไป blocked until another spot",
+            "same spot found while filling: the card blocks the step, leaving asks to discard"
+          ]
+        },
+        "aliases": {
+          "problem": {
+            "css": "[data-step='problem']"
+          },
+          "location": {
+            "css": "[data-step='location']"
+          },
+          "send": {
+            "css": "[data-step='send']"
+          },
+          "next": {
+            "role": "button",
+            "name": "ถัดไป"
+          },
+          "card": {
+            "role": "region",
+            "name": "มีคนแจ้งเรื่องนี้ไว้แล้ว",
+            "within": "@location"
+          }
+        },
+        "steps": [
+          {
+            "node": "s",
+            "role": "security_lead",
+            "goto": "/repair/new",
+            "title": "เตรียม: มีคนแจ้งไว้ก่อน",
+            "desc": "หัวหน้ารปภ. แจ้ง แอร์ไม่เย็น ที่ อาคาร 1 ชั้น 4 · อ.1 ห้อง 401 จุด \"Atlas {{run}}\" (ระบบกรอกให้)",
+            "expect": "กดส่งแล้วได้เลขงาน สถานะ รับเรื่อง",
+            "do": [
+              {
+                "see": {
+                  "text": "เลือกหมวดที่ตรงกับปัญหา",
+                  "visible": true
+                }
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "อาคาร 1",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "click": {
+                  "text": "4",
+                  "exact": true,
+                  "within": {
+                    "role": "radiogroup",
+                    "name": "เลือกชั้น",
+                    "within": "@location"
+                  }
+                }
+              },
+              {
+                "click": {
+                  "text": "อ.1 ห้อง 401",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "fill": {
+                  "label": "บอกจุดเพิ่มเติม",
+                  "within": "@location"
+                },
+                "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "upload": {
+                  "css": "[data-step='send'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": "@send"
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ยืนยันส่งแจ้งซ่อม"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ยืนยันส่งแจ้งซ่อม"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "heading",
+                  "name": "รับเรื่องแล้ว"
+                }
+              }
+            ]
+          },
+          {
+            "node": "s",
+            "role": "employee",
+            "goto": "/repair/new",
+            "title": "พนักงานจะแจ้งเรื่องเดียวกัน",
+            "desc": "เลือก ระบบปรับอากาศ · แอร์ไม่เย็น แล้วกด ถัดไป",
+            "expect": "ไปขั้น สถานที่",
+            "do": [
+              {
+                "see": {
+                  "text": "เลือกหมวดที่ตรงกับปัญหา",
+                  "visible": true
+                }
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              }
+            ],
+            "highlight": "@next"
+          },
+          {
+            "node": "a1",
+            "title": "เลือกห้องเดิม จุดเดิม",
+            "desc": "อาคาร 1 · ชั้น 4 · อ.1 ห้อง 401 · บอกจุดเพิ่มเติม \"Atlas {{run}}\"",
+            "expect": "ระบบค้นงานที่ยังไม่ปิดในหมวด ชั้น และห้องเดียวกัน แล้วแสดงการ์ด มีคนแจ้งเรื่องนี้ไว้แล้ว ระหว่างห้องกับจุด",
+            "do": [
+              {
+                "click": {
+                  "text": "อาคาร 1",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "click": {
+                  "text": "4",
+                  "exact": true,
+                  "within": {
+                    "role": "radiogroup",
+                    "name": "เลือกชั้น",
+                    "within": "@location"
+                  }
+                }
+              },
+              {
+                "click": {
+                  "text": "อ.1 ห้อง 401",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "fill": {
+                  "label": "บอกจุดเพิ่มเติม",
+                  "within": "@location"
+                },
+                "text": "Atlas {{run}}"
+              }
+            ],
+            "highlight": "@card",
+            "next": false
+          },
+          {
+            "node": "a2",
+            "title": "ถัดไป ไม่ผ่าน",
+            "desc": "กด ถัดไป ทั้งที่ยังเป็นจุดเดิม",
+            "expect": "ระบบบอก กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ และยังอยู่ขั้นสถานที่",
+            "highlight": "@next"
+          },
+          {
+            "node": "d2",
+            "title": "เลือก ติดตามเคสนี้",
+            "desc": "ถ้าเป็นเรื่องเดียวกัน กด ติดตามเคสนี้ (ถ้าเป็นคนละจุด ให้แก้ บอกจุดเพิ่มเติม แล้วแจ้งเป็นงานใหม่)",
+            "expect": "รายละเอียดและรูปที่กรอกจะเพิ่มในงานเดิม",
+            "do": [
+              {
+                "see": "กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ"
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ติดตามเคสนี้",
+              "within": "@card"
+            }
+          },
+          {
+            "node": "e1",
+            "title": "ไปหน้ารายละเอียดเคสเดิม",
+            "desc": "ระบบพาไปงานของหัวหน้ารปภ. — คุณเป็นผู้ติดตามแล้ว",
+            "expect": "ข้อความ คุณติดตามเคส … แล้ว · ความคืบหน้ามีรายการ คุณติดตามงานนี้",
+            "do": [
+              {
+                "see": "/คุณติดตามเคส .+ แล้ว/"
+              }
+            ],
+            "highlight": {
+              "role": "region",
+              "name": "ความคืบหน้าของงาน"
+            },
+            "next": false
+          },
+          {
+            "node": "e1",
+            "role": "admin",
+            "goto": "/repair/admin/queue?q=Atlas%20{{run}}",
+            "title": "ล้างข้อมูลทดสอบ",
+            "desc": "Admin ปิดงานตัวอย่างที่ tour นี้สร้าง (ขั้นนี้มีเฉพาะใน tour)",
+            "expect": "งานตัวอย่างปิดแล้ว ไม่ค้างในคิวช่าง",
+            "do": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "/^ปิดงาน/",
+                  "visible": true
+                }
+              },
+              {
+                "fill": {
+                  "label": "/เหตุผลที่ปิดงาน/",
+                  "within": {
+                    "role": "dialog"
+                  }
+                },
+                "text": "ล้างข้อมูล tour"
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ปิดงาน",
+              "exact": true,
+              "within": {
+                "role": "dialog"
+              }
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ปิดงาน",
+                  "exact": true,
+                  "within": {
+                    "role": "dialog"
+                  }
+                }
+              },
+              {
+                "see": "ปิดงานแล้ว"
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "F04",
@@ -1637,7 +1943,205 @@
           "t": "k2",
           "dash": true
         }
-      ]
+      ],
+      "tour": {
+        "from": {
+          "spec": "frontend/e2e/repair/F04-team-handled.spec.ts",
+          "tests": [
+            "AC3 + AC4 + AC6: S06 บันทึกงานที่ทีมแก้แล้ว → locked team form → closed at once → ทีมแก้เอง tab"
+          ]
+        },
+        "aliases": {
+          "problem": {
+            "css": "[data-step='problem']"
+          },
+          "location": {
+            "css": "[data-step='location']"
+          },
+          "send": {
+            "css": "[data-step='send']"
+          },
+          "next": {
+            "role": "button",
+            "name": "ถัดไป"
+          }
+        },
+        "steps": [
+          {
+            "node": "s",
+            "role": "housekeeper_lead",
+            "goto": "/repair/my",
+            "title": "หน้าติดตามงานซ่อมของหัวหน้าแม่บ้าน",
+            "desc": "หัวหน้าทีมมี 2 ปุ่ม: แจ้งซ่อมใหม่ (เรียกช่าง) และ บันทึกงานที่ทีมแก้แล้ว",
+            "expect": "กด บันทึกงานที่ทีมแก้แล้ว",
+            "highlight": {
+              "role": "link",
+              "name": "บันทึกงานที่ทีมแก้แล้ว"
+            }
+          },
+          {
+            "node": "a1",
+            "title": "ฟอร์มทีม (เปลี่ยนประเภทไม่ได้)",
+            "desc": "เลือก ระบบปรับอากาศ · แอร์ไม่เย็น แล้วกด ถัดไป",
+            "expect": "หัวข้อ บันทึกงานที่ทีมแก้แล้ว · ไม่มีปุ่มสลับไปแจ้งช่าง",
+            "do": [
+              {
+                "see": {
+                  "role": "heading",
+                  "name": "บันทึกงานที่ทีมแก้แล้ว"
+                }
+              },
+              {
+                "see": {
+                  "text": "เลือกหมวดที่ตรงกับปัญหา",
+                  "visible": true
+                }
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              }
+            ],
+            "highlight": "@next"
+          },
+          {
+            "node": "a1",
+            "title": "สถานที่",
+            "desc": "อาคาร 1 · ชั้น 4 · อ.1 ห้อง 401 · จุด \"Atlas {{run}}\"",
+            "expect": "ถัดไป ไปขั้นรูปภาพ",
+            "do": [
+              {
+                "click": {
+                  "text": "อาคาร 1",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "click": {
+                  "text": "4",
+                  "exact": true,
+                  "within": {
+                    "role": "radiogroup",
+                    "name": "เลือกชั้น",
+                    "within": "@location"
+                  }
+                }
+              },
+              {
+                "click": {
+                  "text": "อ.1 ห้อง 401",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "fill": {
+                  "label": "บอกจุดเพิ่มเติม",
+                  "within": "@location"
+                },
+                "text": "Atlas {{run}}"
+              }
+            ],
+            "highlight": "@next"
+          },
+          {
+            "node": "a1",
+            "title": "สิ่งที่ทีมทำ + รูปหลังทำ",
+            "desc": "แนบรูปปัญหา บอกสิ่งที่ทีมทำ และแนบรูปหลังทำอย่างน้อย 1 รูป",
+            "expect": "กด ยืนยันบันทึกงานทีม",
+            "do": [
+              {
+                "upload": {
+                  "css": "[data-step='send'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": "@send"
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              },
+              {
+                "fill": {
+                  "label": "สิ่งที่ทีมทำ"
+                },
+                "text": "เช็ดพื้นและวางป้ายระวังลื่นแล้ว"
+              },
+              {
+                "upload": {
+                  "css": "[data-field='teamHandled.photoIds'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": {
+                    "css": "[data-field='teamHandled.photoIds']"
+                  }
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ยืนยันบันทึกงานทีม"
+            }
+          },
+          {
+            "node": "a2",
+            "title": "ระบบปิดงานทันที",
+            "desc": "ตรวจงานซ้ำก่อน แล้วปิดงานแบบ ทีมทำเอง — ไม่ไปถึงช่าง ไม่มีขั้นประเมิน",
+            "expect": "หน้า บันทึกงานทีมเรียบร้อย พร้อมเลขงาน",
+            "do": [
+              {
+                "waitFor": {
+                  "role": "heading",
+                  "name": "บันทึกงานทีมเรียบร้อย"
+                }
+              }
+            ],
+            "highlight": {
+              "role": "heading",
+              "name": "บันทึกงานทีมเรียบร้อย"
+            },
+            "next": false
+          },
+          {
+            "node": "e1",
+            "goto": "/repair/my?scope=team&q=Atlas%20{{run}}",
+            "title": "อยู่ในแท็บ ทีมแก้เอง",
+            "desc": "งานที่ทีมแก้เองแสดงในแท็บ ทีมแก้เอง ของหัวหน้าทีม",
+            "expect": "แถวงานมีป้าย · ทีมแก้เอง · ต่อท้ายเลขงาน",
+            "highlight": {
+              "text": "· ทีมแก้เอง ·",
+              "visible": true
+            },
+            "next": false
+          }
+        ]
+      }
     },
     {
       "id": "F05",
@@ -1737,7 +2241,278 @@
           "f": "a2",
           "t": "k1"
         }
-      ]
+      ],
+      "tour": {
+        "from": {
+          "spec": "frontend/e2e/repair/F05-handover.spec.ts",
+          "tests": [
+            "AC5: S07 ส่งต่อให้ช่าง with a reason → same number under รอประเมิน"
+          ]
+        },
+        "aliases": {
+          "problem": {
+            "css": "[data-step='problem']"
+          },
+          "location": {
+            "css": "[data-step='location']"
+          },
+          "send": {
+            "css": "[data-step='send']"
+          },
+          "next": {
+            "role": "button",
+            "name": "ถัดไป"
+          },
+          "dialog": {
+            "role": "dialog",
+            "name": "ส่งต่องานนี้ให้ช่าง?"
+          }
+        },
+        "steps": [
+          {
+            "node": "s1",
+            "role": "housekeeper_lead",
+            "goto": "/repair/new?mode=team",
+            "title": "เตรียม: งานที่ทีมแก้เองแล้ว",
+            "desc": "หัวหน้าแม่บ้านบันทึกงานทีมที่ อ.1 ห้อง 401 จุด \"Atlas {{run}}\" (ระบบกรอกให้)",
+            "expect": "งานปิดแบบ ทีมทำเอง",
+            "do": [
+              {
+                "see": {
+                  "text": "เลือกหมวดที่ตรงกับปัญหา",
+                  "visible": true
+                }
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "อาคาร 1",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "click": {
+                  "text": "4",
+                  "exact": true,
+                  "within": {
+                    "role": "radiogroup",
+                    "name": "เลือกชั้น",
+                    "within": "@location"
+                  }
+                }
+              },
+              {
+                "click": {
+                  "text": "อ.1 ห้อง 401",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "fill": {
+                  "label": "บอกจุดเพิ่มเติม",
+                  "within": "@location"
+                },
+                "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "upload": {
+                  "css": "[data-step='send'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": "@send"
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              },
+              {
+                "fill": {
+                  "label": "สิ่งที่ทีมทำ"
+                },
+                "text": "เช็ดพื้นแล้ว"
+              },
+              {
+                "upload": {
+                  "css": "[data-field='teamHandled.photoIds'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": {
+                    "css": "[data-field='teamHandled.photoIds']"
+                  }
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ยืนยันบันทึกงานทีม"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ยืนยันบันทึกงานทีม"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "heading",
+                  "name": "บันทึกงานทีมเรียบร้อย"
+                }
+              }
+            ]
+          },
+          {
+            "node": "s1",
+            "goto": "/repair/my?scope=team&q=Atlas%20{{run}}",
+            "title": "เปิดงานทีมของตัวเอง",
+            "desc": "แท็บ ทีมแก้เอง ใน ติดตามงานซ่อม แล้วเปิดงานนั้น",
+            "expect": "หน้ารายละเอียดงานที่ปิดแบบ ทีมทำเอง",
+            "highlight": {
+              "role": "link",
+              "name": "/^ดูงาน /",
+              "visible": true
+            }
+          },
+          {
+            "node": "a1",
+            "title": "กด ส่งต่อให้ช่าง",
+            "desc": "ภายหลังพบว่าต้องใช้ช่าง (ใช้ได้เฉพาะงานที่ปิดแบบ ทีมทำเอง)",
+            "expect": "กล่อง ส่งต่องานนี้ให้ช่าง? · งานเดิม เลขเดิม",
+            "highlight": {
+              "role": "button",
+              "name": "ส่งต่อให้ช่าง"
+            }
+          },
+          {
+            "node": "a1",
+            "title": "ใส่เหตุผล (บังคับ)",
+            "desc": "บอกเหตุผลที่ต้องให้ช่างดู แล้วกด ส่งต่อให้ช่าง",
+            "expect": "ไม่ใส่เหตุผล = ระบบบอก กรุณาใส่เหตุผล",
+            "do": [
+              {
+                "fill": {
+                  "label": "/เหตุผลที่ส่งต่อ/",
+                  "within": "@dialog"
+                },
+                "text": "ทีมเช็ดแล้วแต่ยังมีน้ำซึมจากฝ้า"
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ส่งต่อให้ช่าง",
+              "within": "@dialog"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ส่งต่อให้ช่าง",
+                  "within": "@dialog"
+                }
+              },
+              {
+                "see": "ส่งต่อให้ช่างแล้ว"
+              }
+            ]
+          },
+          {
+            "node": "a2",
+            "title": "งานเดิมกลับไปที่ช่าง",
+            "desc": "เลขเดิม ประวัติเดิม สถานะกลับเป็น รับเรื่อง รอช่างกำหนดวันเสร็จ",
+            "expect": "ความคืบหน้า: ขั้น รับเรื่อง มีรายการส่งต่อพร้อมเหตุผล",
+            "highlight": {
+              "role": "region",
+              "name": "ความคืบหน้าของงาน"
+            },
+            "next": false
+          },
+          {
+            "node": "a2",
+            "role": "admin",
+            "goto": "/repair/admin/queue?q=Atlas%20{{run}}",
+            "title": "ล้างข้อมูลทดสอบ",
+            "desc": "Admin ปิดงานตัวอย่างที่ tour นี้สร้าง (ขั้นนี้มีเฉพาะใน tour)",
+            "expect": "งานตัวอย่างปิดแล้ว ไม่ค้างในคิวช่าง",
+            "do": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "/^ปิดงาน/",
+                  "visible": true
+                }
+              },
+              {
+                "fill": {
+                  "label": "/เหตุผลที่ปิดงาน/",
+                  "within": {
+                    "role": "dialog"
+                  }
+                },
+                "text": "ล้างข้อมูล tour"
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ปิดงาน",
+              "exact": true,
+              "within": {
+                "role": "dialog"
+              }
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ปิดงาน",
+                  "exact": true,
+                  "within": {
+                    "role": "dialog"
+                  }
+                }
+              },
+              {
+                "see": "ปิดงานแล้ว"
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "F06",
