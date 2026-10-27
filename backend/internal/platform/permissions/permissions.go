@@ -90,6 +90,22 @@ func (r *Registry) IsFixed(key string) bool {
 	return r.byKey[key].fixed
 }
 
+// Label is the Thai label of key (audit rows store labels, settings F30); "" for an unknown key.
+func (r *Registry) Label(key string) string {
+	return r.byKey[key].Label
+}
+
+// Ordered returns keys in catalog order, dropping unknown ones and duplicates.
+func (r *Registry) Ordered(keys []string) []string {
+	out := []string{}
+	for _, k := range r.order {
+		if slices.Contains(keys, k) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 // Effective is what a role may do: super_admin gets every key; any other role gets its stored keys
 // that are still in the catalog and not fixed, plus the fixed keys granted to its key. The result
 // is in catalog order.

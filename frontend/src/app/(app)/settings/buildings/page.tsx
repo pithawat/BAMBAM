@@ -1,6 +1,11 @@
-import { SettingsPlaceholder } from "@/modules/settings/components/settings-placeholder";
+import { Suspense } from "react";
+import { PlacesScreen } from "@/modules/settings/components/places/places-screen";
 
-// Placeholder until its stage is built (settings 03-plan.md).
+// S20 อาคารและอุปกรณ์ (settings Stage 4). Tab and selection live in the URL (read on the client), hence the Suspense boundary.
 export default function Page() {
-  return <SettingsPlaceholder page="buildings" />;
+  return (
+    <Suspense>
+      <PlacesScreen />
+    </Suspense>
+  );
 }

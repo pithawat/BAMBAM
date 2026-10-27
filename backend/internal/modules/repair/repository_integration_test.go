@@ -359,7 +359,8 @@ func TestPgMasterData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := string(up)
+	// buildings and floors moved to `platform` later (settings Stage 4, 20261026000003_platform_locations.sql)
+	body := strings.NewReplacer("repair.buildings", "platform.buildings", "repair.floors", "platform.floors").Replace(string(up))
 	start, end := strings.Index(body, "-- ---- master data"), strings.Index(body, "-- +goose Down")
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {

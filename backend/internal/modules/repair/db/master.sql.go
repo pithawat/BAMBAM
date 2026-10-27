@@ -13,8 +13,8 @@ import (
 
 const activeFloorInBuilding = `-- name: ActiveFloorInBuilding :one
 SELECT EXISTS (
-    SELECT 1 FROM repair.floors f
-    JOIN repair.buildings b ON b.id = f.building_id
+    SELECT 1 FROM platform.floors f
+    JOIN platform.buildings b ON b.id = f.building_id
     WHERE f.id = $1 AND f.building_id = $2 AND f.is_active AND b.is_active
 )
 `
@@ -100,7 +100,7 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 }
 
 const listActiveBuildings = `-- name: ListActiveBuildings :many
-SELECT id, name FROM repair.buildings
+SELECT id, name FROM platform.buildings
 WHERE is_active
 ORDER BY sort_order, name
 `
@@ -172,8 +172,8 @@ func (q *Queries) ListActiveCategories(ctx context.Context) ([]ListActiveCategor
 }
 
 const listActiveFloors = `-- name: ListActiveFloors :many
-SELECT f.id, f.building_id, f.name, f.level FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+SELECT f.id, f.building_id, f.name, f.level FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 WHERE f.is_active AND b.is_active
 ORDER BY f.level
 `

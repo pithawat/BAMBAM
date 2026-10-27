@@ -20,6 +20,8 @@ const apiEnv = {
   DATABASE_URL,
   HTTP_PORT: new URL(API_URL).port || "80",
   ROLE_SWITCHER_ENABLED: "true",
+  // env-defined Superadmin of the settings sample people (e2e/settings/people.ts): S25 "กำหนดโดยระบบ"
+  SUPER_ADMIN_EMPLOYEE_CODES: "EMP0105",
 };
 
 /** Env for `next dev`: proxies /api to the test API; .next-e2e so it can run beside the dev server. */

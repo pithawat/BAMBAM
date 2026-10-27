@@ -1,6 +1,6 @@
-import { SettingsPlaceholder } from "@/modules/settings/components/settings-placeholder";
+import { CategoriesScreen } from "@/modules/settings/components/categories/categories-screen";
 
-// Placeholder until its stage is built (settings 03-plan.md).
+// S22 หมวดงานและอาการ (settings Stage 5): the first category selected.
 export default function Page() {
-  return <SettingsPlaceholder page="categories" />;
+  return <CategoriesScreen />;
 }

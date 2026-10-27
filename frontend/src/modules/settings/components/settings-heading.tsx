@@ -18,7 +18,7 @@ export function SettingsHeading({ title, subtitle, action }: Props) {
   const mascot = settingsMascot(me);
   return (
     <div className="mb-5 flex flex-wrap items-start gap-x-4 gap-y-3 lg:mb-7 lg:flex-nowrap lg:items-center">
-      <div className="flex min-w-0 flex-1 items-start gap-2 lg:gap-3">
+      <div className="flex min-w-0 flex-1 basis-full items-start gap-2 lg:basis-auto lg:gap-3">
         <button
           ref={menuButton}
           type="button"

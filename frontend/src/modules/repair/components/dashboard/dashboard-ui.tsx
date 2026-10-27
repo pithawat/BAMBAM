@@ -1,15 +1,14 @@
 import { createElement } from "react";
-import { AirVent, Box, Mic, Speaker, Tv, type LucideIcon } from "lucide-react";
+import { assetIconOf, SEEDED_TYPE_ICONS } from "@/components/shared/asset-icon";
 import { pointInShape } from "../../plan-geometry";
 import type { Asset, OverviewCounts, OverviewFloor, PlanShape, TicketStep, TicketSummary } from "../../types";
 import { addDays, dayLabel, todayBangkok } from "../ticket-presentation";
 
 // Shared S29 bits (CR-016): equipment icons, pin colours, sub-line copy (S29 spec "Content").
 
-export const ASSET_ICONS: Record<string, LucideIcon> = { aircon: AirVent, microphone: Mic, speaker: Speaker, tv: Tv };
-/** Equipment type icon (unknown keys from the master → a generic box). */
-export function AssetIcon({ typeKey, className }: { typeKey: string; className?: string }) {
-  return createElement(ASSET_ICONS[typeKey] ?? Box, { className, "aria-hidden": true });
+/** Equipment type icon: the type's stored `icon` (settings CR-001, shared map), else the seeded key's icon, else a box. */
+export function AssetIcon({ typeKey, icon, className }: { typeKey: string; icon?: string; className?: string }) {
+  return createElement(assetIconOf(icon ?? SEEDED_TYPE_ICONS[typeKey]), { className, "aria-hidden": true });
 }
 
 /** Short palette label (modern mockup): แอร์ · ไมค์ · ลำโพง · จอทีวี. */

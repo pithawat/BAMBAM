@@ -305,8 +305,8 @@ SELECT
     (SELECT count(*) FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id) AS subscriber_count
 FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
-JOIN repair.buildings b ON b.id = t.building_id
-JOIN repair.floors f ON f.id = t.floor_id
+JOIN platform.buildings b ON b.id = t.building_id
+JOIN platform.floors f ON f.id = t.floor_id
 LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
@@ -698,8 +698,8 @@ SELECT
     t.auto_close_at, t.resolved_at, t.updated_at
 FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
-JOIN repair.buildings b ON b.id = t.building_id
-JOIN repair.floors f ON f.id = t.floor_id
+JOIN platform.buildings b ON b.id = t.building_id
+JOIN platform.floors f ON f.id = t.floor_id
 LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 WHERE (($2::text IN ('all', 'reported') AND t.reporter_id = $1)
      OR ($2::text IN ('all', 'following') AND EXISTS (
@@ -827,8 +827,8 @@ FROM (
         t.building_id, b.name AS building_name, t.floor_id, f.name AS floor_name,
         t.room_id, rm.name AS room_name, t.location_detail, t.created_at AS last_reported_at
     FROM repair.tickets t
-    JOIN repair.buildings b ON b.id = t.building_id AND b.is_active
-    JOIN repair.floors f ON f.id = t.floor_id AND f.is_active
+    JOIN platform.buildings b ON b.id = t.building_id AND b.is_active
+    JOIN platform.floors f ON f.id = t.floor_id AND f.is_active
     JOIN platform.rooms rm ON rm.id = t.room_id AND rm.is_active AND rm.floor_id = t.floor_id
     WHERE t.reporter_id = $1
     ORDER BY t.building_id, t.floor_id, t.room_id, t.created_at DESC
@@ -978,8 +978,8 @@ SELECT
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1) AS viewer_subscribed
 FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
-JOIN repair.buildings b ON b.id = t.building_id
-JOIN repair.floors f ON f.id = t.floor_id
+JOIN platform.buildings b ON b.id = t.building_id
+JOIN platform.floors f ON f.id = t.floor_id
 LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id

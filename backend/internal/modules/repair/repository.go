@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	repairdb "github.com/pithawat/BAMBAM/backend/internal/modules/repair/db"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/audit"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/db"
 )
 
@@ -55,6 +56,9 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 	}
 	out := make([]Category, 0, len(cats))
 	for _, c := range cats {
+		if len(byCat[c.ID]) == 0 && !c.IsOther {
+			continue // no active symptom: not offered in the form (settings F27)
+		}
 		out = append(out, Category{
 			ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, IsOther: c.IsOther,
 			AreaTypes: nonNil(areasBy[c.ID]), Symptoms: nonNil(byCat[c.ID]),
@@ -455,6 +459,19 @@ func (r *PgRepository) EnsureContractorType(ctx context.Context, name string, by
 	existing, err := r.q.GetContractorTypeByName(ctx, name)
 	if err != nil {
 		return Ref{}, err
+	}
+	if !existing.IsActive {
+		// settings F28: the name of a deactivated type re-activates it, with an audit row by whoever typed it
+		err := db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
+			if err := repairdb.New(tx).ReactivateContractorType(ctx, repairdb.ReactivateContractorTypeParams{ID: existing.ID, ActorID: &by}); err != nil {
+				return err
+			}
+			return audit.Write(ctx, tx, audit.Entry{ActorID: &by, Action: "activate", TargetType: "contractor_type", TargetID: existing.ID.String(),
+				Data: map[string]any{"entityName": existing.Name, "changes": []any{}}})
+		})
+		if err != nil {
+			return Ref{}, err
+		}
 	}
 	return Ref{ID: existing.ID, Name: existing.Name}, nil
 }

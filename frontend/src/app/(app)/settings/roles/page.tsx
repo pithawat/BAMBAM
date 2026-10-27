@@ -1,6 +1,11 @@
-import { SettingsPlaceholder } from "@/modules/settings/components/settings-placeholder";
+import { Suspense } from "react";
+import { RolesScreen } from "@/modules/settings/components/roles/roles-screen";
 
-// Placeholder until its stage is built (settings 03-plan.md).
+// S24 Role และสิทธิ์ (settings Stage 2). `?tab=` is read on the client, hence the Suspense boundary.
 export default function Page() {
-  return <SettingsPlaceholder page="roles" />;
+  return (
+    <Suspense>
+      <RolesScreen />
+    </Suspense>
+  );
 }

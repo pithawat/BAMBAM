@@ -113,51 +113,56 @@
       "id": "2",
       "short": "Role และสิทธิ์",
       "name": "ติ๊กสิทธิ์ใน matrix มีผลทันที เพิ่ม แก้ ลบ role",
-      "status": "pending",
+      "status": "accepted",
       "flows": [
         "F29"
       ],
-      "cr": "CR-001"
+      "cr": "CR-001",
+      "date": "2026-10-27"
     },
     {
       "id": "3",
       "short": "ผู้ใช้ + ประวัติ",
       "name": "ค้นหาผู้ใช้ เปลี่ยน role และดูประวัติการเปลี่ยนแปลง",
-      "status": "pending",
+      "status": "accepted",
       "flows": [
         "F15",
         "F30"
       ],
-      "cr": "CR-001"
+      "cr": "CR-001",
+      "date": "2026-10-27"
     },
     {
       "id": "4",
       "short": "อาคารและอุปกรณ์",
       "name": "เลือกห้องจากผัง แก้ชื่อ จัดการอุปกรณ์และประเภทอุปกรณ์",
-      "status": "pending",
+      "status": "accepted",
       "flows": [
         "F26"
       ],
-      "cr": "CR-001 · CR-002"
+      "cr": "CR-001 · CR-002",
+      "date": "2026-10-27"
     },
     {
       "id": "5",
       "short": "หมวดงาน + ผู้รับเหมา",
       "name": "หมวดงาน อาการ และประเภทผู้รับเหมา",
-      "status": "pending",
+      "status": "accepted",
       "flows": [
         "F27",
         "F28"
       ],
-      "cr": "CR-001"
+      "cr": "CR-001",
+      "date": "2026-10-27"
     },
     {
       "id": "6",
       "short": "พร้อม UAT",
       "name": "edge cases สิทธิ์ทุก role มือถือ a11y และความพร้อม UAT",
-      "status": "pending",
+      "status": "accepted",
       "flows": [],
-      "note": "ครอบคลุมทุก flow"
+      "note": "ครอบคลุมทุก flow",
+      "date": "2026-10-27"
     }
   ],
   "features": [
@@ -229,8 +234,8 @@
         "super"
       ],
       "stage": "2",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "Role และสิทธิ์"
     },
     {
@@ -243,8 +248,8 @@
         "super"
       ],
       "stage": "2",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "Role และสิทธิ์"
     },
     {
@@ -257,8 +262,8 @@
         "super"
       ],
       "stage": "3",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ผู้ใช้"
     },
     {
@@ -271,8 +276,8 @@
         "super"
       ],
       "stage": "3",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ผู้ใช้"
     },
     {
@@ -286,8 +291,8 @@
         "admin"
       ],
       "stage": "4",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ข้อมูลกลาง"
     },
     {
@@ -301,8 +306,8 @@
         "admin"
       ],
       "stage": "4",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ข้อมูลกลาง"
     },
     {
@@ -316,14 +321,14 @@
         "admin"
       ],
       "stage": "4",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ข้อมูลกลาง"
     },
     {
       "id": "F27-1",
       "name": "หมวดงานและอาการ",
-      "desc": "เพิ่ม แก้ เรียงลำดับ ปิดใช้งานหมวดและอาการ ฟอร์มแจ้งซ่อมแสดงตามนี้",
+      "desc": "เพิ่ม แก้ เรียงลำดับ ปิดใช้งานหมวดและอาการ พร้อมความเร่งด่วน ฟอร์มแจ้งซ่อมแสดงตามนี้ หมวดที่ไม่มีอาการเปิดใช้งานจะไม่แสดงในฟอร์ม",
       "flow": "F27",
       "screens": "S22",
       "roles": [
@@ -331,22 +336,22 @@
         "admin"
       ],
       "stage": "5",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ข้อมูลกลาง"
     },
     {
       "id": "F28-1",
       "name": "ประเภทผู้รับเหมา",
-      "desc": "เพิ่ม แก้ชื่อ ปิดใช้งาน หรือลบประเภทที่ไม่เคยถูกใช้",
+      "desc": "เพิ่ม แก้ชื่อ ปิดใช้งาน หรือลบประเภทที่ไม่เคยถูกใช้ ประเภทที่ปิดแล้วช่างเลือกไม่ได้ ถ้าช่างพิมพ์ชื่อเดิมจะเปิดใช้งานกลับเอง",
       "flow": "F28",
       "screens": "S23",
       "roles": [
         "super"
       ],
       "stage": "5",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ข้อมูลกลาง"
     }
   ],

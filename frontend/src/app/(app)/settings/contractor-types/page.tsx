@@ -1,6 +1,6 @@
-import { SettingsPlaceholder } from "@/modules/settings/components/settings-placeholder";
+import { ContractorTypesScreen } from "@/modules/settings/components/contractor-types/contractor-types-screen";
 
-// Placeholder until its stage is built (settings 03-plan.md).
+// S23 ประเภทผู้รับเหมา (settings Stage 5, Superadmin).
 export default function Page() {
-  return <SettingsPlaceholder page="contractor-types" />;
+  return <ContractorTypesScreen />;
 }

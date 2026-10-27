@@ -28,16 +28,17 @@ type PlatformAsset struct {
 }
 
 type PlatformAssetType struct {
-	ID         uuid.UUID
-	Key        string
-	Name       string
-	CodePrefix string
-	Icon       string
-	Mount      string
-	SortOrder  int32
-	IsActive   bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID          uuid.UUID
+	Key         string
+	Name        string
+	CodePrefix  string
+	Icon        string
+	Mount       string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	UpdatedByID *uuid.UUID
 }
 
 type PlatformAuditLog struct {
@@ -49,6 +50,26 @@ type PlatformAuditLog struct {
 	Data        []byte
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type PlatformBuilding struct {
+	ID          uuid.UUID
+	Name        string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	UpdatedByID *uuid.UUID
+}
+
+type PlatformFloor struct {
+	ID         uuid.UUID
+	BuildingID uuid.UUID
+	Name       string
+	Level      int32
+	IsActive   bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type PlatformFloorPlan struct {
@@ -87,15 +108,16 @@ type PlatformRolePermission struct {
 }
 
 type PlatformRoom struct {
-	ID        uuid.UUID
-	FloorID   uuid.UUID
-	Name      string
-	AreaType  string
-	SortOrder int32
-	IsActive  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	PlanShape []byte
+	ID          uuid.UUID
+	FloorID     uuid.UUID
+	Name        string
+	AreaType    string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	PlanShape   []byte
+	UpdatedByID *uuid.UUID
 }
 
 type PlatformSession struct {
@@ -138,15 +160,6 @@ type RepairAssetTypeCategory struct {
 	CategoryID  uuid.UUID
 }
 
-type RepairBuilding struct {
-	ID        uuid.UUID
-	Name      string
-	SortOrder int32
-	IsActive  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
 type RepairCategory struct {
 	ID              uuid.UUID
 	Name            string
@@ -157,6 +170,7 @@ type RepairCategory struct {
 	UpdatedAt       time.Time
 	DefaultPriority string
 	IsOther         bool
+	UpdatedByID     *uuid.UUID
 }
 
 type RepairCategoryAreaType struct {
@@ -182,6 +196,8 @@ type RepairContractorType struct {
 	CreatedByID *uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	IsActive    bool
+	UpdatedByID *uuid.UUID
 }
 
 type RepairContractorTypeLink struct {
@@ -189,16 +205,6 @@ type RepairContractorTypeLink struct {
 	TypeID       uuid.UUID
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
-}
-
-type RepairFloor struct {
-	ID         uuid.UUID
-	BuildingID uuid.UUID
-	Name       string
-	Level      int32
-	IsActive   bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
 }
 
 type RepairPerson struct {
@@ -230,14 +236,15 @@ type RepairSetting struct {
 }
 
 type RepairSymptom struct {
-	ID         uuid.UUID
-	CategoryID uuid.UUID
-	Name       string
-	SortOrder  int32
-	IsActive   bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Priority   string
+	ID          uuid.UUID
+	CategoryID  uuid.UUID
+	Name        string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Priority    string
+	UpdatedByID *uuid.UUID
 }
 
 type RepairTicket struct {

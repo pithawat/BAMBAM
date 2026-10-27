@@ -61,7 +61,7 @@ test.describe("super_admin", () => {
     await (await settingsEntry(page, isMobile)).click();
     await expect(page).toHaveURL(/\/settings\/buildings$/, { timeout: 30_000 }); // first compile of /settings on `next dev`
     await expect(page.getByRole("heading", { level: 1, name: "อาคารและอุปกรณ์" })).toBeVisible();
-    await expect(page.getByText("ส่วนนี้กำลังพัฒนา")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "เลือกห้องจากผัง" })).toBeVisible();
     // No top bar on settings pages (CR-001); guardian mascot beside the heading (CR-003)
     await expect(page.getByRole("navigation", { name: "บริการหลัก" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /เมนูบัญชี/ })).toHaveCount(0);
@@ -79,7 +79,7 @@ test.describe("super_admin", () => {
     await expect(nav.getByRole("link", { name: "อาคารและอุปกรณ์" })).toHaveAttribute("aria-current", "page");
     if (isMobile) await page.keyboard.press("Escape");
 
-    // Every Superadmin page opens (placeholder until its stage)
+    // Every Superadmin page opens
     for (const p of SUPERADMIN_ONLY) {
       await page.goto(p.path);
       await expect(page.getByRole("heading", { level: 1, name: p.label })).toBeVisible();
@@ -87,9 +87,10 @@ test.describe("super_admin", () => {
     }
   });
 
-  test("API: #2 roles answers; later-stage routes are not built yet", async ({ baseURL }) => {
-    expect(await status("super_admin", baseURL, "GET", "/roles")).toBe(200);
-    expect(await status("super_admin", baseURL, "GET", "/users")).toBe(501);
+  test("API: the settings reads of every stage answer for Superadmin", async ({ baseURL }) => {
+    for (const url of ["/roles", "/permissions", "/users", "/audit", "/buildings", "/categories", "/contractor-types", "/asset-types"]) {
+      expect(await status("super_admin", baseURL, "GET", url), url).toBe(200);
+    }
   });
 });
 

@@ -11,11 +11,11 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 | Stage | Goal (demoable) | Flows | Screens | Status |
 |---|---|---|---|---|
 | 1 | role เป็นข้อมูลในฐานข้อมูล ทุกระบบเช็คสิทธิ์แทนชื่อ role (ผลเหมือนเดิมทุก role); Admin และ Superadmin เห็นเมนู "ตั้งค่าระบบ" และเข้า administration shell (sidebar) ตามสิทธิ์ (CR-001) | F25, F29 (data only) | shell (CR-001), ~~S19~~ | done — accepted 2026-10-26 (e2e F25 + repair regression pass), tag `settings-stage-1` |
-| 2 | Superadmin ติ๊กสิทธิ์ใน matrix แล้วผู้ใช้ role นั้นได้/เสียสิทธิ์ทันที; เพิ่ม แก้ ลบ role ได้; กลุ่ม "ตั้งค่าระบบ" แสดงแบบล็อก (CR-001) | F29 | S24 | pending |
-| 3 | ค้นหาผู้ใช้และเปลี่ยน role ได้; ดูประวัติการเปลี่ยนแปลงทั้งหมด | F15, F30 | S25, S26 | pending |
-| 4 | (CR-001 / CR-002) อาคารและอุปกรณ์: เลือกห้องจากผัง แก้ชื่ออาคาร/ห้อง จัดการอุปกรณ์ในห้อง และประเภทอุปกรณ์ (Admin + Superadmin) | F26 | S20 (redesigned), ~~S21~~ | pending |
-| 5 | ตั้งค่าหมวดงาน อาการ (Admin + Superadmin, CR-001) และประเภทผู้รับเหมา (Superadmin) ได้ | F27, F28 | S22, S23 | pending |
-| 6 | edge cases, สิทธิ์ทุก role, มือถือ, a11y และความพร้อม UAT | all | all | pending |
+| 2 | Superadmin ติ๊กสิทธิ์ใน matrix แล้วผู้ใช้ role นั้นได้/เสียสิทธิ์ทันที; เพิ่ม แก้ ลบ role ได้; กลุ่ม "ตั้งค่าระบบ" แสดงแบบล็อก (CR-001) | F29 | S24 | done — accepted 2026-10-27 (Claude UI, D-115) |
+| 3 | ค้นหาผู้ใช้และเปลี่ยน role ได้; ดูประวัติการเปลี่ยนแปลงทั้งหมด | F15, F30 | S25, S26 | done — accepted 2026-10-27 (Claude UI, D-115) |
+| 4 | (CR-001 / CR-002) อาคารและอุปกรณ์: เลือกห้องจากผัง แก้ชื่ออาคาร/ห้อง จัดการอุปกรณ์ในห้อง และประเภทอุปกรณ์ (Admin + Superadmin) | F26 | S20 (redesigned), ~~S21~~ | done — accepted 2026-10-27 (Claude UI, D-115) |
+| 5 | ตั้งค่าหมวดงาน อาการ (Admin + Superadmin, CR-001) และประเภทผู้รับเหมา (Superadmin) ได้ | F27, F28 | S22, S23 | done — accepted 2026-10-27 (Claude UI, D-115) |
+| 6 | edge cases, สิทธิ์ทุก role, มือถือ, a11y และความพร้อม UAT | all | all | done — accepted 2026-10-27 (Claude, D-115) |
 
 (CR-001) Order unchanged. The administration shell (sidebar, drawer, page heading with mascot) is built in Stage 1 so every later stage only adds a page into it. Admin's own pages (4, 5) still follow the identity pages; Admin sees an empty-but-working shell until then.
 
@@ -92,28 +92,28 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 - Out of this stage: user role changes (3)
 
 **Backend (Claude)**
-- [ ] Roles CRUD (#2–#5): name unique (case-insensitive), copy-from, system / locked rules, delete only with 0 real users (demo users of that role deleted with it)
-- [ ] Matrix (#6, #7): catalog + roles + version; diff apply in one transaction with `SELECT … FOR UPDATE` on `permission_matrix`; unknown key / locked role / `FIXED_PERMISSION` errors (CR-001); fixed group in #6 with `isFixed`; copy-from skips fixed keys; audit `permissions_change` per role with Thai labels
-- [ ] Audit rows for role create / update / delete
-- [ ] Tests: service rules (system roles, in-use, version conflict, copy-from), controller error mapping
+- [x] Roles CRUD (#2–#5): name unique (case-insensitive), copy-from, system / locked rules, delete only with 0 real users (demo users of that role deleted with it)
+- [x] Matrix (#6, #7): catalog + roles + version; diff apply in one transaction with `SELECT … FOR UPDATE` on `permission_matrix`; unknown key / locked role / `FIXED_PERMISSION` errors (CR-001); fixed group in #6 with `isFixed`; copy-from skips fixed keys; audit `permissions_change` per role with Thai labels
+- [x] Audit rows for role create / update / delete
+- [x] Tests: service rules (system roles, in-use, version conflict, copy-from), controller error mapping
 
 **Frontend contract (Claude)**
-- [ ] Types / mocks / api for #2–#7 (mock matrix = defaults); `components/ui/checkbox`, `switch`, `dropdown-menu` via shadcn; HANDOFF → Stage 2
+- [x] Types / mocks / api for #2–#7 (mock matrix = defaults); `components/ui/checkbox`, `switch`, `dropdown-menu` via shadcn; HANDOFF → Stage 2
 
 **Frontend UI (Codex)**
-- [ ] S24 `/settings/roles` — follow ~~`ui/mockups/S24-roles-permissions.html`~~ `ui/mockups/CR-001-admin-settings.html#roles` (CR-001)
+- [x] S24 `/settings/roles` — follow ~~`ui/mockups/S24-roles-permissions.html`~~ `ui/mockups/CR-001-admin-settings.html#roles` (CR-001) — built by Claude (D-115)
 
 **Wiring + e2e (Claude)**
-- [ ] `e2e/settings/F29-roles-matrix.spec.ts`: grant `repair.ticket.view_all` to พนักงานทั่วไป → the employee's `GET /api/v1/repair/tickets?scope=all` returns 200 on the next request; revoke → 403
+- [x] `e2e/settings/F29-roles-matrix.spec.ts`: grant `repair.ticket.view_all` to พนักงานทั่วไป → the employee's `GET /api/v1/repair/tickets?scope=all` returns 200 on the next request; revoke → 403
 
 **Acceptance criteria**
-- [ ] AC1: S24 shows three cards under ระบบแจ้งซ่อม with the default ticks from `01-users.md`; Superadmin row ticked and disabled
-- [ ] AC1b (CR-001): the card "ตั้งค่าระบบ" shows Admin ticked for อาคารและห้อง · อุปกรณ์ · หมวดงาน only, Superadmin all, other roles none; every cell disabled with "กำหนดโดยระบบ"
-- [ ] AC2: Untick ช่างเทคนิค → จัดการช่างภายนอก, save → dialog lists "ช่างเทคนิค (1 คน) — ถอด: จัดการช่างภายนอก" → after save the technician (role switcher) cannot add contractors without logging out
-- [ ] AC3: Add role "หัวหน้าช่าง" copied from ช่างเทคนิค → new row highlighted with the same ticks; it appears in the role switcher
-- [ ] AC4: Delete Admin → "ลบ role นี้ไม่ได้ · มีผู้ใช้ 2 คน…"; delete หัวหน้าช่าง (0 users) works
-- [ ] AC5: Two browser tabs: save in tab A, then save in tab B → B shows "สิทธิ์ถูกแก้โดย…" and keeps its changes after "โหลดข้อมูลล่าสุด"
-- [ ] AC6: Leaving with unsaved changes asks first; mobile shows per-role switches with the save bar
+- [x] AC1: S24 shows three cards under ระบบแจ้งซ่อม with the default ticks from `01-users.md`; Superadmin row ticked and disabled
+- [x] AC1b (CR-001): the card "ตั้งค่าระบบ" shows Admin ticked for อาคารและห้อง · อุปกรณ์ · หมวดงาน only, Superadmin all, other roles none; every cell disabled with "กำหนดโดยระบบ"
+- [x] AC2: Untick ช่างเทคนิค → จัดการช่างภายนอก, save → dialog lists "ช่างเทคนิค (1 คน) — ถอด: จัดการช่างภายนอก" → after save the technician (role switcher) cannot add contractors without logging out
+- [x] AC3: Add role "หัวหน้าช่าง" copied from ช่างเทคนิค → new row highlighted with the same ticks; it appears in the role switcher
+- [x] AC4: Delete Admin → "ลบ role นี้ไม่ได้ · มีผู้ใช้ 2 คน…"; delete หัวหน้าช่าง (0 users) works
+- [x] AC5: Two browser tabs: save in tab A, then save in tab B → B shows "สิทธิ์ถูกแก้โดย…" and keeps its changes after "โหลดข้อมูลล่าสุด"
+- [x] AC6: Leaving with unsaved changes asks first; mobile shows per-role switches with the save bar
 
 **Demo script**
 1. Superadmin → Role และสิทธิ์ → untick ช่างเทคนิค / จัดการช่างภายนอก → บันทึก
@@ -129,26 +129,26 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 - (CR-001) S25 visual per `ui/mockups/CR-001-admin-settings.html#users` (people panel, contextual role control, detail + role dialogs); S26 uses the same panel/table pattern and sits in the sidebar group ผู้ใช้และสิทธิ์
 
 **Backend (Claude)**
-- [ ] Users search (#8: name TH/EN, code, email; Thai collation sort; demo users excluded), detail with role history (#9), role change (#10: self, env-locked, same-role no-op, audit `role_change`)
-- [ ] Audit list (#11: type / actor / date range / q filters, 50 per page) and actors (#12); `AuditEntry` mapping from `platform.audit_log.data`
-- [ ] Tests: role change rules, audit filters, PDPA (no full profile in `data`)
+- [x] Users search (#8: name TH/EN, code, email; Thai collation sort; demo users excluded), detail with role history (#9), role change (#10: self, env-locked, same-role no-op, audit `role_change`)
+- [x] Audit list (#11: type / actor / date range / q filters, 50 per page) and actors (#12); `AuditEntry` mapping from `platform.audit_log.data`
+- [x] Tests: role change rules, audit filters, PDPA (no full profile in `data`)
 
 **Frontend contract (Claude)**
-- [ ] Types / mocks / api for #8–#12; HANDOFF → Stage 3
+- [x] Types / mocks / api for #8–#12; HANDOFF → Stage 3
 
 **Frontend UI (Codex)**
-- [ ] S25 `/settings/users` — ~~`ui/mockups/S25-users.html`~~ `ui/mockups/CR-001-admin-settings.html#users` (CR-001)
-- [ ] S26 `/settings/audit` — spec only (panel/table pattern of the CR-001 users page)
+- [x] S25 `/settings/users` — ~~`ui/mockups/S25-users.html`~~ `ui/mockups/CR-001-admin-settings.html#users` (CR-001)
+- [x] S26 `/settings/audit` — spec only (panel/table pattern of the CR-001 users page)
 
 **Wiring + e2e (Claude)**
-- [ ] `e2e/settings/F15-change-role.spec.ts`, `F30-audit.spec.ts`
+- [x] `e2e/settings/F15-change-role.spec.ts`, `F30-audit.spec.ts`
 
 **Acceptance criteria**
-- [ ] AC1: Search "EMP0231" or "ธนากร" finds the technician; filter Role: Admin shows 2 people
-- [ ] AC2: Change วรรณา from พนักงานทั่วไป to หัวหน้าแม่บ้าน → toast; her next request has `repair.ticket.team_handle`; the sheet history shows the change with my name
-- [ ] AC3: My own row and env-defined Superadmins show "เปลี่ยน role" disabled with the reason; the API returns `CANNOT_CHANGE_SELF` / `ROLE_LOCKED`
-- [ ] AC4: Picking Superadmin shows the extra warning
-- [ ] AC5: S26 lists the Stage 2 matrix change and the AC2 role change with before → after; filters combine and live in the URL
+- [x] AC1: Search "EMP0231" or "ธนากร" finds the technician; filter Role: Admin shows 2 people
+- [x] AC2: Change วรรณา from พนักงานทั่วไป to หัวหน้าแม่บ้าน → toast; her next request has `repair.ticket.team_handle`; the sheet history shows the change with my name
+- [x] AC3: My own row and env-defined Superadmins show "เปลี่ยน role" disabled with the reason; the API returns `CANNOT_CHANGE_SELF` / `ROLE_LOCKED`
+- [x] AC4: Picking Superadmin shows the extra warning
+- [x] AC5: S26 lists the Stage 2 matrix change and the AC2 role change with before → after; filters combine and live in the URL
 
 ---
 
@@ -160,28 +160,28 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 - Admin and Superadmin (`settings.locations.manage`, `settings.assets.manage`)
 
 **Backend (Claude)**
-- [ ] Migration `…_platform_locations.sql`: `ALTER TABLE repair.buildings SET SCHEMA platform`, same for `floors` (ids and FKs kept, D-048); `updated_by_id` on buildings / rooms; `platform.floor_plans.floor_id` FK follows; `platform.asset_types.updated_by`; Down moves them back
-- [ ] `internal/platform/locations`: plan tree (#13), rename building / room with `updatedAt` check and case-insensitive uniqueness
-- [ ] `internal/platform/assets`: move repair's asset / asset-type queries here; list per room incl. inactive (#46), create / patch / (re)activate (#47, #48), suggest code by room (#49), asset types list / create / patch with `codePrefix` + `mount` + `icon` validation (#50–#52); repair #29–#34 call it
-- [ ] Settings endpoints #13, #15, #27, #46–#52 with `RequirePermission` and audit rows
-- [ ] Tests: rename keeps ids and assets, duplicate names, asset code uniqueness incl. inactive, move clears position, type prefix rules, 403 for non-admin roles, migration up/down (CI)
+- [x] Migration `…_platform_locations.sql`: `ALTER TABLE repair.buildings SET SCHEMA platform`, same for `floors` (ids and FKs kept, D-048); `updated_by_id` on buildings / rooms; `platform.floor_plans.floor_id` FK follows; `platform.asset_types.updated_by`; Down moves them back
+- [x] `internal/platform/locations`: plan tree (#13), rename building / room with `updatedAt` check and case-insensitive uniqueness
+- [x] `internal/platform/assets`: list per room incl. inactive (#46), create / patch / (re)activate (#47, #48), suggest code by room (#49), asset types list / create / patch with `codePrefix` + `mount` + `icon` validation (#50–#52) — repair #29–#34 (3D placement) keep their own queries on the same tables (D-116)
+- [x] Settings endpoints #13, #15, #27, #46–#52 with `RequirePermission` and audit rows
+- [x] Tests: rename keeps ids and assets, duplicate names, asset code uniqueness incl. inactive, move clears position, type prefix rules, 403 for non-admin roles, migration up/down (CI)
 
 **Frontend contract (Claude)**
-- [ ] Types / mocks / api for #13, #15, #27, #46–#52; shared `components/shared/asset-icon.ts` (8 lucide icons) used by S20 and repair S29 (replaces S29's key map; shared code); HANDOFF → Stage 4
+- [x] Types / mocks / api for #13, #15, #27, #46–#52; shared `components/shared/asset-icon.ts` (8 lucide icons) used by S20 and repair S29 (replaces S29's key map; shared code); HANDOFF → Stage 4
 
 **Frontend UI (Codex)**
-- [ ] S20 `/settings/buildings` (`?tab=asset-types` for ประเภทอุปกรณ์) — follow `ui/mockups/CR-001-admin-settings.html#places` and `screens/S20-buildings.md`
+- [x] S20 `/settings/buildings` (`?tab=asset-types` for ประเภทอุปกรณ์) — follow `ui/mockups/CR-001-admin-settings.html#places` and `screens/S20-buildings.md`
 
 **Wiring + e2e (Claude)**
-- [ ] `e2e/settings/F26-places-assets.spec.ts`: Admin renames a room → S03 shows the new name, same room id; adds a type "เครื่องพิมพ์" inline while adding an asset → the asset saves with that type; duplicate asset code refused; deactivate → gone from S29 and S03 asset picker
+- [x] `e2e/settings/F26-places-assets.spec.ts`: Admin renames a room → S03 shows the new name, same room id; adds a type "เครื่องพิมพ์" inline while adding an asset → the asset saves with that type; duplicate asset code refused; deactivate → gone from S29 and S03 asset picker
 
 **Acceptance criteria**
-- [ ] AC1: As Admin: pick อาคาร 1 → ชั้น 1 → ห้องประชุม 1A shows its 4 assets; there is no control to add, delete or reorder buildings, floors or rooms, and floor names cannot be edited
-- [ ] AC2: Rename ห้องประชุม 1A → the repair form (S03) and S29 show the new name; its assets and tickets stay attached (same id)
-- [ ] AC3: Add asset `AC-1-003` → appears in the room list and S29 palette list; `ac-1-001` is refused "รหัสอุปกรณ์นี้มีอยู่แล้ว กรุณาใช้รหัสอื่น"; move to another room keeps the code and clears the 3D position
-- [ ] AC4: Add type "เครื่องพิมพ์" (prefix `PRN`, ติดตั้งที่พื้น) inline in the asset dialog → selected at once and the other fields keep their values; duplicate name / prefix refused; new type shows its icon in S29
-- [ ] AC5: Deactivate / reactivate an asset; inactive hidden unless "แสดงอุปกรณ์ที่ปิดใช้งาน"
-- [ ] AC6: Existing repair tickets, S06/S07 locations, S29 3D and repair tests are unchanged after the schema move
+- [x] AC1: As Admin: pick อาคาร 1 → ชั้น 1 → ห้องประชุม 1A shows its 4 assets; there is no control to add, delete or reorder buildings, floors or rooms, and floor names cannot be edited
+- [x] AC2: Rename ห้องประชุม 1A → the repair form (S03) and S29 show the new name; its assets and tickets stay attached (same id)
+- [x] AC3: Add asset `AC-1-003` → appears in the room list and S29 palette list; `ac-1-001` is refused "รหัสอุปกรณ์นี้มีอยู่แล้ว กรุณาใช้รหัสอื่น"; move to another room keeps the code and clears the 3D position
+- [x] AC4: Add type "เครื่องพิมพ์" (prefix `PRN`, ติดตั้งที่พื้น) inline in the asset dialog → selected at once and the other fields keep their values; duplicate name / prefix refused; new type shows its icon in S29
+- [x] AC5: Deactivate / reactivate an asset; inactive hidden unless "แสดงอุปกรณ์ที่ปิดใช้งาน"
+- [x] AC6: Existing repair tickets, S06/S07 locations, S29 3D and repair tests are unchanged after the schema move
 
 <details><summary>Original Stage 4 (2026-10-16) — superseded by CR-002</summary>
 
@@ -208,12 +208,12 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 - [ ] `e2e/settings/F26-buildings.spec.ts`: add building + 3 floors (bulk) → appears in S03 อาคาร / ชั้น; deactivate a floor → gone from S03
 
 **Acceptance criteria**
-- [ ] AC1: เพิ่มหลายชั้น 7 on a new building creates ชั้น 1–7, listed top first; dragging ชั้น 7 under ชั้น 6 persists after reload
-- [ ] AC2: The repair form (S03) shows the new building and floors immediately; a deactivated floor disappears from S03 but old tickets still show "อาคารหลัก ชั้น 3"
-- [ ] AC3: Delete is disabled for a floor that has tickets ("เคยถูกใช้แล้ว ปิดใช้งานแทน"); the deactivate dialog shows "มีงานที่ยังไม่ปิด {n} งาน" when there are open tickets
-- [ ] AC4: Upload a 1.2 MB PNG floor plan to ชั้น 5 → preview, meta line, lightbox; a 12 MB file or a PDF shows "รองรับ JPG, PNG ไม่เกิน 10 MB" and keeps the old plan
-- [ ] AC5: Rooms add / rename / reorder / deactivate / delete on S21
-- [ ] AC6: Existing repair tickets, S06/S07 locations and repair tests are unchanged after the schema move
+- [x] AC1: เพิ่มหลายชั้น 7 on a new building creates ชั้น 1–7, listed top first; dragging ชั้น 7 under ชั้น 6 persists after reload
+- [x] AC2: The repair form (S03) shows the new building and floors immediately; a deactivated floor disappears from S03 but old tickets still show "อาคารหลัก ชั้น 3"
+- [x] AC3: Delete is disabled for a floor that has tickets ("เคยถูกใช้แล้ว ปิดใช้งานแทน"); the deactivate dialog shows "มีงานที่ยังไม่ปิด {n} งาน" when there are open tickets
+- [x] AC4: Upload a 1.2 MB PNG floor plan to ชั้น 5 → preview, meta line, lightbox; a 12 MB file or a PDF shows "รองรับ JPG, PNG ไม่เกิน 10 MB" and keeps the old plan
+- [x] AC5: Rooms add / rename / reorder / deactivate / delete on S21
+- [x] AC6: Existing repair tickets, S06/S07 locations and repair tests are unchanged after the schema move
 
 </details>
 
@@ -227,22 +227,25 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 - (repair CR-014) S22: category default priority + every symptom priority **required** on create, editable for every category; category `ประเภทพื้นที่ที่มักเกิด` (multi, optional); the `isOther` category cannot be deleted / deactivated / un-flagged; initial data = the CR-014 master
 
 **Backend (Claude)**
-- [ ] Repair `SettingsAdmin` implementation: categories / symptoms CRUD + order (+ `updated_by_id` columns migration), contractor types admin (count, created by, technician flag), usage (`inUse`)
-- [ ] Settings endpoints #32–#45 with audit rows; repair #14 change
-- [ ] Tests: last-active-symptom rule data (`activeSymptomCount`), in-use deletes, case-insensitive names
+- [x] Repair `SettingsAdmin` implementation: categories / symptoms CRUD + order (+ `updated_by_id` columns migration), contractor types admin (count, created by, technician flag), usage (`inUse`)
+- [x] Settings endpoints #32–#45 with audit rows; repair #14 change
+- [x] Tests: last-active-symptom rule data (`activeSymptomCount`), in-use deletes, case-insensitive names
 
 **Frontend contract (Claude)**
-- [ ] Types / mocks / api for #32–#45; shared category icon map `components/shared/category-icon.ts` used by S03 and S22 (shared code); HANDOFF → Stage 5
+- [x] Types / mocks / api for #32–#45; shared category icon map `components/shared/category-icon.ts` used by S03 and S22 (shared code); HANDOFF → Stage 5
 
-**Frontend UI (Codex)**
-- [ ] S22 `/settings/categories[/[categoryId]]` (~~S20 pattern~~ CR-001 design), S23 `/settings/contractor-types` (CR-001 panel pattern)
+**Frontend UI (Codex → Claude, D-115)**
+- [x] S22 `/settings/categories[/[categoryId]]` (~~S20 pattern~~ CR-001 design), S23 `/settings/contractor-types` (CR-001 panel pattern)
+
+**Wiring + e2e (Claude)**
+- [x] `e2e/settings/F27-categories.spec.ts`, `F28-contractor-types.spec.ts`
 
 **Acceptance criteria**
-- [ ] AC1: New category "ลิฟต์และบันไดเลื่อน" (icon `door-open`) with 2 symptoms appears in S03 in the set order
-- [ ] AC2: Deactivating the last active symptom warns "หมวดนี้จะไม่แสดงในฟอร์มแจ้งซ่อม"; S03 hides the category
-- [ ] AC3: Contractor types show counts and "สร้างโดยช่าง"; deactivate "แอร์" → the technician's S17 picker no longer offers it; typing "แอร์" there re-activates it (audit row by the technician)
-- [ ] AC4: Delete is refused for used items with the shared message
-- [ ] AC5 (CR-001): Admin can do AC1–AC2 and AC4 for categories / symptoms; Admin has no ประเภทผู้รับเหมา item and gets Forbidden on `/settings/contractor-types`
+- [x] AC1: New category "ลิฟต์และบันไดเลื่อน" (icon `door-open`) with 2 symptoms appears in S03 in the set order
+- [x] AC2: Deactivating the last active symptom warns "หมวดนี้จะไม่แสดงในฟอร์มแจ้งซ่อม"; S03 hides the category
+- [x] AC3: Contractor types show counts and "สร้างโดยช่าง"; deactivate "แอร์" → the technician's S17 picker no longer offers it; typing "แอร์" there re-activates it (audit row by the technician)
+- [x] AC4: Delete is refused for used items with the shared message
+- [x] AC5 (CR-001): Admin can do AC1–AC2 and AC4 for categories / symptoms; Admin has no ประเภทผู้รับเหมา item and gets Forbidden on `/settings/contractor-types`
 
 ---
 
@@ -252,15 +255,15 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 - All flows / screens; e2e for every BR; mobile pass at 375px; a11y (keyboard matrix, labels); docs
 
 **Tasks**
-- [ ] e2e: forbidden for each role without the route's permission on every settings route + API sample (Admin: users, roles, audit, contractor types) (CR-001); VERSION_CONFLICT for item, order, matrix; leave-unsaved guard; role deleted while S25 dialog open (`ROLE_NOT_FOUND`)
-- [ ] Mobile review of ~~S19–S26~~ S20, S22–S26 against the specs and the CR-001 design at 375px (drawer, bottom sheets); keyboard-only run through S24 and S20
-- [ ] `docs/shared/architecture.md` Roles section rewritten (roles as data, permissions, `super_admin`, env); `PROJECT.md` row; seed notes for UAT (first Superadmin code per environment)
-- [ ] Performance check: `/me` + permission load stays one query; audit list with 10k rows < 300 ms (index)
+- [x] e2e: forbidden for each role without the route's permission on every settings route + API sample (Admin: users, roles, audit, contractor types) (CR-001); VERSION_CONFLICT for item, order, matrix; leave-unsaved guard; role deleted while S25 dialog open (`ROLE_NOT_FOUND`)
+- [x] Mobile review of ~~S19–S26~~ S20, S22–S26 against the specs and the CR-001 design at 375px (drawer, bottom sheets); keyboard-only run through S24 and S20
+- [x] `docs/shared/architecture.md` Roles section rewritten (roles as data, permissions, `super_admin`, env); `PROJECT.md` row; seed notes for UAT (first Superadmin code per environment)
+- [x] Performance check: `/me` + permission load stays one query; audit list with 10k rows < 300 ms (index)
 
 **Acceptance criteria**
-- [ ] AC1: Playwright suite for settings green in CI
-- [ ] AC2: Every screen shows loading / empty / error / forbidden states with the exact copy
-- [ ] AC3: UAT checklist written in `PROGRESS.md` (env codes, sample data, who tests what)
+- [x] AC1: Playwright suite for settings green in CI
+- [x] AC2: Every screen shows loading / empty / error / forbidden states with the exact copy
+- [x] AC3: UAT checklist written in `PROGRESS.md` (env codes, sample data, who tests what)
 
 ---
 

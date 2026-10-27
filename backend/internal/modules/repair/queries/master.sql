@@ -15,13 +15,13 @@ WHERE s.is_active AND c.is_active
 ORDER BY s.sort_order, s.name;
 
 -- name: ListActiveBuildings :many
-SELECT id, name FROM repair.buildings
+SELECT id, name FROM platform.buildings
 WHERE is_active
 ORDER BY sort_order, name;
 
 -- name: ListActiveFloors :many
-SELECT f.id, f.building_id, f.name, f.level FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+SELECT f.id, f.building_id, f.name, f.level FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 WHERE f.is_active AND b.is_active
 ORDER BY f.level;
 
@@ -45,8 +45,8 @@ WHERE id = ANY(@ids::uuid[]) AND category_id = @category_id AND is_active;
 
 -- name: ActiveFloorInBuilding :one
 SELECT EXISTS (
-    SELECT 1 FROM repair.floors f
-    JOIN repair.buildings b ON b.id = f.building_id
+    SELECT 1 FROM platform.floors f
+    JOIN platform.buildings b ON b.id = f.building_id
     WHERE f.id = @floor_id AND f.building_id = @building_id AND f.is_active AND b.is_active
 );
 

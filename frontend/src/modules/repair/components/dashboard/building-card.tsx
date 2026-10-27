@@ -298,7 +298,7 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
       <span className="inline-flex items-center gap-1 font-medium text-priority-critical"><TriangleAlert className="size-3.5" aria-hidden />ฉุกเฉิน</span>
       <span>· 1 หมุด = 1 งาน</span>
       {(types.length ? types : []).map((t) => {
-        return <span key={t.id} className="inline-flex items-center gap-1.5"><AssetIcon typeKey={t.key} className="size-3.5" />{ASSET_SHORT[t.key] ?? t.name}</span>;
+        return <span key={t.id} className="inline-flex items-center gap-1.5"><AssetIcon typeKey={t.key} icon={t.icon} className="size-3.5" />{ASSET_SHORT[t.key] ?? t.name}</span>;
       })}
     </div>}
     {edit && (floorId && plan
@@ -309,7 +309,7 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
               onClick={() => setDraft({ mode: "add", typeId: t.id, roomId: "", x: null, z: null, fromDrop: false })}
               aria-label={`เพิ่ม${t.name}`} title="ลากไปวางในห้อง หรือกดเพื่อเลือกห้อง"
               className="flex w-16 cursor-grab touch-none flex-col items-center gap-0.5 rounded-md border bg-card px-1 py-1.5 text-xs font-semibold outline-none select-none hover:border-primary hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/40">
-              <AssetIcon typeKey={t.key} className="size-5 text-primary" />{ASSET_SHORT[t.key] ?? t.name}
+              <AssetIcon typeKey={t.key} icon={t.icon} className="size-5 text-primary" />{ASSET_SHORT[t.key] ?? t.name}
             </button>;
           })}
           <Button size="sm" variant="outline" onClick={() => setDraft({ mode: "add", typeId: null, roomId: "", x: null, z: null, fromDrop: false })}><Plus aria-hidden />เพิ่มอุปกรณ์</Button>

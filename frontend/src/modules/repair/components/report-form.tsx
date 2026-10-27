@@ -32,7 +32,7 @@ import { CategoryTile, categoryIcon } from "./category-icon";
 import { PhotoLightbox } from "./photo-gallery";
 import { PhotoPicker, PhotoTile, usePhotoUploads, type PhotoItem } from "./photo-picker";
 import { floorLabel, listDate, timeOf } from "./ticket-presentation";
-import { useDiscardGuard } from "./use-discard-guard";
+import { useDiscardGuard } from "@/components/shared/use-discard-guard";
 
 // S03 แจ้งซ่อมใหม่ — CR-014 wizard (docs/modules/repair/ui/screens/S03-report-form.md CR-014 block, visual
 // reference docs/modules/repair/changes/CR-014/form-steps.html): 3 steps ปัญหาที่พบ → สถานที่ → รูปภาพและส่ง

@@ -1,6 +1,11 @@
-import { SettingsPlaceholder } from "@/modules/settings/components/settings-placeholder";
+import { Suspense } from "react";
+import { UsersScreen } from "@/modules/settings/components/users/users-screen";
 
-// Placeholder until its stage is built (settings 03-plan.md).
+// S25 ผู้ใช้ (settings Stage 3). Filters live in the URL (read on the client), hence the Suspense boundary.
 export default function Page() {
-  return <SettingsPlaceholder page="users" />;
+  return (
+    <Suspense>
+      <UsersScreen />
+    </Suspense>
+  );
 }

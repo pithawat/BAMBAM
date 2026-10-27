@@ -16,10 +16,13 @@ import (
 
 	"github.com/pithawat/BAMBAM/backend/internal/modules/repair"
 	"github.com/pithawat/BAMBAM/backend/internal/modules/settings"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/assets"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/audit"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/auth"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/config"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/db"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/httpx"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/locations"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/middleware"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/permissions"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/roles"
@@ -68,7 +71,17 @@ func run() error {
 	}
 	repairSvc := repair.NewService(repair.NewRepository(pool), photoStore)
 	repairCtl := repair.NewController(repairSvc)
-	settingsCtl := settings.NewController(settings.NewService(roleSvc))
+	locationSvc := locations.NewService(locations.NewRepository(pool))
+	repairAdmin := repair.NewSettingsAdmin(pool)
+	settingsCtl := settings.NewController(settings.NewService(settings.Deps{
+		Roles:     roleSvc,
+		Users:     users.NewAdmin(users.NewAdminRepository(pool), userSvc),
+		Audit:     audit.NewReader(pool),
+		Locations: locationSvc,
+		Assets:    assets.NewService(assets.NewRepository(pool), locationSvc),
+		Repair:    repairAdmin,
+		Master:    repairAdmin,
+	}))
 
 	if cfg.RoleSwitcherEnabled {
 		if err := userSvc.EnsureDemoUsers(ctx); err != nil {

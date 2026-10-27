@@ -1,10 +1,16 @@
 -- name: ListContractorTypes :many
+-- Active types only: a type deactivated in ตั้งค่าระบบ is no longer offered (settings F28).
 SELECT id, name FROM repair.contractor_types
+WHERE is_active
 ORDER BY lower(name);
 
 -- name: GetContractorTypeByName :one
-SELECT id, name FROM repair.contractor_types
+SELECT id, name, is_active FROM repair.contractor_types
 WHERE lower(name) = lower(@name);
+
+-- name: ReactivateContractorType :exec
+-- #14 (settings CR-007 C): typing the name of an inactive type re-activates it.
+UPDATE repair.contractor_types SET is_active = true, updated_by_id = @actor_id, updated_at = now() WHERE id = @id;
 
 -- name: InsertContractorType :one
 -- A concurrent insert of the same name keeps the first row (unique on lower(name)).

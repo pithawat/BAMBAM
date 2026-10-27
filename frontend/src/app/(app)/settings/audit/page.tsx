@@ -1,6 +1,11 @@
-import { SettingsPlaceholder } from "@/modules/settings/components/settings-placeholder";
+import { Suspense } from "react";
+import { AuditScreen } from "@/modules/settings/components/audit/audit-screen";
 
-// Placeholder until its stage is built (settings 03-plan.md).
+// S26 ประวัติการเปลี่ยนแปลง (settings Stage 3). Filters live in the URL (read on the client), hence the Suspense boundary.
 export default function Page() {
-  return <SettingsPlaceholder page="audit" />;
+  return (
+    <Suspense>
+      <AuditScreen />
+    </Suspense>
+  );
 }

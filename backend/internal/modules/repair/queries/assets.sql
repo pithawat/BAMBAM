@@ -40,8 +40,8 @@ SELECT f.id, f.building_id, f.name, f.level,
     count(t.id) FILTER (WHERE t.status = 'in_progress' AND t.expected_done_on IS NULL) AS awaiting_assessment_count,
     count(t.id) FILTER (WHERE t.status = 'in_progress' AND t.expected_done_on IS NOT NULL) AS in_repair_count,
     count(t.id) FILTER (WHERE t.status = 'resolved') AS awaiting_rating_count
-FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 LEFT JOIN repair.tickets t ON t.floor_id = f.id AND t.status <> 'closed'
 WHERE f.is_active AND b.is_active
 GROUP BY f.id
@@ -51,7 +51,7 @@ ORDER BY f.level;
 -- Buildings with a floor plan and their footprint (the largest plan of the building, CR-017).
 SELECT f.building_id, max(fp.width_m)::float8 AS width_m, max(fp.depth_m)::float8 AS depth_m
 FROM platform.floor_plans fp
-JOIN repair.floors f ON f.id = fp.floor_id
+JOIN platform.floors f ON f.id = fp.floor_id
 WHERE f.is_active
 GROUP BY f.building_id;
 
@@ -77,8 +77,8 @@ ORDER BY sort_order, name;
 SELECT f.id, f.name, f.level, b.id AS building_id, b.name AS building_name,
     COALESCE(fp.width_m, 0)::float8 AS width_m, COALESCE(fp.depth_m, 0)::float8 AS depth_m, fp.model_file,
     (fp.floor_id IS NOT NULL)::boolean AS has_plan
-FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 LEFT JOIN platform.floor_plans fp ON fp.floor_id = f.id
 WHERE f.id = @id AND f.is_active AND b.is_active;
 
@@ -130,7 +130,7 @@ SELECT id, key, code_prefix FROM platform.asset_types WHERE id = @id AND is_acti
 SELECT r.id, r.floor_id, r.plan_shape, COALESCE(fp.width_m, 0)::float8 AS width_m, COALESCE(fp.depth_m, 0)::float8 AS depth_m,
     (fp.floor_id IS NOT NULL)::boolean AS has_plan
 FROM platform.rooms r
-JOIN repair.floors f ON f.id = r.floor_id
+JOIN platform.floors f ON f.id = r.floor_id
 LEFT JOIN platform.floor_plans fp ON fp.floor_id = r.floor_id
 WHERE r.id = @id AND r.is_active AND f.is_active;
 
@@ -148,7 +148,7 @@ SELECT EXISTS (
 SELECT code FROM platform.assets WHERE lower(code) LIKE lower(@prefix::text) || '%';
 
 -- name: GetActiveFloorName :one
-SELECT f.name FROM repair.floors f WHERE f.id = @id AND f.is_active;
+SELECT f.name FROM platform.floors f WHERE f.id = @id AND f.is_active;
 
 -- name: InsertAsset :exec
 INSERT INTO platform.assets (id, code, name, asset_type_id, room_id, pos_x, pos_z, rotation_deg, created_by, updated_by)
@@ -168,3 +168,10 @@ UPDATE platform.assets SET is_active = false, updated_by = @actor_id, updated_at
 -- BR-F31-5: every add / move / edit / deactivate (actor, before → after).
 INSERT INTO platform.audit_log (actor_user_id, action, target_type, target_id, data)
 VALUES (@actor_id, @action, 'asset', @target_id, @data);
+
+-- name: CountOpenTicketsByAsset :many
+-- settings #46 `openTicketCount`: tickets not closed per asset.
+SELECT asset_id::uuid AS asset_id, count(*)::bigint AS open_count
+FROM repair.tickets
+WHERE asset_id = ANY(@asset_ids::uuid[]) AND status <> 'closed'
+GROUP BY asset_id;

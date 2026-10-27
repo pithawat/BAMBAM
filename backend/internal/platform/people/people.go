@@ -34,3 +34,15 @@ func joinName(first, last *string) string {
 	}
 	return strings.Join(parts, " ")
 }
+
+// NewRef builds a Ref from the joined `updated_by_*` / `actor_*` columns of a query; nil id = no person.
+func NewRef(id *uuid.UUID, code, firstTH, lastTH, firstEN, lastEN, department *string) *Ref {
+	if id == nil {
+		return nil
+	}
+	c := ""
+	if code != nil {
+		c = *code
+	}
+	return &Ref{ID: *id, Name: DisplayName(c, firstTH, lastTH, firstEN, lastEN), Department: department}
+}

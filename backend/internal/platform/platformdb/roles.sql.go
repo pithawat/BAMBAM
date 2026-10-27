@@ -7,9 +7,123 @@ package platformdb
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+const bumpPermissionMatrix = `-- name: BumpPermissionMatrix :exec
+UPDATE platform.permission_matrix SET version = version + 1, updated_by_id = $1, updated_at = now()
+`
+
+func (q *Queries) BumpPermissionMatrix(ctx context.Context, actorID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, bumpPermissionMatrix, actorID)
+	return err
+}
+
+const countRealUsersInRole = `-- name: CountRealUsersInRole :one
+SELECT count(*)::bigint FROM platform.users u
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+WHERE NOT u.is_demo AND (ur.role_id = $1 OR (ur.role_id IS NULL AND $2::text = 'employee'))
+`
+
+type CountRealUsersInRoleParams struct {
+	RoleID  uuid.UUID
+	RoleKey string
+}
+
+// Same rule as ListRoles.user_count: demo users do not count.
+func (q *Queries) CountRealUsersInRole(ctx context.Context, arg CountRealUsersInRoleParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countRealUsersInRole, arg.RoleID, arg.RoleKey)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const deleteDemoUser = `-- name: DeleteDemoUser :exec
+DELETE FROM platform.users WHERE employee_code = $1 AND is_demo
+`
+
+func (q *Queries) DeleteDemoUser(ctx context.Context, employeeCode string) error {
+	_, err := q.db.Exec(ctx, deleteDemoUser, employeeCode)
+	return err
+}
+
+const deleteDemoUserRoles = `-- name: DeleteDemoUserRoles :many
+DELETE FROM platform.user_roles ur
+USING platform.users u
+WHERE u.employee_code = ur.employee_code AND u.is_demo AND ur.role_id = $1
+RETURNING ur.employee_code
+`
+
+// Unassigns the demo users of a role before it is deleted; returns their employee codes.
+func (q *Queries) DeleteDemoUserRoles(ctx context.Context, roleID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, deleteDemoUserRoles, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var employee_code string
+		if err := rows.Scan(&employee_code); err != nil {
+			return nil, err
+		}
+		items = append(items, employee_code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const deleteRole = `-- name: DeleteRole :exec
+DELETE FROM platform.roles WHERE id = $1
+`
+
+func (q *Queries) DeleteRole(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteRole, id)
+	return err
+}
+
+const getPermissionMatrix = `-- name: GetPermissionMatrix :one
+SELECT m.version, m.updated_at,
+       ub.id AS updated_by_user_id, ub.employee_code AS updated_by_employee_code,
+       ub.first_name_th AS updated_by_first_name_th, ub.last_name_th AS updated_by_last_name_th,
+       ub.first_name_en AS updated_by_first_name_en, ub.last_name_en AS updated_by_last_name_en,
+       ub.department AS updated_by_department
+FROM platform.permission_matrix m
+LEFT JOIN platform.users ub ON ub.id = m.updated_by_id
+`
+
+type GetPermissionMatrixRow struct {
+	Version               int32
+	UpdatedAt             time.Time
+	UpdatedByUserID       *uuid.UUID
+	UpdatedByEmployeeCode *string
+	UpdatedByFirstNameTh  *string
+	UpdatedByLastNameTh   *string
+	UpdatedByFirstNameEn  *string
+	UpdatedByLastNameEn   *string
+	UpdatedByDepartment   *string
+}
+
+func (q *Queries) GetPermissionMatrix(ctx context.Context) (GetPermissionMatrixRow, error) {
+	row := q.db.QueryRow(ctx, getPermissionMatrix)
+	var i GetPermissionMatrixRow
+	err := row.Scan(
+		&i.Version,
+		&i.UpdatedAt,
+		&i.UpdatedByUserID,
+		&i.UpdatedByEmployeeCode,
+		&i.UpdatedByFirstNameTh,
+		&i.UpdatedByLastNameTh,
+		&i.UpdatedByFirstNameEn,
+		&i.UpdatedByLastNameEn,
+		&i.UpdatedByDepartment,
+	)
+	return i, err
+}
 
 const getRoleByKey = `-- name: GetRoleByKey :one
 SELECT id, key, name, description, is_system, is_locked, sort_order, created_by_id, updated_by_id, created_at, updated_at FROM platform.roles WHERE key = $1
@@ -32,6 +146,87 @@ func (q *Queries) GetRoleByKey(ctx context.Context, key string) (PlatformRole, e
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const grantRolePermission = `-- name: GrantRolePermission :exec
+INSERT INTO platform.role_permissions (role_id, permission) VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type GrantRolePermissionParams struct {
+	RoleID     uuid.UUID
+	Permission string
+}
+
+func (q *Queries) GrantRolePermission(ctx context.Context, arg GrantRolePermissionParams) error {
+	_, err := q.db.Exec(ctx, grantRolePermission, arg.RoleID, arg.Permission)
+	return err
+}
+
+const insertRole = `-- name: InsertRole :one
+INSERT INTO platform.roles (key, name, description, created_by_id, updated_by_id)
+VALUES ($1, $2, $3, $4, $4)
+RETURNING id, key, name, description, is_system, is_locked, sort_order, created_by_id, updated_by_id, created_at, updated_at
+`
+
+type InsertRoleParams struct {
+	Key         string
+	Name        string
+	Description string
+	ActorID     *uuid.UUID
+}
+
+func (q *Queries) InsertRole(ctx context.Context, arg InsertRoleParams) (PlatformRole, error) {
+	row := q.db.QueryRow(ctx, insertRole,
+		arg.Key,
+		arg.Name,
+		arg.Description,
+		arg.ActorID,
+	)
+	var i PlatformRole
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.IsSystem,
+		&i.IsLocked,
+		&i.SortOrder,
+		&i.CreatedByID,
+		&i.UpdatedByID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listAllRolePermissions = `-- name: ListAllRolePermissions :many
+SELECT role_id, permission FROM platform.role_permissions ORDER BY role_id, permission
+`
+
+type ListAllRolePermissionsRow struct {
+	RoleID     uuid.UUID
+	Permission string
+}
+
+func (q *Queries) ListAllRolePermissions(ctx context.Context) ([]ListAllRolePermissionsRow, error) {
+	rows, err := q.db.Query(ctx, listAllRolePermissions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllRolePermissionsRow
+	for rows.Next() {
+		var i ListAllRolePermissionsRow
+		if err := rows.Scan(&i.RoleID, &i.Permission); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listRolePermissions = `-- name: ListRolePermissions :many
@@ -126,4 +321,93 @@ func (q *Queries) ListRoles(ctx context.Context) ([]ListRolesRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPermissionMatrix = `-- name: LockPermissionMatrix :one
+SELECT version FROM platform.permission_matrix FOR UPDATE
+`
+
+// Serialises matrix saves (D-051): the second writer waits, then sees the new version.
+func (q *Queries) LockPermissionMatrix(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, lockPermissionMatrix)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
+}
+
+const lockRole = `-- name: LockRole :one
+
+SELECT id, key, name, description, is_system, is_locked, sort_order, created_by_id, updated_by_id, created_at, updated_at FROM platform.roles WHERE id = $1 FOR UPDATE
+`
+
+// ---- settings Stage 2: roles CRUD and the permission matrix (F29, contract #2–#7) ----
+func (q *Queries) LockRole(ctx context.Context, id uuid.UUID) (PlatformRole, error) {
+	row := q.db.QueryRow(ctx, lockRole, id)
+	var i PlatformRole
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.IsSystem,
+		&i.IsLocked,
+		&i.SortOrder,
+		&i.CreatedByID,
+		&i.UpdatedByID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const revokeRolePermission = `-- name: RevokeRolePermission :exec
+DELETE FROM platform.role_permissions WHERE role_id = $1 AND permission = $2
+`
+
+type RevokeRolePermissionParams struct {
+	RoleID     uuid.UUID
+	Permission string
+}
+
+func (q *Queries) RevokeRolePermission(ctx context.Context, arg RevokeRolePermissionParams) error {
+	_, err := q.db.Exec(ctx, revokeRolePermission, arg.RoleID, arg.Permission)
+	return err
+}
+
+const updateRole = `-- name: UpdateRole :one
+UPDATE platform.roles
+SET name = $1, description = $2, updated_by_id = $3, updated_at = now()
+WHERE id = $4
+RETURNING id, key, name, description, is_system, is_locked, sort_order, created_by_id, updated_by_id, created_at, updated_at
+`
+
+type UpdateRoleParams struct {
+	Name        string
+	Description string
+	ActorID     *uuid.UUID
+	ID          uuid.UUID
+}
+
+func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (PlatformRole, error) {
+	row := q.db.QueryRow(ctx, updateRole,
+		arg.Name,
+		arg.Description,
+		arg.ActorID,
+		arg.ID,
+	)
+	var i PlatformRole
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.IsSystem,
+		&i.IsLocked,
+		&i.SortOrder,
+		&i.CreatedByID,
+		&i.UpdatedByID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

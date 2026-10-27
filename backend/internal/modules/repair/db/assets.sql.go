@@ -74,7 +74,7 @@ func (q *Queries) AttentionTicketIDs(ctx context.Context, arg AttentionTicketIDs
 const buildingsWithPlans = `-- name: BuildingsWithPlans :many
 SELECT f.building_id, max(fp.width_m)::float8 AS width_m, max(fp.depth_m)::float8 AS depth_m
 FROM platform.floor_plans fp
-JOIN repair.floors f ON f.id = fp.floor_id
+JOIN platform.floors f ON f.id = fp.floor_id
 WHERE f.is_active
 GROUP BY f.building_id
 `
@@ -96,6 +96,39 @@ func (q *Queries) BuildingsWithPlans(ctx context.Context) ([]BuildingsWithPlansR
 	for rows.Next() {
 		var i BuildingsWithPlansRow
 		if err := rows.Scan(&i.BuildingID, &i.WidthM, &i.DepthM); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countOpenTicketsByAsset = `-- name: CountOpenTicketsByAsset :many
+SELECT asset_id::uuid AS asset_id, count(*)::bigint AS open_count
+FROM repair.tickets
+WHERE asset_id = ANY($1::uuid[]) AND status <> 'closed'
+GROUP BY asset_id
+`
+
+type CountOpenTicketsByAssetRow struct {
+	AssetID   uuid.UUID
+	OpenCount int64
+}
+
+// settings #46 `openTicketCount`: tickets not closed per asset.
+func (q *Queries) CountOpenTicketsByAsset(ctx context.Context, assetIds []uuid.UUID) ([]CountOpenTicketsByAssetRow, error) {
+	rows, err := q.db.Query(ctx, countOpenTicketsByAsset, assetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountOpenTicketsByAssetRow
+	for rows.Next() {
+		var i CountOpenTicketsByAssetRow
+		if err := rows.Scan(&i.AssetID, &i.OpenCount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -138,7 +171,7 @@ func (q *Queries) GetActiveAssetType(ctx context.Context, id uuid.UUID) (GetActi
 }
 
 const getActiveFloorName = `-- name: GetActiveFloorName :one
-SELECT f.name FROM repair.floors f WHERE f.id = $1 AND f.is_active
+SELECT f.name FROM platform.floors f WHERE f.id = $1 AND f.is_active
 `
 
 func (q *Queries) GetActiveFloorName(ctx context.Context, id uuid.UUID) (string, error) {
@@ -199,8 +232,8 @@ const getFloorPlan = `-- name: GetFloorPlan :one
 SELECT f.id, f.name, f.level, b.id AS building_id, b.name AS building_name,
     COALESCE(fp.width_m, 0)::float8 AS width_m, COALESCE(fp.depth_m, 0)::float8 AS depth_m, fp.model_file,
     (fp.floor_id IS NOT NULL)::boolean AS has_plan
-FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 LEFT JOIN platform.floor_plans fp ON fp.floor_id = f.id
 WHERE f.id = $1 AND f.is_active AND b.is_active
 `
@@ -238,7 +271,7 @@ const getPlacementRoom = `-- name: GetPlacementRoom :one
 SELECT r.id, r.floor_id, r.plan_shape, COALESCE(fp.width_m, 0)::float8 AS width_m, COALESCE(fp.depth_m, 0)::float8 AS depth_m,
     (fp.floor_id IS NOT NULL)::boolean AS has_plan
 FROM platform.rooms r
-JOIN repair.floors f ON f.id = r.floor_id
+JOIN platform.floors f ON f.id = r.floor_id
 LEFT JOIN platform.floor_plans fp ON fp.floor_id = r.floor_id
 WHERE r.id = $1 AND r.is_active AND f.is_active
 `
@@ -670,8 +703,8 @@ SELECT f.id, f.building_id, f.name, f.level,
     count(t.id) FILTER (WHERE t.status = 'in_progress' AND t.expected_done_on IS NULL) AS awaiting_assessment_count,
     count(t.id) FILTER (WHERE t.status = 'in_progress' AND t.expected_done_on IS NOT NULL) AS in_repair_count,
     count(t.id) FILTER (WHERE t.status = 'resolved') AS awaiting_rating_count
-FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 LEFT JOIN repair.tickets t ON t.floor_id = f.id AND t.status <> 'closed'
 WHERE f.is_active AND b.is_active
 GROUP BY f.id
