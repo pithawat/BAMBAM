@@ -1,7 +1,7 @@
 import type { Category, Priority, PrioritySource } from "./types";
 
-// BR-F02-2 (CR-008): the system sets the priority — the most urgent picked symptom; with only a
-// typed symptom the category default; a typed category ("อื่นๆ") starts at medium.
+// BR-F02-2 (CR-008, CR-014): the system sets the priority — the most urgent picked symptom; with
+// only a typed symptom the category default ("อื่น ๆ" included).
 // Same rule as the backend `ticketPriority` (rules.go); S03 uses it to explain the level before
 // sending, the mocks to create tickets.
 
@@ -14,8 +14,8 @@ export type PriorityResult = {
   symptom?: string;
 };
 
-export function ticketPriority(category: Category | undefined, symptomIds: string[], typedCategory: boolean): PriorityResult {
-  if (typedCategory || !category) return { priority: "medium", source: "default" };
+export function ticketPriority(category: Category | undefined, symptomIds: string[]): PriorityResult {
+  if (!category) return { priority: "medium", source: "default" };
   const picked = category.symptoms
     .filter((s) => symptomIds.includes(s.id))
     .sort((a, b) => RANK[a.priority] - RANK[b.priority]);

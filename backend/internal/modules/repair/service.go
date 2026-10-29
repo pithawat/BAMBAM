@@ -19,11 +19,11 @@ import (
 type Repository interface {
 	ListCategories(ctx context.Context) ([]Category, error)
 	ListBuildings(ctx context.Context) ([]Building, error)
-	CountCategories(ctx context.Context) (int64, error)
-	InsertMasterData(ctx context.Context, cats []Category, buildings []Building) error
-	// RefreshSampleData applies newer sample values by id (dev / UAT only, CR-008): category defaults
-	// and symptom priorities still at `medium`, and building names still at their first sample name.
-	RefreshSampleData(ctx context.Context, cats []Category, renames []SampleRename) error
+	// InsertSampleLocations inserts sample buildings, floors and rooms by id, leaving existing rows
+	// as they are (dev / UAT only, D-032, CR-014).
+	InsertSampleLocations(ctx context.Context, buildings []Building) error
+	// RefreshSampleData renames sample buildings still at their first sample name (dev / UAT only, CR-008).
+	RefreshSampleData(ctx context.Context, renames []SampleRename) error
 	ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]RecentPlace, error)
 
 	InsertPhoto(ctx context.Context, p NewPhoto) error
@@ -50,11 +50,13 @@ type Repository interface {
 
 // TxRepository is used inside write transactions.
 type TxRepository interface {
-	// LockActiveCategory returns the category's default priority (CR-008); ok is false when it is inactive or missing.
-	LockActiveCategory(ctx context.Context, id uuid.UUID) (defaultPriority string, ok bool, err error)
+	// LockActiveCategory returns the category's default priority (CR-008) and "อื่น ๆ" flag (CR-014);
+	// ok is false when it is inactive or missing.
+	LockActiveCategory(ctx context.Context, id uuid.UUID) (cat ActiveCategory, ok bool, err error)
 	// ActiveSymptomPriorities returns the priorities of the given symptoms that are active in the category.
 	ActiveSymptomPriorities(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error)
 	ActiveFloorInBuilding(ctx context.Context, floorID, buildingID uuid.UUID) (bool, error)
+	ActiveRoomOnFloor(ctx context.Context, roomID, floorID uuid.UUID) (bool, error)
 	LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error)
 	TicketNumberFormat(ctx context.Context) (TicketNumberFormat, error)
 	NextTicketCounter(ctx context.Context, year int) (int64, error)
@@ -100,24 +102,17 @@ func (s *Service) Buildings(ctx context.Context) ([]Building, error) {
 	return s.repo.ListBuildings(ctx)
 }
 
-// EnsureSampleData inserts the sample master data (seed.go) when no category exists yet, and
-// otherwise refreshes the sample values added later (CR-008 priorities and building names).
-// main.go calls it only in dev/UAT (D-032); real seed files replace it.
-func (s *Service) EnsureSampleData(ctx context.Context) (bool, error) {
-	n, err := s.repo.CountCategories(ctx)
-	if err != nil {
-		return false, err
+// EnsureSampleData inserts the sample buildings, floors and rooms (seed.go) that are missing and
+// renames sample buildings still at their first sample name. Categories and symptoms are the real
+// master loaded by migration (CR-014). main.go calls it only in dev/UAT (D-032).
+func (s *Service) EnsureSampleData(ctx context.Context) error {
+	if err := s.repo.RefreshSampleData(ctx, sampleBuildingRenames()); err != nil {
+		return fmt.Errorf("refresh sample master data: %w", err)
 	}
-	if n > 0 {
-		if err := s.repo.RefreshSampleData(ctx, sampleCategories(), sampleBuildingRenames()); err != nil {
-			return false, fmt.Errorf("refresh sample master data: %w", err)
-		}
-		return false, nil
+	if err := s.repo.InsertSampleLocations(ctx, sampleBuildings()); err != nil {
+		return fmt.Errorf("insert sample locations: %w", err)
 	}
-	if err := s.repo.InsertMasterData(ctx, sampleCategories(), sampleBuildings()); err != nil {
-		return false, fmt.Errorf("insert sample master data: %w", err)
-	}
-	return true, nil
+	return nil
 }
 
 // ---- photos ----
@@ -233,38 +228,44 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 
 	now := s.now()
 	t := NewTicket{
-		ID: uuid.New(), CategoryID: in.CategoryID,
+		ID: uuid.New(), CategoryID: *in.CategoryID,
 		CategoryOther: optional(in.CategoryOther), SymptomOther: optional(in.SymptomOther),
-		BuildingID: *in.BuildingID, FloorID: *in.FloorID,
+		BuildingID: *in.BuildingID, FloorID: *in.FloorID, RoomID: *in.RoomID,
 		LocationDetail: optional(in.LocationDetail), Details: optional(in.Details), AssetCode: optional(in.AssetCode),
 		ReporterID: v.ID, SymptomIDs: in.SymptomIDs, PhotoIDs: in.PhotoIDs,
 		CreatedAt: now, CreatedEventID: uuid.New(),
 	}
 
 	err := s.repo.InTx(ctx, func(tx TxRepository) error {
+		cat, ok, err := tx.LockActiveCategory(ctx, t.CategoryID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return ErrMasterDataChanged
+		}
+		// CR-014: a typed category name is a value under the "อื่น ๆ" category only.
+		if t.CategoryOther != nil && !cat.IsOther {
+			return apperr.Validation(map[string]string{"categoryOther": "NOT_ALLOWED"})
+		}
 		var symptomPriorities []string
-		categoryDefault := ""
-		if t.CategoryID != nil {
-			def, ok, err := tx.LockActiveCategory(ctx, *t.CategoryID)
-			if err != nil {
+		if len(t.SymptomIDs) > 0 {
+			if symptomPriorities, err = tx.ActiveSymptomPriorities(ctx, t.CategoryID, t.SymptomIDs); err != nil {
 				return err
 			}
-			if !ok {
+			if len(symptomPriorities) != len(t.SymptomIDs) {
 				return ErrMasterDataChanged
-			}
-			categoryDefault = def
-			if len(t.SymptomIDs) > 0 {
-				if symptomPriorities, err = tx.ActiveSymptomPriorities(ctx, *t.CategoryID, t.SymptomIDs); err != nil {
-					return err
-				}
-				if len(symptomPriorities) != len(t.SymptomIDs) {
-					return ErrMasterDataChanged
-				}
 			}
 		}
 		// BR-F02-2 (CR-008): the system sets the priority.
-		t.Priority, t.PrioritySource = ticketPriority(symptomPriorities, categoryDefault, t.CategoryID == nil)
+		t.Priority, t.PrioritySource = ticketPriority(symptomPriorities, cat.DefaultPriority)
 		if ok, err := tx.ActiveFloorInBuilding(ctx, t.FloorID, t.BuildingID); err != nil {
+			return err
+		} else if !ok {
+			return ErrMasterDataChanged
+		}
+		// BR-F02-7 (CR-014): the room is required and must be active on the floor.
+		if ok, err := tx.ActiveRoomOnFloor(ctx, t.RoomID, t.FloorID); err != nil {
 			return err
 		} else if !ok {
 			return ErrMasterDataChanged

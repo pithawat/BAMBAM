@@ -129,7 +129,7 @@ func TestControllerReportFlow(t *testing.T) {
 	}
 
 	req, _ := json.Marshal(map[string]any{
-		"categoryId": f.cat, "symptomIds": []uuid.UUID{f.sym1}, "buildingId": f.building, "floorId": f.floor,
+		"categoryId": f.cat, "symptomIds": []uuid.UUID{f.sym1}, "buildingId": f.building, "floorId": f.floor, "roomId": f.room,
 		"priority": "high", "photoIds": []uuid.UUID{up.Data.ID}, "teamHandled": nil,
 	})
 	w, _ = do(t, r, "POST", "/api/v1/repair/tickets", req, "application/json")
@@ -140,7 +140,7 @@ func TestControllerReportFlow(t *testing.T) {
 		Data map[string]any `json:"data"`
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &created)
-	for _, k := range []string{"ticketNo", "viewerRelation", "awaitingMyConfirmation", "photos", "timeline", "allowedActions", "blockedActions", "asset", "result"} {
+	for _, k := range []string{"ticketNo", "viewerRelation", "awaitingMyConfirmation", "photos", "timeline", "allowedActions", "blockedActions", "asset", "result", "room"} {
 		if _, ok := created.Data[k]; !ok {
 			t.Errorf("response missing %q", k)
 		}

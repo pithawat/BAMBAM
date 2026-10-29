@@ -1,6 +1,10 @@
 # UI handoff — ระบบแจ้งซ่อม — Stages 1–2 + 2R (CR-008)
 
-Status: BUILT BY CLAUDE — Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+Status: BUILT BY CLAUDE — Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+
+## CR-014 (approved 2026-10-19) — Stage 2M, built by Claude 2026-10-19
+
+S03 = 3 equal frames (`changes/CR-014/form-steps.html`), categories from the DB master, required room. Files (Claude owns): `modules/repair/components/report-form.tsx` (rewritten), `modules/repair/{types,mocks,errors,priority}.ts`, location line `placeLine` / `ticketLocation` / `floorLabel` in `ticket-presentation.ts`, used by `my-tickets.tsx`, `ticket-detail.tsx`, `ticket-actions.tsx`, `technician-work.tsx`, `report-success.tsx`. Codex has nothing to build.
 
 ## CR-010 / CR-011 (2026-10-18) — built by Claude
 

@@ -15,7 +15,7 @@
 
 | Key | Name (TH) | Purpose | Main users | Phase | Stage | Status |
 |---|---|---|---|---|---|---|
-| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 1–2 of 8 | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stages 1–2 built, waiting acceptance; CR-008 (L) proposed 2026-10-16 |
+| `repair` | ระบบแจ้งซ่อม | แจ้งปัญหา → ช่างรับงานจากคิว → ซ่อม → ผู้แจ้งตรวจรับ | ทุก role | P5 | 2M of 8 (next 3) | Stage 0 platform accepted 2026-10-14 (`platform-stage-0`); Stage 2M (CR-014) accepted 2026-10-19 (`repair-stage-2M`); Stages 1 / 2 / 2R / 2N built, waiting acceptance |
 | `car_booking` | ระบบจองรถ | จองรถส่วนกลาง | ✏️ | – | – | brief needed |
 | `room_booking` | ระบบจองห้องประชุม | จองห้องประชุม | ✏️ | – | – | brief needed |
 | `settings` | ตั้งค่าระบบ (Superadmin) | ตั้งค่า master ผังอาคาร role / สิทธิ์ และผู้ใช้ ใช้ร่วมทั้ง 3 ระบบ | `super_admin` | P5 | 0 of 6 | screens + plan + CR-007 approved 2026-10-16; Stage 1 next |

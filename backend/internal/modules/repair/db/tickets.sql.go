@@ -101,6 +101,7 @@ func (q *Queries) ConfirmTicket(ctx context.Context, arg ConfirmTicketParams) er
 
 const countTickets = `-- name: CountTickets :one
 SELECT count(*) FROM repair.tickets t
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 WHERE ($1::boolean OR (
         ($2::text IN ('all', 'reported') AND t.reporter_id = $3)
      OR ($2::text IN ('all', 'following') AND EXISTS (
@@ -114,7 +115,8 @@ WHERE ($1::boolean OR (
         ELSE 'in_repair' END) = ANY($5::text[]))
   AND ($6::text IS NULL OR t.closed_reason = $6::text)
   AND ($7::text IS NULL OR t.ticket_no ILIKE '%' || $7::text || '%'
-       OR t.location_detail ILIKE '%' || $7::text || '%')
+       OR t.location_detail ILIKE '%' || $7::text || '%'
+       OR rm.name ILIKE '%' || $7::text || '%')
   AND ($8::timestamptz IS NULL OR t.created_at >= $8::timestamptz)
   AND ($9::timestamptz IS NULL OR t.created_at <= $9::timestamptz)
   AND ($10::uuid IS NULL OR t.category_id = $10::uuid)
@@ -169,13 +171,15 @@ SELECT
     count(*) FILTER (WHERE t.status = 'in_progress' AND t.expected_done_on IS NOT NULL) AS in_repair_count,
     count(*) FILTER (WHERE t.status = 'resolved' AND t.reporter_id = $1) AS awaiting_my_confirmation_count
 FROM repair.tickets t
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 WHERE ($2::boolean OR (
         ($3::text IN ('all', 'reported') AND t.reporter_id = $1)
      OR ($3::text IN ('all', 'following') AND EXISTS (
             SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1))))
   AND ($4::text IS NULL OR t.closed_reason = $4::text)
   AND ($5::text IS NULL OR t.ticket_no ILIKE '%' || $5::text || '%'
-       OR t.location_detail ILIKE '%' || $5::text || '%')
+       OR t.location_detail ILIKE '%' || $5::text || '%'
+       OR rm.name ILIKE '%' || $5::text || '%')
   AND ($6::timestamptz IS NULL OR t.created_at >= $6::timestamptz)
   AND ($7::timestamptz IS NULL OR t.created_at <= $7::timestamptz)
   AND ($8::uuid IS NULL OR t.category_id = $8::uuid)
@@ -270,6 +274,7 @@ SELECT
     t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
+    t.room_id, rm.name AS room_name,
     t.location_detail, t.details, t.asset_code,
     t.reporter_id, rp.name AS reporter_name, rp.department AS reporter_department,
     t.holder_id, hp.name AS holder_name, hp.department AS holder_department,
@@ -285,6 +290,7 @@ FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.people rb ON rb.id = t.resolved_by_id
@@ -312,6 +318,8 @@ type GetTicketRow struct {
 	BuildingName            string
 	FloorID                 uuid.UUID
 	FloorName               string
+	RoomID                  *uuid.UUID
+	RoomName                *string
 	LocationDetail          *string
 	Details                 *string
 	AssetCode               *string
@@ -362,6 +370,8 @@ func (q *Queries) GetTicket(ctx context.Context, arg GetTicketParams) (GetTicket
 		&i.BuildingName,
 		&i.FloorID,
 		&i.FloorName,
+		&i.RoomID,
+		&i.RoomName,
 		&i.LocationDetail,
 		&i.Details,
 		&i.AssetCode,
@@ -441,11 +451,11 @@ const insertTicket = `-- name: InsertTicket :exec
 
 INSERT INTO repair.tickets (
     id, ticket_no, status, priority, priority_source, category_id, category_other, symptom_other,
-    building_id, floor_id, location_detail, details, asset_code, reporter_id
+    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id
 ) VALUES (
     $1, $2, 'in_progress', $3, $4, $5::uuid,
     $6::text, $7::text,
-    $8, $9, $10, $11, $12, $13
+    $8, $9, $10, $11, $12, $13, $14
 )
 `
 
@@ -459,6 +469,7 @@ type InsertTicketParams struct {
 	SymptomOther   *string
 	BuildingID     uuid.UUID
 	FloorID        uuid.UUID
+	RoomID         *uuid.UUID
 	LocationDetail *string
 	Details        *string
 	AssetCode      *string
@@ -482,6 +493,7 @@ func (q *Queries) InsertTicket(ctx context.Context, arg InsertTicketParams) erro
 		arg.SymptomOther,
 		arg.BuildingID,
 		arg.FloorID,
+		arg.RoomID,
 		arg.LocationDetail,
 		arg.Details,
 		arg.AssetCode,
@@ -535,16 +547,18 @@ func (q *Queries) InsertTicketSymptoms(ctx context.Context, arg InsertTicketSymp
 }
 
 const listRecentPlaces = `-- name: ListRecentPlaces :many
-SELECT p.building_id, p.building_name, p.floor_id, p.floor_name, p.location_detail, p.last_reported_at
+SELECT p.building_id, p.building_name, p.floor_id, p.floor_name, p.room_id, p.room_name,
+       p.location_detail, p.last_reported_at
 FROM (
-    SELECT DISTINCT ON (t.building_id, t.floor_id, COALESCE(t.location_detail, ''))
+    SELECT DISTINCT ON (t.building_id, t.floor_id, t.room_id)
         t.building_id, b.name AS building_name, t.floor_id, f.name AS floor_name,
-        t.location_detail, t.created_at AS last_reported_at
+        t.room_id, rm.name AS room_name, t.location_detail, t.created_at AS last_reported_at
     FROM repair.tickets t
     JOIN repair.buildings b ON b.id = t.building_id AND b.is_active
     JOIN repair.floors f ON f.id = t.floor_id AND f.is_active
+    JOIN platform.rooms rm ON rm.id = t.room_id AND rm.is_active AND rm.floor_id = t.floor_id
     WHERE t.reporter_id = $1
-    ORDER BY t.building_id, t.floor_id, COALESCE(t.location_detail, ''), t.created_at DESC
+    ORDER BY t.building_id, t.floor_id, t.room_id, t.created_at DESC
 ) p
 ORDER BY p.last_reported_at DESC
 LIMIT 3
@@ -555,11 +569,14 @@ type ListRecentPlacesRow struct {
 	BuildingName   string
 	FloorID        uuid.UUID
 	FloorName      string
+	RoomID         *uuid.UUID
+	RoomName       string
 	LocationDetail *string
 	LastReportedAt time.Time
 }
 
-// "ที่เคยแจ้ง" (#28, CR-008): the reporter's last 3 distinct places on active buildings / floors.
+// "ที่เคยแจ้ง" (#28, CR-008, CR-014): the reporter's last 3 distinct rooms on active buildings / floors / rooms;
+// each keeps the extra spot of its newest ticket. Tickets without a room (before CR-014) are skipped.
 func (q *Queries) ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]ListRecentPlacesRow, error) {
 	rows, err := q.db.Query(ctx, listRecentPlaces, reporterID)
 	if err != nil {
@@ -574,6 +591,8 @@ func (q *Queries) ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([
 			&i.BuildingName,
 			&i.FloorID,
 			&i.FloorName,
+			&i.RoomID,
+			&i.RoomName,
 			&i.LocationDetail,
 			&i.LastReportedAt,
 		); err != nil {
@@ -675,6 +694,7 @@ SELECT
     t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
+    t.room_id, rm.name AS room_name,
     t.location_detail,
     t.reporter_id, rp.name AS reporter_name, rp.department AS reporter_department,
     t.holder_id, hp.name AS holder_name, hp.department AS holder_department,
@@ -687,6 +707,7 @@ FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN repair.buildings b ON b.id = t.building_id
 JOIN repair.floors f ON f.id = t.floor_id
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
@@ -703,7 +724,8 @@ WHERE ($2::boolean OR (
         ELSE 'in_repair' END) = ANY($5::text[]))
   AND ($6::text IS NULL OR t.closed_reason = $6::text)
   AND ($7::text IS NULL OR t.ticket_no ILIKE '%' || $7::text || '%'
-       OR t.location_detail ILIKE '%' || $7::text || '%')
+       OR t.location_detail ILIKE '%' || $7::text || '%'
+       OR rm.name ILIKE '%' || $7::text || '%')
   AND ($8::timestamptz IS NULL OR t.created_at >= $8::timestamptz)
   AND ($9::timestamptz IS NULL OR t.created_at <= $9::timestamptz)
   AND ($10::uuid IS NULL OR t.category_id = $10::uuid)
@@ -759,6 +781,8 @@ type ListTicketsRow struct {
 	BuildingName       string
 	FloorID            uuid.UUID
 	FloorName          string
+	RoomID             *uuid.UUID
+	RoomName           *string
 	LocationDetail     *string
 	ReporterID         uuid.UUID
 	ReporterName       string
@@ -824,6 +848,8 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Lis
 			&i.BuildingName,
 			&i.FloorID,
 			&i.FloorName,
+			&i.RoomID,
+			&i.RoomName,
 			&i.LocationDetail,
 			&i.ReporterID,
 			&i.ReporterName,

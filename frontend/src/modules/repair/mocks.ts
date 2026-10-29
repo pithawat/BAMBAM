@@ -3,6 +3,7 @@ import { mockMeByRole } from "@/lib/platform/mocks";
 import { ticketPriority } from "./priority";
 import type { Role } from "@/lib/platform/types";
 import type {
+  AreaType,
   Building,
   Category,
   Photo,
@@ -11,6 +12,7 @@ import type {
   PrioritySource,
   RecentPlace,
   Ref,
+  Room,
   TicketCounts,
   TicketCountsQuery,
   TicketDetail,
@@ -23,7 +25,8 @@ import type {
 } from "./types";
 
 // Mock data for building the UI without the backend (NEXT_PUBLIC_USE_MOCKS=true).
-// Sample data from docs/modules/repair/ui/screens/_common.md §8 — names are fictional.
+// Categories / symptoms = the real master (CR-014, same ids as migration 20261019000001); buildings,
+// rooms and tickets are sample data (_common.md §8, seed.go) — names are fictional.
 // Dates are relative to "now" so today / yesterday / this year formats show up.
 //
 // Scenarios — pick with `?mock=<name>` on any page (remembered in localStorage) or
@@ -33,7 +36,7 @@ import type {
 //   error           every read fails; create and upload fail with a network error
 //   forbidden       S07 shows the forbidden state for every ticket
 //   slow            normal data after 3 s (loading skeletons)
-//   validation      create returns VALIDATION_FAILED for symptoms / floor / photos
+//   validation      create returns VALIDATION_FAILED for symptoms / room / photos
 //   master_changed  create returns MASTER_DATA_CHANGED
 //   upload_error    every photo upload fails (tile "ลองใหม่")
 // Fixed ids: MOCK_IDS.forbiddenTicket is someone else's ticket (forbidden for the employee in
@@ -78,7 +81,7 @@ export const mockErrors = {
   validation: () =>
     new ApiError(400, "VALIDATION_FAILED", "mock: validation failed", {
       symptomIds: "MIN_ITEMS",
-      floorId: "REQUIRED",
+      roomId: "REQUIRED",
       photoIds: "MIN_ITEMS",
     }),
 };
@@ -90,39 +93,73 @@ const DAY = 24 * HOUR;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const later = (ms: number) => new Date(Date.now() + ms).toISOString();
 
-// ---- master data (ids of the first two categories match lib/platform/mocks technicianCategories) ----
+// ---- master data ----
 
-const catId = (n: number) => `6f1c2a90-0000-4000-8000-00000000000${n}`;
-const symId = (c: number, s: number) => `11a00000-0000-4000-8000-0000000${c}0${s.toString().padStart(3, "0")}`;
+// CR-014 master: ids match the migration, so mock and real data line up.
+const catId = (n: number) => `c014ca70-0000-4000-8000-00000000000${n}`;
+const symId = (c: number, s: number) => `c0145e00-000${c}-4000-8000-00000000000${s}`;
 const bldId = (n: number) => `b1000000-0000-4000-8000-00000000000${n}`;
 const floorId = (b: number, level: number) => `f1000000-0000-4000-8000-0000000${b}0${level.toString().padStart(3, "0")}`;
+const roomId = (b: number, level: number, k: number) => `e1000000-0000-4000-8000-${b}${level.toString().padStart(3, "0")}${k.toString().padStart(8, "0")}`;
 
-// Priorities and category defaults: _common.md CR-008 sample (set by the admin in settings S22 later).
-const categoryData: [string, string, Priority, [string, Priority][]][] = [
-  ["ระบบปรับอากาศ", "snowflake", "medium", [["แอร์ไม่เย็น", "medium"], ["มีน้ำหยด", "high"], ["มีเสียงดัง", "medium"], ["มีกลิ่นอับ", "low"], ["เปิดไม่ติด", "high"]]],
-  ["ไฟฟ้าและแสงสว่าง", "lightbulb", "high", [["ไฟไม่ติด", "medium"], ["ไฟกะพริบ", "low"], ["ปลั๊กไม่มีไฟ", "medium"], ["เบรกเกอร์ตัด", "critical"]]],
-  ["ประปาและสุขภัณฑ์", "droplets", "medium", [["น้ำรั่ว", "high"], ["ท่อตัน", "medium"], ["ชักโครกกดไม่ลง", "medium"], ["น้ำไม่ไหล", "high"]]],
-  ["อาคารและเฟอร์นิเจอร์", "armchair", "low", [["ประตูปิดไม่สนิท", "low"], ["กระเบื้องแตก", "medium"], ["เก้าอี้ชำรุด", "low"], ["ฝ้าเพดานรั่ว", "high"]]],
-  ["ความสะอาด", "sparkles", "medium", [["พื้นเปียก", "high"], ["ขยะล้น", "medium"], ["มีกลิ่นไม่พึงประสงค์", "low"]]],
+// [name, icon, symptoms with the owner-accepted priorities, area types] — every default is medium.
+const categoryData: [string, string, [string, Priority][], AreaType[]][] = [
+  ["ไฟฟ้าและแสงสว่าง", "zap", [["ไฟไม่ติด/ไฟกะพริบ", "medium"], ["ปลั๊กไม่มีไฟ/สวิตช์เสีย", "medium"], ["ไฟตกหรือดับ", "high"], ["มีกลิ่นไหม้/ประกายไฟ", "critical"]], ["office", "meeting_room", "common_area"]],
+  ["ระบบปรับอากาศ", "snowflake", [["แอร์ไม่เย็น", "medium"], ["น้ำหยด/รั่วซึม", "high"], ["มีเสียงดัง", "medium"], ["มีกลิ่น", "low"], ["เปิดไม่ติด", "high"], ["รีโมทเสีย", "low"]], ["meeting_room", "office"]],
+  ["ประปาและสุขาภิบาล", "droplets", [["น้ำไม่ไหล", "high"], ["น้ำรั่วซึม", "high"], ["ท่อตัน", "medium"], ["ก๊อก/วาล์วเสีย", "medium"], ["ชักโครกเสีย", "medium"], ["ที่กดน้ำยาเช็ดฝาชักโครก/กล่องทิชชู่ชำรุด", "low"]], ["restroom", "pantry"]],
+  ["ห้องประชุมและโสตทัศนูปกรณ์", "presentation", [["ไมค์ไม่มีเสียง/เสียงขาด", "medium"], ["ลำโพงไม่ดัง", "medium"], ["จอไม่แสดงผล/ไม่ติด", "medium"], ["กล้องไม่ทำงาน", "medium"], ["สายสัญญาณ HDMI เสีย", "medium"]], ["meeting_room"]],
+  ["อาคารและพื้นที่ส่วนกลาง", "building-2", [["ฝ้า/ผนังชำรุด", "medium"], ["พื้นแตก/ร่อน", "medium"], ["ประตู/กระจกเสีย", "medium"], ["หลังคารั่ว", "high"], ["สีลอก", "low"], ["เสี่ยงหล่นใส่คน", "critical"]], ["common_area"]],
+  ["ลานจอด / ไม้กั้น", "square-parking", [["ไม้กั้นค้าง/ไม่ยกลง", "high"], ["ไม้กั้นไม่ทำงาน", "high"], ["ไม้กั้นหัก/ชำรุด", "medium"], ["ที่จอดรถชำรุด/พื้นแตก", "low"], ["เส้นจราจรลบเลือน", "low"], ["ป้าย/สัญญาณจราจรเสีย", "medium"], ["ไฟส่องสว่างลานจอดดับ", "medium"]], ["parking"]],
+  ["อื่น ๆ", "ellipsis", [["ใช้งานไม่ได้", "medium"], ["มีเสียง/กลิ่นผิดปกติ", "medium"], ["รั่วซึมชำรุด", "medium"], ["มีความเสี่ยงอันตราย", "critical"]], []],
 ];
 
-export const mockCategories: Category[] = categoryData.map(([name, icon, defaultPriority, symptoms], i) => ({
+export const mockCategories: Category[] = categoryData.map(([name, icon, symptoms, areaTypes], i) => ({
   id: catId(i + 1),
   name,
   icon,
-  defaultPriority,
+  defaultPriority: "medium",
+  isOther: i === categoryData.length - 1,
+  areaTypes,
   symptoms: symptoms.map(([s, priority], j) => ({ id: symId(i + 1, j + 1), name: s, priority })),
 }));
 
+/** Same sample rooms as backend seed.go: floor 2 of the main building has > 9 rooms (S03 picker). */
+function sampleRooms(b: number, level: number): Room[] {
+  const n = String(level);
+  const meetings = b === 1 && level === 2 ? ["A", "B", "C", "D", "E", "F"] : ["A", "B"];
+  const rooms: [string, AreaType][] = [
+    ...meetings.map((m): [string, AreaType] => [`ห้องประชุม ${n}${m}`, "meeting_room"]),
+    [`สำนักงานชั้น ${n}`, "office"],
+    ["ห้องน้ำชาย", "restroom"],
+    ["ห้องน้ำหญิง", "restroom"],
+    ...(b === 1 ? [["Pantry", "pantry"] as [string, AreaType]] : []),
+    [`พื้นที่ส่วนกลางชั้น ${n}`, "common_area"],
+  ];
+  return rooms.map(([name, areaType], k) => ({ id: roomId(b, level, k + 1), name, areaType }));
+}
+
 // CR-008 names: อาคารหลัก → อาคารฝั่ง Office, อาคารด้านหลัง → อาคาร Office โรงงานบางซ่อน (ids unchanged).
+// CR-014: the car park is an outdoor "building" with one floor and room (migration ids).
 export const mockBuildings: Building[] = [
-  { name: "อาคารฝั่ง Office", floors: 7 },
-  { name: "อาคาร Office โรงงานบางซ่อน", floors: 2 },
-].map((b, i) => ({
-  id: bldId(i + 1),
-  name: b.name,
-  floors: Array.from({ length: b.floors }, (_, k) => ({ id: floorId(i + 1, k + 1), name: String(k + 1), level: k + 1 })),
-}));
+  ...[
+    { name: "อาคารฝั่ง Office", floors: 7 },
+    { name: "อาคาร Office โรงงานบางซ่อน", floors: 2 },
+  ].map((b, i) => ({
+    id: bldId(i + 1),
+    name: b.name,
+    floors: Array.from({ length: b.floors }, (_, k) => ({
+      id: floorId(i + 1, k + 1), name: String(k + 1), level: k + 1, rooms: sampleRooms(i + 1, k + 1),
+    })),
+  })),
+  {
+    id: "c014b1d0-0000-4000-8000-000000000001",
+    name: "พื้นที่ภายนอกอาคาร",
+    floors: [{
+      id: "c014f100-0000-4000-8000-000000000001", name: "ลานจอดรถ", level: 1,
+      rooms: [{ id: "c014e000-0000-4000-8000-000000000001", name: "ลานจอดรถ", areaType: "parking" }],
+    }],
+  },
+];
 
 const cat = (n: number): Ref => ({ id: mockCategories[n - 1].id, name: mockCategories[n - 1].name });
 const sym = (c: number, ...s: number[]): Ref[] => s.map((n) => {
@@ -134,6 +171,17 @@ const flr = (b: number, level: number): Ref => {
   const f = mockBuildings[b - 1].floors[level - 1];
   return { id: f.id, name: f.name };
 };
+const room = (b: number, level: number, name: string): Ref => {
+  const r = mockBuildings[b - 1].floors[level - 1].rooms.find((x) => x.name === name);
+  if (!r) throw new Error(`mock room ${name} not on ${b}/${level}`);
+  return { id: r.id, name: r.name };
+};
+
+/** Sample categories switched off by CR-014 — older tickets still point at them. */
+const legacy = {
+  furniture: { category: { id: "6f1c2a90-0000-4000-8000-000000000004", name: "อาคารและเฟอร์นิเจอร์" }, symptoms: [{ id: "11a00000-0000-4000-8000-000000040003", name: "เก้าอี้ชำรุด" }] },
+  cleaning: { category: { id: "6f1c2a90-0000-4000-8000-000000000005", name: "ความสะอาด" }, symptoms: [{ id: "11a00000-0000-4000-8000-000000050001", name: "พื้นเปียก" }] },
+} satisfies Record<string, { category: Ref; symptoms: Ref[] }>;
 
 // ---- people (ids match lib/platform/mocks where the person is a demo user) ----
 
@@ -187,13 +235,17 @@ type Seed = {
   status: TicketStatus;
   priority: Priority;
   prioritySource?: PrioritySource;
-  /** 0 = typed category ("อื่นๆ") → `categoryOther`. */
+  /** Index in the CR-014 master; 0 = typed category before CR-014 ("อื่นๆ", `category: null`). */
   category: number;
   categoryOther?: string;
   symptoms: number[];
+  /** A switched-off sample category (tickets before CR-014). */
+  legacy?: { category: Ref; symptoms: Ref[] };
   symptomOther?: string;
   building: number;
   floor: number;
+  /** Room name on that floor (CR-014); tickets before CR-014 have none. */
+  room?: string;
   location?: string;
   details?: string;
   reporter: PersonRef;
@@ -295,12 +347,13 @@ function build(s: Seed): TicketDetail {
     closedReason: s.closedReason ?? null,
     priority: s.priority,
     prioritySource: s.prioritySource ?? (s.categoryOther ? "default" : "symptom"),
-    category: s.category ? cat(s.category) : null,
+    category: s.legacy?.category ?? (s.category ? cat(s.category) : null),
     categoryOther: s.categoryOther ?? null,
-    symptoms: s.category ? sym(s.category, ...s.symptoms) : [],
+    symptoms: s.legacy?.symptoms ?? (s.category ? sym(s.category, ...s.symptoms) : []),
     symptomOther: s.symptomOther ?? null,
     building: bld(s.building),
     floor: flr(s.building, s.floor),
+    room: s.room ? room(s.building, s.floor, s.room) : null,
     locationDetail: s.location ?? null,
     thumbUrl: s.photos[0]?.thumbUrl ?? null,
     reporter: s.reporter,
@@ -344,49 +397,49 @@ const P = mockPeople;
 
 const seeds: Seed[] = [
   {
-    n: 150, status: "in_progress", priority: "high", category: 1, symptoms: [1, 2], building: 1, floor: 5,
-    location: "ห้องประชุม 5B", details: "น้ำหยดใส่โต๊ะประชุม เริ่มตั้งแต่เช้า แอร์เปิดแล้วลมไม่เย็น",
+    n: 150, status: "in_progress", priority: "high", category: 2, symptoms: [1, 2], building: 1, floor: 5,
+    room: "ห้องประชุม 5B", location: "ฝั่งหน้าต่าง", details: "น้ำหยดใส่โต๊ะประชุม เริ่มตั้งแต่เช้า แอร์เปิดแล้วลมไม่เย็น",
     reporter: P.wanna, createdAgo: 50 * 60 * 1000,
     photos: [mockPhoto(HUE.ac, "แอร์ห้อง 5B"), mockPhoto(HUE.ac, "น้ำหยดบนโต๊ะ")],
   },
   {
-    n: 149, status: "in_progress", priority: "low", category: 2, symptoms: [2], building: 1, floor: 3,
-    location: "ทางเดินหน้าลิฟต์", reporter: P.wanna, technician: P.thanakorn,
+    n: 149, status: "in_progress", priority: "medium", category: 1, symptoms: [1], building: 1, floor: 3,
+    room: "พื้นที่ส่วนกลางชั้น 3", location: "ทางเดินหน้าลิฟต์", reporter: P.wanna, technician: P.thanakorn,
     createdAgo: DAY + 3 * HOUR, assessedAgo: DAY, dateChange: { ago: 2 * HOUR, days: 1, reason: "รออะไหล่บัลลาสต์" },
     photos: [mockPhoto(HUE.electric, "ไฟทางเดิน")],
   },
   {
-    n: 148, status: "resolved", priority: "high", category: 3, symptoms: [1], building: 1, floor: 2,
-    location: "ห้องน้ำหญิง ฝั่งทิศเหนือ", details: "น้ำรั่วจากใต้อ่างล้างมือ พื้นเปียกตลอด",
+    n: 148, status: "resolved", priority: "high", category: 3, symptoms: [2], building: 1, floor: 2,
+    room: "ห้องน้ำหญิง", location: "ฝั่งทิศเหนือ", details: "น้ำรั่วจากใต้อ่างล้างมือ พื้นเปียกตลอด",
     reporter: P.wanna, technician: P.weera, createdAgo: DAY + 4 * HOUR, assessedAgo: DAY, resolvedAgo: 2 * HOUR,
     contractor: { id: "5c0a7d10-0000-4000-8000-000000000001", name: "ร้านประปาเจริญ", types: ["ประปา"], rating: 4 },
     photos: [mockPhoto(HUE.water, "ใต้อ่างล้างมือ")],
     result: { note: "เปลี่ยนสายน้ำดีและซีลใต้อ่างใหม่ ทดสอบเปิดน้ำ 15 นาที ไม่มีรั่วซึม", photos: [mockPhoto(HUE.result, "หลังซ่อม")] },
   },
   {
-    n: 147, status: "in_progress", priority: "critical", category: 2, symptoms: [4], building: 1, floor: 6,
-    location: "ห้องเซิร์ฟเวอร์", details: "เบรกเกอร์ตัดซ้ำทุกครึ่งชั่วโมง",
+    n: 147, status: "in_progress", priority: "critical", category: 1, symptoms: [4], building: 1, floor: 6,
+    room: "สำนักงานชั้น 6", location: "ห้องเซิร์ฟเวอร์", details: "เบรกเกอร์ตัดซ้ำทุกครึ่งชั่วโมง",
     reporter: P.kittipat, subscribers: [P.wanna], createdAgo: 2 * HOUR, photos: [mockPhoto(HUE.electric, "ตู้ไฟชั้น 6")],
   },
   {
-    n: 146, status: "resolved", priority: "high", category: 4, symptoms: [4], building: 1, floor: 4,
-    location: "ฝ่ายจัดซื้อ โซน B", reporter: P.kittipat, subscribers: [P.wanna], technician: P.anucha,
+    n: 146, status: "resolved", priority: "medium", category: 5, symptoms: [1], building: 1, floor: 4,
+    room: "สำนักงานชั้น 4", location: "ฝ่ายจัดซื้อ โซน B", reporter: P.kittipat, subscribers: [P.wanna], technician: P.anucha,
     createdAgo: 2 * DAY, assessedAgo: DAY + 6 * HOUR, resolvedAgo: 5 * HOUR,
     photos: [mockPhoto(HUE.building, "ฝ้าเพดาน")],
     result: { note: "อุดรอยรั่วรอบท่อแอร์บนฝ้า เปลี่ยนแผ่นฝ้า 2 แผ่น", photos: [mockPhoto(HUE.result, "ฝ้าใหม่")] },
   },
   {
-    n: 143, status: "in_progress", priority: "medium", category: 0, categoryOther: "ลิฟต์", symptoms: [],
+    n: 143, status: "in_progress", priority: "medium", prioritySource: "default", category: 0, categoryOther: "ลิฟต์", symptoms: [],
     symptomOther: "ลิฟต์ตัวซ้ายค้างระหว่างชั้น 2 กับ 3", building: 1, floor: 2, location: "โถงลิฟต์",
     reporter: P.wanna, createdAgo: 4 * HOUR, photos: [mockPhoto(HUE.building, "ลิฟต์ตัวซ้าย")],
   },
   {
-    n: 145, status: "in_progress", priority: "medium", category: 2, symptoms: [1], building: 2, floor: 1,
-    location: "ห้องเก็บเอกสาร", reporter: P.wanna, technician: P.suriya,
+    n: 145, status: "in_progress", priority: "medium", category: 1, symptoms: [1], building: 2, floor: 1,
+    room: "สำนักงานชั้น 1", location: "ห้องเก็บเอกสาร", reporter: P.wanna, technician: P.suriya,
     createdAgo: DAY + 2 * HOUR, assessedAgo: 20 * HOUR, photos: [mockPhoto(HUE.electric, "หลอดไฟห้องเอกสาร")],
   },
   {
-    n: 144, status: "closed", closedReason: "confirmed", priority: "medium", category: 3, symptoms: [2], building: 1, floor: 7,
+    n: 144, status: "closed", closedReason: "confirmed", priority: "medium", category: 3, symptoms: [3], building: 1, floor: 7,
     location: "แพนทรี", reporter: P.wanna, technician: P.weera,
     createdAgo: 4 * DAY, assessedAgo: 4 * DAY - 2 * HOUR, resolvedAgo: 3 * DAY, closedAgo: 2 * DAY, rating: 5,
     ratingComment: "ช่างมาเร็ว เก็บงานเรียบร้อยค่ะ",
@@ -394,24 +447,24 @@ const seeds: Seed[] = [
     result: { note: "ล้างท่อน้ำทิ้ง เอาเศษอาหารที่อุดตันออก", photos: [mockPhoto(HUE.result, "ท่อหลังล้าง")] },
   },
   {
-    n: 142, status: "closed", closedReason: "auto_closed", priority: "low", prioritySource: "reporter", category: 1, symptoms: [3], building: 1, floor: 5,
+    n: 142, status: "closed", closedReason: "auto_closed", priority: "low", prioritySource: "reporter", category: 2, symptoms: [3], building: 1, floor: 5,
     location: "ฝ่ายบัญชี", reporter: P.wanna, technician: P.thanakorn,
     createdAgo: 9 * DAY, assessedAgo: 8 * DAY, resolvedAgo: 8 * DAY - 3 * HOUR, closedAgo: 5 * DAY,
     photos: [mockPhoto(HUE.ac, "แอร์ฝ่ายบัญชี")],
     result: { note: "ขันน็อตยึดพัดลมคอยล์ร้อนที่หลวม เสียงหายแล้ว", photos: [mockPhoto(HUE.result, "คอยล์ร้อน")] },
   },
   {
-    n: 141, status: "in_progress", priority: "medium", category: 2, symptoms: [3], building: 1, floor: 4,
-    location: "โต๊ะประชุมเล็ก ฝ่ายจัดซื้อ", reporter: P.kittipat, createdAgo: 6 * HOUR,
+    n: 141, status: "in_progress", priority: "medium", category: 1, symptoms: [2], building: 1, floor: 4,
+    room: "ห้องประชุม 4A", reporter: P.kittipat, createdAgo: 6 * HOUR,
     photos: [mockPhoto(HUE.electric, "ปลั๊กพ่วง")],
   },
   {
-    n: 140, status: "closed", closedReason: "admin_closed", priority: "low", category: 4, symptoms: [3], building: 1, floor: 5,
+    n: 140, status: "closed", closedReason: "admin_closed", priority: "low", category: 0, legacy: legacy.furniture, symptoms: [], building: 1, floor: 5,
     location: "ห้องประชุม 5A", reporter: P.wanna, createdAgo: 12 * DAY, closedAgo: 10 * DAY,
     photos: [mockPhoto(HUE.building, "เก้าอี้ขาหัก")],
   },
   {
-    n: 138, status: "closed", closedReason: "confirmed", priority: "high", prioritySource: "reporter", category: 1, symptoms: [1], building: 1, floor: 3,
+    n: 138, status: "closed", closedReason: "confirmed", priority: "high", prioritySource: "reporter", category: 2, symptoms: [1], building: 1, floor: 3,
     location: "ห้องประชุมใหญ่", reporter: P.wanna, technician: P.thanakorn, sendBackCount: 1,
     createdAgo: 22 * DAY, assessedAgo: 22 * DAY - 2 * HOUR, resolvedAgo: 20 * DAY, closedAgo: 20 * DAY - 4 * HOUR, rating: 4,
     photos: [mockPhoto(HUE.ac, "แอร์ห้องประชุมใหญ่")],
@@ -425,13 +478,13 @@ const seeds: Seed[] = [
     ],
   },
   {
-    n: 135, status: "closed", closedReason: "team_handled", priority: "medium", prioritySource: "reporter", category: 5, symptoms: [1], building: 1, floor: 1,
+    n: 135, status: "closed", closedReason: "team_handled", priority: "medium", prioritySource: "reporter", category: 0, legacy: legacy.cleaning, symptoms: [], building: 1, floor: 1,
     location: "ล็อบบี้ หน้าลิฟต์", reporter: P.malee, createdAgo: 25 * DAY, closedAgo: 25 * DAY,
     photos: [mockPhoto(HUE.clean, "พื้นล็อบบี้")],
   },
   {
     n: 981, ticketNo: "RP-2568-000981", status: "closed", closedReason: "confirmed", priority: "medium", category: 3,
-    symptoms: [3], building: 2, floor: 2, location: "ห้องน้ำชาย", reporter: P.wanna, technician: P.weera,
+    symptoms: [5], building: 2, floor: 2, location: "ห้องน้ำชาย", reporter: P.wanna, technician: P.weera,
     createdAgo: 400 * DAY, assessedAgo: 400 * DAY - HOUR, resolvedAgo: 399 * DAY, closedAgo: 398 * DAY, rating: 5,
     photos: [mockPhoto(HUE.water, "ชักโครก")],
     result: { note: "เปลี่ยนชุดลูกลอยชักโครก", photos: [mockPhoto(HUE.result, "ชุดลูกลอยใหม่")] },
@@ -523,7 +576,8 @@ function matches(t: TicketSummary, q: TicketCountsQuery, v: Viewer): boolean {
   if (q.closedReason && t.closedReason !== q.closedReason) return false;
   if (q.q) {
     const needle = q.q.toLowerCase();
-    if (!t.ticketNo.toLowerCase().includes(needle) && !(t.locationDetail ?? "").toLowerCase().includes(needle)) return false;
+    const texts = [t.ticketNo, t.locationDetail ?? "", t.room?.name ?? ""];
+    if (!texts.some((x) => x.toLowerCase().includes(needle))) return false;
   }
   if (q.createdFrom && t.createdAt < new Date(q.createdFrom).toISOString()) return false;
   if (q.createdTo && t.createdAt > new Date(q.createdTo).toISOString()) return false;
@@ -571,16 +625,16 @@ export function mockRememberPhoto(p: Photo) {
   store.photos.set(p.id, p);
 }
 
-/** #28: the viewer's last 3 distinct places (building · floor · location), newest first. */
+/** #28 (CR-014): the viewer's last 3 distinct rooms, newest first; tickets without a room are skipped. */
 export function mockRecentPlaces(v: Viewer): RecentPlace[] {
   const seen = new Set<string>();
   const out: RecentPlace[] = [];
   for (const t of [...store.tickets].sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
-    if (t.reporter.id !== v.id) continue;
-    const key = `${t.building.id}|${t.floor.id}|${t.locationDetail ?? ""}`;
+    if (t.reporter.id !== v.id || !t.room) continue;
+    const key = `${t.building.id}|${t.floor.id}|${t.room.id}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ building: t.building, floor: t.floor, locationDetail: t.locationDetail, lastReportedAt: t.createdAt });
+    out.push({ building: t.building, floor: t.floor, room: t.room, locationDetail: t.locationDetail, lastReportedAt: t.createdAt });
     if (out.length === 3) break;
   }
   return out;
@@ -589,12 +643,13 @@ export function mockRecentPlaces(v: Viewer): RecentPlace[] {
 /** Adds a ticket the way the backend would (`in_progress` awaiting assessment, next number, `created` event). */
 export function mockCreateTicket(
   req: {
-    categoryId?: string;
+    categoryId: string;
     categoryOther?: string;
     symptomIds: string[];
     symptomOther?: string;
     buildingId: string;
     floorId: string;
+    roomId: string;
     locationDetail?: string;
     details?: string;
     photoIds: string[];
@@ -602,12 +657,16 @@ export function mockCreateTicket(
   reporter: PersonRef,
   v: Viewer,
 ): TicketDetail {
-  const category = req.categoryId ? mockCategories.find((c) => c.id === req.categoryId) : undefined;
+  const category = mockCategories.find((c) => c.id === req.categoryId);
   const building = mockBuildings.find((b) => b.id === req.buildingId);
   const floor = building?.floors.find((f) => f.id === req.floorId);
+  const picked = floor?.rooms.find((r) => r.id === req.roomId);
   const symptoms = (category?.symptoms ?? []).filter((s) => req.symptomIds.includes(s.id)).map(({ id, name }) => ({ id, name }));
-  if ((req.categoryId && !category) || !building || !floor || symptoms.length !== req.symptomIds.length) throw mockErrors.masterChanged();
-  const { priority, source } = ticketPriority(category, req.symptomIds, !category);
+  if (!category || !building || !floor || !picked || symptoms.length !== req.symptomIds.length) throw mockErrors.masterChanged();
+  if (req.categoryOther?.trim() && !category.isOther) {
+    throw new ApiError(400, "VALIDATION_FAILED", "mock: categoryOther not allowed", { categoryOther: "NOT_ALLOWED" });
+  }
+  const { priority, source } = ticketPriority(category, req.symptomIds);
   const photos = req.photoIds.map((id) => store.photos.get(id));
   if (photos.some((p) => !p)) throw new ApiError(422, "PHOTO_NOT_FOUND", "mock: photo not uploaded in this session");
 
@@ -621,12 +680,13 @@ export function mockCreateTicket(
     closedReason: null,
     priority,
     prioritySource: source,
-    category: category ? { id: category.id, name: category.name } : null,
-    categoryOther: category ? null : req.categoryOther?.trim() || null,
+    category: { id: category.id, name: category.name },
+    categoryOther: req.categoryOther?.trim() || null,
     symptoms,
     symptomOther: req.symptomOther?.trim() || null,
     building: { id: building.id, name: building.name },
     floor: { id: floor.id, name: floor.name },
+    room: { id: picked.id, name: picked.name },
     locationDetail: req.locationDetail?.trim() || null,
     thumbUrl: photos[0]!.thumbUrl,
     reporter,

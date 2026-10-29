@@ -49,14 +49,15 @@ export function errorCode(err: unknown): RepairErrorCode | undefined {
 
 // ---- field errors (VALIDATION_FAILED) ----
 
-/** S03 "Validation" (CR-008): `field` + `FieldCode` → message. */
+/** S03 "Validation" (CR-008, CR-014): `field` + `FieldCode` → message. */
 const createTicketFieldMessages: Record<string, Partial<Record<FieldCode, string>>> = {
   categoryId: { REQUIRED: "กรุณาเลือกหมวดงาน", INVALID: "กรุณาเลือกหมวดงาน" },
-  categoryOther: { REQUIRED: "ระบุหมวดงาน", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
+  categoryOther: { REQUIRED: "ระบุหมวดงาน", TOO_LONG: "ไม่เกิน 100 ตัวอักษร", NOT_ALLOWED: "ระบุชื่อหมวดได้เฉพาะหมวดอื่น ๆ" },
   symptomIds: { MIN_ITEMS: "เลือกอาการอย่างน้อย 1 ข้อ หรือระบุอาการอื่นๆ", INVALID: "เลือกอาการอย่างน้อย 1 ข้อ" },
   symptomOther: { REQUIRED: "ระบุอาการที่พบ", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
   buildingId: { REQUIRED: "กรุณาเลือกอาคาร", INVALID: "กรุณาเลือกอาคาร" },
   floorId: { REQUIRED: "กรุณาเลือกชั้น", INVALID: "กรุณาเลือกชั้น" },
+  roomId: { REQUIRED: "เลือกห้องหรือจุดที่เกิด", INVALID: "เลือกห้องหรือจุดที่เกิด" },
   locationDetail: { TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
   photoIds: {
     MIN_ITEMS: "แนบรูปอย่างน้อย 1 รูป",

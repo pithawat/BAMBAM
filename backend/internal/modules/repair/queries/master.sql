@@ -1,7 +1,12 @@
 -- name: ListActiveCategories :many
-SELECT id, name, icon, default_priority FROM repair.categories
+-- The "อื่น ๆ" category is listed last (CR-014).
+SELECT id, name, icon, default_priority, is_other FROM repair.categories
 WHERE is_active
-ORDER BY sort_order, name;
+ORDER BY is_other, sort_order, name;
+
+-- name: ListCategoryAreaTypes :many
+SELECT category_id, area_type FROM repair.category_area_types
+ORDER BY category_id, area_type;
 
 -- name: ListActiveSymptoms :many
 SELECT s.id, s.category_id, s.name, s.priority FROM repair.symptoms s
@@ -20,24 +25,29 @@ JOIN repair.buildings b ON b.id = f.building_id
 WHERE f.is_active AND b.is_active
 ORDER BY f.level;
 
--- name: CountCategories :one
-SELECT count(*) FROM repair.categories;
+-- name: ListActiveRooms :many
+-- Rooms of active floors (CR-014); the common area comes last by its sort order.
+SELECT r.id, r.floor_id, r.name, r.area_type FROM platform.rooms r
+WHERE r.is_active
+ORDER BY r.sort_order, r.name;
 
--- name: InsertCategory :exec
-INSERT INTO repair.categories (id, name, icon, default_priority, sort_order) VALUES (@id, @name, @icon, @default_priority, @sort_order);
+-- Sample locations (dev / UAT only, D-032): inserted by id, existing rows are left as they are.
+-- name: InsertSampleBuilding :exec
+INSERT INTO repair.buildings (id, name, sort_order) VALUES (@id, @name, @sort_order)
+ON CONFLICT DO NOTHING;
 
--- name: InsertSymptom :exec
-INSERT INTO repair.symptoms (id, category_id, name, priority, sort_order) VALUES (@id, @category_id, @name, @priority, @sort_order);
+-- name: InsertSampleFloor :exec
+INSERT INTO repair.floors (id, building_id, name, level) VALUES (@id, @building_id, @name, @level)
+ON CONFLICT DO NOTHING;
 
--- name: InsertBuilding :exec
-INSERT INTO repair.buildings (id, name, sort_order) VALUES (@id, @name, @sort_order);
-
--- name: InsertFloor :exec
-INSERT INTO repair.floors (id, building_id, name, level) VALUES (@id, @building_id, @name, @level);
+-- name: InsertSampleRoom :exec
+INSERT INTO platform.rooms (id, floor_id, name, area_type, sort_order) VALUES (@id, @floor_id, @name, @area_type, @sort_order)
+ON CONFLICT DO NOTHING;
 
 -- name: LockActiveCategory :one
--- Locks the category so it cannot be deactivated while a ticket is created in it; returns its default priority (CR-008).
-SELECT default_priority FROM repair.categories
+-- Locks the category so it cannot be deactivated while a ticket is created in it; returns its default
+-- priority (CR-008) and whether it is the "อื่น ๆ" category (CR-014).
+SELECT default_priority, is_other FROM repair.categories
 WHERE id = @id AND is_active
 FOR NO KEY UPDATE;
 
@@ -53,6 +63,13 @@ SELECT EXISTS (
     WHERE f.id = @floor_id AND f.building_id = @building_id AND f.is_active AND b.is_active
 );
 
+-- name: ActiveRoomOnFloor :one
+-- CR-014: the picked room must be active and on the picked floor.
+SELECT EXISTS (
+    SELECT 1 FROM platform.rooms r
+    WHERE r.id = @room_id AND r.floor_id = @floor_id AND r.is_active
+);
+
 -- name: GetSettings :one
 SELECT ticket_prefix, ticket_year_format, ticket_digits FROM repair.settings WHERE id;
 
@@ -65,11 +82,3 @@ RETURNING last_no;
 -- Sample data refresh (dev / UAT only, D-032, CR-008): applied by id so existing databases keep their ids.
 -- name: RenameSampleBuilding :exec
 UPDATE repair.buildings SET name = @new_name, updated_at = now() WHERE id = @id AND name = @old_name;
-
--- name: SetSampleCategoryDefault :exec
-UPDATE repair.categories SET default_priority = @default_priority, updated_at = now()
-WHERE id = @id AND default_priority = 'medium';
-
--- name: SetSampleSymptomPriority :exec
-UPDATE repair.symptoms SET priority = @priority, updated_at = now()
-WHERE id = @id AND priority = 'medium';

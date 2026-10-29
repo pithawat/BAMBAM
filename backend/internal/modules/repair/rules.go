@@ -132,21 +132,14 @@ func validateCreate(in CreateTicketInput) (CreateTicketInput, map[string]string)
 	in.SymptomIDs = uniqueIDs(in.SymptomIDs)
 	in.PhotoIDs = uniqueIDs(in.PhotoIDs)
 
-	// BR-F02-1 (CR-008): a listed category needs >= 1 symptom or a typed one; a typed category
-	// ("อื่นๆ") has no listed symptoms and needs the typed symptom.
-	switch {
-	case in.CategoryID != nil:
-		in.CategoryOther = ""
-		if len(in.SymptomIDs) == 0 && in.SymptomOther == "" {
-			fields["symptomIds"] = "MIN_ITEMS"
-		}
-	case in.CategoryOther == "":
+	// BR-F02-1 (CR-014): a category from the master is always required; every category, "อื่น ๆ"
+	// included, needs >= 1 symptom or a typed one. Whether a typed category name is allowed depends
+	// on the category (only "อื่น ๆ"), so the service checks it against the DB.
+	if in.CategoryID == nil {
 		fields["categoryId"] = "REQUIRED"
-	default:
-		in.SymptomIDs = nil
-		if in.SymptomOther == "" {
-			fields["symptomOther"] = "REQUIRED"
-		}
+	}
+	if len(in.SymptomIDs) == 0 && in.SymptomOther == "" {
+		fields["symptomIds"] = "MIN_ITEMS"
 	}
 	if utf8.RuneCountInString(in.CategoryOther) > MaxOtherChars {
 		fields["categoryOther"] = "TOO_LONG"
@@ -159,6 +152,9 @@ func validateCreate(in CreateTicketInput) (CreateTicketInput, map[string]string)
 	}
 	if in.FloorID == nil {
 		fields["floorId"] = "REQUIRED"
+	}
+	if in.RoomID == nil {
+		fields["roomId"] = "REQUIRED"
 	}
 	checkPhotos(fields, "photoIds", in.PhotoIDs, 1)
 	if utf8.RuneCountInString(in.LocationDetail) > MaxLocationChars {
@@ -173,12 +169,9 @@ func validateCreate(in CreateTicketInput) (CreateTicketInput, map[string]string)
 	return in, fields
 }
 
-// ticketPriority applies BR-F02-2 (CR-008): the most urgent picked symptom; with only a typed
-// symptom the category's default; a typed category ("อื่นๆ") starts at medium.
-func ticketPriority(symptomPriorities []string, categoryDefault string, typedCategory bool) (priority, source string) {
-	if typedCategory {
-		return PriorityMedium, PrioritySourceDefault
-	}
+// ticketPriority applies BR-F02-2 (CR-008, CR-014): the most urgent picked symptom; with only a
+// typed symptom the category's default ("อื่น ๆ" included).
+func ticketPriority(symptomPriorities []string, categoryDefault string) (priority, source string) {
 	for _, p := range symptomPriorities {
 		if priorityRank(p) >= 0 && (priority == "" || priorityRank(p) < priorityRank(priority)) {
 			priority = p

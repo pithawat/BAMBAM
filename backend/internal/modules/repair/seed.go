@@ -6,8 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Sample master data from docs/modules/repair/ui/screens/_common.md §8 (+ CR-008 priorities and
-// building names) — SAMPLE ONLY, replaced when the real seed files arrive (PROGRESS.md Open issues).
+// Sample locations (buildings, floors, rooms) — SAMPLE ONLY until the owner's lists arrive (PROGRESS.md
+// Open issues). Categories and symptoms are the real master loaded by migration 20261019000001 (CR-014).
 // Ids are derived from stable keys, so every dev/UAT database gets the same ids.
 
 var seedNamespace = uuid.MustParse("5b0d3c8e-7a51-4c2f-9f61-2d8a4e7b1c90")
@@ -18,31 +18,6 @@ func seedID(parts ...string) uuid.UUID {
 		key += "/" + p
 	}
 	return uuid.NewSHA1(seedNamespace, []byte(key))
-}
-
-type sampleSymptom struct{ name, priority string }
-
-func sampleCategories() []Category {
-	type cat struct {
-		name, icon, def string
-		symptoms        []sampleSymptom
-	}
-	data := []cat{
-		{"ระบบปรับอากาศ", "snowflake", PriorityMedium, []sampleSymptom{{"แอร์ไม่เย็น", PriorityMedium}, {"มีน้ำหยด", PriorityHigh}, {"มีเสียงดัง", PriorityMedium}, {"มีกลิ่นอับ", PriorityLow}, {"เปิดไม่ติด", PriorityHigh}}},
-		{"ไฟฟ้าและแสงสว่าง", "lightbulb", PriorityHigh, []sampleSymptom{{"ไฟไม่ติด", PriorityMedium}, {"ไฟกะพริบ", PriorityLow}, {"ปลั๊กไม่มีไฟ", PriorityMedium}, {"เบรกเกอร์ตัด", PriorityCritical}}},
-		{"ประปาและสุขภัณฑ์", "droplets", PriorityMedium, []sampleSymptom{{"น้ำรั่ว", PriorityHigh}, {"ท่อตัน", PriorityMedium}, {"ชักโครกกดไม่ลง", PriorityMedium}, {"น้ำไม่ไหล", PriorityHigh}}},
-		{"อาคารและเฟอร์นิเจอร์", "armchair", PriorityLow, []sampleSymptom{{"ประตูปิดไม่สนิท", PriorityLow}, {"กระเบื้องแตก", PriorityMedium}, {"เก้าอี้ชำรุด", PriorityLow}, {"ฝ้าเพดานรั่ว", PriorityHigh}}},
-		{"ความสะอาด", "sparkles", PriorityMedium, []sampleSymptom{{"พื้นเปียก", PriorityHigh}, {"ขยะล้น", PriorityMedium}, {"มีกลิ่นไม่พึงประสงค์", PriorityLow}}},
-	}
-	out := make([]Category, 0, len(data))
-	for _, c := range data {
-		cat := Category{ID: seedID("category", c.name), Name: c.name, Icon: c.icon, DefaultPriority: c.def}
-		for _, s := range c.symptoms {
-			cat.Symptoms = append(cat.Symptoms, Symptom{ID: seedID("symptom", c.name, s.name), Name: s.name, Priority: s.priority})
-		}
-		out = append(out, cat)
-	}
-	return out
 }
 
 // sampleBuilding: key keeps the id stable (it was the first sample name); name is shown (CR-008).
@@ -62,11 +37,39 @@ func sampleBuildings() []Building {
 		building := Building{ID: seedID("building", b.key), Name: b.name}
 		for level := 1; level <= b.floors; level++ {
 			name := strconv.Itoa(level)
-			building.Floors = append(building.Floors, Floor{ID: seedID("floor", b.key, name), Name: name, Level: int32(level)}) // #nosec G115 -- small constant
+			floor := Floor{ID: seedID("floor", b.key, name), Name: name, Level: int32(level)} // #nosec G115 -- small constant
+			for _, rm := range sampleRooms(b.key, level) {
+				rm.ID = seedID("room", b.key, name, rm.Name)
+				floor.Rooms = append(floor.Rooms, rm)
+			}
+			building.Floors = append(building.Floors, floor)
 		}
 		out = append(out, building)
 	}
 	return out
+}
+
+// sampleRooms: meeting rooms, restrooms, pantry and an office per floor, plus the common area every
+// floor has (CR-014). Floor 2 of the main building has more than 9 rooms, so S03 shows the room picker.
+func sampleRooms(buildingKey string, level int) []Room {
+	n := strconv.Itoa(level)
+	meetings := []string{"A", "B"}
+	if buildingKey == "อาคารหลัก" && level == 2 {
+		meetings = []string{"A", "B", "C", "D", "E", "F"}
+	}
+	var rooms []Room
+	for _, m := range meetings {
+		rooms = append(rooms, Room{Name: "ห้องประชุม " + n + m, AreaType: AreaMeetingRoom})
+	}
+	rooms = append(rooms,
+		Room{Name: "สำนักงานชั้น " + n, AreaType: AreaOffice},
+		Room{Name: "ห้องน้ำชาย", AreaType: AreaRestroom},
+		Room{Name: "ห้องน้ำหญิง", AreaType: AreaRestroom},
+	)
+	if buildingKey == "อาคารหลัก" {
+		rooms = append(rooms, Room{Name: "Pantry", AreaType: AreaPantry})
+	}
+	return append(rooms, Room{Name: "พื้นที่ส่วนกลางชั้น " + n, AreaType: AreaCommon})
 }
 
 // SampleRename renames a sample building that still has its first sample name.

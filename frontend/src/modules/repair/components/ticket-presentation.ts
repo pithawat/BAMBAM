@@ -26,11 +26,27 @@ export const RATING_LABELS = ["", "ต้องปรับปรุง", "พ�
 /** Symptom names, then the typed symptom (CR-008). */
 export const ticketTitle = (ticket: Pick<TicketSummary, "symptoms" | "symptomOther">) =>
   [...ticket.symptoms.map((s) => s.name), ...(ticket.symptomOther ? [ticket.symptomOther] : [])].join(" · ");
-/** The listed category, or the name the reporter typed for "อื่นๆ" (CR-008). */
+/**
+ * The category; CR-014: `อื่น ๆ · {typed name}` under the "อื่น ๆ" category; before CR-014 a typed
+ * category had no category (CR-008).
+ */
 export const categoryName = (ticket: Pick<TicketSummary, "category" | "categoryOther">) =>
-  ticket.category?.name ?? ticket.categoryOther ?? "อื่นๆ";
-export const ticketLocation = (ticket: TicketSummary) =>
-  `${ticket.building.name} ชั้น ${ticket.floor.name}${ticket.locationDetail ? ` · ${ticket.locationDetail}` : ""}`;
+  ticket.category
+    ? [ticket.category.name, ticket.categoryOther].filter(Boolean).join(" · ")
+    : ticket.categoryOther ?? "อื่นๆ";
+/** "ชั้น 5"; a floor named in Thai (e.g. `ลานจอดรถ` of พื้นที่ภายนอกอาคาร, CR-014) shows its name only. */
+export const floorLabel = (name: string) => (/^\p{Script=Thai}/u.test(name) ? name : `ชั้น ${name}`);
+/**
+ * Location line without the building (CR-014): `ชั้น {n} · {room}` + ` · {extra spot}`; tickets before
+ * CR-014 keep `ชั้น {n} · {spot}`. A part equal to the one before it is shown once (ลานจอดรถ · ลานจอดรถ).
+ */
+export function placeLine(t: Pick<TicketSummary, "floor" | "room" | "locationDetail">) {
+  const parts = [floorLabel(t.floor.name), t.room?.name, t.locationDetail].filter((p): p is string => !!p);
+  return parts.filter((p, i) => p !== parts[i - 1]).join(" · ");
+}
+/** `{building} ชั้น {n} · {room}` (+ extra spot). */
+export const ticketLocation = (ticket: Pick<TicketSummary, "building" | "floor" | "room" | "locationDetail">) =>
+  `${ticket.building.name} ${placeLine(ticket)}`;
 export const ticketHref = (id: string) => `/repair/tickets/${encodeURIComponent(id)}`;
 
 /** "ช่างของบริษัท" / "ช่างภายนอก · แอร์, ไฟฟ้า" (+ contractor name for staff). */

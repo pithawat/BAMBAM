@@ -1,6 +1,14 @@
 # S03 — ฟอร์มแจ้งซ่อม
 
-Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14)
+Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19)
+
+> **CR-014 (approved 2026-10-19) — replaces the step list, category, location and frame parts of CR-008 below.** Visual reference: `../../changes/CR-014/form-steps.html` (sample data).
+> - **3 steps, one frame:** `ปัญหาที่พบ → สถานที่ → รูปภาพและส่ง`. Desktop frame 880px wide on every step, body height = the tallest step, fixed for all steps (progress strip, card edge and footer never move). Phone / tablet: one column, frame = viewport between header and sticky footer.
+> - **ปัญหาที่พบ:** categories from the DB master (`attachments/REPAIR-CATEGORY-SYMPTOM-MASTER.md`, 7 categories, 4 columns desktop / 2 mobile, `อื่น ๆ` last). No client-side "อื่นๆ" card: the `อื่น ๆ` category (`isOther`) has symptoms like the others plus `ระบุหมวดงาน (ไม่บังคับ)` ≤ 100 (placeholder `เช่น ลิฟต์ ระบบเสียง`). Symptoms 3 columns desktop / 1 mobile + `อาการอื่นๆ`. Priority explanation stays. `+ เล่ารายละเอียดเพิ่ม` moves to step 3.
+> - **สถานที่:** heading row with `ที่เคยแจ้ง ▾` button on the right · `เลือกอาคาร *` and `เลือกชั้น *` side by side (desktop) · **`ห้องหรือจุดที่เกิด *`**: room cards of the floor — `ห้องที่ตรงกับปัญหา ({หมวด})` (room area type in the category's `areaTypes`, with the area type caption) then `ห้องอื่นบนชั้นนี้`; no matching room → one list without group labels; > 9 rooms → searchable `Picker` (`ค้นหาห้อง`) · `บอกจุดเพิ่มเติม (ไม่บังคับ)` ≤ 100 (placeholder `เช่น ฝั่งหน้าต่าง เครื่องที่ 2`). Building change clears floor + room; floor change clears room; category change keeps the room.
+> - **รูปภาพและส่ง** (heading `รูปภาพและตรวจสอบก่อนส่ง`): desktop two columns — left `รูปภาพ *` (drop zone / camera + gallery, thumbnails, tips); right `เล่ารายละเอียดเพิ่ม (ไม่บังคับ)` textarea (≤ 500) + `ตรวจสอบก่อนส่ง` card (ปัญหา · ความเร่งด่วน (staff wording as today) · สถานที่ `{อาคาร} · ชั้น {n}` / `{ห้อง}` (+ จุดเพิ่มเติม), `แก้ไข` per row; photos not repeated). Phone: photos → รายละเอียด → ตรวจสอบก่อนส่ง. Final button `ยืนยันส่งแจ้งซ่อม`. Team mode (Stage 4): `สิ่งที่ทีมทำ *` + `รูปหลังทำ *` take the รายละเอียด slot.
+> - **Validation:** `ห้องหรือจุดที่เกิด` → required → `เลือกห้องหรือจุดที่เกิด`; `บอกจุดเพิ่มเติม` → max 100; room inactive on submit → `MASTER_DATA_CHANGED` alert + reload master. Draft and ที่เคยแจ้ง store / fill the room id.
+> - Loading skeleton matches the 3-step frame.
 
 > **CR-009 (approved 2026-10-18):** leads choose `เรียกช่าง | ทีมแก้เองแล้ว` at the top as soon as the form opens (others never see it; team steps per BR-F04). Duplicate card in สถานที่ once category + floor + spot are known; on submit a match opens a blocking dialog with only `ติดตามเคสเดิม` / `ยกเลิกการแจ้ง`; the reporter's own ticket waiting for ประเมินตรวจงาน → `ไปที่งานของคุณ` (no new ticket). Built in Stage 4. ที่เคยแจ้ง, QR banner and draft restore stay.
 

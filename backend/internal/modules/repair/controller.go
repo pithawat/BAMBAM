@@ -155,6 +155,7 @@ func (ctl *Controller) CreateTicket(c *gin.Context) {
 		SymptomIDs:     parseIDs(req.SymptomIDs, "symptomIds", fields),
 		BuildingID:     parseOptionalID(req.BuildingID, "buildingId", fields),
 		FloorID:        parseOptionalID(req.FloorID, "floorId", fields),
+		RoomID:         parseOptionalID(req.RoomID, "roomId", fields),
 		LocationDetail: req.LocationDetail,
 		Details:        req.Details,
 		CategoryOther:  req.CategoryOther,
