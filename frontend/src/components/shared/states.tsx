@@ -22,11 +22,11 @@ export function EmptyState({ title, hint, action, className }: EmptyStateProps) 
   return (
     <div
       className={cn(
-        "flex flex-col items-center rounded-xl bg-linear-to-b from-secondary to-status-resolved/5 px-6 py-8 text-center",
+        "flex flex-col items-center rounded-xl border bg-card px-6 py-8 text-center",
         className,
       )}
     >
-      <Mascot pose="guide" size={120} />
+      <Mascot pose="guide" size={120} surface="sage" />
       <h3 className="mt-3 font-heading text-base font-semibold">{title}</h3>
       {hint && <p className="mt-1 text-[13.5px] text-muted-foreground">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -68,7 +68,7 @@ export function ErrorState({
   }
   return (
     <div role="alert" className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
-      <Mascot pose="loading" size={140} />
+      <Mascot pose="loading" size={140} surface="warm" />
       <h2 className="mt-4 font-heading text-lg font-semibold">{title}</h2>
       <p className="mt-1 text-[13.5px] text-muted-foreground">{hint}</p>
       {onRetry && (
@@ -98,7 +98,7 @@ export function ForbiddenState({
 }: ForbiddenStateProps) {
   return (
     <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
-      <Mascot pose="review" size={140} />
+      <Mascot pose="review" size={140} surface="blue" />
       <h2 className="mt-4 font-heading text-lg font-semibold">{title}</h2>
       {reason && <p className="mt-1 text-[13.5px] text-muted-foreground">{reason}</p>}
       <Button asChild className="mt-5">

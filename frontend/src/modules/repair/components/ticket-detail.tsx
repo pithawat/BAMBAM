@@ -142,11 +142,11 @@ type Actions = ReturnType<typeof useTicketActions>;
 
 function ReviewBand({ ticket, actions }: { ticket: TicketDetail; actions: Actions }) {
   const autoClose = ticket.autoCloseAt ? `${shortDate(ticket.autoCloseAt, true)} เวลา ${timeOf(ticket.autoCloseAt)} น.` : "";
-  return <section aria-labelledby="review-title" className="bg-muted/40 px-4 pt-4 sm:px-7 sm:pt-5 print:hidden">
+  return <section aria-labelledby="review-title" className="border-y border-attention/15 bg-attention/5 px-4 pt-4 sm:px-7 sm:pt-5 print:hidden">
     <div className="grid gap-x-8 gap-y-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
       <div className="flex items-center gap-4">
-        <Mascot pose="review" size={96} className="hidden shrink-0 sm:block" />
-        <Mascot pose="review" size={72} className="shrink-0 sm:hidden" />
+        <Mascot pose="review" size={96} surface="warm" className="hidden shrink-0 sm:block" />
+        <Mascot pose="review" size={72} surface="warm" className="shrink-0 sm:hidden" />
         <div className="min-w-0">
           <h2 id="review-title" className="text-lg leading-7 font-semibold">ซ่อมเสร็จแล้ว งานซ่อมเป็นอย่างไรบ้าง?</h2>
           <p className="text-[13px] leading-5 text-muted-foreground">ตรวจผลซ่อมด้านล่าง แล้วให้คะแนนความพึงพอใจ</p>

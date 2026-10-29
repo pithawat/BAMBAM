@@ -6,6 +6,8 @@
 
 ## Now
 
+- **White-mascot follow-up accepted 2026-10-29 (repair CR-029, D-128):** white planner / guardian PNG masters + `-white.webp` exports, sage / blue heading backdrops; shared empty/error/forbidden states updated. Both roles checked at 375/1280 in both themes; lint / typecheck / build pass. Temporary evidence and duplicate exports removed at owner's request; R1 / R2 scope and order stay as below.
+
 - D-115 (owner 2026-10-26): Claude builds the UI of Stages 2–6 back to back; each stage gets its tests + report below; nothing committed / tagged until the owner accepts each stage.
 - Module complete: Stages 1–6 accepted (2–6 on 2026-10-27, one commit, tags `settings-stage-2`…`6`). Atlas synced; no settings tours yet.
 

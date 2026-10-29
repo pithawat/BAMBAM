@@ -150,7 +150,7 @@ export function LoginScreen({ signedOut = false }: { signedOut?: boolean }) {
         <div aria-hidden className="bl-scene">
           <div className="bl-speech">พร้อมช่วยดูแลครับ <span>✦</span></div>
           <div className="bl-halo" />
-          <Image src="/brand/bam-mascot-login.webp" alt="" width={631} height={640} priority className="bl-mascot" />
+          <Image src="/brand/bam-mascot-login-white.webp" alt="" width={631} height={640} priority className="bl-mascot" />
           <span className="bl-mascotLabel">YOUR WORKPLACE BUDDY</span>
         </div>
 

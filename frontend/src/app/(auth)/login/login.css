@@ -254,3 +254,36 @@
   .bl-spin { animation: none; }
 }
 
+/* CR-029: cool workplace palette and a full-height sage backdrop for the white tiger.
+   Keep the established composition and measured viewport fitting. */
+.bl-page { background: var(--background); color: var(--foreground); }
+.bl-title { color: var(--foreground); }
+.bl-title > span { color: var(--primary); }
+.bl-title > span::after { border-color: var(--mascot-blue); }
+.bl-brandCaption, .bl-description, .bl-accountNote, .bl-servicesTitle,
+.bl-mascotLabel, .bl-footer, .bl-footerHelp { color: var(--muted-foreground); }
+.bl-eyebrow { background: var(--secondary); color: var(--secondary-foreground); border-color: var(--border); }
+.bl-eyebrow > span { background: var(--primary); }
+.bl-help, .bl-serviceList > li, .bl-card, .bl-speech { background: var(--card); border-color: var(--border); }
+.bl-help, .bl-serviceList > li, .bl-cardEyebrow, .bl-room .bl-cardCopy p,
+.bl-account p, .bl-tags span, .bl-car .bl-tags span { color: var(--muted-foreground); }
+.bl-card h3, .bl-car h3 { color: var(--foreground); }
+.bl-help:hover { background: var(--secondary); border-color: var(--mascot-edge); }
+.bl-cta { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+.bl-cta:hover:not(:disabled) { background: var(--secondary-foreground); }
+.bl-cta:focus-visible, .bl-help:focus-visible, .bl-footerHelp:focus-visible { outline-color: var(--ring); }
+.bl-maintenance, .bl-repairArt, .bl-check { background: var(--secondary); color: var(--primary); }
+.bl-repairArt > svg { stroke: var(--primary); box-shadow: 0 6px 0 var(--mascot-blue); }
+.bl-spark, .bl-speech span { color: var(--primary); }
+.bl-dot { background: var(--mascot-blue); }
+.bl-vehicle, .bl-carArt { background: color-mix(in srgb, var(--mascot-blue) 25%, var(--card)); color: var(--svc-car); }
+.bl-carArt > svg { stroke: var(--svc-car); }
+.bl-meeting, .bl-roomArt { background: color-mix(in srgb, var(--mascot-sage) 25%, var(--card)); color: var(--success); }
+.bl-roomArt > svg { stroke: var(--success); }
+.bl-slots i { background: var(--mascot-sage); }
+.bl-slots i:nth-child(2) { background: var(--success); }
+.bl-halo { inset: 0; border-radius: 40% 44% 30% 32%; background: var(--mascot-sage); border: 1px solid var(--mascot-edge); }
+.bl-mascot { padding: 8px; filter: drop-shadow(0 4px 3px rgb(23 32 51 / 18%)); }
+.bl-speech { color: var(--secondary-foreground); }
+@media (max-width: 1050px) { .bl-halo { inset: 0; } }
+

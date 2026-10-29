@@ -32,7 +32,9 @@ export function SettingsHeading({ title, subtitle, action }: Props) {
           <h1 className="font-heading text-2xl leading-tight font-semibold lg:text-3xl">{title}</h1>
           {subtitle && <p className="mt-1.5 text-[13.5px] text-muted-foreground">{subtitle}</p>}
         </div>
-        <Image src={mascot.src} alt={mascot.alt} width={112} height={112} className="size-18 shrink-0 object-contain lg:size-28" />
+        <span aria-hidden="true" data-mascot="settings" data-surface={me.role === "super_admin" ? "blue" : "sage"} className="mascot-frame relative size-18 shrink-0 lg:size-28">
+          <Image src={mascot.src} alt={mascot.alt} width={112} height={112} className="mascot-image relative size-full object-contain" />
+        </span>
       </div>
       {action && <div className="ml-11 shrink-0 lg:ml-0">{action}</div>}
     </div>

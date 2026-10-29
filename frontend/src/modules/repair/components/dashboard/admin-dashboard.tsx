@@ -76,7 +76,7 @@ export function AdminDashboard() {
   if (state === "forbidden") return <ForbiddenState />;
 
   return <div className="px-4 pb-8 lg:px-0">
-    <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+    <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-mascot-edge/30 bg-mascot-blue/15 p-4 sm:p-5">
       <div className="flex min-w-60 flex-1 items-center gap-4">
         <Mascot pose="welcome" size={104} className="hidden shrink-0 sm:block" priority />
         <Mascot pose="welcome" size={76} className="shrink-0 sm:hidden" priority />
@@ -193,7 +193,7 @@ function AttentionPanel({ overview }: { overview: Overview | null }) {
   return <Panel title="งานที่ควรติดตาม" sub="เลยกำหนด ส่งกลับ หรือเร่งด่วน" count={overview?.attention.length} labelledBy="attention-title" className="flex flex-col">
     {!list ? <div className="space-y-2 px-5 pb-5">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
       : list.length === 0 ? <div className="flex flex-col items-center gap-2 border-t px-5 py-6 text-center">
-          <Mascot pose="review" size={72} />
+          <Mascot pose="review" size={72} surface="sage" />
           <p className="text-sm text-muted-foreground">ไม่มีงานที่ต้องติดตาม</p>
         </div>
       : list.map((t) => {

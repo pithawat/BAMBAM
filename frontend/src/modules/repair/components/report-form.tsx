@@ -489,7 +489,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
         <li aria-current="page" className="text-foreground">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</li>
       </ol>
     </nav>
-    <div className="mt-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 lg:mb-5">
+    <div className="mt-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl border border-mascot-edge/30 bg-mascot-blue/15 p-4 lg:mb-5 lg:p-5">
       <Mascot pose="guide" size={120} className="hidden shrink-0 sm:block" priority />
       <Mascot pose="guide" size={88} className="shrink-0 sm:hidden" priority />
       <div className="min-w-0 flex-1 basis-48">

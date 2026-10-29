@@ -116,7 +116,7 @@ export function MyTicketsScreen() {
   return <div className="space-y-4 px-4 pt-4 pb-8 lg:space-y-5 lg:px-0 lg:pt-2">
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-5">
       {/* Leads' CTA card holds two buttons, so their hero scales up to fill the taller row (owner, 2026-10-26). */}
-      <header className={cn("flex items-center gap-4 rounded-xl border bg-card px-4 py-4 shadow-card sm:px-8 sm:py-5", lead ? "sm:gap-7" : "sm:gap-6")}>
+      <header className={cn("flex items-center gap-4 rounded-xl border border-mascot-edge/35 bg-mascot-blue/15 px-4 py-4 shadow-card sm:px-8 sm:py-5", lead ? "sm:gap-7" : "sm:gap-6")}>
         <Mascot pose="tracking" size={lead ? 160 : 120} className="hidden shrink-0 sm:block" priority />
         <Mascot pose="tracking" size={84} className="shrink-0 sm:hidden" priority />
         <div className="min-w-0">

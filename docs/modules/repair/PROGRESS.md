@@ -6,7 +6,7 @@
 
 ## Now
 
-- **CR-029 visual follow-up built 2026-10-29 (D-128), awaiting owner review:** all 8 tiger poses now white (PNG + cache-safe WebP); contrasting theme-aware surfaces across login / Home / repair / settings / shared states. Preview: `output/white-tiger/index.html`; browser audit 56/56 pass (14 screens/states × 375/1280 × 2 themes), final Home recheck 4/4. Existing next/font fallback used in isolated preview; no font changes. Shared: `components/shared/mascot.tsx`, `states.tsx`, `app/globals.css`.
+- **CR-029 accepted 2026-10-29 (D-128):** 8 white tiger poses (PNG masters + cache-safe WebP), contrasting theme-aware surfaces across login / Home / repair / settings / shared states; lint / typecheck / build pass, browser audit 56/56 + Home recheck 4/4. Owner requested cleanup: temporary previews / logs / helpers and duplicate exports removed. Shared: `components/shared/mascot.tsx`, `states.tsx`, `app/globals.css`.
 
 - **Stage 4R accepted 2026-10-29**, tag `repair-stage-4R` (CR-024). Next: Stage 5 (QR scan → prefilled S03, F13-B)
 - **Stage 3D-2 accepted 2026-10-29**, tag `repair-stage-3D-2` (CR-027 + CR-028, D-124 / D-126 / D-127): site view in 2 sides, real อาคาร 1 / 2 models, อาคาร 2 floors 1–4. Next: **Stage 3D-3** (CR-030 approved, D-129) — office-side real buildings + models; start with `/build-stage repair 3D-3 prepare` in a fresh session
@@ -22,8 +22,6 @@
 
 ## Next
 
-- Review the CR-029 white-tiger gallery (`output/white-tiger/index.html`); this visual task does not advance the module stage.
-
    - (2026-10-27) System Atlas already follows CR-024 / CR-025 / CR-026: no executive role, no F19-B / bell, 4R + 4P on the timeline (pending, no flows bound — owner's choice), F07 tour added (verify passes); 4R only re-checks with `/atlas sync repair` + `verify` after its FE changes
    - (D-113, 2026-10-26) the backend part is done in settings Stage 1 (migration executive → employee, no executive role, `Viewer.Can`, Go tests); 4R keeps FE copy / bell / toasts, e2e and the Atlas
 0. Then `/build-stage repair 5 prepare` (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
@@ -32,7 +30,7 @@
 
 ## Open issues / questions
 
-- 2026-10-29: concurrent CR-029 (white mascot, other session) adds `?v=white-20261029` to `mascot.tsx` image URLs → Next.js runtime error "query string not configured in images.localPatterns" on pages with the mascot; breaks e2e / Atlas until fixed there. Re-run F23 / F31 + Atlas verify for 3D-2 after that
+- CR-029's temporary Next.js image-query error is resolved: live sources use `-white.webp` filenames, no query strings. Re-run F23 / F31 + Atlas verify for 3D-2 separately; CR-029's 56 browser checks, lint / typecheck / build all pass.
 
 - 3D-2 owner checks: CPAC Warehouse 3 plan is 80 × 40 m but its map frame (no. 13) is ~18 × 17 m next to Warehouse 2 — kept the frame size; storeys / footprints of 16 โรงอาหาร and 17 ห้องประชุม 60 ปี are the frame (one irregular plan for both); no. 14 โรงตาข่าย not on the map; อาคาร 2 room names by Claude (อ.2 ห้อง 201–205 / 301–303, พื้นที่ทำงาน ชั้น 2 / 3) — rename in settings
 - 3D-2: the full e2e under 4 workers had 5 timing flakes (F01 / F02 AC7 / F06 / F26 / F29), all pass on re-run; 3D specs now `test.slow()`
@@ -84,7 +82,7 @@
 
 - 2026-10-29: **Stage 3D-2 accepted** by the owner, tag `repair-stage-3D-2` — Atlas verify / full e2e not re-run after CR-028 because of the concurrent CR-029 mascot image error (open issue)
 
-- 2026-10-29: CR-029 white-tiger visual follow-up — 8 transparent poses, contrasting surfaces / login palette, full desktop Home mascot; lint / typecheck / production build pass, browser audit 56/56 + Home recheck 4/4; `output/white-tiger/index.html`; uncommitted, waiting for visual review.
+- 2026-10-29: CR-029 accepted — 8 transparent white poses, contrasting surfaces / login palette, full desktop Home mascot; lint / typecheck / production build pass, browser audit 56/56 + Home recheck 4/4. Temporary evidence / helpers / preview cache and duplicate exports removed at owner's request.
 
 - 2026-10-29: CR-028 applied in 3D-2 — `site_blocks.side`, #27 `side`, card side toggle + picker, real models on the site; Go tests incl. Pg pass, tsc / eslint pass, F23 / F31 14–15 / 15 (fails only from the concurrent CR-029 mascot `?v=` image error, not 3D)
 

@@ -14,8 +14,8 @@ Both were inspected before generation. They are identity/style references, not e
 
 | Role | Concept | Original | Web delivery |
 |---|---|---|---|
-| Admin | Facility planner: kneeling with a rolled plan and a small office model | `frontend/public/brand/bam-mascot-admin-planner.png` | `frontend/public/brand/bam-mascot-admin-planner.webp` |
-| Superadmin | Access guardian: friendly shield/checkmark and raised key | `frontend/public/brand/bam-mascot-superadmin-guardian.png` | `frontend/public/brand/bam-mascot-superadmin-guardian.webp` |
+| Admin | Facility planner: kneeling with a rolled plan and a small office model | `frontend/public/brand/bam-mascot-admin-planner.png` | `frontend/public/brand/bam-mascot-admin-planner-white.webp` (repair CR-029) |
+| Superadmin | Access guardian: friendly shield/checkmark and raised key | `frontend/public/brand/bam-mascot-superadmin-guardian.png` | `frontend/public/brand/bam-mascot-superadmin-guardian-white.webp` (repair CR-029) |
 
 Originals are 1254 × 1254 transparent PNGs. WebP delivery copies are 384 × 384, quality 88 with alpha quality 100 (42,708 and 36,990 bytes). Conversion only optimizes size/format; original generated art is retained unchanged. No generative content or background edits were performed after generation.
 
