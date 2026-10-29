@@ -19,6 +19,7 @@ import type {
   FollowRequest,
   Overview,
   OverviewBuilding,
+  SiteBlock,
   OverviewCounts,
   Photo,
   PersonRef,
@@ -1132,6 +1133,7 @@ export function mockOverview(v: Viewer): Overview {
     hasModel: b.id === B1_ID,
     widthM: b.id === B1_ID ? B1_SIZE.widthM : null,
     depthM: b.id === B1_ID ? B1_SIZE.depthM : null,
+    modelKey: b.id === B1_ID ? "b1" : null,
     floors: b.floors.map((f) => {
       const open = all.filter((t) => isOpen(t) && t.floor.id === f.id);
       const n = (...steps: TicketStep[]) => open.filter((t) => steps.includes(t.step)).length;
@@ -1155,8 +1157,15 @@ export function mockOverview(v: Viewer): Overview {
     .slice(0, 5)
     .map((t) => decorate(t, v));
 
-  return { counts, buildings, attention };
+  return { counts, buildings, site: mockSite, attention };
 }
+
+/** #27 `site[]` (CR-027): อาคาร 1 linked, two map blocks without a building (positions from the migration). */
+const mockSite: SiteBlock[] = [
+  { id: "5b000000-0000-4000-8000-000000000001", mapNo: 1, name: "อาคาร 1", buildingId: B1_ID, x: 0, z: 0, rotDeg: 17.1, widthM: 32, depthM: 15, storeys: 6, side: 1 },
+  { id: "5b000000-0000-4000-8000-000000000003", mapNo: 3, name: "อาคาร 3", buildingId: null, x: 48.5, z: 61.1, rotDeg: 7.6, widthM: 72, depthM: 17, storeys: 1, side: 1 },
+  { id: "5b000000-0000-4000-8000-000000000016", mapNo: 16, name: "โรงอาหาร", buildingId: null, x: -40.6, z: -12.2, rotDeg: -76, widthM: 24.4, depthM: 11.4, storeys: 1, side: 1 },
+];
 
 /** #29. */
 export function mockGetAssetTypes(v: Viewer): AssetType[] {

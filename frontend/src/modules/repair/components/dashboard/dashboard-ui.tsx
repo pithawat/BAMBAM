@@ -113,3 +113,7 @@ export function spreadInRoom(center: [number, number], shape: PlanShape | null, 
     return shape && !pointInShape(x, z, shape) ? center : [x, z];
   });
 }
+
+/** S29 site view sides (CR-028): each shows its own group of map blocks, centred. */
+export const SITE_SIDES = { 1: "ฝั่งสำนักงานใหญ่", 2: "ฝั่ง Riverside" } as const;
+export type SiteSide = keyof typeof SITE_SIDES;

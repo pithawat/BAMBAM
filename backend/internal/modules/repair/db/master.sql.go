@@ -121,7 +121,7 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 }
 
 const listActiveBuildings = `-- name: ListActiveBuildings :many
-SELECT b.id, b.name, bt.id AS building_type_id, bt.name AS building_type_name
+SELECT b.id, b.name, bt.id AS building_type_id, bt.name AS building_type_name, b.model_key
 FROM platform.buildings b
 JOIN platform.building_types bt ON bt.id = b.building_type_id
 WHERE b.is_active
@@ -133,6 +133,7 @@ type ListActiveBuildingsRow struct {
 	Name             string
 	BuildingTypeID   uuid.UUID
 	BuildingTypeName string
+	ModelKey         *string
 }
 
 func (q *Queries) ListActiveBuildings(ctx context.Context) ([]ListActiveBuildingsRow, error) {
@@ -149,6 +150,7 @@ func (q *Queries) ListActiveBuildings(ctx context.Context) ([]ListActiveBuilding
 			&i.Name,
 			&i.BuildingTypeID,
 			&i.BuildingTypeName,
+			&i.ModelKey,
 		); err != nil {
 			return nil, err
 		}

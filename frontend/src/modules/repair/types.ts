@@ -407,14 +407,30 @@ export type OverviewFloor = {
 };
 
 /**
- * `hasModel`: the building has floor plans → 3D (only อาคาร 1 in CR-016); others show the floor list.
+ * `hasModel`: the building has floor plans → 3D when it also has a `modelKey`; others show the floor list.
  * `widthM` / `depthM`: footprint of the model (largest floor plan, CR-017); null without a plan.
+ * `modelKey`: which procedural 3D shape draws it (CR-027: `b1`, `b2`); null = no shape.
  */
-export type OverviewBuilding = { id: string; name: string; hasModel: boolean; widthM: number | null; depthM: number | null; floors: OverviewFloor[] };
+export type OverviewBuilding = {
+  id: string; name: string; hasModel: boolean; widthM: number | null; depthM: number | null; modelKey: string | null; floors: OverviewFloor[];
+};
+
+/**
+ * #27 `site[]` (CR-027, D-126): one box per building frame of the campus map, numbered as the owner's list.
+ * Metres from the centre of อาคาร 1 (x east, z south); `rotDeg` clockwise on the map, north up. Position and
+ * size are approximate; a block with an active `buildingId` is drawn at that building's plan footprint.
+ */
+export type SiteBlock = {
+  id: string; mapNo: number; name: string; buildingId: string | null;
+  x: number; z: number; rotDeg: number; widthM: number; depthM: number; storeys: number;
+  /** CR-028: the site view shows one side at a time — 1 ฝั่งสำนักงานใหญ่, 2 ฝั่ง Riverside. */
+  side: 1 | 2;
+};
 
 export type Overview = {
   counts: OverviewCounts;
   buildings: OverviewBuilding[];
+  site: SiteBlock[];
   /** ≤ 5: overdue first, then reworking, then critical / high, oldest first. */
   attention: TicketSummary[];
 };

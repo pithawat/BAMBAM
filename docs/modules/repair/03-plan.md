@@ -24,7 +24,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over); CR-021: S03 / S04 / S06 relayout | done (2026-10-26, `repair-stage-4`) |
 | 4P | **CR-025 rework:** ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร (สำนักงาน · โกดัง · ภายนอกอาคาร) · การ์ดงานซ้ำย้ายไปขั้นปัญหาที่พบ · โกดังตัวอย่าง 1 หลัง + **CR-026:** รูป quality 0.25 และเก็บรูปไว้ในฟอร์มจนกดส่ง (ทุกฟอร์มที่แนบรูป) | F02, F03, F04, F07, F21 | S03, S04, S08, S10, PhotoPicker | done — accepted 2026-10-29, tag `repair-stage-4P` |
 | 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | done — accepted 2026-10-29, tag `repair-stage-4R` |
-| 3D-2 | **CR-027:** โมเดล 3D อาคาร 2 + มุมมองทั้งพื้นที่ (site view) จาก `Cpac map.png` — เบาที่สุด (D-124) | F23, F31 | S29 | in progress (2026-10-29) |
+| 3D-2 | **CR-027:** โมเดล 3D อาคาร 2 + มุมมองทั้งพื้นที่ (site view) จาก `Cpac map.png` — เบาที่สุด (D-124) | F23, F31 | S29 | done — accepted 2026-10-29, tag `repair-stage-3D-2` (+ CR-028) |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
@@ -487,24 +487,27 @@ Status: done — accepted 2026-10-29 (tag `repair-stage-4R`). Built by Claude (n
 
 ## Stage 3D-2 — อาคาร 2 model + site view (CR-027) — starts only on the owner's go
 
+Status: done — accepted 2026-10-29 (tag `repair-stage-3D-2`, incl. CR-028). Built by Claude (no Codex hand-off). Branch `repair/stage-3D-2`
+
 **Scope**
 - อาคาร 2 (24 × 15 m, 4 floors) as a procedural model from the photo + plans in `attachments/building plan/2-อาคาร 2.pdf`; floors 1–4 rooms traced (unnamed rooms named by Claude, renamed later in settings)
 - S29 site view: every building of `รายชื่ออาคาร.txt` placed / rotated from `Cpac map.png` (low-poly block; อาคาร 1 / 2 with their shape); click → per-building view (existing building → floor flow). A switcher lists the buildings too
+- (CR-028) The site view shows one side at a time (ฝั่งสำนักงานใหญ่ / ฝั่ง Riverside, `site_blocks.side`), centred; อาคาร 1 / 2 are their real models on the site (without surroundings); budget per side ≤ ~20k triangles / ~60 draw calls (D-127)
 - **Resource budget (hard, D-124):** no GLB / texture downloads (shapes = code, textures = the existing generated canvas set, reused); site view ≤ 1 draw call per material (merged geometry), ≤ ~10k triangles total, one count marker per building (no per-ticket pins); one detailed building in memory at a time (dispose geometry / materials / textures on leave); render on demand only (no idle frames); pixel ratio capped; each building shape is its own lazy chunk; nothing 3D loads on mobile / no WebGL
 
 **Backend (Claude)**
-- [ ] Migration: `platform.buildings` + `model_key text NULL`, `site_x`, `site_z`, `site_rot` (numeric, NULL = not on the site); create อาคาร 2, floors 1–4, `floor_plans` 24 × 15, rooms with `plan_shape` and stable ids; set `model_key = 'b1'` for อาคาร 1
-- [ ] #27 adds `modelKey`, `site {x, z, rot} | null` per building (additive, contract updated); unit + Pg tests
+- [x] Migration `20261029000002_repair_cr027_building_two`: `platform.buildings` + `model_key text NULL`; ~~`site_x`, `site_z`, `site_rot`~~ → table `platform.site_blocks` (16 map blocks, optional `building_id`; D-126) (CR-027); create อาคาร 2, floors 1–4, `floor_plans` 24 × 15, rooms with `plan_shape` and stable ids; set `model_key = 'b1'` for อาคาร 1
+- [x] #27 adds `modelKey` per building and ~~`site {x, z, rot} | null` per building~~ `site[]` blocks (D-126) (CR-027) (additive, contract updated); unit + Pg tests
 
 **Frontend (Claude unless HANDOFF says otherwise)**
-- [ ] `scene/registry.ts` (`modelKey → () => import(...)`), `scene/building-two.ts`, `scene/site.ts` (merged blocks); engine builds by key instead of always `buildBuildingOne`
-- [ ] Site ↔ building ↔ floor transitions; switcher; types / mocks / api
+- [x] `scene/registry.ts` (`modelKey → () => import(...)`), `scene/building-two.ts`, `scene/site.ts` (merged blocks); engine builds by key instead of always `buildBuildingOne` (+ `scene/model.ts`, `scene/parts.ts`; the floor plan takes the shape's grid / core)
+- [x] Site ↔ building ↔ floor transitions; switcher; types / mocks / api
 
 **Acceptance criteria**
-- [ ] AC1: S29 opens on the site view; อาคาร 1 / 2 have their shape, others are blocks in the map position; each shows its open-ticket count
-- [ ] AC2: Click อาคาร 2 → its model → pick a floor → rooms, equipment drag and drop (F31) and ticket pins work as for อาคาร 1
-- [ ] AC3: Budget check recorded in the stage report: site view draw calls / triangles (`renderer.info`), JS chunk sizes, GPU memory stays flat after 10 enter / leave cycles, 0 frames rendered while idle
-- [ ] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F23 / F31 (+ อาคาร 2 case) and Atlas `verify` pass
+- [x] AC1: S29 opens on the site view; อาคาร 1 / 2 have their shape, others are blocks in the map position; each shows its open-ticket count
+- [x] AC2: Click อาคาร 2 → its model → pick a floor → rooms, equipment drag and drop (F31) and ticket pins work as for อาคาร 1
+- [x] AC3: Budget check recorded in the stage report: site view draw calls / triangles (`renderer.info`), JS chunk sizes, GPU memory stays flat after 10 enter / leave cycles, 0 frames rendered while idle
+- [x] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F23 / F31 (+ อาคาร 2 case) and Atlas `verify` pass
 
 ---
 

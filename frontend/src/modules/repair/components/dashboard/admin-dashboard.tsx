@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Building2, Check, ChevronRight, Clock, FileText, Move, Wrench, type LucideIcon } from "lucide-react";
@@ -20,11 +20,12 @@ import { getOverview } from "../../api";
 import { errorCode } from "../../errors";
 import type { Overview } from "../../types";
 import { placeLine, ticketHref, ticketTitle } from "../ticket-presentation";
-import { attentionReason, autoCloseSoonest, greeting, hasWebGL, oldestText, REASON_CHIP } from "./dashboard-ui";
+import { attentionReason, autoCloseSoonest, greeting, hasWebGL, oldestText, REASON_CHIP, SITE_SIDES, type SiteSide } from "./dashboard-ui";
 import { FloorList } from "./floor-list";
+import { hasShape } from "./scene/registry";
 
 // S29 หน้าแรก Admin (CR-016, layout = ui/mockups/S29-admin-dashboard-modern.html, D-082):
-// ภาพรวมวันนี้ band · 3D อาคาร 1 (desktop + WebGL) or the floor list · แจ้งซ่อม counts · งานที่ควรติดตาม ·
+// ภาพรวมวันนี้ band · 3D site view → building (desktop + WebGL, CR-027) or the floor list · แจ้งซ่อม counts · งานที่ควรติดตาม ·
 // car / room services shown as "not open yet" without numbers (CR-017: every number comes from the API).
 // `settings.assets.manage` (Admin, Superadmin; settings CR-001) toggles จัดวางอุปกรณ์; anyone else reads only (BR-F23-2). CR-019 polish: welcome mascot heading, tiles with an
 // icon, card headers with a sub-line and count chip, soft card shadows.
@@ -35,6 +36,9 @@ const BuildingCard = dynamic(() => import("./building-card"), {
 });
 
 const QUEUE = "/repair/admin/queue";
+/** Picker values of the S29 site view sides (CR-027, CR-028). */
+const SITE = { 1: "site-1", 2: "site-2" } as const;
+const sideOf = (v: string): SiteSide | null => (v === SITE[1] ? 1 : v === SITE[2] ? 2 : null);
 const noop = () => () => {};
 
 export function AdminDashboard() {
@@ -57,10 +61,17 @@ export function AdminDashboard() {
   const load = () => { setState("loading"); setRev((n) => n + 1); };
 
   const isAdmin = can(me, PERM.settingsAssets);
-  const buildings = overview?.buildings.filter((b) => b.floors.length > 0) ?? [];
-  const building = buildings.find((b) => b.id === buildingId) ?? buildings.find((b) => b.hasModel) ?? buildings[0];
-  const show3D = desktop && webgl && !!building?.hasModel && building.widthM !== null && building.depthM !== null;
+  const buildings = useMemo(() => overview?.buildings.filter((b) => b.floors.length > 0) ?? [], [overview]);
+  // CR-027: buildings drawn in 3D (a registered shape + floor plans); the site view needs desktop + WebGL
+  // stable between renders: the 3D card rebuilds the site mesh when this list changes
+  const modelBuildings = useMemo(() => buildings.filter((b) => b.hasModel && hasShape(b.modelKey) && b.widthM !== null && b.depthM !== null), [buildings]);
+  const siteView = desktop && webgl && !!overview?.site.length;
+  const side: SiteSide = sideOf(buildingId) ?? 1;
+  const onSite = siteView && (!!sideOf(buildingId) || !buildingId);
+  const building = onSite ? null : buildings.find((b) => b.id === buildingId) ?? modelBuildings[0] ?? buildings[0];
+  const show3D = desktop && webgl && (onSite || (!!building && modelBuildings.includes(building)));
   const firstName = me.name.split(/\s+/)[0];
+  const pick = (v: string) => { setBuildingId(v); setEditing(false); };
 
   if (state === "forbidden") return <ForbiddenState />;
 
@@ -76,8 +87,11 @@ export function AdminDashboard() {
         </div>
       </div>
       {buildings.length > 0 && <div className="w-full sm:w-60">
-        <Picker title="อาคาร" placeholder="เลือกอาคาร" icon={Building2} value={building?.id ?? ""} onValueChange={(v) => { setBuildingId(v); setEditing(false); }}
-          options={buildings.map((b) => ({ value: b.id, label: b.name, description: b.hasModel ? undefined : "ยังไม่มีโมเดล" }))} />
+        <Picker title="อาคาร" placeholder="เลือกอาคาร" icon={Building2} value={building?.id ?? SITE[side]} onValueChange={pick}
+          options={[
+            ...(siteView ? ([1, 2] as const).map((s) => ({ value: SITE[s], label: `ภาพรวม${SITE_SIDES[s]}`, description: "อาคารบนแผนที่" })) : []),
+            ...buildings.map((b) => ({ value: b.id, label: b.name, description: modelBuildings.includes(b) ? undefined : "ยังไม่มีโมเดล" })),
+          ]} />
       </div>}
       {isAdmin && show3D && <Button aria-pressed={editing} onClick={() => setEditing((e) => !e)} variant={editing ? "secondary" : "default"} className="h-13">
         {editing ? <Check aria-hidden /> : <Move aria-hidden />}{editing ? "เสร็จสิ้น" : "จัดวางอุปกรณ์"}
@@ -102,8 +116,9 @@ export function AdminDashboard() {
           so the palette and the whole plan are on screen together on laptop heights. */}
       <div className="md:col-span-2 lg:sticky lg:top-26 lg:col-span-1 lg:row-span-2 lg:h-[calc(100dvh-7.5rem)] lg:min-h-140 lg:self-start">
         {!overview ? <Skeleton className="h-60 rounded-xl lg:h-full" />
+          : show3D ? <BuildingCard buildings={modelBuildings} site={overview.site} buildingId={building?.id ?? null}
+              side={side} onOpenBuilding={setBuildingId} onShowSite={(s) => setBuildingId(SITE[s])} canEdit={isAdmin} editing={editing} />
           : !building ? null
-          : show3D ? <BuildingCard key={building.id} building={building} canEdit={isAdmin} editing={editing} />
           : <FloorList building={building} note={desktop
               ? (webgl ? "อาคารนี้ยังไม่มีโมเดล 3 มิติ" : "เบราว์เซอร์นี้แสดงภาพ 3 มิติไม่ได้")
               : isAdmin ? "จัดวางอุปกรณ์ได้บนคอมพิวเตอร์" : "ภาพ 3 มิติใช้ได้บนคอมพิวเตอร์"} />}

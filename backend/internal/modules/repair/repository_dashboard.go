@@ -75,12 +75,25 @@ func (r *PgRepository) OverviewBuildings(ctx context.Context) ([]OverviewBuildin
 	}
 	out := make([]OverviewBuilding, 0, len(blds))
 	for _, b := range blds {
-		ob := OverviewBuilding{ID: b.ID, Name: b.Name, Floors: nonNil(byBuilding[b.ID])}
+		ob := OverviewBuilding{ID: b.ID, Name: b.Name, ModelKey: b.ModelKey, Floors: nonNil(byBuilding[b.ID])}
 		if p, ok := plans[b.ID]; ok {
 			w, d := p.WidthM, p.DepthM
 			ob.HasModel, ob.WidthM, ob.DepthM = true, &w, &d
 		}
 		out = append(out, ob)
+	}
+	return out, nil
+}
+
+func (r *PgRepository) SiteBlocks(ctx context.Context) ([]SiteBlock, error) {
+	rows, err := r.q.ListSiteBlocks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SiteBlock, 0, len(rows))
+	for _, b := range rows {
+		out = append(out, SiteBlock{ID: b.ID, MapNo: b.MapNo, Name: b.Name, BuildingID: b.BuildingID,
+			X: b.XM, Z: b.ZM, RotDeg: b.RotDeg, WidthM: b.WidthM, DepthM: b.DepthM, Storeys: b.Storeys, Side: b.Side})
 	}
 	return out, nil
 }

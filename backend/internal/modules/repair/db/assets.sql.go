@@ -567,6 +567,62 @@ func (q *Queries) ListRoomShapesOnFloor(ctx context.Context, floorID uuid.UUID) 
 	return items, nil
 }
 
+const listSiteBlocks = `-- name: ListSiteBlocks :many
+SELECT sb.id, sb.map_no, sb.name, b.id AS building_id,
+    sb.x_m::float8 AS x_m, sb.z_m::float8 AS z_m, sb.rot_deg::float8 AS rot_deg,
+    sb.width_m::float8 AS width_m, sb.depth_m::float8 AS depth_m, sb.storeys, sb.side
+FROM platform.site_blocks sb
+LEFT JOIN platform.buildings b ON b.id = sb.building_id AND b.is_active
+ORDER BY sb.map_no
+`
+
+type ListSiteBlocksRow struct {
+	ID         uuid.UUID
+	MapNo      int16
+	Name       string
+	BuildingID *uuid.UUID
+	XM         float64
+	ZM         float64
+	RotDeg     float64
+	WidthM     float64
+	DepthM     float64
+	Storeys    int16
+	Side       int16
+}
+
+// S29 site view (CR-027, D-126): every map block; building_id only while that building is active.
+func (q *Queries) ListSiteBlocks(ctx context.Context) ([]ListSiteBlocksRow, error) {
+	rows, err := q.db.Query(ctx, listSiteBlocks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSiteBlocksRow
+	for rows.Next() {
+		var i ListSiteBlocksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.MapNo,
+			&i.Name,
+			&i.BuildingID,
+			&i.XM,
+			&i.ZM,
+			&i.RotDeg,
+			&i.WidthM,
+			&i.DepthM,
+			&i.Storeys,
+			&i.Side,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockAsset = `-- name: LockAsset :one
 SELECT a.id, a.code, a.name, a.asset_type_id, a.room_id, COALESCE(a.pos_x, 0)::float8 AS pos_x, COALESCE(a.pos_z, 0)::float8 AS pos_z, (a.pos_x IS NOT NULL)::boolean AS placed,
     a.rotation_deg, a.is_active

@@ -36,6 +36,7 @@ type dashFake struct {
 	// #27 inputs and what the service passed in
 	counts                    OverviewCounts
 	attention                 []uuid.UUID
+	site                      []SiteBlock
 	gotToday, gotDay, gotWeek time.Time
 	gotLimit                  int
 }
@@ -50,6 +51,7 @@ func (f *fakeRepo) OverviewCounts(_ context.Context, today, dayStart, weekStart 
 	return f.dash.counts, nil
 }
 func (f *fakeRepo) OverviewBuildings(context.Context) ([]OverviewBuilding, error) { return nil, nil }
+func (f *fakeRepo) SiteBlocks(context.Context) ([]SiteBlock, error)               { return f.dash.site, nil }
 func (f *fakeRepo) AttentionTicketIDs(_ context.Context, _ time.Time, limit int) ([]uuid.UUID, error) {
 	f.dash.gotLimit = limit
 	return f.dash.attention, nil
@@ -457,5 +459,26 @@ func TestOverviewUsesBangkokDayAndDecoratesAttention(t *testing.T) {
 	}
 	if o.Counts.Open != 1 {
 		t.Errorf("counts = %+v", o.Counts)
+	}
+}
+
+// CR-027: #27 carries the site blocks as the repository returns them (an unlinked block keeps a nil building).
+func TestOverviewCarriesSiteBlocks(t *testing.T) {
+	a := newAssetFixture(t)
+	b2 := uuid.New()
+	a.repo.dash.site = []SiteBlock{
+		{ID: uuid.New(), MapNo: 2, Name: "อาคาร 2", BuildingID: &b2, X: -62.5, Z: 22.2, RotDeg: 17.1, WidthM: 24, DepthM: 15, Storeys: 4},
+		{ID: uuid.New(), MapNo: 3, Name: "อาคาร 3", X: 48.5, Z: 61.1, RotDeg: 7.6, WidthM: 72, DepthM: 17, Storeys: 1},
+	}
+	o, err := a.svc.Overview(context.Background(), a.admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := toOverviewDTO(o)
+	if len(d.Site) != 2 || d.Site[0].BuildingID == nil || *d.Site[0].BuildingID != b2 || d.Site[1].BuildingID != nil || d.Site[1].RotDeg != 7.6 {
+		t.Errorf("site = %+v", d.Site)
+	}
+	if _, err := a.svc.Overview(context.Background(), viewerAs(users.RoleEmployee, uuid.New())); err == nil {
+		t.Error("an employee must not see the overview")
 	}
 }

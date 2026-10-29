@@ -17,7 +17,7 @@ WHERE s.is_active AND c.is_active
 ORDER BY s.sort_order, s.name;
 
 -- name: ListActiveBuildings :many
-SELECT b.id, b.name, bt.id AS building_type_id, bt.name AS building_type_name
+SELECT b.id, b.name, bt.id AS building_type_id, bt.name AS building_type_name, b.model_key
 FROM platform.buildings b
 JOIN platform.building_types bt ON bt.id = b.building_type_id
 WHERE b.is_active

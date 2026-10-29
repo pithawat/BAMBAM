@@ -3,6 +3,8 @@ package repair
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -561,6 +563,39 @@ func TestPgDashboardAndAssets(t *testing.T) {
 	}
 	if b1.WidthM == nil || *b1.WidthM != 32 || b1.DepthM == nil || *b1.DepthM != 15 {
 		t.Errorf("อาคาร 1 footprint = %v × %v, want 32 × 15", b1.WidthM, b1.DepthM)
+	}
+	// CR-027: อาคาร 2 with its 3D key, 4 floors of 24 × 15 m, and the site blocks of the map.
+	b2Building := uuid.MustParse("c027b1d0-0000-4000-8000-000000000002")
+	var b2 *OverviewBuilding
+	for i := range o.Buildings {
+		if o.Buildings[i].ID == b2Building {
+			b2 = &o.Buildings[i]
+		}
+	}
+	if b2 == nil || !b2.HasModel || b2.ModelKey == nil || *b2.ModelKey != "b2" || len(b2.Floors) != 4 ||
+		b2.WidthM == nil || *b2.WidthM != 24 || b2.DepthM == nil || *b2.DepthM != 15 {
+		t.Fatalf("อาคาร 2 = %+v", b2)
+	}
+	if b1.ModelKey == nil || *b1.ModelKey != "b1" {
+		t.Errorf("อาคาร 1 model key = %v", b1.ModelKey)
+	}
+	if len(o.Site) != 16 || o.Site[1].MapNo != 2 || o.Site[1].BuildingID == nil || *o.Site[1].BuildingID != b2Building || o.Site[2].BuildingID != nil || o.Site[1].Side != 1 || o.Site[5].Side != 2 {
+		t.Errorf("site = %+v", o.Site)
+	}
+	for n := 1; n <= 4; n++ {
+		fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c027f200-0000-4000-8000-00000000000%d", n)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		area := 0.0 // every floor adds up to 360 m² (ห้องน้ำ lies inside the common area)
+		for _, r := range fp.Rooms {
+			if r.AreaType != "restroom" {
+				area += shapeArea(r.Shape)
+			}
+		}
+		if math.Abs(area-360) > 1e-6 {
+			t.Errorf("อาคาร 2 floor %d rooms add up to %.2f m², want 360", n, area)
+		}
 	}
 	for _, f := range b1.Floors { // CR-017: steps split the same open tickets
 		if st := f.Steps; st.AwaitingAssessment+st.InRepair+st.AwaitingRating != f.Open.Total() {

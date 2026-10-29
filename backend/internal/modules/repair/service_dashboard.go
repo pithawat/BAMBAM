@@ -27,6 +27,10 @@ func (s *Service) Overview(ctx context.Context, v Viewer) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
+	site, err := s.repo.SiteBlocks(ctx)
+	if err != nil {
+		return Overview{}, err
+	}
 	ids, err := s.repo.AttentionTicketIDs(ctx, today, AttentionLimit)
 	if err != nil {
 		return Overview{}, err
@@ -41,7 +45,7 @@ func (s *Service) Overview(ctx context.Context, v Viewer) (Overview, error) {
 		decorate(v, &t)
 		attention = append(attention, t)
 	}
-	return Overview{Counts: counts, Buildings: buildings, Attention: attention}, nil
+	return Overview{Counts: counts, Buildings: buildings, Site: site, Attention: attention}, nil
 }
 
 // AssetTypes implements #29 (the palette).

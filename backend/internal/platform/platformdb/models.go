@@ -61,6 +61,7 @@ type PlatformBuilding struct {
 	UpdatedAt      time.Time
 	UpdatedByID    *uuid.UUID
 	BuildingTypeID uuid.UUID
+	ModelKey       *string
 }
 
 type PlatformBuildingType struct {
@@ -139,6 +140,22 @@ type PlatformSession struct {
 	ExpiresAt    time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type PlatformSiteBlock struct {
+	ID         uuid.UUID
+	MapNo      int16
+	Name       string
+	BuildingID *uuid.UUID
+	XM         pgtype.Numeric
+	ZM         pgtype.Numeric
+	RotDeg     pgtype.Numeric
+	WidthM     pgtype.Numeric
+	DepthM     pgtype.Numeric
+	Storeys    int16
+	Side       int16
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type PlatformUser struct {

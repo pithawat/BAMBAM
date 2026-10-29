@@ -3,12 +3,13 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { AreaType, FloorPlan, PlanRoom, PlanShape } from "../../../types";
 import { shapeArea } from "../../../plan-geometry";
-import { B1 } from "./building-one";
 import { bg, leafClusters, merged, mesh, rng, worldUV, type Textures } from "./kit";
+import type { PlanSpec } from "./model";
 
 // Floor plan cutaway (owner's model `buildPlan`, section 5, D-082): floor slab + tiles, low walls cut at
 // 1.2 m with door gaps, core, facade sill + glass, columns on the grid, CAD-like dimensions, desks and
-// plants. Rooms come from #30 outlines (polygons) instead of the model's floor-1 zones.
+// plants. Rooms come from #30 outlines (polygons) instead of the model's floor-1 zones; grid, core, entrance
+// and plants come from the building shape (CR-027).
 
 export type PlanLabel = { pos: THREE.Vector3; kind: "room" | "core" | "dim" | "note"; text: string; sub?: string };
 
@@ -48,6 +49,7 @@ export function buildFloorPlan(
   tex: Textures,
   center: (room: PlanRoom) => [number, number] | null,
   fallback: { width: number; depth: number },
+  spec: PlanSpec,
 ): BuiltPlan {
   // a floor without a plan is drawn at the building footprint (#27)
   const W = plan.widthM ?? fallback.width;
@@ -137,9 +139,9 @@ export function buildFloorPlan(
   }
   if (!traced.length) labels.push({ pos: new THREE.Vector3(0, 1.6, PZ(D * 0.68)), kind: "note", text: "ยังไม่มีผังห้องของชั้นนี้" });
 
-  // core: toilets, stairs, lift, A.H.U. (the same on every floor)
+  // core: toilets, stairs, lift, A.H.U.
   const stairs: THREE.BufferGeometry[] = [];
-  for (const c of B1.core) {
+  for (const c of spec.core(plan.floor.level)) {
     const fm = c.kind === "tile"
       ? new THREE.MeshStandardMaterial({ map: own(tex.wetTile, c.w / 1.2, c.d / 1.2), roughness: 0.3, envMapIntensity: 0.7 })
       : new THREE.MeshStandardMaterial({ color: c.kind === "lift" ? 0x9aa1a7 : 0xc6c8c8, roughness: c.kind === "lift" ? 0.3 : 0.85, metalness: c.kind === "lift" ? 0.6 : 0 });
@@ -159,7 +161,8 @@ export function buildFloorPlan(
   if (stairs.length) group.add(merged(stairs.map((s) => worldUV(s)), colMat));
 
   // facade: sill wall + glass, entrance gap on the ground floor
-  const front: [number, number][] = isGround ? [[0, B1.entrance.x], [B1.entrance.x + B1.entrance.w, W]] : [[0, W]];
+  const ent = isGround ? spec.entrance : null;
+  const front: [number, number][] = ent ? [[0, ent.x], [ent.x + ent.w, W]] : [[0, W]];
   for (const [a, c] of front) seg(a, D - 0.1, c, D - 0.1, 0.9, 0.2);
   seg(0, 0.1, W, 0.1, 0.9, 0.2);
   seg(0.1, 0, 0.1, D, 0.9, 0.2);
@@ -170,8 +173,8 @@ export function buildFloorPlan(
 
   // columns on the structural grid
   const zs = [0];
-  B1.rows.forEach((r) => zs.push(zs[zs.length - 1] + r));
-  for (let x = 0; x <= W + 1e-3; x += B1.bay) {
+  spec.rows.forEach((r) => zs.push(zs[zs.length - 1] + r));
+  for (let x = 0; x <= W + 1e-3; x += spec.bay) {
     for (const z of zs) {
       walls.push(bg(0.5, CUT, 0.5, PX(x), 0, PZ(z)));
       caps.push(bg(0.51, 0.025, 0.51, PX(x), CUT, PZ(z)));
@@ -181,14 +184,14 @@ export function buildFloorPlan(
 
   // dimension ticks + labels (like the CAD drawing)
   const tick: number[] = [];
-  for (let x = 0; x <= W + 1e-3; x += B1.bay) tick.push(PX(x), 0.03, PZ(0) - 0.6, PX(x), 0.03, PZ(0) - 2.0);
+  for (let x = 0; x <= W + 1e-3; x += spec.bay) tick.push(PX(x), 0.03, PZ(0) - 0.6, PX(x), 0.03, PZ(0) - 2.0);
   for (const z of zs) tick.push(PX(0) - 0.6, 0.03, PZ(z), PX(0) - 2.4, 0.03, PZ(z));
   const tg = new THREE.BufferGeometry();
   tg.setAttribute("position", new THREE.Float32BufferAttribute(tick, 3));
   group.add(new THREE.LineSegments(tg, new THREE.LineBasicMaterial({ color: 0x62657c })));
-  for (let x = 0; x + B1.bay <= W + 1e-3; x += B1.bay) labels.push({ pos: new THREE.Vector3(PX(x + B1.bay / 2), 0.05, PZ(0) - 1.3), kind: "dim", text: String(B1.bay * 1000) });
+  for (let x = 0; x + spec.bay <= W + 1e-3; x += spec.bay) labels.push({ pos: new THREE.Vector3(PX(x + spec.bay / 2), 0.05, PZ(0) - 1.3), kind: "dim", text: String(spec.bay * 1000) });
   let acc = 0;
-  for (const r of B1.rows) {
+  for (const r of spec.rows) {
     labels.push({ pos: new THREE.Vector3(PX(0) - 1.7, 0.05, PZ(acc + r / 2)), kind: "dim", text: String(r * 1000) });
     acc += r;
   }
@@ -237,8 +240,8 @@ export function buildFloorPlan(
     group.add(dm, cm);
   }
 
-  if (isGround) {
-    const rc = B1.reception;
+  const rc = isGround ? spec.reception : null;
+  if (rc) {
     group.add(mesh(bg(rc.w, 1.05, rc.d, PX(rc.x + rc.w / 2), 0, PZ(rc.z + rc.d / 2)), new THREE.MeshStandardMaterial({ color: 0x7d5f43, roughness: 0.55 })));
     group.add(mesh(bg(rc.w + 0.1, 0.04, rc.d + 0.15, PX(rc.x + rc.w / 2), 1.05, PZ(rc.z + rc.d / 2)), new THREE.MeshStandardMaterial({ color: 0xf0eee8, roughness: 0.3 })));
     labels.push({ pos: new THREE.Vector3(PX(rc.x + rc.w / 2), 1.6, PZ(rc.z + rc.d / 2)), kind: "core", text: "Information" });
@@ -246,7 +249,7 @@ export function buildFloorPlan(
 
   // potted plants in the corridor
   const pots: THREE.BufferGeometry[] = [], plants: [number, number, number, number, number][] = [];
-  for (const [px, pz] of [[12.6, 6.6], [23.4, 6.6], [12.6, 8.4], [23.4, 8.4]]) {
+  for (const [px, pz] of spec.plants) {
     pots.push(new THREE.CylinderGeometry(0.28, 0.22, 0.45, 12).translate(PX(px), 0.225, PZ(pz)));
     plants.push([PX(px), 0.95, PZ(pz), 0.55, 12]);
   }

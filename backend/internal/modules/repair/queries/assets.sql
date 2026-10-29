@@ -55,6 +55,15 @@ JOIN platform.floors f ON f.id = fp.floor_id
 WHERE f.is_active
 GROUP BY f.building_id;
 
+-- name: ListSiteBlocks :many
+-- S29 site view (CR-027, D-126): every map block; building_id only while that building is active.
+SELECT sb.id, sb.map_no, sb.name, b.id AS building_id,
+    sb.x_m::float8 AS x_m, sb.z_m::float8 AS z_m, sb.rot_deg::float8 AS rot_deg,
+    sb.width_m::float8 AS width_m, sb.depth_m::float8 AS depth_m, sb.storeys, sb.side
+FROM platform.site_blocks sb
+LEFT JOIN platform.buildings b ON b.id = sb.building_id AND b.is_active
+ORDER BY sb.map_no;
+
 -- name: AttentionTicketIDs :many
 -- #27 attention: overdue first, then reworking, then critical / high, oldest report first.
 SELECT t.id FROM repair.tickets t

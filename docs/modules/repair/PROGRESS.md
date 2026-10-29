@@ -2,12 +2,14 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P accepted 2026-10-29; 4R accepted 2026-10-29; next: 5 · of 8   **Updated:** 2026-10-29 (Stage 4R)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 accepted 2026-10-29; next: office-side 3D models (CR-030), then 5 · of 8   **Updated:** 2026-10-29 (Stage 3D-2 built)
 
 ## Now
 
+- **CR-029 visual follow-up built 2026-10-29 (D-128), awaiting owner review:** all 8 tiger poses now white (PNG + cache-safe WebP); contrasting theme-aware surfaces across login / Home / repair / settings / shared states. Preview: `output/white-tiger/index.html`; browser audit 56/56 pass (14 screens/states × 375/1280 × 2 themes), final Home recheck 4/4. Existing next/font fallback used in isolated preview; no font changes. Shared: `components/shared/mascot.tsx`, `states.tsx`, `app/globals.css`.
+
 - **Stage 4R accepted 2026-10-29**, tag `repair-stage-4R` (CR-024). Next: Stage 5 (QR scan → prefilled S03, F13-B)
-- **CR-027 approved 2026-10-29 (L, D-124):** อาคาร 2 3D model + S29 site view, lightest possible (resource budget in `03-plan.md` Stage 3D-2). Build waits for the owner's go
+- **Stage 3D-2 accepted 2026-10-29**, tag `repair-stage-3D-2` (CR-027 + CR-028, D-124 / D-126 / D-127): site view in 2 sides, real อาคาร 1 / 2 models, อาคาร 2 floors 1–4. Next: CR-030 models for the office side (owner 2026-10-29)
 - **CR-025 approved + applied to docs 2026-10-27 (L, D-117 / D-118):** S03 = สถานที่ → ปัญหาที่พบ → รูปภาพและส่ง; building types (`platform.building_types`: สำนักงาน · โกดัง · ภายนอกอาคาร), categories per type (`repair.category_building_types`, อื่น ๆ everywhere), #5 `CATEGORY_NOT_FOR_BUILDING`; duplicate card → step 2; mock warehouse `โกดังเก็บของ 1 (ตัวอย่าง)`; admin side = settings CR-005 / settings Stage 4P. Code = new Stage 4P
 - **CR-026 approved 2026-10-27 (M, D-119) + A1 2026-10-29 (D-120):** photo JPEG quality 0.85 → 0.25 (1920px kept); photos stay in the form and upload only on submit (option A, all photo forms); S03 draft photos in IndexedDB, 24 h expiry — in Stage 4P
 - **CR-024 approved + applied to docs 2026-10-26 (M, D-112):** remove the `executive` role (existing users → `employee`) and the whole notification system (F19-B, S13, bell, P4–P7); new copy in `ui/screens/_common.md` §9. Code, unit / e2e tests and System Atlas = Stage 4R (Claude only)
@@ -20,6 +22,8 @@
 
 ## Next
 
+- Review the CR-029 white-tiger gallery (`output/white-tiger/index.html`); this visual task does not advance the module stage.
+
    - (2026-10-27) System Atlas already follows CR-024 / CR-025 / CR-026: no executive role, no F19-B / bell, 4R + 4P on the timeline (pending, no flows bound — owner's choice), F07 tour added (verify passes); 4R only re-checks with `/atlas sync repair` + `verify` after its FE changes
    - (D-113, 2026-10-26) the backend part is done in settings Stage 1 (migration executive → employee, no executive role, `Viewer.Can`, Go tests); 4R keeps FE copy / bell / toasts, e2e and the Atlas
 0. Then `/build-stage repair 5 prepare` (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
@@ -27,6 +31,11 @@
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 
 ## Open issues / questions
+
+- 2026-10-29: concurrent CR-029 (white mascot, other session) adds `?v=white-20261029` to `mascot.tsx` image URLs → Next.js runtime error "query string not configured in images.localPatterns" on pages with the mascot; breaks e2e / Atlas until fixed there. Re-run F23 / F31 + Atlas verify for 3D-2 after that
+
+- 3D-2 owner checks: CPAC Warehouse 3 plan is 80 × 40 m but its map frame (no. 13) is ~18 × 17 m next to Warehouse 2 — kept the frame size; storeys / footprints of 16 โรงอาหาร and 17 ห้องประชุม 60 ปี are the frame (one irregular plan for both); no. 14 โรงตาข่าย not on the map; อาคาร 2 room names by Claude (อ.2 ห้อง 201–205 / 301–303, พื้นที่ทำงาน ชั้น 2 / 3) — rename in settings
+- 3D-2: the full e2e under 4 workers had 5 timing flakes (F01 / F02 AC7 / F06 / F26 / F29), all pass on re-run; 3D specs now `test.slow()`
 
 - 4R: copy not in §9 — S18 contractor dialog / S10 contractor score said "เห็นเฉพาะช่าง Admin และผู้บริหาร", now "เห็นเฉพาะช่างและ Admin" (confirm)
 - e2e: a stale `next dev` on :3100 from an earlier run is reused by Playwright and dies / crawls mid-run (100–196 false failures); kill it, or start the stack by hand, before `test:e2e`
@@ -72,6 +81,14 @@
 - Mock photo restore: drafts drop photos with `blob:` URLs (mock uploads), so in mock mode a restored draft needs photos again
 
 ## Stage log
+
+- 2026-10-29: **Stage 3D-2 accepted** by the owner, tag `repair-stage-3D-2` — Atlas verify / full e2e not re-run after CR-028 because of the concurrent CR-029 mascot image error (open issue)
+
+- 2026-10-29: CR-029 white-tiger visual follow-up — 8 transparent poses, contrasting surfaces / login palette, full desktop Home mascot; lint / typecheck / production build pass, browser audit 56/56 + Home recheck 4/4; `output/white-tiger/index.html`; uncommitted, waiting for visual review.
+
+- 2026-10-29: CR-028 applied in 3D-2 — `site_blocks.side`, #27 `side`, card side toggle + picker, real models on the site; Go tests incl. Pg pass, tsc / eslint pass, F23 / F31 14–15 / 15 (fails only from the concurrent CR-029 mascot `?v=` image error, not 3D)
+
+- 2026-10-29: Stage 3D-2 built (CR-027) — migration `20261029000002` (`model_key`, `platform.site_blocks`, อาคาร 2 + rooms, idempotent Up), #27 `modelKey` + `site[]`; FE registry / site / building-two, engine site mode; Go lint 0, go test incl. Pg pass; tsc / eslint / next build pass; e2e F23 / F31 15 / 15 ×3, full suite 189 + 5 flakes (pass on re-run); Atlas verify all pass (F23 / F31 tours got a site step)
 
 - 2026-10-29: **Stage 4R accepted**, tag `repair-stage-4R` — CR-024: bell + notification copy removed (§9), no executive traces, Go test executive → 400, e2e F01-cr024 (AC1–AC3); e2e 193 pass (2 timing flakes passed on re-run), Atlas verify pass
 - 2026-10-29: **Stage 4P accepted**, tag `repair-stage-4P` — CR-025 (place first, building types, mock warehouse, #5 422) + CR-026 (0.25, upload on submit, IndexedDB drafts); UI by Claude; e2e repair + Atlas 13 / 13 pass; settings e2e not run (Docker off, D-123)

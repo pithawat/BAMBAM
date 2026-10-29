@@ -11,31 +11,55 @@ import { cn } from "@/lib/utils";
 import { getAssetTypes, getFloorPlan, getTickets, updateAsset } from "../../api";
 import { errorMessage } from "../../errors";
 import { pointInShape, roomAt, roomCenter } from "../../plan-geometry";
-import type { Asset, AssetType, FloorPlan, OverviewBuilding, OverviewFloor, PlanRoom, TicketSummary } from "../../types";
+import type { Asset, AssetType, FloorPlan, OverviewBuilding, OverviewFloor, PlanRoom, SiteBlock, TicketSummary } from "../../types";
 import { floorLabel, listDate, ticketHref, ticketTitle } from "../ticket-presentation";
 import { AssetDialog, DeactivateAssetDialog, type AssetDraft } from "./asset-dialog";
-import { ASSET_SHORT, AssetIcon, assetLabel, floorStepCounts, floorTopStep, MODEL_STEP, MODEL_STEPS, modelStep, MOUNT_Y, spreadInRoom, type ModelStepKey } from "./dashboard-ui";
+import { ASSET_SHORT, AssetIcon, SITE_SIDES, type SiteSide, assetLabel, floorStepCounts, floorTopStep, MODEL_STEP, MODEL_STEPS, modelStep, MOUNT_Y, spreadInRoom, type ModelStepKey } from "./dashboard-ui";
 import { BuildingEngine, type TicketPin } from "./scene/engine";
+import { siteAnchor, type SiteBlockSpec } from "./scene/site";
 
-// S29 3D card (F23 + F31, CR-016, CR-017): อาคาร 1 model → floor plan with one pin per open ticket (colour =
-// step, from #6) and equipment chips. Floors / footprint / step counts come from #27; opening a floor plays
-// the repair-map lift transition.
+// S29 3D card (F23 + F31, CR-016, CR-017, CR-027): campus site view (one block per map frame, a marker with
+// the open-ticket count on each building that has floors) → building model → floor plan with one pin per
+// open ticket (colour = step, from #6) and equipment chips. Floors / footprint / step counts come from #27;
+// opening a floor plays the repair-map lift transition. One engine (one WebGL context) for every view.
 // Admin edit mode: drag a type from the palette into a room (dialog), drag a chip to move it (toast with
 // undo), chip popover → แก้ไข / ปิดใช้งาน. Without the edit permission: the same views without edit controls.
 // Loaded with next/dynamic only on desktop with WebGL (three.js stays out of every other chunk).
 
-type Props = { building: OverviewBuilding; canEdit: boolean; editing: boolean };
+type Props = {
+  /** Buildings that have a 3D shape (`modelKey` in the registry) and floor plans. */
+  buildings: OverviewBuilding[];
+  site: SiteBlock[];
+  /** null = the site view of `side`. */
+  buildingId: string | null;
+  side: SiteSide;
+  onOpenBuilding: (id: string) => void;
+  /** Shows the site view of one side (back from a building, or the side toggle). */
+  onShowSite: (side: SiteSide) => void;
+  canEdit: boolean;
+  editing: boolean;
+};
+
+type PlacedBlock = SiteBlockSpec & { name: string; building: OverviewBuilding | null };
 
 type DragSource = { kind: "new"; type: AssetType } | { kind: "move"; asset: Asset };
 type DragState = { source: DragSource; x: number; y: number; room: PlanRoom | null; point: [number, number] | null; moved: boolean };
 
 const round = (v: number) => Math.round(v * 100) / 100;
 
-export default function BuildingCard({ building, canEdit, editing }: Props) {
+export default function BuildingCard({ buildings, site, buildingId, side, onOpenBuilding, onShowSite, canEdit, editing }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [engine, setEngine] = useState<BuildingEngine | null>(null);
-  const [floorId, setFloorId] = useState<string | null>(null);
+  const building = buildings.find((b) => b.id === buildingId) ?? null;
+  // the floor picked in a building; another building (or the site) starts at the building view
+  const [floorSel, setFloorSel] = useState<{ buildingId: string; floorId: string } | null>(null);
+  const floorId = floorSel && floorSel.buildingId === building?.id ? floorSel.floorId : null;
+  const setFloorId = (id: string | null) => setFloorSel(id && building ? { buildingId: building.id, floorId: id } : null);
+  // the building whose model is on screen (set when the engine has built it)
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const ready = !!building && loaded === building.id;
+  const [blockTip, setBlockTip] = useState<{ id: string; x: number; y: number } | null>(null);
   // #30 result tagged with its request key, so nothing is reset inside effects.
   const [planResult, setPlanResult] = useState<{ key: string; floorId: string; plan?: FloorPlan; failed?: boolean } | null>(null);
   const [planRev, setPlanRev] = useState(0);
@@ -49,29 +73,60 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
   const [ticketResult, setTicketResult] = useState<{ key: string; items: TicketSummary[] } | null>(null);
   const [readyFloor, setReadyFloor] = useState<string | null>(null);
 
-  const floors = useMemo(() => [...building.floors].sort((a, b) => b.level - a.level), [building.floors]);
+  const floors = [...(building?.floors ?? [])].sort((a, b) => b.level - a.level);
   const byLevel = useRef(new Map<number, string>());
-  useEffect(() => { byLevel.current = new Map(building.floors.map((f) => [f.level, f.id])); }, [building.floors]);
+  const currentBuilding = useRef<string | null>(null);
+  useEffect(() => {
+    byLevel.current = new Map((building?.floors ?? []).map((f) => [f.level, f.id]));
+    currentBuilding.current = building?.id ?? null;
+  }, [building]);
   const planKey = `${floorId}:${planRev}`;
   const sameFloor = planResult && planResult.floorId === floorId ? planResult : null;
   const [plan, setPlanLocal] = useOptimisticPlan(sameFloor?.plan ?? null);
   const planState: "idle" | "loading" | "error" = !floorId ? "idle" : planResult?.key === planKey ? (planResult.failed ? "error" : "idle") : "loading";
-  const current = building.floors.find((f) => f.id === floorId) ?? null;
-  const totalOpen = building.floors.reduce((n, f) => n + f.openCount, 0);
+  const current = building?.floors.find((f) => f.id === floorId) ?? null;
+  const totalOpen = (building?.floors ?? []).reduce((n, f) => n + f.openCount, 0);
   const edit = canEdit && editing;
   const tickets = ticketResult?.key === planKey ? ticketResult.items : null;
 
-  // engine lifecycle
-  const spec = useRef({ floors: Math.max(...building.floors.map((f) => f.level)), widthM: building.widthM ?? 0, depthM: building.depthM ?? 0 });
+  // site blocks: a block linked to a building with a 3D shape takes that building's footprint and floors
+  // CR-028: one side at a time (the camera centres on it)
+  const siteBlocks = useMemo(() => site.filter((s) => s.side === side).map((s): PlacedBlock => {
+    const b = buildings.find((x) => x.id === s.buildingId) ?? null;
+    return {
+      id: s.id, name: s.name, building: b, x: s.x, z: s.z, rotDeg: s.rotDeg,
+      width: b?.widthM ?? s.widthM, depth: b?.depthM ?? s.depthM,
+      storeys: b ? Math.max(...b.floors.map((f) => f.level)) : s.storeys,
+      modelKey: b?.modelKey ?? null, linked: !!b,
+    };
+  }), [site, side, buildings]);
+  const openBlock = useRef<(id: string) => void>(() => {});
   useEffect(() => {
-    const e = new BuildingEngine(hostRef.current!, overlayRef.current!, spec.current, {
+    openBlock.current = (id) => {
+      const b = siteBlocks.find((x) => x.id === id)?.building;
+      if (b) onOpenBuilding(b.id);
+    };
+  }, [siteBlocks, onOpenBuilding]);
+
+  // engine lifecycle
+  useEffect(() => {
+    const e = new BuildingEngine(hostRef.current!, overlayRef.current!, {
       onFloorHover: (level, x, y) => {
         const r = hostRef.current?.getBoundingClientRect();
         setTip(level && r ? { level, x: x - r.left, y: y - r.top } : null);
       },
-      onFloorClick: (level) => setFloorId(byLevel.current.get(level) ?? null),
+      onFloorClick: (level) => {
+        const id = byLevel.current.get(level), b = currentBuilding.current;
+        if (id && b) setFloorSel({ buildingId: b, floorId: id });
+      },
+      onBlockHover: (id, x, y) => {
+        const r = hostRef.current?.getBoundingClientRect();
+        setBlockTip(id && r ? { id, x: x - r.left, y: y - r.top } : null);
+      },
+      onBlockClick: (id) => openBlock.current(id),
     });
     setEngine(e);
+    if (process.env.NODE_ENV !== "production") (window as { __s29Engine?: BuildingEngine }).__s29Engine = e; // e2e budget check (AC3)
     return () => {
       e.dispose();
       setEngine(null);
@@ -79,8 +134,12 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
   }, []);
 
   useEffect(() => {
-    engine?.setFloorSteps(building.floors.map((f) => ({ level: f.level, step: floorTopStep(f) })));
-  }, [engine, building.floors]);
+    engine?.setSite(siteBlocks);
+  }, [engine, siteBlocks]);
+
+  useEffect(() => {
+    if (ready) engine?.setFloorSteps((building?.floors ?? []).map((f) => ({ level: f.level, step: floorTopStep(f) })));
+  }, [engine, building, ready]);
 
   useEffect(() => {
     let alive = true;
@@ -88,36 +147,55 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
     return () => { alive = false; };
   }, []);
 
-  // building ↔ floor view
-  // The 3D plan is rebuilt only when the floor changes; a reload after an equipment write only refreshes
-  // the HTML overlays (chips, pins), which keeps edits instant (room outlines never change here).
-  const shownFloor = useRef<string | null>(null);
+  // the picked floor's plan (#30) and open tickets (#6), fetched at once (also while the model loads)
   useEffect(() => {
-    if (!engine) return;
-    if (!floorId) {
-      shownFloor.current = null;
-      void engine.showBuilding();
-      return;
-    }
-    // the lift starts on click; the plan swaps in when #30 has answered
-    const level = byLevel.current.size ? [...byLevel.current].find(([, id]) => id === floorId)?.[0] : undefined;
-    if (level && shownFloor.current !== floorId) engine.enterFloor(level);
+    if (!floorId) return;
     let alive = true;
     getFloorPlan(floorId)
-      .then((p) => {
-        if (!alive) return;
-        setPlanResult({ key: planKey, floorId, plan: p });
-        if (shownFloor.current !== floorId) {
-          shownFloor.current = floorId;
-          void engine.showPlan(p, (room) => roomCenter(room, p.rooms)).then(() => { if (alive) setReadyFloor(floorId); });
-        }
-      })
+      .then((p) => { if (alive) setPlanResult({ key: planKey, floorId, plan: p }); })
       .catch(() => { if (alive) setPlanResult({ key: planKey, floorId, failed: true }); });
     getTickets({ scope: "all", floorId, status: ["in_progress", "resolved"], pageSize: 100, sort: "createdAt:asc" })
       .then((page) => { if (alive) setTicketResult({ key: planKey, items: page.items }); })
       .catch(() => { if (alive) setTicketResult({ key: planKey, items: [] }); });
     return () => { alive = false; };
-  }, [engine, floorId, planKey]);
+  }, [floorId, planKey]);
+
+  // building ↔ floor view, once the model is built (a floor picked while it loads opens right after)
+  // The 3D plan is rebuilt only when the floor changes; a reload after an equipment write only refreshes
+  // the HTML overlays (chips, pins), which keeps edits instant (room outlines never change here).
+  const shownFloor = useRef<string | null>(null);
+  const fetchedPlan = sameFloor?.plan ?? null;
+  useEffect(() => {
+    if (!engine || !ready) return;
+    if (!floorId) {
+      shownFloor.current = null;
+      void engine.showBuilding();
+      return;
+    }
+    if (shownFloor.current === floorId) return;
+    // the lift starts on click; the plan swaps in when #30 has answered
+    const level = [...byLevel.current].find(([, id]) => id === floorId)?.[0];
+    if (level) engine.enterFloor(level);
+    if (!fetchedPlan) return;
+    shownFloor.current = floorId;
+    void engine.showPlan(fetchedPlan, (room) => roomCenter(room, fetchedPlan.rooms)).then(() => setReadyFloor(floorId));
+  }, [engine, ready, floorId, fetchedPlan]);
+
+  // site ↔ building (declared after the floor effect: its transition replaces the floor one)
+  const modelKey = building?.modelKey ?? null;
+  const size = building ? `${Math.max(...building.floors.map((f) => f.level))}:${building.widthM}:${building.depthM}` : "";
+  useEffect(() => {
+    if (!engine) return;
+    let alive = true;
+    shownFloor.current = null; // the engine drops the plan with the building
+    if (!buildingId || !modelKey) {
+      void engine.showSite().then(() => { if (alive) setLoaded(null); });
+    } else {
+      const [floors, width, depth] = size.split(":").map(Number);
+      void engine.openBuilding(modelKey, { floors, width, depth }).then((ok) => { if (alive && ok) setLoaded(buildingId); });
+    }
+    return () => { alive = false; };
+  }, [engine, buildingId, modelKey, size]);
 
   // one 3D pin per open ticket, spread around the centre of its room (no room → the common area)
   const pins = useMemo(() => {
@@ -143,7 +221,7 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
     }
     return out;
   }, [plan, tickets]);
-  const pinsShown = !!engine && !!floorId && readyFloor === floorId;
+  const pinsShown = !!engine && ready && !!floorId && readyFloor === floorId;
   useEffect(() => {
     if (pinsShown) engine!.setTicketPins(pins);
   }, [engine, pins, pinsShown]);
@@ -236,13 +314,20 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
     next?.click();
   };
 
-  const tipFloor = tip ? building.floors.find((f) => f.level === tip.level) : null;
+  const tipFloor = tip && building ? building.floors.find((f) => f.level === tip.level) : null;
+  const tipBlock = blockTip && !building ? siteBlocks.find((b) => b.id === blockTip.id) : null;
   const mountOf = (key: string) => MOUNT_Y[types.find((t) => t.key === key)?.mount ?? "wall"] ?? 1.6;
+  const siteOpen = siteBlocks.reduce((n, b) => n + (b.building?.floors.reduce((m, f) => m + f.openCount, 0) ?? 0), 0);
+  const buildingSide = (site.find((s) => s.buildingId === building?.id)?.side ?? side) as SiteSide;
 
-  return <section aria-label={`${building.name} แบบ 3 มิติ`} className="relative h-full min-h-140 overflow-hidden rounded-xl border bg-muted shadow-card">
+  return <section aria-label={`${building?.name ?? "ภาพรวมพื้นที่"} แบบ 3 มิติ`} className="relative h-full min-h-140 overflow-hidden rounded-xl border bg-muted shadow-card">
     <div ref={hostRef} className="absolute inset-0" />
     <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-10">
-      {engine && !floorId && floors.filter((f) => f.openCount > 0).map((f) =>
+      {engine && !building && siteBlocks.filter((b) => b.building).map((b) =>
+        <Anchor key={b.id} engine={engine} at={siteAnchor(b)} className="-translate-x-1/2 -translate-y-full">
+          <SiteMarker building={b.building!} onOpen={() => onOpenBuilding(b.building!.id)} />
+        </Anchor>)}
+      {engine && ready && !floorId && floors.filter((f) => f.openCount > 0).map((f) =>
         <Anchor key={f.id} engine={engine} at={engine.floorAnchor(f.level)} className="-translate-y-1/2">
           <FloorBadge floor={f} onOpen={() => setFloorId(f.id)} />
         </Anchor>)}
@@ -258,13 +343,20 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
     {/* header */}
     <div className="pointer-events-none absolute inset-x-4.5 top-4.5 z-20 flex items-center gap-1.5">
       {floorId && <Button size="sm" variant="outline" className="pointer-events-auto" onClick={back}><ChevronLeft aria-hidden />ภาพอาคาร</Button>}
+      {building && !floorId && <Button size="sm" variant="outline" className="pointer-events-auto" onClick={() => onShowSite(buildingSide)}><ChevronLeft aria-hidden />ภาพรวมพื้นที่</Button>}
       <p className="pointer-events-auto rounded-md bg-card px-3 py-2 text-[15px] font-semibold shadow-card">
-        {building.name}
+        {building?.name ?? "ภาพรวมพื้นที่"}
         <small className="ml-1.5 text-xs font-normal text-muted-foreground">
-          {current ? `${floorLabel(current.name)} · งานค้าง ${current.openCount}` : `${building.floors.length} ชั้น · งานค้าง ${totalOpen}`}
+          {!building ? `${SITE_SIDES[side]} · ${siteBlocks.length} อาคาร · งานค้าง ${siteOpen}`
+            : current ? `${floorLabel(current.name)} · งานค้าง ${current.openCount}` : `${building.floors.length} ชั้น · งานค้าง ${totalOpen}`}
         </small>
       </p>
-      {planState === "loading" && <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="กำลังโหลดผังชั้น" />}
+      {!building && <span role="group" aria-label="เลือกฝั่ง" className="pointer-events-auto flex rounded-md bg-card p-1 shadow-card">
+        {([1, 2] as const).map((s) => <button key={s} type="button" aria-pressed={s === side} onClick={() => onShowSite(s)}
+          className={cn("rounded-sm px-2.5 py-1 text-xs font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/40",
+            s === side ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>{SITE_SIDES[s]}</button>)}
+      </span>}
+      {(planState === "loading" || (building && !ready)) && <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label={building && !ready ? "กำลังโหลดอาคาร" : "กำลังโหลดผังชั้น"} />}
       <span className="pointer-events-auto ml-auto flex gap-1.5">
         <IconButton label="ซูมเข้า" onClick={() => engine?.zoomBy(0.8)}><Plus /></IconButton>
         <IconButton label="ซูมออก" onClick={() => engine?.zoomBy(1.25)}><Minus /></IconButton>
@@ -273,7 +365,7 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
     </div>
 
     {/* floor picker */}
-    <div ref={pickerRef} role="group" aria-label="เลือกชั้น" onKeyDown={onPickerKey} className="absolute top-20.5 left-4.5 z-20 flex flex-col gap-2">
+    {building && <div ref={pickerRef} role="group" aria-label="เลือกชั้น" onKeyDown={onPickerKey} className="absolute top-20.5 left-4.5 z-20 flex flex-col gap-2">
       {floors.map((f) => {
         const on = f.id === floorId;
         return <button key={f.id} type="button" data-floor={f.level} aria-current={on || undefined} tabIndex={on || (!floorId && f === floors[0]) ? 0 : -1}
@@ -284,7 +376,7 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
           {f.openCount > 0 && <span className={cn("grid h-5 min-w-5 place-items-center rounded-full px-1 text-xs text-white", MODEL_STEP[floorTopStep(f)!].dot)}>{f.openCount}</span>}
         </button>;
       })}
-    </div>
+    </div>}
 
     {edit && <p className="absolute top-18.5 right-4.5 z-20 rounded-md bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">โหมดจัดวางอุปกรณ์</p>}
 
@@ -314,7 +406,12 @@ export default function BuildingCard({ building, canEdit, editing }: Props) {
           })}
           <Button size="sm" variant="outline" onClick={() => setDraft({ mode: "add", typeId: null, roomId: "", x: null, z: null, fromDrop: false })}><Plus aria-hidden />เพิ่มอุปกรณ์</Button>
         </div>
-      : <p className="absolute bottom-4.5 left-1/2 z-20 -translate-x-1/2 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-raised">เลือกชั้นก่อนจัดวางอุปกรณ์</p>)}
+      : <p className="absolute bottom-4.5 left-1/2 z-20 -translate-x-1/2 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-raised">{building ? "เลือกชั้นก่อนจัดวางอุปกรณ์" : "เลือกอาคารและชั้นก่อนจัดวางอุปกรณ์"}</p>)}
+
+    {tipBlock && blockTip && <p role="tooltip" style={{ left: blockTip.x + 14, top: blockTip.y + 14 }}
+      className="pointer-events-none absolute z-30 rounded-sm bg-foreground px-2.5 py-1.5 text-xs whitespace-nowrap text-background">
+      <b>{tipBlock.name}</b> · {tipBlock.building ? "กดเพื่อดูรายชั้น" : "ยังไม่มีข้อมูลชั้นและห้อง"}
+    </p>}
 
     {tip && tipFloor && !floorId && <p role="tooltip" style={{ left: tip.x + 14, top: tip.y + 14 }}
       className="pointer-events-none absolute z-30 rounded-sm bg-foreground px-2.5 py-1.5 text-xs whitespace-nowrap text-background">
@@ -395,6 +492,22 @@ function PlanOverlays({ engine, plan, edit, canEdit, mountOf, openAsset, setOpen
       </Anchor>;
     })}
   </>;
+}
+
+/** Site view: one marker per building with floors — name + open tickets (the earliest open step's colour) → that building. */
+function SiteMarker({ building, onOpen }: { building: OverviewBuilding; onOpen: () => void }) {
+  const open = building.floors.reduce((n, f) => n + f.openCount, 0);
+  const critical = building.floors.reduce((n, f) => n + f.criticalCount, 0);
+  const top = MODEL_STEPS.find((st) => building.floors.some((f) => floorTopStep(f) === st.key));
+  return <button type="button" onClick={onOpen} aria-label={`${building.name} งานค้าง ${open}${critical ? `, ฉุกเฉิน ${critical}` : ""}`}
+    className="flex items-center gap-2 rounded-full border bg-card/95 py-1 pr-1.5 pl-3 text-xs shadow-raised backdrop-blur-sm outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-3 focus-visible:ring-ring/40 motion-reduce:transition-none">
+    <b className="font-semibold whitespace-nowrap">{building.name}</b>
+    <span aria-hidden className={cn("inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-semibold tabular-nums",
+      top ? cn(MODEL_STEP[top.key].dot, "text-white") : "bg-muted text-muted-foreground")}>{open}</span>
+    {critical > 0 && <span aria-hidden className="inline-flex h-5 items-center gap-1 rounded-full bg-priority-critical px-1.5 font-semibold text-white">
+      <TriangleAlert className="size-3" />{critical}
+    </span>}
+  </button>;
 }
 
 /** Building view: floor name + open tickets per step (only the steps that have tickets). */

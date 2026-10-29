@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { bg, leafClusters, merged, mesh, planeUV, rng, worldUV, type Textures } from "./kit";
+import type { BuildingModel, BuildingSize, FloorEntry } from "./model";
+import { finishFloor, floorMats, glassBox, mullionGrid, newParts, trees } from "./parts";
 
 // อาคาร 1 from the owner's model `แผนผังงานซ่อมอาคาร.html` (section 4, D-082): ground floor with posters,
 // entrance canopy and steps, 5 balcony floors, roof with railing, planters and the CPAC billboard, plus
@@ -30,74 +32,14 @@ export const B1 = {
 } as const;
 
 /** The model shape + the building data from #27 (floors, footprint in metres). */
-export type BuildingSpec = typeof B1 & { floors: number; width: number; depth: number };
+export type BuildingSpec = typeof B1 & BuildingSize;
 
-type Parts = { C: THREE.BufferGeometry[]; G: THREE.BufferGeometry[]; T: THREE.BufferGeometry[]; L: THREE.BufferGeometry[] };
-
-export type FloorEntry = {
-  level: number;
-  group: THREE.Group;
-  /** Concrete material: its emissive shows the floor's priority colour. */
-  glowMat: THREE.MeshStandardMaterial;
-  /** Invisible pick box + outline used for hover / priority highlight. */
-  shell: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
-  edges: THREE.LineSegments<THREE.EdgesGeometry, THREE.LineBasicMaterial>;
-};
-
-function floorMats(tex: Textures) {
-  return {
-    c: new THREE.MeshStandardMaterial({ map: tex.concrete, color: B1.cladding, roughness: 0.93, envMapIntensity: 0.55 }),
-    glass: new THREE.MeshStandardMaterial({ map: tex.interior, roughness: 0.05, metalness: 0.25, envMapIntensity: 1.4 }),
-    metal: new THREE.MeshStandardMaterial({ color: B1.frame, metalness: 0.75, roughness: 0.35, envMapIntensity: 0.9 }),
-    light: new THREE.MeshStandardMaterial({ color: 0xd2d5d3, metalness: 0.3, roughness: 0.55, envMapIntensity: 0.7 }),
-  };
-}
-
-function glassBox(W: number, D: number, y: number, h: number, inset: number, list: THREE.BufferGeometry[], uOff: number) {
-  list.push(planeUV(W, h, W / 16, 1, uOff).translate(0, y + h / 2, D / 2 + inset));
-  list.push(planeUV(W, h, W / 16, 1, uOff + 0.31).rotateY(Math.PI).translate(0, y + h / 2, -D / 2 - inset));
-  list.push(planeUV(D, h, D / 16, 1, uOff + 0.57).rotateY(Math.PI / 2).translate(W / 2 + inset, y + h / 2, 0));
-  list.push(planeUV(D, h, D / 16, 1, uOff + 0.83).rotateY(-Math.PI / 2).translate(-W / 2 - inset, y + h / 2, 0));
-}
-
-function mullionGrid(W: number, D: number, y: number, h: number, step: number, list: THREE.BufferGeometry[], out = 0.05) {
-  const dpt = 0.1;
-  for (let x = -W / 2; x <= W / 2 + 1e-3; x += step) list.push(bg(0.07, h, dpt, x, y, D / 2 + out), bg(0.07, h, dpt, x, y, -D / 2 - out));
-  for (let z = -D / 2 + step; z < D / 2 - 1e-3; z += step) list.push(bg(dpt, h, 0.07, W / 2 + out, y, z), bg(dpt, h, 0.07, -W / 2 - out, y, z));
-  for (const yy of [y, y + h * 0.68, y + h - 0.06]) {
-    list.push(bg(W, 0.06, dpt, 0, yy, D / 2 + out), bg(W, 0.06, dpt, 0, yy, -D / 2 - out));
-    list.push(bg(dpt, 0.06, D, W / 2 + out, yy, 0), bg(dpt, 0.06, D, -W / 2 - out, yy, 0));
-  }
-}
-
-function makeShell(s: BuildingSpec, level: number, y0: number) {
-  const OH = s.overhang;
-  const geo = new THREE.BoxGeometry(s.width + 2 * OH + 0.5, s.floorHeight - 0.04, s.depth + 2 * OH + 0.5);
-  const shell = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
-  shell.position.set(0, y0 + s.floorHeight / 2, 0);
-  shell.userData = { level, noFade: true }; // keeps its own opacity while the floor fades
-  shell.renderOrder = 5;
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
-  edges.position.copy(shell.position);
-  edges.renderOrder = 6;
-  edges.visible = false;
-  return { shell, edges };
-}
-
-function finishFloor(s: BuildingSpec, level: number, y0: number, g: THREE.Group, M: ReturnType<typeof floorMats>, parts: Parts): FloorEntry {
-  if (parts.C.length) g.add(merged(parts.C.map((x) => worldUV(x)), M.c));
-  if (parts.G.length) g.add(merged(parts.G, M.glass, false, true));
-  if (parts.T.length) g.add(merged(parts.T, M.metal));
-  if (parts.L.length) g.add(merged(parts.L, M.light));
-  const { shell, edges } = makeShell(s, level, y0);
-  g.add(shell, edges);
-  return { level, group: g, glowMat: M.c, shell, edges };
-}
+const mats = (tex: Textures) => floorMats(tex, B1.cladding, B1.frame);
 
 function groundFloor(tex: Textures, s: BuildingSpec): FloorEntry {
   const { width: W, depth: D, floorHeight: FH } = s;
-  const M = floorMats(tex), g = new THREE.Group();
-  const parts: Parts = { C: [], G: [], T: [], L: [] };
+  const M = mats(tex), g = new THREE.Group();
+  const parts = newParts();
   const stone = new THREE.MeshStandardMaterial({ map: tex.concrete, color: 0x8f918e, roughness: 0.85, envMapIntensity: 0.4 });
   const P = 0.6;
   g.add(merged([worldUV(bg(W + 1.0, P, D + 1.0, 0, 0, 0))], stone));
@@ -131,8 +73,8 @@ function groundFloor(tex: Textures, s: BuildingSpec): FloorEntry {
 
 function balconyFloor(tex: Textures, s: BuildingSpec, f: number): FloorEntry {
   const { width: W, depth: D, floorHeight: FH, overhang: OH } = s;
-  const M = floorMats(tex), g = new THREE.Group();
-  const parts: Parts = { C: [], G: [], T: [], L: [] };
+  const M = mats(tex), g = new THREE.Group();
+  const parts = newParts();
   const r = rng(f * 131 + 7);
   const y0 = (f - 1) * FH, ys = 0.35, ph = 1.0, pt = 0.2, yP = y0 + ys;
   parts.C.push(bg(W + 2 * OH, ys, D + 2 * OH, 0, y0, 0));
@@ -158,7 +100,7 @@ function balconyFloor(tex: Textures, s: BuildingSpec, f: number): FloorEntry {
 
 function roof(tex: Textures, s: BuildingSpec) {
   const { width: W, depth: D, floorHeight: FH, overhang: OH, floors: NF } = s;
-  const M = floorMats(tex), g = new THREE.Group();
+  const M = mats(tex), g = new THREE.Group();
   const C: THREE.BufferGeometry[] = [], T: THREE.BufferGeometry[] = [];
   const yR = NF * FH, top = yR + 0.4;
   C.push(bg(W + 2 * OH + 0.3, 0.4, D + 2 * OH + 0.3, 0, yR, 0));
@@ -182,18 +124,6 @@ function roof(tex: Textures, s: BuildingSpec) {
   g.add(merged(C.map((x) => worldUV(x)), M.c));
   g.add(merged(T, M.metal));
   return g;
-}
-
-function trees(parent: THREE.Object3D, tex: Textures, list: [number, number, number][]) {
-  const trunks: THREE.BufferGeometry[] = [];
-  const crowns: [number, number, number, number, number][] = [];
-  const bark = new THREE.MeshStandardMaterial({ color: 0x5d5044, roughness: 0.95 });
-  for (const [x, z, s] of list) {
-    trunks.push(new THREE.CylinderGeometry(0.14 * s, 0.24 * s, 3.4 * s, 7).translate(x, 1.7 * s, z));
-    crowns.push([x, 4.4 * s, z, 2.6 * s, 34], [x + 0.9 * s, 3.6 * s, z + 0.4 * s, 1.7 * s, 16], [x - 0.8 * s, 3.8 * s, z - 0.5 * s, 1.8 * s, 16]);
-  }
-  parent.add(merged(trunks, bark));
-  leafClusters(parent, tex, crowns);
 }
 
 /** Ground, plaza, lawns and hedges, parking with cars and trees around อาคาร 1 (the model's site, other buildings removed). */
@@ -254,9 +184,9 @@ function site(tex: Textures) {
 }
 
 /** Builds อาคาร 1 on its site. `floors[level - 1]` = that floor. */
-export function buildBuildingOne(tex: Textures, s: BuildingSpec) {
+export function buildBuildingOne(tex: Textures, s: BuildingSpec, surroundings = true) {
   const root = new THREE.Group();
-  root.add(site(tex));
+  if (surroundings) root.add(site(tex));
   const floors: FloorEntry[] = [];
   for (let f = 1; f <= s.floors; f++) {
     const e = f === 1 ? groundFloor(tex, s) : balconyFloor(tex, s, f);
@@ -267,3 +197,18 @@ export function buildBuildingOne(tex: Textures, s: BuildingSpec) {
   root.add(roofGroup);
   return { root, floors, roof: roofGroup };
 }
+
+/** CR-027 registry entry `b1`. */
+export const model: BuildingModel = {
+  floorHeight: B1.floorHeight,
+  overhang: B1.overhang,
+  plan: {
+    bay: B1.bay,
+    rows: B1.rows,
+    core: () => B1.core,
+    entrance: B1.entrance,
+    reception: B1.reception,
+    plants: [[12.6, 6.6], [23.4, 6.6], [12.6, 8.4], [23.4, 8.4]],
+  },
+  build: (tex, size, opts) => buildBuildingOne(tex, { ...B1, ...size }, opts?.surroundings ?? true),
+};

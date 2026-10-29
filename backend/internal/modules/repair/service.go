@@ -46,6 +46,7 @@ type Repository interface {
 	// OverviewCounts: dayStart / weekStart are Bangkok midnights, today the Bangkok date (BR-F23-1).
 	OverviewCounts(ctx context.Context, today, dayStart, weekStart time.Time) (OverviewCounts, error)
 	OverviewBuildings(ctx context.Context) ([]OverviewBuilding, error)
+	SiteBlocks(ctx context.Context) ([]SiteBlock, error)
 	AttentionTicketIDs(ctx context.Context, today time.Time, limit int) ([]uuid.UUID, error)
 	ListAssetTypes(ctx context.Context) ([]AssetType, error)
 	// GetFloorPlan returns ErrFloorNotFound for an unknown or inactive floor.

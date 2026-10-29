@@ -48,13 +48,30 @@ type OverviewBuildingDTO struct {
 	HasModel bool               `json:"hasModel"`
 	WidthM   *float64           `json:"widthM"`
 	DepthM   *float64           `json:"depthM"`
+	ModelKey *string            `json:"modelKey"`
 	Floors   []OverviewFloorDTO `json:"floors"`
+}
+
+// SiteBlockDTO = #27 `site[]` item (CR-027).
+type SiteBlockDTO struct {
+	ID         uuid.UUID  `json:"id"`
+	MapNo      int16      `json:"mapNo"`
+	Name       string     `json:"name"`
+	BuildingID *uuid.UUID `json:"buildingId"`
+	X          float64    `json:"x"`
+	Z          float64    `json:"z"`
+	RotDeg     float64    `json:"rotDeg"`
+	WidthM     float64    `json:"widthM"`
+	DepthM     float64    `json:"depthM"`
+	Storeys    int16      `json:"storeys"`
+	Side       int16      `json:"side"`
 }
 
 // OverviewDTO = #27.
 type OverviewDTO struct {
 	Counts    OverviewCountsDTO     `json:"counts"`
 	Buildings []OverviewBuildingDTO `json:"buildings"`
+	Site      []SiteBlockDTO        `json:"site"`
 	Attention []TicketSummaryDTO    `json:"attention"`
 }
 
@@ -140,10 +157,14 @@ func toOverviewDTO(o Overview) OverviewDTO {
 			OldestAwaitingAssessmentAt: utcPtr(c.OldestAwaitingAssessmentAt), NextAutoCloseAt: utcPtr(c.NextAutoCloseAt),
 		},
 		Buildings: make([]OverviewBuildingDTO, 0, len(o.Buildings)),
+		Site:      make([]SiteBlockDTO, 0, len(o.Site)),
 		Attention: toSummaryDTOs(o.Attention),
 	}
+	for _, b := range o.Site {
+		d.Site = append(d.Site, SiteBlockDTO(b))
+	}
 	for _, b := range o.Buildings {
-		bd := OverviewBuildingDTO{ID: b.ID, Name: b.Name, HasModel: b.HasModel, WidthM: b.WidthM, DepthM: b.DepthM, Floors: make([]OverviewFloorDTO, 0, len(b.Floors))}
+		bd := OverviewBuildingDTO{ID: b.ID, Name: b.Name, HasModel: b.HasModel, WidthM: b.WidthM, DepthM: b.DepthM, ModelKey: b.ModelKey, Floors: make([]OverviewFloorDTO, 0, len(b.Floors))}
 		for _, f := range b.Floors {
 			bd.Floors = append(bd.Floors, OverviewFloorDTO{ID: f.ID, Name: f.Name, Level: f.Level,
 				OpenCount: f.Open.Total(), HighestPriority: f.Open.Highest(), Steps: StepCountsDTO(f.Steps),

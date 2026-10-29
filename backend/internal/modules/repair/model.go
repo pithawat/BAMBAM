@@ -598,12 +598,29 @@ type OverviewBuilding struct {
 	HasModel bool
 	// Footprint of the model in metres (largest floor plan); nil without a plan (CR-017).
 	WidthM, DepthM *float64
-	Floors         []OverviewFloor
+	// Procedural 3D shape (frontend registry, CR-027); nil = no shape.
+	ModelKey *string
+	Floors   []OverviewFloor
+}
+
+// SiteBlock: one building frame of the campus map on the S29 site view (CR-027, D-126). Metres from the
+// centre of อาคาร 1 (x east, z south), RotDeg clockwise on the map. BuildingID is nil when the block is
+// not (or no longer) an active building.
+type SiteBlock struct {
+	ID                           uuid.UUID
+	MapNo                        int16
+	Name                         string
+	BuildingID                   *uuid.UUID
+	X, Z, RotDeg, WidthM, DepthM float64
+	Storeys                      int16
+	// Side of the campus shown together on the site view (CR-028): 1 ฝั่งสำนักงานใหญ่, 2 ฝั่ง Riverside.
+	Side int16
 }
 
 type Overview struct {
 	Counts    OverviewCounts
 	Buildings []OverviewBuilding
+	Site      []SiteBlock
 	Attention []TicketSummary
 }
 
