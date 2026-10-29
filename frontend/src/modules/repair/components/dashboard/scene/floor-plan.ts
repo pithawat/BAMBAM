@@ -37,6 +37,32 @@ function isRect(s: PlanShape) {
   return xs.size === 2 && zs.size === 2;
 }
 
+/** A wall piece from (x1, z1) to (x2, z2) at any angle, bottom at y (scene coordinates). */
+function edgeBox(x1: number, z1: number, x2: number, z2: number, y: number, h: number, t: number) {
+  const len = Math.hypot(x2 - x1, z2 - z1);
+  return new THREE.BoxGeometry(len, h, t).rotateY(-Math.atan2(z2 - z1, x2 - x1)).translate((x1 + x2) / 2, y + h / 2, (z1 + z2) / 2);
+}
+
+function inside(o: PlanShape, x: number, z: number) {
+  let r = false;
+  for (let i = 0, j = o.length - 1; i < o.length; j = i++) {
+    const [xi, zi] = o[i], [xj, zj] = o[j];
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) r = !r;
+  }
+  return r;
+}
+
+/** True when the segment lies on an outline edge (the facade draws it). */
+function onOutline(outlines: readonly PlanShape[], x1: number, z1: number, x2: number, z2: number) {
+  const on = (o: PlanShape, x: number, z: number) => o.some(([ax, az], i) => {
+    const [bx, bz] = o[(i + 1) % o.length];
+    const cross = (bx - ax) * (z - az) - (bz - az) * (x - ax);
+    const dot = (x - ax) * (bx - ax) + (z - az) * (bz - az);
+    return Math.abs(cross) < 1e-3 * Math.hypot(bx - ax, bz - az) && dot >= -1e-6 && dot <= (bx - ax) ** 2 + (bz - az) ** 2 + 1e-6;
+  });
+  return outlines.some((o) => on(o, x1, z1) && on(o, x2, z2) && on(o, (x1 + x2) / 2, (z1 + z2) / 2));
+}
+
 function bbox(s: PlanShape) {
   const xs = s.map((p) => p[0]);
   const zs = s.map((p) => p[1]);
@@ -74,9 +100,22 @@ export function buildFloorPlan(
   const colMat = new THREE.MeshStandardMaterial({ map: tex.concrete, color: 0xd9d8d2, roughness: 0.9 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0xa9d0e6, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.3, depthWrite: false });
 
-  group.add(mesh(worldUV(bg(W + 0.6, 0.35, D + 0.6, 0, -0.35, 0)), new THREE.MeshStandardMaterial({ map: tex.concrete, color: 0xb5b8b8, roughness: 0.9 })));
-  group.add(mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2).translate(0, 0.005, 0),
-    new THREE.MeshStandardMaterial({ map: own(tex.tile, W / 2.4, D / 2.4), roughness: 0.35, envMapIntensity: 0.6 }), false, true));
+  // CR-030: a floor that is not the whole W × D box (canteen, TrialMix + lab) is drawn from its outline
+  const outlines: readonly PlanShape[] = spec.outline?.(plan.floor.level) ?? [[[0, 0], [W, 0], [W, D], [0, D]]];
+  const boxed = !spec.outline;
+  const slabMat = new THREE.MeshStandardMaterial({ map: tex.concrete, color: 0xb5b8b8, roughness: 0.9 });
+  const tileMat = new THREE.MeshStandardMaterial({ map: own(tex.tile, 1, 1), roughness: 0.35, envMapIntensity: 0.6 });
+  if (boxed) {
+    group.add(mesh(worldUV(bg(W + 0.6, 0.35, D + 0.6, 0, -0.35, 0)), slabMat));
+    tileMat.map!.repeat.set(W / 2.4, D / 2.4);
+    group.add(mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2).translate(0, 0.005, 0), tileMat, false, true));
+  } else {
+    for (const o of outlines) {
+      const sh = new THREE.Shape(o.map(([x, z]) => new THREE.Vector2(PX(x), -PZ(z))));
+      group.add(mesh(worldUV(new THREE.ExtrudeGeometry(sh, { depth: 0.35, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, -0.35, 0)), slabMat));
+      group.add(mesh(worldUV(new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2).translate(0, 0.005, 0), 1 / 2.4), tileMat, false, true));
+    }
+  }
 
   const walls: THREE.BufferGeometry[] = [], caps: THREE.BufferGeometry[] = [];
   const seg = (x1: number, z1: number, x2: number, z2: number, h = CUT, t = 0.12) => {
@@ -88,7 +127,7 @@ export function buildFloorPlan(
     walls.push(bg(w, h, d, cx, 0, cz));
     caps.push(bg(w + 0.01, 0.025, d + 0.01, cx, h, cz));
   };
-  const onEdge = (x1: number, z1: number, x2: number, z2: number) =>
+  const onEdge = (x1: number, z1: number, x2: number, z2: number) => !boxed ? onOutline(outlines, x1, z1, x2, z2) :
     (Math.abs(z1 - z2) < 1e-6 && (z1 < 0.05 || z1 > D - 0.05)) || (Math.abs(x1 - x2) < 1e-6 && (x1 < 0.05 || x1 > W - 0.05));
   const drawn = new Set<string>();
   const edgeWithDoor = (a: [number, number], b: [number, number]) => {
@@ -161,21 +200,33 @@ export function buildFloorPlan(
   if (stairs.length) group.add(merged(stairs.map((s) => worldUV(s)), colMat));
 
   // facade: sill wall + glass, entrance gap on the ground floor
-  const ent = isGround ? spec.entrance : null;
-  const front: [number, number][] = ent ? [[0, ent.x], [ent.x + ent.w, W]] : [[0, W]];
-  for (const [a, c] of front) seg(a, D - 0.1, c, D - 0.1, 0.9, 0.2);
-  seg(0, 0.1, W, 0.1, 0.9, 0.2);
-  seg(0.1, 0, 0.1, D, 0.9, 0.2);
-  seg(W - 0.1, 0, W - 0.1, D, 0.9, 0.2);
-  const gl = [bg(W, CUT - 0.9, 0.04, 0, 0.9, PZ(0.1)), bg(0.04, CUT - 0.9, D, PX(0.1), 0.9, 0), bg(0.04, CUT - 0.9, D, PX(W - 0.1), 0.9, 0)];
-  for (const [a, c] of front) gl.push(bg(c - a, CUT - 0.9, 0.04, PX((a + c) / 2), 0.9, PZ(D - 0.1)));
-  group.add(merged(gl, glassMat, false, false));
+  if (boxed) {
+    const ent = isGround ? spec.entrance : null;
+    const front: [number, number][] = ent ? [[0, ent.x], [ent.x + ent.w, W]] : [[0, W]];
+    for (const [a, c] of front) seg(a, D - 0.1, c, D - 0.1, 0.9, 0.2);
+    seg(0, 0.1, W, 0.1, 0.9, 0.2);
+    seg(0.1, 0, 0.1, D, 0.9, 0.2);
+    seg(W - 0.1, 0, W - 0.1, D, 0.9, 0.2);
+    const gl = [bg(W, CUT - 0.9, 0.04, 0, 0.9, PZ(0.1)), bg(0.04, CUT - 0.9, D, PX(0.1), 0.9, 0), bg(0.04, CUT - 0.9, D, PX(W - 0.1), 0.9, 0)];
+    for (const [a, c] of front) gl.push(bg(c - a, CUT - 0.9, 0.04, PX((a + c) / 2), 0.9, PZ(D - 0.1)));
+    group.add(merged(gl, glassMat, false, false));
+  } else {
+    const gl: THREE.BufferGeometry[] = [];
+    for (const o of outlines) for (let i = 0; i < o.length; i++) {
+      const [x1, z1] = o[i], [x2, z2] = o[(i + 1) % o.length];
+      walls.push(edgeBox(PX(x1), PZ(z1), PX(x2), PZ(z2), 0, 0.9, 0.2));
+      caps.push(edgeBox(PX(x1), PZ(z1), PX(x2), PZ(z2), 0.9, 0.025, 0.21));
+      gl.push(edgeBox(PX(x1), PZ(z1), PX(x2), PZ(z2), 0.9, CUT - 0.9, 0.04));
+    }
+    group.add(merged(gl, glassMat, false, false));
+  }
 
   // columns on the structural grid
   const zs = [0];
   spec.rows.forEach((r) => zs.push(zs[zs.length - 1] + r));
   for (let x = 0; x <= W + 1e-3; x += spec.bay) {
     for (const z of zs) {
+      if (!boxed && !outlines.some((o) => inside(o, x, z))) continue;
       walls.push(bg(0.5, CUT, 0.5, PX(x), 0, PZ(z)));
       caps.push(bg(0.51, 0.025, 0.51, PX(x), CUT, PZ(z)));
     }
@@ -253,11 +304,13 @@ export function buildFloorPlan(
     pots.push(new THREE.CylinderGeometry(0.28, 0.22, 0.45, 12).translate(PX(px), 0.225, PZ(pz)));
     plants.push([PX(px), 0.95, PZ(pz), 0.55, 12]);
   }
-  group.add(merged(pots, new THREE.MeshStandardMaterial({ color: 0x6e6a64, roughness: 0.7 })));
-  leafClusters(group, tex, plants);
+  if (pots.length) { // CR-030 shapes have none
+    group.add(merged(pots, new THREE.MeshStandardMaterial({ color: 0x6e6a64, roughness: 0.7 })));
+    leafClusters(group, tex, plants);
+  }
 
   const outline = new THREE.LineLoop(
-    new THREE.BufferGeometry().setFromPoints([[0, 0], [W, 0], [W, D], [0, D]].map(([x, z]) => new THREE.Vector3(PX(x), 0.04, PZ(z)))),
+    new THREE.BufferGeometry().setFromPoints(outlines[0].map(([x, z]) => new THREE.Vector3(PX(x), 0.04, PZ(z)))),
     new THREE.LineBasicMaterial({ color: 0xc33432 }),
   );
   outline.visible = false;

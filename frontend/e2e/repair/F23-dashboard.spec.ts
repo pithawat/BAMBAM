@@ -5,6 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 // 3D with floor drill-down, other roles keep the normal Home; phones get the floor list.
 // Runs against the real API (migration 20261020000001: อาคาร 1, 6 floors with traced rooms).
 // CR-027 (migration 20261029000002): S29 opens on the campus site view; อาคาร 2 (4 floors) opens like อาคาร 1.
+// CR-030 (migration 20261029000003): อาคาร 3 / 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี open the same way.
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 const API = "/api/v1/repair";
 const SITE = "section[aria-label='ภาพรวมพื้นที่ แบบ 3 มิติ']";
@@ -127,7 +128,10 @@ test.describe("admin", () => {
     const b2 = overview.buildings.find((x: { name: string }) => x.name === "อาคาร 2");
     const open = b2.floors.reduce((n: number, f: { openCount: number }) => n + f.openCount, 0);
     await expect(site.getByRole("button", { name: new RegExp(`^อาคาร 2 งานค้าง ${open}(,|$)`) })).toBeVisible();
-    await expect(site.getByRole("button", { name: /^อาคาร 3 / })).toHaveCount(0); // a block without floors has no marker
+    // CR-030: every office-side block is a real building with a marker
+    for (const b of overview.site.filter((x: { side: number }) => x.side === 1)) {
+      await expect(site.getByRole("button", { name: new RegExp(`^${b.name} งานค้าง`) })).toBeVisible();
+    }
     await expect(site.getByRole("group", { name: "เลือกชั้น" })).toHaveCount(0);
     await site.getByRole("group", { name: "เลือกฝั่ง" }).getByRole("button", { name: "ฝั่ง Riverside" }).click();
     await expect(site.getByText(new RegExp(`^ฝั่ง Riverside · ${overview.site.length - side1} อาคาร`))).toBeVisible();
@@ -151,6 +155,29 @@ test.describe("admin", () => {
     await card.getByRole("button", { name: "ภาพรวมพื้นที่" }).click();
     await expect(page.locator(SITE).getByRole("button", { name: /^อาคาร 2 งานค้าง/ })).toBeVisible();
   });
+
+  for (const [name, floors, room] of [
+    ["อาคาร 3", 1, "RMC Excellence โรงซ่อมอุปกรณ์"],
+    ["อาคาร 4", 2, "อ.4 ห้อง 101"],
+    ["อาคาร TrialMix และห้องทดสอบหินทราย", 1, "RMC METRO ห้องทดสอบหินทราย"],
+    ["โรงอาหาร", 1, "พื้นที่ส่วนกลาง"],
+    ["ห้องประชุม 60 ปี", 1, "ห้องละมาด"],
+  ] as const) {
+    test(`CR-030 AC1: ${name} → ${floors} floor(s) → floor 1 plan with its rooms → back to the site`, async ({ page, isMobile }) => {
+      test.skip(isMobile, "3D is desktop only");
+      test.slow(); // WebGL + model build compete with the other workers
+      const card = await openBuilding(page, name);
+      const picker = card.getByRole("group", { name: "เลือกชั้น" });
+      await expect(picker.getByRole("button")).toHaveCount(floors);
+      await picker.getByRole("button", { name: /^ชั้น 1 / }).click();
+      await expect(card.getByText(/ชั้น 1 · งานค้าง/)).toBeVisible();
+      await expect(card).toContainText(room, { timeout: 15_000 }); // model load + lift + plan build
+      await card.getByRole("button", { name: "ภาพอาคาร" }).click();
+      await expect(card.getByText(new RegExp(`${floors} ชั้น · งานค้าง`))).toBeVisible();
+      await card.getByRole("button", { name: "ภาพรวมพื้นที่" }).click();
+      await expect(page.locator(SITE).getByRole("button", { name: new RegExp(`^${name} งานค้าง`) })).toBeVisible();
+    });
+  }
 
   test("CR-027 AC3 / CR-028: budget — a side ≤ 20k triangles, no frames while idle, GPU memory flat over 10 enter / leave cycles", async ({ page, isMobile }) => {
     test.skip(isMobile, "3D is desktop only");

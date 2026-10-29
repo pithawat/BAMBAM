@@ -579,7 +579,7 @@ func TestPgDashboardAndAssets(t *testing.T) {
 	if b1.ModelKey == nil || *b1.ModelKey != "b1" {
 		t.Errorf("อาคาร 1 model key = %v", b1.ModelKey)
 	}
-	if len(o.Site) != 16 || o.Site[1].MapNo != 2 || o.Site[1].BuildingID == nil || *o.Site[1].BuildingID != b2Building || o.Site[2].BuildingID != nil || o.Site[1].Side != 1 || o.Site[5].Side != 2 {
+	if len(o.Site) != 16 || o.Site[1].MapNo != 2 || o.Site[1].BuildingID == nil || *o.Site[1].BuildingID != b2Building || o.Site[5].BuildingID != nil || o.Site[1].Side != 1 || o.Site[5].Side != 2 {
 		t.Errorf("site = %+v", o.Site)
 	}
 	for n := 1; n <= 4; n++ {
@@ -595,6 +595,47 @@ func TestPgDashboardAndAssets(t *testing.T) {
 		}
 		if math.Abs(area-360) > 1e-6 {
 			t.Errorf("อาคาร 2 floor %d rooms add up to %.2f m², want 360", n, area)
+		}
+	}
+	// CR-030: the office-side buildings 3, 4, 5, 16, 17 with their 3D keys, floors, room areas and site links.
+	for _, w := range []struct {
+		no     int
+		key    string
+		floors []float64 // rooms per floor add up to (m², ห้องน้ำ excepted)
+	}{{3, "b3", []float64{1224}}, {4, "b4", []float64{349.5, 342}}, {5, "b5", []float64{629.3775}}, {16, "b16", []float64{233.64}}, {17, "b17", []float64{90}}} {
+		id := uuid.MustParse(fmt.Sprintf("c030b1d0-0000-4000-8000-%012d", w.no))
+		var ob *OverviewBuilding
+		for i := range o.Buildings {
+			if o.Buildings[i].ID == id {
+				ob = &o.Buildings[i]
+			}
+		}
+		if ob == nil || !ob.HasModel || ob.ModelKey == nil || *ob.ModelKey != w.key || len(ob.Floors) != len(w.floors) {
+			t.Fatalf("map no. %d = %+v", w.no, ob)
+		}
+		linked := false
+		for _, s := range o.Site {
+			if int(s.MapNo) == w.no {
+				linked = s.BuildingID != nil && *s.BuildingID == id && s.Side == 1
+			}
+		}
+		if !linked {
+			t.Errorf("site block %d not linked to its building", w.no)
+		}
+		for n, want := range w.floors {
+			fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c030f200-0000-4000-8000-%012d", w.no*100+n+1)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			area := 0.0
+			for _, r := range fp.Rooms {
+				if r.AreaType != "restroom" {
+					area += shapeArea(r.Shape)
+				}
+			}
+			if math.Abs(area-want) > 1e-6 {
+				t.Errorf("map no. %d floor %d rooms add up to %.4f m², want %v", w.no, n+1, area, want)
+			}
 		}
 	}
 	for _, f := range b1.Floors { // CR-017: steps split the same open tickets

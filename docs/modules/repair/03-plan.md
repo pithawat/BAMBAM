@@ -514,24 +514,26 @@ Status: done — accepted 2026-10-29 (tag `repair-stage-3D-2`, incl. CR-028). Bu
 
 ## Stage 3D-3 — office-side models (CR-030)
 
+Status: done — accepted 2026-10-29 (tag `repair-stage-3D-3`). Built by Claude (no Codex hand-off). Branch `repair/stage-3D-3`
+
 **Scope**
 - Real buildings + procedural models for map no. 3 อาคาร 3 (72 × 17, 1 floor), 4 อาคาร 4 (38 × 10, 2 floors), 5 TrialMix (≈ 43.5 × 13.7 + ห้องทดสอบหินทราย, 1 floor, type โกดัง), 16 โรงอาหาร (irregular, from the site plan + 233.64 m² dining plan), 17 ห้องประชุม 60 ปี (16 × 5 + ห้องละมาด 10 m²)
 - Sources: `attachments/building plan/3-…`, `4-…`, `5-…`, `17-…pdf`, `attachments/building photos/canteen_meeting_building1.png`; unnamed rooms named by Claude
-- Budget (D-129): site side ≤ 40k triangles / ≤ 120 draw calls; everything else as D-124 (lazy chunk per shape, render on demand, one opened building's own scene)
+- Budget (D-130, replaces D-129's 40k / 120): site side ≤ 20k triangles / ≤ 60 draw calls with light site versions of every model (`simplifyForSite`); everything else as D-124 (lazy chunk per shape, render on demand, one opened building's own scene)
 
 **Backend (Claude)**
-- [ ] Migration: 5 buildings (types per D-129), floors, `floor_plans`, rooms with `plan_shape` (each floor adds up to its plan area), `model_key` b3 / b4 / b5 / b16 / b17, link `site_blocks`; fix blocks 16 / 17 position / size from the site plan
-- [ ] Pg test: buildings, floors, room areas per floor, links
+- [x] Migration: 5 buildings (types per D-129), floors, `floor_plans`, rooms with `plan_shape` (each floor adds up to its plan area), `model_key` b3 / b4 / b5 / b16 / b17, link `site_blocks`; fix blocks 16 / 17 position / size from the site plan
+- [x] Pg test: buildings, floors, room areas per floor, links
 
 **Frontend (Claude)**
-- [ ] `scene/building-{three,four,trialmix,canteen,hall60}.ts` + registry keys
-- [ ] Floor plan / footprint for non-rectangular buildings (canteen): plan outline from the rooms instead of W × D where needed
+- [x] `scene/building-{three,four,trialmix,canteen,hall60}.ts` + registry keys
+- [x] Floor plan / footprint for non-rectangular buildings (canteen): plan outline from the rooms instead of W × D where needed
 
 **Acceptance criteria**
-- [ ] AC1: ฝั่งสำนักงานใหญ่ shows 7 real models with markers; each opens → floors → rooms
-- [ ] AC2: Equipment drag and drop and ticket pins work in อาคาร 3 and 4 (F31 case)
-- [ ] AC3: Budget: side 1 ≤ 40k triangles / ≤ 120 draw calls, 0 idle frames, GPU flat over 10 enter / leave cycles
-- [ ] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F02 (new buildings in S03) / F23 / F31 and Atlas `verify` pass
+- [x] AC1: ฝั่งสำนักงานใหญ่ shows 7 real models with markers; each opens → floors → rooms
+- [x] AC2: Equipment drag and drop and ticket pins work in อาคาร 3 and 4 (F31 case)
+- [x] AC3: Budget: side 1 ≤ 20k triangles / ≤ 60 draw calls (D-130), 0 idle frames, GPU flat over 10 enter / leave cycles
+- [x] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F02 (new buildings in S03) / F23 / F31 and Atlas `verify` pass
 
 ---
 

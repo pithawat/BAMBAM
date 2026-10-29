@@ -2,9 +2,11 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 accepted 2026-10-29; next: office-side 3D models (CR-030), then 5 · of 8   **Updated:** 2026-10-29 (Stage 3D-2 built)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29; next: 5 · of 8   **Updated:** 2026-10-29 (Stage 3D-3 accepted)
 
 ## Now
+
+- **Stage 3D-3 accepted 2026-10-29**, tag `repair-stage-3D-3` (CR-030): office side = 7 real models. Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
 
 - **CR-029 accepted 2026-10-29 (D-128):** 8 white tiger poses (PNG masters + cache-safe WebP), contrasting theme-aware surfaces across login / Home / repair / settings / shared states; lint / typecheck / build pass, browser audit 56/56 + Home recheck 4/4. Owner requested cleanup: temporary previews / logs / helpers and duplicate exports removed. Shared: `components/shared/mascot.tsx`, `states.tsx`, `app/globals.css`.
 
@@ -29,6 +31,8 @@
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 
 ## Open issues / questions
+
+- 3D-3 owner checks: names by Claude — RMC Excellence Office 1 / 2, RMC Metro 1–3, ทางเดิน (อ.3), ห้องทดสอบก้อนปูน 1 / 2, SB&M 1–6, ฟิตเนส (plan says ฟิสเนส); อ.4 floor 2 drawn on x 0–35 of the 38 m plan, its 3.25 m² closet left in the common area; TrialMix lab placed 3 m east of the shed; canteen outline approximated from plan p.2 (scaled to 233.64 m²); ลานกองของ 337.5 m² (outdoor) not drawn; ห้องประชุม 60 ปี common area has no shape. Go Pg tests must run with `-p 1` (TestRenames collides with repair tests on a shared DB)
 
 - CR-029's temporary Next.js image-query error is resolved: live sources use `-white.webp` filenames, no query strings. Re-run F23 / F31 + Atlas verify for 3D-2 separately; CR-029's 56 browser checks, lint / typecheck / build all pass.
 
@@ -79,6 +83,8 @@
 - Mock photo restore: drafts drop photos with `blob:` URLs (mock uploads), so in mock mode a restored draft needs photos again
 
 ## Stage log
+
+- 2026-10-29: **Stage 3D-3 accepted**, tag `repair-stage-3D-3` (CR-030) — office side: อาคาร 3 / 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี as real buildings + procedural models; floor plans from outlines; budget 49 calls / 12.5k tris; e2e F02 / F23 / F31 pass (2 parallel-load flakes passed alone), Atlas 13 / 13 (F31 passed on re-run)
 
 - 2026-10-29: **Stage 3D-2 accepted** by the owner, tag `repair-stage-3D-2` — Atlas verify / full e2e not re-run after CR-028 because of the concurrent CR-029 mascot image error (open issue)
 

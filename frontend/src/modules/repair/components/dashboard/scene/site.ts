@@ -109,3 +109,47 @@ export function buildSite(blocks: SiteBlockSpec[]): BuiltSite {
     },
   };
 }
+
+/**
+ * Light version of a real model for the site view (CR-030 follow-up, owner 2026-10-29): leaf cards dropped,
+ * every single-material mesh baked to world space and merged per material look (colour + texture +
+ * transparency) — a handful of draw calls per building instead of ~25. Multi-material and instanced meshes
+ * stay as they are. The opened building keeps the full version.
+ */
+export function simplifyForSite(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  const groups = new Map<string, { mat: THREE.Material; geos: THREE.BufferGeometry[] }>();
+  const drop: THREE.Object3D[] = [];
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || (m as THREE.InstancedMesh).isInstancedMesh || Array.isArray(m.material)) return;
+    drop.push(m);
+    const mat = m.material as THREE.MeshStandardMaterial;
+    if (!m.visible || mat.alphaTest > 0) return; // hidden pick shells, leaf cards
+    const key = [mat.type, mat.color?.getHexString(), mat.map?.uuid, mat.transparent, mat.opacity, mat.emissiveMap?.uuid].join("|");
+    const geo = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrixWorld);
+    for (const name of Object.keys(geo.attributes)) if (!["position", "normal", "uv"].includes(name)) geo.deleteAttribute(name);
+    if (!geo.attributes.uv) return;
+    const g = groups.get(key) ?? { mat, geos: [] };
+    g.geos.push(geo);
+    groups.set(key, g);
+  });
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  for (const o of drop) {
+    o.removeFromParent();
+    (o as THREE.Mesh).geometry.dispose();
+  }
+  const usedMats = new Set([...groups.values()].map((g) => g.mat));
+  for (const o of drop) {
+    const mat = (o as THREE.Mesh).material as THREE.Material;
+    if (!usedMats.has(mat)) mat.dispose();
+  }
+  for (const { mat, geos } of groups.values()) {
+    const merged = mergeGeometries(geos);
+    for (const g of geos) g.dispose();
+    if (!merged) continue;
+    root.add(new THREE.Mesh(merged.applyMatrix4(inv), mat));
+  }
+  // empty groups (floors, roof) and line helpers are left; they draw nothing
+  root.traverse((o) => { if ((o as THREE.LineSegments).isLineSegments) o.visible = false; });
+}

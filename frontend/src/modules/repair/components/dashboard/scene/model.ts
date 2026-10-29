@@ -1,4 +1,5 @@
 import type * as THREE from "three";
+import type { PlanShape } from "../../../types";
 import type { Textures } from "./kit";
 
 // CR-027: what the engine needs from a building shape. Each shape lives in its own file and is loaded
@@ -19,6 +20,8 @@ export type PlanSpec = {
   reception: { x: number; z: number; w: number; d: number } | null;
   /** Potted plants (plan coordinates). */
   plants: readonly (readonly [number, number])[];
+  /** CR-030: footprint polygons of the floor when it is not the whole W × D box (canteen, TrialMix + lab). */
+  outline?: (level: number) => readonly PlanShape[];
 };
 
 /** Size from #27 (floors, plan footprint in metres). */

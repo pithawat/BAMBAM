@@ -9,7 +9,10 @@ const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json
 const API = "/api/v1/repair";
 const CARD = "section[aria-label='อาคาร 1 แบบ 3 มิติ']";
 const SITE = "section[aria-label='ภาพรวมพื้นที่ แบบ 3 มิติ']";
-const FLOOR = (level: number, building = 1) => `${building === 2 ? "c027f200" : "c016f100"}-0000-4000-8000-00000000000${level}`;
+// อาคาร 1 / 2 by number; CR-030 buildings by map number (floor ids c030f200-…-{no}{level:02})
+const FLOOR = (level: number, building = 1) => building > 2
+  ? `c030f200-0000-4000-8000-${String(building * 100 + level).padStart(12, "0")}`
+  : `${building === 2 ? "c027f200" : "c016f100"}-0000-4000-8000-00000000000${level}`;
 
 // The 3D card needs WebGL: Chrome's new headless keeps it on the GPU (D-103). Only the 3D specs use it.
 test.use({ channel: "chromium" });
@@ -159,3 +162,25 @@ test("CR-027: อาคาร 2 — drag a type into a traced room of floor 2, t
   await expect(page.locator(B2).getByRole("button", { name: new RegExp(code) })).toBeVisible();
   expect((await page.request.post(`${API}/assets/${placed!.id}/deactivate`)).status()).toBe(204);
 });
+
+for (const [building, no, level, room] of [["อาคาร 3", 3, 1, "RMC Metro 2"], ["อาคาร 4", 4, 2, "SB&M 6"]] as const) {
+  test(`CR-030 AC2: ${building} — drag a type into ${room} on floor ${level}, the asset is stored in that room`, async ({ page }) => {
+    test.slow();
+    const card = `section[aria-label='${building} แบบ 3 มิติ']`;
+    const code = `E2E-C${no}${Date.now().toString(36).toUpperCase()}`;
+    await openFloor(page, level, building);
+    await expect(page.locator(card)).toContainText(room, { timeout: 15_000 }); // model load + plan build
+    const palette = (await page.getByRole("button", { name: "เพิ่มเครื่องปรับอากาศ" }).boundingBox())!;
+    await drag(page, { x: palette.x + palette.width / 2, y: palette.y + palette.height / 2 }, await roomPoint(page, room, card));
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("combobox", { name: "ห้อง" })).toContainText(room);
+    await dialog.getByLabel(/รหัสอุปกรณ์/).fill(code);
+    await dialog.getByLabel(/ชื่ออุปกรณ์/).fill(`แอร์ ${room}`);
+    await dialog.getByRole("button", { name: "บันทึก" }).click();
+    await expect(page.getByText(`เพิ่ม ${code} แล้ว`)).toBeVisible();
+    const placed = await assetOnFloor(page, level, code, no);
+    expect(placed?.room.name).toBe(room);
+    expect(placed?.x).not.toBeNull();
+    expect((await page.request.post(`${API}/assets/${placed!.id}/deactivate`)).status()).toBe(204);
+  });
+}

@@ -5,15 +5,15 @@ import { buildFloorPlan, type BuiltPlan, type PlanLabel } from "./floor-plan";
 import { createTextures, disposeTree, ease, mesh, type Textures } from "./kit";
 import type { BuildingModel, BuildingSize, FloorEntry } from "./model";
 import { loadModel } from "./registry";
-import { buildSite, type BuiltSite, type SiteBlockSpec } from "./site";
+import { buildSite, simplifyForSite, type BuiltSite, type SiteBlockSpec } from "./site";
 
 // S29 3D engine (D-082, CR-017, CR-027): campus site view → one building model → floor-plan cutaway, in
 // one WebGL canvas. Floors and footprint come from #27; floor colours and ticket pins follow the ticket
 // step (S11 rules). Entering a floor plays the repair-map transition: the floors above lift and fade, the
 // camera dives to the floor, a short crossfade swaps to the plan; going back reverses it.
 // Budget (D-124, CR-028): renders on demand only (no idle frames); the site view shows one side: its boxes
-// as one merged mesh without shadows, อาคาร 1 / 2 as their real models without surroundings (≤ ~20k
-// triangles per side); a building's shape is a lazy chunk; the opened building's own scene (geometry,
+// as one merged mesh without shadows, อาคาร 1 / 2 as light versions of their real models (merged per material, no
+// surroundings or leaves; ≤ ~20k triangles / 60 draw calls per side); a building's shape is a lazy chunk; the opened building's own scene (geometry,
 // materials, environment and shadow maps) is disposed when it is left, and the shared canvas textures
 // (drawn once) free their GPU copies, re-uploaded on the next use.
 
@@ -210,6 +210,7 @@ export class BuildingEngine {
         for (const f of built.floors) f.shell.visible = false;
         built.root.position.set(b.x, 0, b.z);
         built.root.rotation.y = (-b.rotDeg * Math.PI) / 180;
+        simplifyForSite(built.root); // light version on the site; the opened building is full
         site.group.add(built.root);
         this.siteScene.environment = this.environment();
         this.requestRender();
