@@ -22,8 +22,9 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 3D | **CR-016:** หน้าแรก Admin ~~/ ผู้บริหาร~~ (CR-024 → 4R) = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
 | 3U | **CR-019 rework:** หน้าตาใหม่ตามต้นแบบ `bam-workplace-mascot-v4-refined.html` — S06 ตารางเดียว + ตัวกรองสถานะ · S07 กล่องเดียว + แท็บ · S03 สองคอลัมน์ + สรุป · S29 ขัดเกลา · มาสคอตเสือทั้งแอป | F02, F06, F07, F23 | S03, S06, S07, S29, S01, shared states | done (2026-10-24, `repair-stage-3U`) |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over); CR-021: S03 / S04 / S06 relayout | done (2026-10-26, `repair-stage-4`) |
-| 4P | **CR-025 rework:** ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร (สำนักงาน · โกดัง · ภายนอกอาคาร) · การ์ดงานซ้ำย้ายไปขั้นปัญหาที่พบ · โกดังตัวอย่าง 1 หลัง + **CR-026:** รูป quality 0.25 และเก็บรูปไว้ในฟอร์มจนกดส่ง (ทุกฟอร์มที่แนบรูป) | F02, F03, F04, F07, F21 | S03, S04, S08, S10, PhotoPicker | pending — next (D-121) |
-| 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | done |
+| 4P | **CR-025 rework:** ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร (สำนักงาน · โกดัง · ภายนอกอาคาร) · การ์ดงานซ้ำย้ายไปขั้นปัญหาที่พบ · โกดังตัวอย่าง 1 หลัง + **CR-026:** รูป quality 0.25 และเก็บรูปไว้ในฟอร์มจนกดส่ง (ทุกฟอร์มที่แนบรูป) | F02, F03, F04, F07, F21 | S03, S04, S08, S10, PhotoPicker | done — accepted 2026-10-29, tag `repair-stage-4P` |
+| 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | done — accepted 2026-10-29, tag `repair-stage-4R` |
+| 3D-2 | **CR-027:** โมเดล 3D อาคาร 2 + มุมมองทั้งพื้นที่ (site view) จาก `Cpac map.png` — เบาที่สุด (D-124) | F23, F31 | S29 | in progress (2026-10-29) |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
@@ -492,18 +493,18 @@ Status: done — accepted 2026-10-29 (tag `repair-stage-4R`). Built by Claude (n
 - **Resource budget (hard, D-124):** no GLB / texture downloads (shapes = code, textures = the existing generated canvas set, reused); site view ≤ 1 draw call per material (merged geometry), ≤ ~10k triangles total, one count marker per building (no per-ticket pins); one detailed building in memory at a time (dispose geometry / materials / textures on leave); render on demand only (no idle frames); pixel ratio capped; each building shape is its own lazy chunk; nothing 3D loads on mobile / no WebGL
 
 **Backend (Claude)**
-- [x] Migration: `platform.buildings` + `model_key text NULL`, `site_x`, `site_z`, `site_rot` (numeric, NULL = not on the site); create อาคาร 2, floors 1–4, `floor_plans` 24 × 15, rooms with `plan_shape` and stable ids; set `model_key = 'b1'` for อาคาร 1
-- [x] #27 adds `modelKey`, `site {x, z, rot} | null` per building (additive, contract updated); unit + Pg tests
+- [ ] Migration: `platform.buildings` + `model_key text NULL`, `site_x`, `site_z`, `site_rot` (numeric, NULL = not on the site); create อาคาร 2, floors 1–4, `floor_plans` 24 × 15, rooms with `plan_shape` and stable ids; set `model_key = 'b1'` for อาคาร 1
+- [ ] #27 adds `modelKey`, `site {x, z, rot} | null` per building (additive, contract updated); unit + Pg tests
 
 **Frontend (Claude unless HANDOFF says otherwise)**
-- [x] `scene/registry.ts` (`modelKey → () => import(...)`), `scene/building-two.ts`, `scene/site.ts` (merged blocks); engine builds by key instead of always `buildBuildingOne`
-- [x] Site ↔ building ↔ floor transitions; switcher; types / mocks / api
+- [ ] `scene/registry.ts` (`modelKey → () => import(...)`), `scene/building-two.ts`, `scene/site.ts` (merged blocks); engine builds by key instead of always `buildBuildingOne`
+- [ ] Site ↔ building ↔ floor transitions; switcher; types / mocks / api
 
 **Acceptance criteria**
-- [x] AC1: S29 opens on the site view; อาคาร 1 / 2 have their shape, others are blocks in the map position; each shows its open-ticket count
-- [x] AC2: Click อาคาร 2 → its model → pick a floor → rooms, equipment drag and drop (F31) and ticket pins work as for อาคาร 1
-- [x] AC3: Budget check recorded in the stage report: site view draw calls / triangles (`renderer.info`), JS chunk sizes, GPU memory stays flat after 10 enter / leave cycles, 0 frames rendered while idle
-- [x] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F23 / F31 (+ อาคาร 2 case) and Atlas `verify` pass
+- [ ] AC1: S29 opens on the site view; อาคาร 1 / 2 have their shape, others are blocks in the map position; each shows its open-ticket count
+- [ ] AC2: Click อาคาร 2 → its model → pick a floor → rooms, equipment drag and drop (F31) and ticket pins work as for อาคาร 1
+- [ ] AC3: Budget check recorded in the stage report: site view draw calls / triangles (`renderer.info`), JS chunk sizes, GPU memory stays flat after 10 enter / leave cycles, 0 frames rendered while idle
+- [ ] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F23 / F31 (+ อาคาร 2 case) and Atlas `verify` pass
 
 ---
 
