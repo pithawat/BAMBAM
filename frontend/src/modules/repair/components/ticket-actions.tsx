@@ -46,11 +46,11 @@ export function useTicketActions(ticket: TicketDetail, onChanged: (t: TicketDeta
   const firstAssess = !ticket.expectedDoneOn || !ticket.workBy;
   const dialogs = <>
     {allowed.has("assess") && <AssessDialog ticket={ticket} open={open?.kind === "assess"} onOpenChange={close} reaccept={opts.awaitingReaccept}
-      onDone={(t) => done(t, firstAssess ? "เริ่มดำเนินการแล้ว ผู้แจ้งจะได้รับแจ้งเตือนวันที่คาดว่าจะเสร็จ" : "บันทึกวันใหม่แล้ว ผู้แจ้งจะได้รับแจ้งเตือน")} />}
+      onDone={(t) => done(t, firstAssess ? "เริ่มดำเนินการแล้ว ผู้แจ้งจะเห็นวันที่คาดว่าจะเสร็จในหน้างาน" : "บันทึกวันใหม่แล้ว ผู้แจ้งจะเห็นวันใหม่ในหน้างาน")} />}
     {allowed.has("resolve") && <ResolveDialog ticket={ticket} open={open?.kind === "resolve"} onOpenChange={close} onDone={(t) => done(t, RESOLVED_TOAST)} />}
     {allowed.has("confirm") && <ConfirmDialog ticket={ticket} open={open?.kind === "confirm"} initial={open?.kind === "confirm" ? open.score : 0} onOpenChange={close}
       onSendBack={() => setOpen({ kind: "send_back" })} onDone={(t) => done(t, "ขอบคุณที่ประเมินตรวจงาน งานนี้ปิดแล้ว")} />}
-    {allowed.has("send_back") && <SendBackDialog ticket={ticket} open={open?.kind === "send_back"} onOpenChange={close} onDone={(t) => done(t, "ส่งกลับให้ช่างแล้ว ช่างจะได้รับแจ้งเตือน")} />}
+    {allowed.has("send_back") && <SendBackDialog ticket={ticket} open={open?.kind === "send_back"} onOpenChange={close} onDone={(t) => done(t, "ส่งกลับให้ช่างแล้ว")} />}
     {allowed.has("close") && <CloseTicketDialog ticket={ticket} open={open?.kind === "close"} onOpenChange={close} onDone={(t) => done(t, CLOSED_TOAST)} />}
     {allowed.has("handover") && open?.kind === "handover" && <HandoverDialog ticket={ticket} open onOpenChange={close}
       onDone={t => done(t, "ส่งต่อให้ช่างแล้ว")} onStale={() => { setOpen(null); getTicket(ticket.id).then(onChanged, err => toast.error(errorMessage(err))); }} />}
@@ -139,7 +139,7 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
       <DialogContent className={sheetLike}>
         <form onSubmit={submit} noValidate className="space-y-5">
           <DialogHeader><DialogTitle className="text-lg">{title}</DialogTitle>
-            <DialogDescription>{first ? "กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่นี้และได้รับแจ้งเตือนทันที" : `เดิม ${ticket.expectedDoneOn ? dayLabel(ticket.expectedDoneOn, true) : "—"} · ผู้แจ้งจะได้รับแจ้งเตือนวันใหม่`}</DialogDescription></DialogHeader>
+            <DialogDescription>{first ? "กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่นี้ในหน้างานทันที" : `เดิม ${ticket.expectedDoneOn ? dayLabel(ticket.expectedDoneOn, true) : "—"} · ผู้แจ้งจะเห็นวันใหม่ในหน้างาน`}</DialogDescription></DialogHeader>
           <div className="space-y-2">
             <p id="expectedDoneOn-label" className="text-[15px] font-semibold">คาดว่าจะเสร็จ <span className="text-destructive">*</span></p>
             <div role="radiogroup" aria-labelledby="expectedDoneOn-label" aria-describedby="expectedDoneOn-error" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -311,7 +311,7 @@ function SendBackDialog({ ticket, open, onOpenChange, onDone }: DialogProps) {
     <DialogContent className={sheetLike}>
       <form onSubmit={submit} noValidate className="space-y-4">
         <DialogHeader><DialogTitle className="text-lg">ส่งกลับให้ช่างแก้ไข</DialogTitle>
-          <DialogDescription>{tech ? `ช่าง${tech}` : "ช่าง"}จะได้รับแจ้งเตือน และกลับมาแก้ในงานเดิม ไม่ต้องแจ้งใหม่</DialogDescription></DialogHeader>
+          <DialogDescription>งานจะกลับไปให้{tech ? `ช่าง${tech}` : "ช่าง"}แก้ในงานเดิม ไม่ต้องแจ้งใหม่</DialogDescription></DialogHeader>
         <div className="space-y-2"><label htmlFor="reason" className="text-[15px] font-semibold">ยังพบปัญหาอะไร <span className="text-destructive">*</span></label>
           <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} placeholder="เช่น ยังมีน้ำหยดเมื่อเปิดแอร์นานๆ" aria-invalid={!!errors.reason} aria-describedby="reason-error" className="rounded-sm bg-card px-3.5 py-2.5 text-base" />
           <FieldError id="reason-error" message={errors.reason} /></div>
@@ -390,7 +390,7 @@ export function CloseTicketDialog({ ticket, open, onOpenChange, onDone }: { tick
     <DialogContent className={sheetLike}>
       <form onSubmit={submit} noValidate className="space-y-4">
         <DialogHeader><DialogTitle className="text-lg">ปิดงาน {ticket.ticketNo}?</DialogTitle>
-          <DialogDescription>งานจะปิดทันทีโดยไม่ต้องรอตรวจรับ ผู้แจ้ง ผู้ติดตาม และช่างที่ถืองานจะได้รับแจ้งเตือน</DialogDescription></DialogHeader>
+          <DialogDescription>งานจะปิดทันทีโดยไม่ต้องรอตรวจรับ ผู้แจ้ง ผู้ติดตาม และช่างจะเห็นสถานะปิดแล้วในหน้างาน</DialogDescription></DialogHeader>
         <div className="space-y-2"><label htmlFor="close-reason" className="text-[15px] font-semibold">เหตุผลที่ปิดงาน <span className="text-destructive">*</span></label>
           <Textarea id="close-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} placeholder="เช่น ส่งเรื่องเปลี่ยนเครื่องใหม่ผ่านฝ่ายจัดซื้อแล้ว"
             aria-invalid={!!error} aria-describedby="close-reason-error" className="rounded-sm bg-card px-3.5 py-2.5 text-base" />

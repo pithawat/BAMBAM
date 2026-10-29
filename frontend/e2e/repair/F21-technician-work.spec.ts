@@ -45,7 +45,7 @@ test.describe("technician", () => {
     await expect(dialog.getByRole("alert")).toHaveText("เลือกวันที่คาดว่าจะเสร็จ");
     await dialog.getByRole("radio", { name: /^พรุ่งนี้/ }).click();
     await dialog.getByRole("button", { name: "เริ่มดำเนินการ" }).click();
-    await expect(page.getByText("เริ่มดำเนินการแล้ว ผู้แจ้งจะได้รับแจ้งเตือนวันที่คาดว่าจะเสร็จ")).toBeVisible();
+    await expect(page.getByText("เริ่มดำเนินการแล้ว ผู้แจ้งจะเห็นวันที่คาดว่าจะเสร็จในหน้างาน")).toBeVisible();
     await expect(nextAction(page)).toContainText("คุณกำลังซ่อมงานนี้ · คาดว่าจะเสร็จ");
     await expect(nextAction(page).getByRole("button", { name: "เลื่อนวันเสร็จ" })).toBeVisible();
 
@@ -64,7 +64,7 @@ test.describe("technician", () => {
     await attachVia(page, sheet.locator("input[type=file]"));
     await sheet.getByLabel("ทำอะไรไป").fill("ล้างแผงคอยล์เย็น เติมน้ำยา ทดสอบ 30 นาที");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
-    await expect(page.getByText("ส่งผลแล้ว ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน")).toBeVisible();
+    await expect(page.getByText("ส่งผลแล้ว รอผู้แจ้งตรวจรับ")).toBeVisible();
 
     const done = (await (await employee.get(`${API}/tickets/${ticket.id}`)).json()).data;
     expect(done).toMatchObject({ status: "resolved", step: "awaiting_rating", allowedActions: ["confirm", "send_back"] });
@@ -106,7 +106,7 @@ test.describe("technician", () => {
     await expect(page.getByText("เพิ่มช่างภายนอกแล้ว")).toBeVisible();
     await expect(dialog.getByRole("combobox", { name: /ช่างภายนอก/ })).toContainText(name);
     await dialog.getByRole("button", { name: "เริ่มดำเนินการ" }).click();
-    await expect(page.getByText("เริ่มดำเนินการแล้ว ผู้แจ้งจะได้รับแจ้งเตือนวันที่คาดว่าจะเสร็จ")).toBeVisible();
+    await expect(page.getByText("เริ่มดำเนินการแล้ว ผู้แจ้งจะเห็นวันที่คาดว่าจะเสร็จในหน้างาน")).toBeVisible();
     await expect(page.getByText(`ช่างภายนอก · ${name} · แอร์`)).toBeVisible();
 
     // The reporter gets the type only (BR-F24-4)
@@ -125,7 +125,7 @@ test.describe("technician", () => {
     await sheet.getByRole("radiogroup", { name: "คะแนน 1 ถึง 5 ดาว" }).getByRole("radio", { name: /^4 ดาว/ }).click();
     await sheet.getByLabel("ความเห็นต่อช่างภายนอก").fill("มาตรงเวลา งานเรียบร้อย");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
-    await expect(page.getByText("ส่งผลแล้ว ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน")).toBeVisible();
+    await expect(page.getByText("ส่งผลแล้ว รอผู้แจ้งตรวจรับ")).toBeVisible();
 
     const staff = (await (await technician.get(`${API}/tickets/${ticket.id}`)).json()).data;
     expect(staff.result).toMatchObject({ contractorRating: 4, contractorRatingComment: "มาตรงเวลา งานเรียบร้อย" });
@@ -159,7 +159,7 @@ test.describe("technician", () => {
     await dialog.getByRole("radio", { name: "ช่างของบริษัท" }).click();
     await dialog.getByLabel(/เหตุผลที่เลื่อน/).fill("ช่างนอกไม่มา ช่างบริษัททำเอง");
     await dialog.getByRole("button", { name: "บันทึกวันใหม่" }).click();
-    await expect(page.getByText("บันทึกวันใหม่แล้ว ผู้แจ้งจะได้รับแจ้งเตือน")).toBeVisible();
+    await expect(page.getByText("บันทึกวันใหม่แล้ว ผู้แจ้งจะเห็นวันใหม่ในหน้างาน")).toBeVisible();
     await expect(page.getByRole("region", { name: "ความคืบหน้าของงาน" })).toContainText("ช่างนอกไม่มา ช่างบริษัททำเอง");
 
     const d = (await (await employee.get(`${API}/tickets/${ticket.id}`)).json()).data;

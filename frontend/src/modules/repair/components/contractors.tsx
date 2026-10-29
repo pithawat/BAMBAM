@@ -211,7 +211,7 @@ export function ContractorFormDialog({ contractor, open, onOpenChange, onSaved, 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
       <form onSubmit={submit} noValidate className="space-y-4">
-        <DialogHeader><DialogTitle>{contractor ? "แก้ไขช่างภายนอก" : "เพิ่มช่างภายนอก"}</DialogTitle><DialogDescription>ข้อมูลนี้เห็นเฉพาะช่าง Admin และผู้บริหาร</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{contractor ? "แก้ไขช่างภายนอก" : "เพิ่มช่างภายนอก"}</DialogTitle><DialogDescription>ข้อมูลนี้เห็นเฉพาะช่างและ Admin</DialogDescription></DialogHeader>
         {field("name", "ชื่อร้าน / บริษัท", { required: true, max: 100, placeholder: "เช่น ร้านแอร์เย็นฉ่ำ หรือ ร้านแอร์เย็นฉ่ำ สาขาบางนา" })}
         {taken && <div className="-mt-2">{taken.isActive && onPickExisting
           ? <Button type="button" variant="link" className="h-9 px-0" disabled={busy} onClick={pickExisting}>เลือกร้านนี้</Button>

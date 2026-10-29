@@ -15,7 +15,7 @@ import { AdminDashboard } from "@/modules/repair/components/dashboard/admin-dash
 // Home: whoever has `repair.overview.view` (Admin, Superadmin; settings CR-001) gets the S29 dashboard (repair
 // Stage 3D, CR-016); every other role keeps the
 // S02 Home — Stage 0 placeholder (D-023): greeting, the option-a CTA card and the services only.
-// Role widgets, "ติดตามงานซ่อม" and the bell count come in repair Stage 6. Bell, account and role
+// Role widgets and "ติดตามงานซ่อม" come in repair Stage 6 (no bell, repair CR-024). Account and role
 // switcher are in the navbar (CR-010).
 
 const SERVICE_LIST: { service: Service; href?: string; hint: string }[] = [

@@ -194,12 +194,12 @@ function NextAction({ ticket, viewer, story, meId, actions }: { ticket: TicketDe
     switch (ticket.step) {
       case "awaiting_assessment":
         icon = ClipboardList; title = "งานใหม่ รอคุณเริ่มดำเนินการ";
-        desc = `ความเร่งด่วน${PRIORITY_LABELS[ticket.priority]} · กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม แล้วผู้แจ้งจะได้รับแจ้งเตือนทันที`;
+        desc = `ความเร่งด่วน${PRIORITY_LABELS[ticket.priority]} · กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่ในหน้างานทันที`;
         if (actions.allowed.has("assess")) buttons.push(primary("เริ่มดำเนินการ", Check, actions.assess));
         break;
       case "in_repair":
         title = `${mine ? "คุณกำลังซ่อมงานนี้" : `${ticket.technician?.name ?? "ช่าง"} กำลังซ่อมงานนี้`} · คาดว่าจะเสร็จ ${expected}`;
-        desc = "ซ่อมเสร็จแล้วถ่ายรูปหลังซ่อมและบันทึกผล ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน";
+        desc = "ซ่อมเสร็จแล้วถ่ายรูปหลังซ่อมและบันทึกผล แล้วงานจะรอผู้แจ้งตรวจรับ";
         if (actions.allowed.has("assess")) buttons.push(outline("เลื่อนวันเสร็จ", CalendarClock, actions.assess));
         if (actions.allowed.has("resolve")) buttons.push(primary("บันทึกผลซ่อม", Camera, actions.resolve));
         break;
@@ -225,14 +225,14 @@ function NextAction({ ticket, viewer, story, meId, actions }: { ticket: TicketDe
   } else if (viewer === "reporter") {
     switch (ticket.step) {
       case "awaiting_assessment":
-        title = "รับเรื่องแล้ว รอช่างกำหนดวันเสร็จ"; desc = "ตอนนี้คุณยังไม่ต้องทำอะไร เมื่อช่างกำหนดวันที่คาดว่าจะเสร็จ เราจะแจ้งเตือนคุณทันที"; break;
+        title = "รับเรื่องแล้ว รอช่างกำหนดวันเสร็จ"; desc = "ตอนนี้คุณยังไม่ต้องทำอะไร เมื่อช่างกำหนดวันที่คาดว่าจะเสร็จ วันที่จะแสดงที่หน้านี้"; break;
       case "in_repair":
-        title = "ช่างกำลังดำเนินการ"; desc = `คาดว่าจะเสร็จ ${expected} · เมื่อซ่อมเสร็จ เราจะแจ้งเตือนให้คุณมาประเมินตรวจงาน`; note = moved; break;
+        title = "ช่างกำลังดำเนินการ"; desc = `คาดว่าจะเสร็จ ${expected} · เมื่อซ่อมเสร็จ งานจะขึ้นใน "ติดตามงาน" ให้คุณประเมินตรวจงาน`; note = moved; break;
       case "reworking":
         title = story.awaitingReaccept ? "ส่งกลับให้แก้แล้ว" : "ช่างกำลังแก้ไขตามที่คุณส่งกลับ";
         desc = story.awaitingReaccept
           ? `${story.sendBackReason ? `เหตุผล: ${story.sendBackReason} · ` : ""}รอช่างกำหนดวันเสร็จใหม่ คุณยังไม่ต้องประเมินซ้ำ`
-          : `คาดว่าจะเสร็จ ${expected} · เราจะแจ้งเตือนเมื่อแก้ไขเสร็จ`;
+          : `คาดว่าจะเสร็จ ${expected} · ติดตามความคืบหน้าได้ที่หน้านี้`;
         note = story.awaitingReaccept ? "" : moved;
         break;
       case "awaiting_rating":
@@ -251,12 +251,12 @@ function NextAction({ ticket, viewer, story, meId, actions }: { ticket: TicketDe
     const line: Record<TicketStep, string> = {
       awaiting_assessment: "รับเรื่องแล้ว รอช่างกำหนดวันเสร็จ",
       in_repair: `ช่างกำลังดำเนินการ คาดว่าจะเสร็จ ${expected}`,
-      reworking: "ผู้แจ้งส่งกลับให้ช่างแก้ไข เราจะแจ้งเตือนเมื่อแก้เสร็จ",
+      reworking: "ผู้แจ้งส่งกลับให้ช่างแก้ไข",
       awaiting_rating: "ซ่อมเสร็จแล้ว รอผู้แจ้งตรวจงาน",
       closed: closedText ? `ปิดงานแล้ว · ผู้แจ้งประเมิน ${closedText}` : `ปิดงานแล้ว · ${closedLine(ticket)}`,
     };
     if (viewer === "follower") {
-      title = line[ticket.step]; desc = "คุณติดตามงานนี้ เราจะแจ้งเตือนเมื่อมีความคืบหน้า · ผู้แจ้งเป็นผู้ประเมินตรวจงานหรือส่งกลับให้แก้";
+      title = line[ticket.step]; desc = 'คุณติดตามงานนี้ ดูความคืบหน้าได้ที่หน้านี้และใน "ติดตามงาน" · ผู้แจ้งเป็นผู้ประเมินตรวจงานหรือส่งกลับให้แก้';
       note = ticket.step === "in_repair" ? moved : "";
     } else { title = stepLabel(ticket); desc = line[ticket.step]; }
   }

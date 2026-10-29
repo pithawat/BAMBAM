@@ -46,7 +46,7 @@ export function ReportSuccessScreen() {
         </li>)}</ol>
 
         <div className="mt-5 rounded-lg bg-secondary px-4 py-3 text-left text-sm leading-6 text-secondary-foreground">
-          {team ? 'งานนี้ปิดแล้วและนับเป็นผลงานของทีม หากต้องใช้ช่างภายหลัง กด "ส่งต่อให้ช่าง" ในหน้ารายละเอียดงาน' : <><b className="font-semibold">ต่อไป</b> ช่างจะกำหนดวันที่คาดว่าจะเสร็จ แล้วเริ่มดำเนินการ เราจะแจ้งเตือนคุณที่กระดิ่งทันที</>}
+          {team ? 'งานนี้ปิดแล้วและนับเป็นผลงานของทีม หากต้องใช้ช่างภายหลัง กด "ส่งต่อให้ช่าง" ในหน้ารายละเอียดงาน' : <><b className="font-semibold">ต่อไป</b> ช่างจะกำหนดวันที่คาดว่าจะเสร็จ แล้วเริ่มดำเนินการ ติดตามได้ที่ &ldquo;ติดตามงาน&rdquo;</>}
           {!team && <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-foreground">ความเร่งด่วนของงานนี้: <PriorityBadge priority={ticket.priority} /><span className="text-muted-foreground">{reason}</span></p>}
         </div>
 

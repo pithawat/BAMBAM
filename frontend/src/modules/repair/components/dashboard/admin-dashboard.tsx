@@ -23,7 +23,7 @@ import { placeLine, ticketHref, ticketTitle } from "../ticket-presentation";
 import { attentionReason, autoCloseSoonest, greeting, hasWebGL, oldestText, REASON_CHIP } from "./dashboard-ui";
 import { FloorList } from "./floor-list";
 
-// S29 หน้าแรก Admin / ผู้บริหาร (CR-016, layout = ui/mockups/S29-admin-dashboard-modern.html, D-082):
+// S29 หน้าแรก Admin (CR-016, layout = ui/mockups/S29-admin-dashboard-modern.html, D-082):
 // ภาพรวมวันนี้ band · 3D อาคาร 1 (desktop + WebGL) or the floor list · แจ้งซ่อม counts · งานที่ควรติดตาม ·
 // car / room services shown as "not open yet" without numbers (CR-017: every number comes from the API).
 // `settings.assets.manage` (Admin, Superadmin; settings CR-001) toggles จัดวางอุปกรณ์; anyone else reads only (BR-F23-2). CR-019 polish: welcome mascot heading, tiles with an

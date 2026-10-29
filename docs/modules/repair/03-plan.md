@@ -23,7 +23,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 3U | **CR-019 rework:** หน้าตาใหม่ตามต้นแบบ `bam-workplace-mascot-v4-refined.html` — S06 ตารางเดียว + ตัวกรองสถานะ · S07 กล่องเดียว + แท็บ · S03 สองคอลัมน์ + สรุป · S29 ขัดเกลา · มาสคอตเสือทั้งแอป | F02, F06, F07, F23 | S03, S06, S07, S29, S01, shared states | done (2026-10-24, `repair-stage-3U`) |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over); CR-021: S03 / S04 / S06 relayout | done (2026-10-26, `repair-stage-4`) |
 | 4P | **CR-025 rework:** ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร (สำนักงาน · โกดัง · ภายนอกอาคาร) · การ์ดงานซ้ำย้ายไปขั้นปัญหาที่พบ · โกดังตัวอย่าง 1 หลัง + **CR-026:** รูป quality 0.25 และเก็บรูปไว้ในฟอร์มจนกดส่ง (ทุกฟอร์มที่แนบรูป) | F02, F03, F04, F07, F21 | S03, S04, S08, S10, PhotoPicker | pending — next (D-121) |
-| 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | pending |
+| 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | done |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
@@ -454,31 +454,56 @@ Status: done — accepted 2026-10-29 (tag `repair-stage-4P`). UI built by Claude
 
 ## Stage 4R — CR-024 rework: no executive role, no notifications (CR-024)
 
+Status: done — accepted 2026-10-29 (tag `repair-stage-4R`). Built by Claude (no Codex hand-off)
+
 **Scope**
 - Remove the `executive` role everywhere (code, DB, mocks, tests, docs, Atlas); existing executive users become `employee` (owner 2026-10-26)
 - Remove every trace of notifications: the bell in the navbar, toast copy that promises a notification, comments; there is no notification table or endpoint to drop (never built)
 - No new UI; built by Claude (no Codex hand-off). Shared code touched: `internal/platform/users`, `components/shared` (navbar, bell), `lib/platform`
 
 **Backend (Claude)**
-- [ ] Migration `…_repair_cr024_remove_executive.sql`: `UPDATE platform.user_roles SET role = 'employee' WHERE role = 'executive'` (non-demo users), delete the executive demo user (and its sessions), replace the `user_roles` CHECK without `executive`; Down restores the CHECK only
-- [ ] `users.RoleExecutive` removed; `rules.go` (scope=all, dashboard `seesDashboard`, contractor view), `service.go` comments; role-switch accepts the 5 remaining roles
-- [ ] Unit tests: drop executive cases in `service_test.go`, `service_dashboard_test.go`, `service_duplicates_test.go`, `controller_test.go`; add "unknown role `executive` → 400" to the role-switch test; comment "get the reporter's notifications" in `service_duplicates.go` (BR-F03-3)
+- [x] Migration `…_repair_cr024_remove_executive.sql`: `UPDATE platform.user_roles SET role = 'employee' WHERE role = 'executive'` (non-demo users), delete the executive demo user (and its sessions), replace the `user_roles` CHECK without `executive`; Down restores the CHECK only
+- [x] `users.RoleExecutive` removed; `rules.go` (scope=all, dashboard `seesDashboard`, contractor view), `service.go` comments; role-switch accepts the 5 remaining roles
+- [x] Unit tests: drop executive cases in `service_test.go`, `service_dashboard_test.go`, `service_duplicates_test.go`, `controller_test.go`; add "unknown role `executive` → 400" to the role-switch test; comment "get the reporter's notifications" in `service_duplicates.go` (BR-F03-3)
 
 **Frontend (Claude)**
-- [ ] `lib/platform/{types,roles,mocks}.ts`, `app/(app)/page.tsx`, `repair-nav.tsx`, `admin-tickets.tsx` (remove read-only mode and its banner; forbidden copy "หน้านี้สำหรับ Admin เท่านั้น"), `ticket-detail.tsx`, `contractors.tsx`, `admin-dashboard.tsx`, `repair/{types,mocks,api}.ts`
-- [ ] Remove `components/shared/bell-button.tsx` and its navbar slot; no `/notifications` link anywhere
-- [ ] Toasts / dialog copy without notifications (exact copy in the screen specs, CR-024): "เริ่มดำเนินการแล้ว รอดำเนินการตามวันที่กำหนด" · "บันทึกวันใหม่แล้ว" · "ส่งผลแล้ว รอผู้แจ้งตรวจรับ" · "ส่งกลับให้ช่างแล้ว" · hand-over / admin-close dialog lines without "จะได้รับแจ้งเตือน"
+- [x] `lib/platform/{types,roles,mocks}.ts`, `app/(app)/page.tsx`, `repair-nav.tsx`, `admin-tickets.tsx` (remove read-only mode and its banner; forbidden copy "หน้านี้สำหรับ Admin เท่านั้น"), `ticket-detail.tsx`, `contractors.tsx`, `admin-dashboard.tsx`, `repair/{types,mocks,api}.ts`
+- [x] Remove `components/shared/bell-button.tsx` and its navbar slot; no `/notifications` link anywhere
+- [x] Toasts / dialog copy without notifications (exact copy in the screen specs, CR-024): "เริ่มดำเนินการแล้ว รอดำเนินการตามวันที่กำหนด" · "บันทึกวันใหม่แล้ว" · "ส่งผลแล้ว รอผู้แจ้งตรวจรับ" · "ส่งกลับให้ช่างแล้ว" · hand-over / admin-close dialog lines without "จะได้รับแจ้งเตือน"
 
 **Tests + Atlas (Claude)**
-- [ ] e2e: ~~drop the executive blocks / loops in F05, F21, F22, F23, F24~~ (done in settings Stage 1 wire, 2026-10-26); update toast assertions in F07 / F21; `test-stack.md` browse roles
-- [ ] Atlas (`/atlas sync repair`): roles without ผู้บริหาร (`project.json`, `modules/repair.json` roles + matrix), remove flow F19-B and feature F19-1, Stage 6 name, executive steps in the F22 / F23 / F24 tours, "แจ้งเตือนช่าง" step text; rebuild `dist/atlas.html`; `cli verify` passes
+- [x] e2e: ~~drop the executive blocks / loops in F05, F21, F22, F23, F24~~ (done in settings Stage 1 wire, 2026-10-26); update toast assertions in F07 / F21; `test-stack.md` browse roles
+- [x] Atlas (`/atlas sync repair`): roles without ผู้บริหาร (`project.json`, `modules/repair.json` roles + matrix), remove flow F19-B and feature F19-1, Stage 6 name, executive steps in the F22 / F23 / F24 tours, "แจ้งเตือนช่าง" step text; rebuild `dist/atlas.html`; `cli verify` passes
 
 **Acceptance criteria**
-- [ ] AC1: The role switcher lists 5 roles (no ผู้บริหาร); `POST /dev/role-switch {"role":"executive"}` → 400; after the migration no user has `executive`
-- [ ] AC2: No bell in the navbar on any page, no text in the app says "แจ้งเตือน"; `/notifications` is 404
-- [ ] AC3: Admin pages (S11, S18, S29) behave as before for Admin; S11 has no read-only mode
-- [ ] AC4: `go vet`, `go test ./...`, `tsc`, `eslint`, `next build`, the full e2e suite and Atlas `verify` pass
-- [ ] AC5: `grep -ri "executive\|ผู้บริหาร"` finds nothing in `backend/`, `frontend/src`, `frontend/e2e`, `docs/atlas` (except migration history / this CR)
+- [x] AC1: The role switcher lists 5 roles (no ผู้บริหาร); `POST /dev/role-switch {"role":"executive"}` → 400; after the migration no user has `executive`
+- [x] AC2: No bell in the navbar on any page, no text in the app says "แจ้งเตือน"; `/notifications` is 404
+- [x] AC3: Admin pages (S11, S18, S29) behave as before for Admin; S11 has no read-only mode
+- [x] AC4: `go vet`, `go test ./...`, `tsc`, `eslint`, `next build`, the full e2e suite and Atlas `verify` pass
+- [x] AC5: `grep -ri "executive\|ผู้บริหาร"` finds nothing in `backend/`, `frontend/src`, `frontend/e2e`, `docs/atlas` (except migration history / this CR)
+
+---
+
+## Stage 3D-2 — อาคาร 2 model + site view (CR-027) — starts only on the owner's go
+
+**Scope**
+- อาคาร 2 (24 × 15 m, 4 floors) as a procedural model from the photo + plans in `attachments/building plan/2-อาคาร 2.pdf`; floors 1–4 rooms traced (unnamed rooms named by Claude, renamed later in settings)
+- S29 site view: every building of `รายชื่ออาคาร.txt` placed / rotated from `Cpac map.png` (low-poly block; อาคาร 1 / 2 with their shape); click → per-building view (existing building → floor flow). A switcher lists the buildings too
+- **Resource budget (hard, D-124):** no GLB / texture downloads (shapes = code, textures = the existing generated canvas set, reused); site view ≤ 1 draw call per material (merged geometry), ≤ ~10k triangles total, one count marker per building (no per-ticket pins); one detailed building in memory at a time (dispose geometry / materials / textures on leave); render on demand only (no idle frames); pixel ratio capped; each building shape is its own lazy chunk; nothing 3D loads on mobile / no WebGL
+
+**Backend (Claude)**
+- [x] Migration: `platform.buildings` + `model_key text NULL`, `site_x`, `site_z`, `site_rot` (numeric, NULL = not on the site); create อาคาร 2, floors 1–4, `floor_plans` 24 × 15, rooms with `plan_shape` and stable ids; set `model_key = 'b1'` for อาคาร 1
+- [x] #27 adds `modelKey`, `site {x, z, rot} | null` per building (additive, contract updated); unit + Pg tests
+
+**Frontend (Claude unless HANDOFF says otherwise)**
+- [x] `scene/registry.ts` (`modelKey → () => import(...)`), `scene/building-two.ts`, `scene/site.ts` (merged blocks); engine builds by key instead of always `buildBuildingOne`
+- [x] Site ↔ building ↔ floor transitions; switcher; types / mocks / api
+
+**Acceptance criteria**
+- [x] AC1: S29 opens on the site view; อาคาร 1 / 2 have their shape, others are blocks in the map position; each shows its open-ticket count
+- [x] AC2: Click อาคาร 2 → its model → pick a floor → rooms, equipment drag and drop (F31) and ticket pins work as for อาคาร 1
+- [x] AC3: Budget check recorded in the stage report: site view draw calls / triangles (`renderer.info`), JS chunk sizes, GPU memory stays flat after 10 enter / leave cycles, 0 frames rendered while idle
+- [x] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F23 / F31 (+ อาคาร 2 case) and Atlas `verify` pass
 
 ---
 

@@ -247,10 +247,13 @@ func TestDemoUserForRole(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService()
 	_ = svc.EnsureDemoUsers(ctx)
-	_, err := svc.DemoUserForRole(ctx, "superuser")
-	e, ok := apperr.As(err)
-	if !ok || e.Code != "VALIDATION_FAILED" || e.Fields["role"] != "INVALID" {
-		t.Fatalf("err = %v, want VALIDATION_FAILED role INVALID", err)
+	// "executive" is gone since repair CR-024, so it is an unknown role like any other (→ 400).
+	for _, key := range []string{"superuser", "executive"} {
+		_, err := svc.DemoUserForRole(ctx, key)
+		e, ok := apperr.As(err)
+		if !ok || e.Code != "VALIDATION_FAILED" || e.Fields["role"] != "INVALID" {
+			t.Fatalf("%s: err = %v, want VALIDATION_FAILED role INVALID", key, err)
+		}
 	}
 	u, err := svc.DemoUserForRole(ctx, RoleAdmin)
 	if err != nil || u.Role != RoleAdmin || !slices.Contains(u.Permissions, "settings.assets.manage") {

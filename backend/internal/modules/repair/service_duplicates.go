@@ -100,7 +100,7 @@ func (s *Service) withDuplicates(ctx context.Context, v Viewer, err error) error
 
 // Follow implements endpoint #23: the caller becomes a subscriber of an open ticket; their note and
 // photos are added to its timeline as a `subscribed` event (F03). Subscribers see the ticket in S06
-// and get the reporter's notifications, but never rate it (BR-F03-3).
+// and see its progress, but never rate it (BR-F03-3).
 func (s *Service) Follow(ctx context.Context, v Viewer, id uuid.UUID, note string, photoIDs []uuid.UUID) (TicketDetail, error) {
 	note = strings.TrimSpace(note)
 	photoIDs = uniqueIDs(photoIDs)

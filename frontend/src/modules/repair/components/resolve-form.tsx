@@ -26,7 +26,7 @@ import { useTicket } from "./use-ticket";
 // S07 action card; this page stays for direct links. Who does the work was set in S17; for a
 // contractor job the technician rates the contractor here (BR-F21-4, BR-F24-3).
 
-export const RESOLVED_TOAST = "ส่งผลแล้ว ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน";
+export const RESOLVED_TOAST = "ส่งผลแล้ว รอผู้แจ้งตรวจรับ";
 
 export function ResolveScreen({ id }: { id: string }) {
   const router = useRouter();
@@ -126,7 +126,7 @@ export function ResolveFields({ ticket, onDone, cancel, onStale }: { ticket: Tic
         <Textarea id="resolve-note" value={note} onChange={(e) => { setNote(e.target.value); setErrors((x) => { const n = { ...x }; delete n.note; return n; }); }} maxLength={500} rows={3} placeholder="เช่น ล้างแผงคอยล์เย็น เปลี่ยนท่อน้ำทิ้งที่แตก" aria-invalid={!!errors.note} aria-describedby="note-error" className="rounded-sm bg-card px-3.5 py-2.5 text-base" />
         {err("note")}</div>
       {contractorJob && <div data-resolve-field="contractorRating" className="space-y-2">
-        <p className="text-[15px] font-semibold">คะแนนช่างภายนอก{!alreadyRated && <span className="text-destructive"> *</span>} <span className="text-xs font-normal text-muted-foreground">เห็นเฉพาะช่าง Admin และผู้บริหาร</span></p>
+        <p className="text-[15px] font-semibold">คะแนนช่างภายนอก{!alreadyRated && <span className="text-destructive"> *</span>} <span className="text-xs font-normal text-muted-foreground">เห็นเฉพาะช่างและ Admin</span></p>
         {alreadyRated && <p className="text-xs text-muted-foreground">ให้คะแนนไว้แล้ว {ticket.result?.contractorRating} ดาว — ให้ใหม่เพื่อแทนที่ หรือปล่อยว่างเพื่อใช้คะแนนเดิม</p>}
         <StarInput id="contractorRating" value={rating} onChange={(n) => { setRating(n); setErrors((e) => { const x = { ...e }; delete x.contractorRating; return x; }); }} invalid={!!errors.contractorRating} describedBy="contractorRating-error" size="sm" />
         {err("contractorRating")}

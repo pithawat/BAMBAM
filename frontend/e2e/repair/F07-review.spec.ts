@@ -63,7 +63,7 @@ test.describe("reporter", () => {
     await dialog.getByLabel(/ยังพบปัญหาอะไร/).fill("ยังมีน้ำหยดเมื่อเปิดแอร์เกิน 1 ชั่วโมง");
     await attachVia(page, dialog.locator("input[type=file]").first());
     await dialog.getByRole("button", { name: "ส่งกลับให้แก้" }).click();
-    await expect(page.getByText("ส่งกลับให้ช่างแล้ว ช่างจะได้รับแจ้งเตือน")).toBeVisible();
+    await expect(page.getByText("ส่งกลับให้ช่างแล้ว")).toBeVisible();
     await expect(nextAction(page)).toContainText("ส่งกลับให้แก้แล้ว");
     await expect(progress(page).locator('[aria-current="step"]')).toContainText("ส่งกลับให้แก้");
     await expect(progress(page)).toContainText("ยังมีน้ำหยดเมื่อเปิดแอร์เกิน 1 ชั่วโมง");
@@ -95,7 +95,7 @@ test.describe("technician", () => {
     await attachVia(page, sheet.locator("input[type=file]"));
     await sheet.getByLabel("ทำอะไรไป").fill("ขันน็อตยึดคอยล์ร้อน เสียงหายแล้ว");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
-    await expect(page.getByText("ส่งผลแล้ว ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน")).toBeVisible();
+    await expect(page.getByText("ส่งผลแล้ว รอผู้แจ้งตรวจรับ")).toBeVisible();
 
     const employee = await as("employee", baseURL);
     const d = (await (await employee.get(`${API}/tickets/${ticket.id}`)).json()).data;

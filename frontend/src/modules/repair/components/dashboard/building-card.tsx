@@ -21,7 +21,7 @@ import { BuildingEngine, type TicketPin } from "./scene/engine";
 // step, from #6) and equipment chips. Floors / footprint / step counts come from #27; opening a floor plays
 // the repair-map lift transition.
 // Admin edit mode: drag a type from the palette into a room (dialog), drag a chip to move it (toast with
-// undo), chip popover → แก้ไข / ปิดใช้งาน. Executive: the same views without edit controls.
+// undo), chip popover → แก้ไข / ปิดใช้งาน. Without the edit permission: the same views without edit controls.
 // Loaded with next/dynamic only on desktop with WebGL (three.js stays out of every other chunk).
 
 type Props = { building: OverviewBuilding; canEdit: boolean; editing: boolean };

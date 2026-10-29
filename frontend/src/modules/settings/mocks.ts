@@ -390,7 +390,7 @@ userStore.audit = [
   { id: "a0000000-0000-4000-8000-000000000004", createdAt: "2026-10-25T08:15:00Z", actor: mockPeople.paweena, action: "update", entityType: "room", entityId: "r-1a", entityName: "ห้องประชุม 1A", parentName: "อาคาร 1 ชั้น 1", exists: true, changes: [{ field: "name", before: "ห้องประชุมใหญ่", after: "ห้องประชุม 1A" }] },
   { id: "a0000000-0000-4000-8000-000000000003", createdAt: "2026-10-24T04:00:00Z", actor: mockPeople.paweena, action: "deactivate", entityType: "contractor_type", entityId: "ct-air", entityName: "แอร์", parentName: null, exists: true, changes: [] },
   { id: "a0000000-0000-4000-8000-000000000002", createdAt: "2026-10-15T07:02:00Z", actor: mockPeople.nattapon, action: "role_change", entityType: "user", entityId: personId(231), entityName: "ธนากร พึ่งบุญ", parentName: null, exists: true, changes: [{ field: "role", before: "พนักงานทั่วไป", after: "ช่างเทคนิค" }] },
-  { id: "a0000000-0000-4000-8000-000000000001", createdAt: "2026-10-14T03:00:00Z", actor: mockPeople.nattapon, action: "delete", entityType: "role", entityId: "deleted-role", entityName: "ผู้บริหาร", parentName: null, exists: false, changes: [] },
+  { id: "a0000000-0000-4000-8000-000000000001", createdAt: "2026-10-14T03:00:00Z", actor: mockPeople.nattapon, action: "delete", entityType: "role", entityId: "deleted-role", entityName: "ผู้ตรวจสอบ", parentName: null, exists: false, changes: [] },
 ];
 
 /** Settings writes in mock mode add audit rows, so S26 shows what was just done. */

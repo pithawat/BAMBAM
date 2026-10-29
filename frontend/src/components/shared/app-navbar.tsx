@@ -11,12 +11,11 @@ import { initials } from "@/lib/platform/roles";
 import type { Me } from "@/lib/platform/types";
 import { applyTheme, currentTheme, THEMES, type ThemeId } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { BellButton } from "./bell-button";
 import { LogoutDialog } from "./logout-dialog";
 import { SERVICES, type Service } from "./service-icon";
 
 // Top navigation (_common.md §1, CR-010): BAMBAM · หน้าแรก · three equal services · ตั้งค่าระบบ (settings CR-001,
-// any `settings.*` permission) · bell · account menu. Settings pages use their own administration shell instead.
+// any `settings.*` permission) · account menu (no bell, repair CR-024). Settings pages use their own administration shell instead.
 // No sidebar, no bottom nav and no repair-only shortcut here; repair tracking and staff tools live in the repair
 // section nav (modules/repair/components/repair-nav.tsx). Desktop: floating sticky bar. Phone / tablet: brand row
 // + a row of the three services; it scrolls away so route-local sticky bars keep the top edge.
@@ -70,8 +69,6 @@ export function AppNavbar({ me }: { me: Me }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-1 lg:gap-2">
-            <BellButton className="bg-transparent shadow-none hover:bg-muted" />
-            <span aria-hidden className="hidden h-8 w-px bg-border lg:block" />
             <AccountMenu me={me} />
           </div>
         </div>

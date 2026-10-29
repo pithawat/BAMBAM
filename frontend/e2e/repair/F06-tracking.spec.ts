@@ -106,7 +106,7 @@ test.describe("follower", () => {
     expect(follow.status()).toBe(200);
 
     await page.goto(`/repair/tickets/${ticket.id}`);
-    await expect(page.getByRole("region", { name: "สิ่งที่เกิดขึ้นตอนนี้" })).toContainText("คุณติดตามงานนี้ เราจะแจ้งเตือนเมื่อมีความคืบหน้า");
+    await expect(page.getByRole("region", { name: "สิ่งที่เกิดขึ้นตอนนี้" })).toContainText('คุณติดตามงานนี้ ดูความคืบหน้าได้ที่หน้านี้และใน "ติดตามงาน"');
     await expect(page.getByRole("group", { name: "เลือกคะแนนเพื่อเปิดแบบประเมิน" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /ประเมินตรวจงาน|ส่งกลับให้แก้/ })).toHaveCount(0);
     await expect(progress(page).getByRole("listitem").first()).toContainText("คุณติดตามงานนี้");
