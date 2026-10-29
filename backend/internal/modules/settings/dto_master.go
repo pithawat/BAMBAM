@@ -30,14 +30,14 @@ type CategoryResponse struct {
 	SortOrder          int32    `json:"sortOrder"`
 	DefaultPriority    string   `json:"defaultPriority"`
 	IsOther            bool     `json:"isOther"`
-	AreaTypes          []string `json:"areaTypes"`
+	AreaTypes          []string `json:"areaTypes"` // always empty since repair CR-025; settings Stage 4P sends buildingTypeIds
 	SymptomCount       int64    `json:"symptomCount"`
 	ActiveSymptomCount int64    `json:"activeSymptomCount"`
 }
 
 func newCategoryResponse(c repair.CategoryAdmin) CategoryResponse {
 	return CategoryResponse{MasterItemResponse: masterItem(c.ID.String(), c.Name, c.MasterMeta), Icon: c.Icon, SortOrder: c.SortOrder,
-		DefaultPriority: c.DefaultPriority, IsOther: c.IsOther, AreaTypes: c.AreaTypes, SymptomCount: c.SymptomCount, ActiveSymptomCount: c.ActiveSymptomCount}
+		DefaultPriority: c.DefaultPriority, IsOther: c.IsOther, AreaTypes: []string{}, SymptomCount: c.SymptomCount, ActiveSymptomCount: c.ActiveSymptomCount}
 }
 
 // SymptomResponse = `MasterItem` + sortOrder + priority (CR-008).
@@ -71,7 +71,7 @@ type CategoryRequest struct {
 	Name            *string    `json:"name"`
 	Icon            *string    `json:"icon"`
 	DefaultPriority *string    `json:"defaultPriority"`
-	AreaTypes       *[]string  `json:"areaTypes"`
+	AreaTypes       *[]string  `json:"areaTypes"` // ignored since repair CR-025 (no hint table); replaced in settings Stage 4P
 	IsActive        *bool      `json:"isActive"`
 	UpdatedAt       *time.Time `json:"updatedAt"`
 }

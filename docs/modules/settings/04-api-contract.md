@@ -94,6 +94,9 @@ Permission column (CR-001): `loc` = `settings.locations.manage` · `asset` = `se
 | 50 | GET | `/api/v1/settings/asset-types` | asset types with usage counts (CR-002) | asset | 4 |
 | 51 | POST | `/api/v1/settings/asset-types` | add an asset type (CR-002) | asset | 4 |
 | 52 | PATCH | `/api/v1/settings/asset-types/{id}` | edit an asset type (CR-002) | asset | 4 |
+| 53 | GET | `/api/v1/settings/building-types` | building types with usage counts (CR-005) | loc · cat | 4P |
+| 54 | POST | `/api/v1/settings/building-types` | add a building type + its categories (CR-005) | loc | 4P |
+| 55 | PATCH | `/api/v1/settings/building-types/{id}` | rename / (de)activate a building type (CR-005) | loc | 4P |
 
 ---
 
@@ -275,10 +278,12 @@ Floors and rooms come from the building plan: settings never creates, deletes, r
 ```
 
 ### 13. GET /api/v1/settings/buildings (changed, CR-002)
+(CR-005) `PlanBuilding` + `"buildingType": { "id": "…", "name": "อาคารสำนักงาน" }` (always set).
 `{ "data": [ <PlanBuilding> ] }` — active buildings in `sort_order`; floors bottom first (`level` ascending = the order of the floor buttons); active rooms in `sort_order`. Floor names are read-only here.
 
 ### 15. PATCH /api/v1/settings/buildings/{id} (changed, CR-002)
 `{ "name": "อาคาร 1 (สำนักงานใหญ่)", "updatedAt": "…" }` → 200 `<PlanBuilding>`. Rename only; the id, floors, rooms and assets stay. Errors: 400 `VALIDATION_FAILED` (`name: REQUIRED|TOO_LONG` 100), 404 `BUILDING_NOT_FOUND`, 409 `NAME_TAKEN` (case-insensitive among buildings), 409 `VERSION_CONFLICT`. Audit `update` (`building`).
+(CR-005) Body may also carry `"buildingTypeId"` (an active type) → 400 `buildingTypeId: REQUIRED|INVALID`; the S20 dialog sends both fields. Changing the type affects new reports only.
 
 ### 27. PATCH /api/v1/settings/rooms/{id} (changed, CR-002)
 `{ "name": "ห้องประชุม 1A (ใหญ่)", "updatedAt": "…" }` → 200 room (shape of `PlanBuilding.floors[].rooms[]`). Rename only. Errors: 400 (`name` REQUIRED / TOO_LONG 100), 404 `ROOM_NOT_FOUND`, 409 `NAME_TAKEN` (same floor, case-insensitive), 409 `VERSION_CONFLICT`. The common-area room ("พื้นที่ส่วนกลางชั้น {n}") can be renamed too. Audit `update` (`room`).
@@ -320,6 +325,22 @@ Same rule as repair #34 (`{codePrefix}-{floor name}-{nnn}`), floor taken from th
 
 ### 52. PATCH /api/v1/settings/asset-types/{id}
 `{ "name"?, "codePrefix"?, "icon"?, "mount"?, "updatedAt" }` → 200 `<AssetTypeAdmin>`. Existing asset codes never change; a new prefix only affects suggestions. Errors: as #51 + 404 `ASSET_TYPE_NOT_FOUND`, 409 `VERSION_CONFLICT`. No deactivate / delete / reorder of types in this release (not in the CR-001 design).
+
+### `BuildingTypeAdmin` (CR-005)
+```json
+{ "id": "bt1…", "name": "โกดังเก็บของ", "isActive": true, "sortOrder": 2,
+  "buildingCount": 1, "categoryIds": ["c014ca70-…-0001", "c014ca70-…-0003", "c014ca70-…-0005"],
+  "updatedAt": "2026-10-27T03:00:00Z", "updatedBy": null }
+```
+`categoryIds` = categories used in this type (`repair.category_building_types`; the `isOther` category is never listed — it is used everywhere).
+
+### 53. GET /api/v1/settings/building-types → `{ "data": [ <BuildingTypeAdmin> ] }` — all types (active first) in `sort_order`.
+
+### 54. POST /api/v1/settings/building-types
+`{ "name": "โรงงาน", "categoryIds": ["…"] }` → 201 `<BuildingTypeAdmin>` (goes last). `categoryIds` may be empty (S20 ticks every active category by default). Errors: 400 `VALIDATION_FAILED` (`name: REQUIRED|TOO_LONG` 100, `categoryIds: INVALID` unknown / `isOther` id), 409 `NAME_TAKEN` (case-insensitive). Audit `create` (`building_type`).
+
+### 55. PATCH /api/v1/settings/building-types/{id}
+`{ "name"?, "isActive"?, "updatedAt" }` → 200 `<BuildingTypeAdmin>`. Errors: as #54 + 404 `BUILDING_TYPE_NOT_FOUND`, 409 `VERSION_CONFLICT`, 409 `IN_USE` (deactivate while an active building has this type). No delete. Which categories a type uses is edited per category (#33 / #34 `buildingTypeIds`). Audit `update` (`building_type`).
 
 <details><summary>Original Stage 4 contract (2026-10-16) — superseded by CR-002</summary>
 
@@ -395,6 +416,7 @@ Image bytes with its content type, `Cache-Control: private, max-age=86400` (the 
 ### 33. POST /api/v1/settings/categories
 `{ "name": "ระบบปรับอากาศ", "icon": "snowflake" }` → 201. Errors: 400 (`name` REQUIRED / TOO_LONG 100, `icon: INVALID`), 409 `NAME_TAKEN`.
 ### 34. PATCH /api/v1/settings/categories/{id} — `MasterItem` PATCH + optional `icon`. `CATEGORY_NOT_FOUND`.
+(CR-005) `Category` + `"buildingTypeIds": ["…"]` (replaces repair CR-014 `areaTypes`; empty for the `isOther` category = every type). #33 requires `buildingTypeIds` ≥ 1 active type; #34 accepts it optionally (≥ 1 when sent). Errors: 400 `buildingTypeIds: MIN_ITEMS|INVALID`; 400 `buildingTypeIds: NOT_ALLOWED` on the `isOther` category.
 ### 35. DELETE /api/v1/settings/categories/{id} — 204 with its unused symptoms; 409 `IN_USE`.
 ### 36. PUT /api/v1/settings/categories/order — order body.
 

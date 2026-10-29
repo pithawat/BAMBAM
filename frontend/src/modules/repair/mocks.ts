@@ -41,6 +41,7 @@ import type {
   TimelineEvent,
   UpdateAssetRequest,
 } from "./types";
+import { categoryUsedIn } from "./types";
 
 // Mock data for building the UI without the backend (NEXT_PUBLIC_USE_MOCKS=true).
 // Categories / symptoms = the real master (CR-014, same ids as migration 20261019000001); buildings,
@@ -111,6 +112,7 @@ export const mockErrors = {
   notFound: () => new ApiError(404, "TICKET_NOT_FOUND", "mock: ticket not found"),
   photoNotFound: () => new ApiError(404, "PHOTO_NOT_FOUND", "mock: photo not found"),
   masterChanged: () => new ApiError(422, "MASTER_DATA_CHANGED", "mock: master data changed"),
+  categoryNotForBuilding: () => new ApiError(422, "CATEGORY_NOT_FOR_BUILDING", "mock: category not used in this building type"),
   validation: () =>
     new ApiError(400, "VALIDATION_FAILED", "mock: validation failed", {
       symptomIds: "MIN_ITEMS",
@@ -135,24 +137,30 @@ const bldId = (n: number) => `b1000000-0000-4000-8000-00000000000${n}`;
 const floorId = (b: number, level: number) => `f1000000-0000-4000-8000-0000000${b}0${level.toString().padStart(3, "0")}`;
 const roomId = (b: number, level: number, k: number) => `e1000000-0000-4000-8000-${b}${level.toString().padStart(3, "0")}${k.toString().padStart(8, "0")}`;
 
-// [name, icon, symptoms with the owner-accepted priorities, area types] — every default is medium.
-const categoryData: [string, string, [string, Priority][], AreaType[]][] = [
-  ["ไฟฟ้าและแสงสว่าง", "zap", [["ไฟไม่ติด/ไฟกะพริบ", "medium"], ["ปลั๊กไม่มีไฟ/สวิตช์เสีย", "medium"], ["ไฟตกหรือดับ", "high"], ["มีกลิ่นไหม้/ประกายไฟ", "critical"]], ["office", "meeting_room", "common_area"]],
-  ["ระบบปรับอากาศ", "snowflake", [["แอร์ไม่เย็น", "medium"], ["น้ำหยด/รั่วซึม", "high"], ["มีเสียงดัง", "medium"], ["มีกลิ่น", "low"], ["เปิดไม่ติด", "high"], ["รีโมทเสีย", "low"]], ["meeting_room", "office"]],
-  ["ประปาและสุขาภิบาล", "droplets", [["น้ำไม่ไหล", "high"], ["น้ำรั่วซึม", "high"], ["ท่อตัน", "medium"], ["ก๊อก/วาล์วเสีย", "medium"], ["ชักโครกเสีย", "medium"], ["ที่กดน้ำยาเช็ดฝาชักโครก/กล่องทิชชู่ชำรุด", "low"]], ["restroom", "pantry"]],
-  ["ห้องประชุมและโสตทัศนูปกรณ์", "presentation", [["ไมค์ไม่มีเสียง/เสียงขาด", "medium"], ["ลำโพงไม่ดัง", "medium"], ["จอไม่แสดงผล/ไม่ติด", "medium"], ["กล้องไม่ทำงาน", "medium"], ["สายสัญญาณ HDMI เสีย", "medium"]], ["meeting_room"]],
-  ["อาคารและพื้นที่ส่วนกลาง", "building-2", [["ฝ้า/ผนังชำรุด", "medium"], ["พื้นแตก/ร่อน", "medium"], ["ประตู/กระจกเสีย", "medium"], ["หลังคารั่ว", "high"], ["สีลอก", "low"], ["เสี่ยงหล่นใส่คน", "critical"]], ["common_area"]],
-  ["ลานจอด / ไม้กั้น", "square-parking", [["ไม้กั้นค้าง/ไม่ยกลง", "high"], ["ไม้กั้นไม่ทำงาน", "high"], ["ไม้กั้นหัก/ชำรุด", "medium"], ["ที่จอดรถชำรุด/พื้นแตก", "low"], ["เส้นจราจรลบเลือน", "low"], ["ป้าย/สัญญาณจราจรเสีย", "medium"], ["ไฟส่องสว่างลานจอดดับ", "medium"]], ["parking"]],
+// CR-025 building types (migration 20261029000001 ids): อาคารสำนักงาน · โกดังเก็บของ · พื้นที่ภายนอกอาคาร.
+export const BT_OFFICE: Ref = { id: "c025b700-0000-4000-8000-000000000001", name: "อาคารสำนักงาน" };
+export const BT_WAREHOUSE: Ref = { id: "c025b700-0000-4000-8000-000000000002", name: "โกดังเก็บของ" };
+export const BT_OUTDOOR: Ref = { id: "c025b700-0000-4000-8000-000000000003", name: "พื้นที่ภายนอกอาคาร" };
+const O = BT_OFFICE.id, W = BT_WAREHOUSE.id, X = BT_OUTDOOR.id;
+
+// [name, icon, symptoms with the owner-accepted priorities, building types (CR-025 table)] — every default is medium.
+const categoryData: [string, string, [string, Priority][], string[]][] = [
+  ["ไฟฟ้าและแสงสว่าง", "zap", [["ไฟไม่ติด/ไฟกะพริบ", "medium"], ["ปลั๊กไม่มีไฟ/สวิตช์เสีย", "medium"], ["ไฟตกหรือดับ", "high"], ["มีกลิ่นไหม้/ประกายไฟ", "critical"]], [O, W, X]],
+  ["ระบบปรับอากาศ", "snowflake", [["แอร์ไม่เย็น", "medium"], ["น้ำหยด/รั่วซึม", "high"], ["มีเสียงดัง", "medium"], ["มีกลิ่น", "low"], ["เปิดไม่ติด", "high"], ["รีโมทเสีย", "low"]], [O]],
+  ["ประปาและสุขาภิบาล", "droplets", [["น้ำไม่ไหล", "high"], ["น้ำรั่วซึม", "high"], ["ท่อตัน", "medium"], ["ก๊อก/วาล์วเสีย", "medium"], ["ชักโครกเสีย", "medium"], ["ที่กดน้ำยาเช็ดฝาชักโครก/กล่องทิชชู่ชำรุด", "low"]], [O, W, X]],
+  ["ห้องประชุมและโสตทัศนูปกรณ์", "presentation", [["ไมค์ไม่มีเสียง/เสียงขาด", "medium"], ["ลำโพงไม่ดัง", "medium"], ["จอไม่แสดงผล/ไม่ติด", "medium"], ["กล้องไม่ทำงาน", "medium"], ["สายสัญญาณ HDMI เสีย", "medium"]], [O]],
+  ["อาคารและพื้นที่ส่วนกลาง", "building-2", [["ฝ้า/ผนังชำรุด", "medium"], ["พื้นแตก/ร่อน", "medium"], ["ประตู/กระจกเสีย", "medium"], ["หลังคารั่ว", "high"], ["สีลอก", "low"], ["เสี่ยงหล่นใส่คน", "critical"]], [O, W]],
+  ["ลานจอด / ไม้กั้น", "square-parking", [["ไม้กั้นค้าง/ไม่ยกลง", "high"], ["ไม้กั้นไม่ทำงาน", "high"], ["ไม้กั้นหัก/ชำรุด", "medium"], ["ที่จอดรถชำรุด/พื้นแตก", "low"], ["เส้นจราจรลบเลือน", "low"], ["ป้าย/สัญญาณจราจรเสีย", "medium"], ["ไฟส่องสว่างลานจอดดับ", "medium"]], [X]],
   ["อื่น ๆ", "ellipsis", [["ใช้งานไม่ได้", "medium"], ["มีเสียง/กลิ่นผิดปกติ", "medium"], ["รั่วซึมชำรุด", "medium"], ["มีความเสี่ยงอันตราย", "critical"]], []],
 ];
 
-export const mockCategories: Category[] = categoryData.map(([name, icon, symptoms, areaTypes], i) => ({
+export const mockCategories: Category[] = categoryData.map(([name, icon, symptoms, buildingTypeIds], i) => ({
   id: catId(i + 1),
   name,
   icon,
   defaultPriority: "medium",
   isOther: i === categoryData.length - 1,
-  areaTypes,
+  buildingTypeIds,
   symptoms: symptoms.map(([s, priority], j) => ({ id: symId(i + 1, j + 1), name: s, priority })),
 }));
 
@@ -259,6 +267,7 @@ export const mockBuildings: Building[] = [
   ].map((b, i) => ({
     id: bldId(i + 1),
     name: b.name,
+    buildingType: BT_OFFICE,
     floors: Array.from({ length: b.floors }, (_, k) => ({
       id: floorId(i + 1, k + 1), name: String(k + 1), level: k + 1, rooms: sampleRooms(i + 1, k + 1),
     })),
@@ -266,6 +275,7 @@ export const mockBuildings: Building[] = [
   {
     id: "c014b1d0-0000-4000-8000-000000000001",
     name: "พื้นที่ภายนอกอาคาร",
+    buildingType: BT_OUTDOOR,
     floors: [{
       id: "c014f100-0000-4000-8000-000000000001", name: "ลานจอดรถ", level: 1,
       rooms: [{ id: "c014e000-0000-4000-8000-000000000001", name: "ลานจอดรถ", areaType: "parking" }],
@@ -274,10 +284,24 @@ export const mockBuildings: Building[] = [
   {
     id: B1_ID,
     name: "อาคาร 1",
+    buildingType: BT_OFFICE,
     floors: Object.entries(B1_ROOMS).map(([level, list]) => ({
       id: b1FloorId(Number(level)), name: level, level: Number(level),
       rooms: list.map(([name, areaType, k]) => ({ id: b1RoomId(Number(level), k), name, areaType })),
     })),
+  },
+  // CR-025: the mock warehouse from the migration, until the owner sends the real ones.
+  {
+    id: "c025b1d0-0000-4000-8000-000000000001",
+    name: "โกดังเก็บของ 1 (ตัวอย่าง)",
+    buildingType: BT_WAREHOUSE,
+    floors: [{
+      id: "c025f100-0000-4000-8000-000000000001", name: "1", level: 1,
+      rooms: [
+        { id: "c025e000-0000-4000-8000-000000000001", name: "พื้นที่เก็บสินค้า", areaType: "other" },
+        { id: "c025e000-0000-4000-8000-000000000002", name: "พื้นที่ส่วนกลางชั้น 1", areaType: "common_area" },
+      ],
+    }],
   },
 ];
 
@@ -954,6 +978,8 @@ export function mockCreateTicket(req: CreateTicketRequest, reporter: PersonRef, 
   const picked = floor?.rooms.find((r) => r.id === req.roomId);
   const symptoms = (category?.symptoms ?? []).filter((s) => req.symptomIds.includes(s.id)).map(({ id, name }) => ({ id, name }));
   if (!category || !building || !floor || !picked || symptoms.length !== req.symptomIds.length) throw mockErrors.masterChanged();
+  // BR-F02-8 (CR-025): after the master data checks, before the duplicate check — same order as the server.
+  if (!categoryUsedIn(category, building)) throw mockErrors.categoryNotForBuilding();
   if (req.categoryOther?.trim() && !category.isOther) {
     throw new ApiError(400, "VALIDATION_FAILED", "mock: categoryOther not allowed", { categoryOther: "NOT_ALLOWED" });
   }

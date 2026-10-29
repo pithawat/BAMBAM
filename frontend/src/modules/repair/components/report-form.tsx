@@ -20,32 +20,33 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { clearDraftPhotos, purgeExpiredDraftPhotos, readDraftPhotos, saveDraftPhotos } from "@/lib/draft-photos";
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
 import { initials } from "@/lib/platform/roles";
 import { cn } from "@/lib/utils";
 import { createTicket, followTicket, getDuplicates, getBuildings, getCategories, getRecentPlaces, MAX_PHOTOS } from "../api";
 import { createTicketFieldErrors, duplicateMatches, ownTicketAwaitingRating, errorCode, errorMessage } from "../errors";
 import { priorityReason, ticketPriority, type PriorityResult } from "../priority";
-import type { AreaType, Building, Category, DuplicateTicket, Floor, Photo, RecentPlace, Room } from "../types";
+import { categoryUsedIn } from "../types";
+import type { Building, Category, DuplicateTicket, Floor, Photo, RecentPlace, Room } from "../types";
 import { DuplicateCard, DuplicateDialog } from "./duplicate-dialog";
 import { CategoryTile, categoryIcon } from "./category-icon";
-import { PhotoLightbox } from "./photo-gallery";
-import { PhotoPicker, PhotoTile, usePhotoUploads, type PhotoItem } from "./photo-picker";
+import { forgetUploads, keptPhoto, photoBlocker, PhotoListLightbox, PhotoPicker, PhotoTile, uploadKeptPhotos, usePhotoList, type PhotoItem } from "./photo-picker";
 import { floorLabel, listDate, timeOf } from "./ticket-presentation";
 import { useDiscardGuard } from "@/components/shared/use-discard-guard";
 
 // S03 แจ้งซ่อมใหม่ — CR-014 wizard (docs/modules/repair/ui/screens/S03-report-form.md CR-014 block, visual
-// reference docs/modules/repair/changes/CR-014/form-steps.html): 3 steps ปัญหาที่พบ → สถานที่ → รูปภาพและส่ง
-// in one frame. Only the current step is rendered, at its own height (CR-022: no reserved heights, the room
+// reference docs/modules/repair/changes/CR-014/form-steps.html), place first since CR-025: 3 steps สถานที่ →
+// ปัญหาที่พบ (only the categories of the building's type, BR-F02-8) → รูปภาพและส่ง in one frame. Only the current step is rendered, at its own height (CR-022: no reserved heights, the room
 // cards grow with the floor's rooms). Phone / tablet: sticky footer. The system sets the priority (BR-F02-2).
-// CR-021: the mode is fixed by the entry point (/repair/new = repair, ?mode=team = team for leads) and the duplicate
-// card sits between the room and the extra spot; a blocking duplicate stops ถัดไป at the location step.
+// CR-021: the mode is fixed by the entry point (/repair/new = repair, ?mode=team = team for leads). CR-025: the duplicate
+// card sits under the symptoms of step 2 with an inline extra spot; a blocking duplicate stops ถัดไป there.
 
 const MAX_OTHER = 100;
 const MAX_LOCATION = 100;
 const MAX_DETAILS = 500;
-/** Unattached photos expire after 24 h (D-022); older drafts drop their photos. */
-const DRAFT_PHOTO_TTL_MS = 20 * 60 * 60 * 1000;
+/** Drafts saved before CR-026 A1 kept uploaded photo ids; unattached photos expire after 24 h (D-022), so older ones are dropped. */
+const UPLOADED_PHOTO_TTL_MS = 20 * 60 * 60 * 1000;
 
 type Values = {
   categoryId: string;
@@ -68,28 +69,31 @@ const initial: Values = {
   buildingId: "", floorId: "", roomId: "", locationDetail: "", teamNote: "",
 };
 const SPOT_REQUIRED = "กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ";
+const CATEGORY_CLEARED = "หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้ เลือกใหม่อีกครั้ง";
+const NO_CATEGORY: Partial<Values> = { categoryId: "", categoryOther: "", symptomIds: [], symptomOtherOn: false, symptomOther: "" };
 
 type StepKey = "problem" | "location" | "send";
 const STEPS: { key: StepKey; label: string }[] = [
-  { key: "problem", label: "ปัญหาที่พบ" },
   { key: "location", label: "สถานที่" },
+  { key: "problem", label: "ปัญหาที่พบ" },
   { key: "send", label: "รูปภาพและส่ง" },
 ];
 const FIELD_STEP: Record<string, StepKey> = {
   categoryId: "problem", categoryOther: "problem", symptomIds: "problem", symptomOther: "problem",
   buildingId: "location", floorId: "location", roomId: "location", locationDetail: "location",
+  /** BR-F03-2 block: the inline extra spot in the step-2 duplicate card (CR-025). */
+  duplicateSpot: "problem",
   photoIds: "send", details: "send",
   "teamHandled.note": "send", "teamHandled.photoIds": "send",
 };
 
-/** v1 drafts (CR-008, 4 steps, no room) are read too; their steps map onto the 3 CR-014 steps. */
-type Draft = { v: 1; savedAt: number; step: string; values: Partial<Values>; photos: Photo[]; teamPhotos?: Photo[] };
+/**
+ * v1 drafts (CR-008, 4 steps, no room) are read too; their steps map onto the 3 CR-014 steps. CR-026 A1: the photo
+ * files are in IndexedDB (lib/draft-photos.ts); `photoCount` says how many were kept, `photos` / `teamPhotos` only
+ * hold uploads of older drafts.
+ */
+type Draft = { v: 1; savedAt: number; step: string; values: Partial<Values>; photos: Photo[]; teamPhotos?: Photo[]; photoCount?: number };
 const draftStep = (s: string): StepKey => (s === "location" ? "location" : s === "photo" || s === "review" || s === "send" ? "send" : "problem");
-
-const AREA_LABELS: Record<AreaType, string> = {
-  meeting_room: "ห้องประชุม", restroom: "ห้องน้ำ", office: "สำนักงาน", pantry: "Pantry",
-  common_area: "พื้นที่ส่วนกลาง", parking: "ลานจอด", other: "อื่นๆ",
-};
 
 function validate(values: Values, photos: PhotoItem[], teamPhotos: PhotoItem[] = [], team = false, blocked = false): Record<string, string> {
   const e: Record<string, string> = {};
@@ -100,16 +104,16 @@ function validate(values: Values, photos: PhotoItem[], teamPhotos: PhotoItem[] =
   else if (!values.floorId) e.floorId = "กรุณาเลือกชั้น";
   else if (!values.roomId) e.roomId = "เลือกห้องหรือจุดที่เกิด";
   if (values.locationDetail.length > MAX_LOCATION) e.locationDetail = "ไม่เกิน 100 ตัวอักษร";
-  else if (blocked) e.locationDetail = SPOT_REQUIRED; // BR-F03-2 (CR-021): another spot, or follow the case
+  else if (blocked) e.duplicateSpot = SPOT_REQUIRED; // BR-F03-2 (CR-021, CR-025): another spot, or follow the case
   if (values.details.length > MAX_DETAILS) e.details = "ไม่เกิน 500 ตัวอักษร";
-  if (photos.some((p) => p.status === "uploading")) e.photoIds = "รอให้รูปอัปโหลดเสร็จก่อน";
-  else if (photos.some((p) => p.status === "failed")) e.photoIds = "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น";
+  const photoWait = photoBlocker(photos);
+  if (photoWait) e.photoIds = photoWait;
   else if (!photos.length) e.photoIds = "ถ่ายหรือแนบรูปปัญหาอย่างน้อย 1 รูป";
   if (team) {
     if (!values.teamNote.trim()) e["teamHandled.note"] = "กรุณาบอกสิ่งที่ทีมทำ";
     else if (values.teamNote.length > MAX_DETAILS) e["teamHandled.note"] = "ไม่เกิน 500 ตัวอักษร";
-    if (teamPhotos.some(p => p.status === "uploading")) e["teamHandled.photoIds"] = "รอให้รูปอัปโหลดเสร็จก่อน";
-    else if (teamPhotos.some(p => p.status === "failed")) e["teamHandled.photoIds"] = "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น";
+    const teamWait = photoBlocker(teamPhotos);
+    if (teamWait) e["teamHandled.photoIds"] = teamWait;
     else if (!teamPhotos.length) e["teamHandled.photoIds"] = "แนบรูปหลังทำอย่างน้อย 1 รูป";
   }
   return e;
@@ -132,23 +136,28 @@ function sanitizeValues(input: Partial<Values>, categories: Category[], building
   if (!building) Object.assign(v, { buildingId: "", floorId: "", roomId: "" });
   else if (!floor) Object.assign(v, { floorId: "", roomId: "" });
   else if (!floor.rooms.some((r) => r.id === v.roomId)) v.roomId = "";
+  if (categoryNotUsed(v, categories, buildings)) Object.assign(v, NO_CATEGORY); // BR-F02-8 (CR-025)
   return v;
 }
 
+/** The picked category exists but the picked building's type does not use it (CR-025). */
+function categoryNotUsed(v: Pick<Values, "categoryId" | "buildingId">, categories: Category[], buildings: Building[]) {
+  const category = categories.find((c) => c.id === v.categoryId);
+  const building = buildings.find((b) => b.id === v.buildingId);
+  return !!category && !!building && !categoryUsedIn(category, building);
+}
+
+/** The first step (in wizard order) that still has a problem, or undefined. */
+const firstOpenStep = (errors: Record<string, string>) => STEPS.find((s) => Object.keys(errors).some((k) => FIELD_STEP[k] === s.key))?.key;
+
 function sanitizeDraft(d: Draft, categories: Category[], buildings: Building[]): { values: Values; photos: PhotoItem[] } {
   const values = sanitizeValues(d.values, categories, buildings);
-  const fresh = Date.now() - d.savedAt < DRAFT_PHOTO_TTL_MS;
+  const fresh = Date.now() - d.savedAt < UPLOADED_PHOTO_TTL_MS;
   const photos: PhotoItem[] = fresh
     ? (d.photos ?? []).filter((p) => !p.url.startsWith("blob:")).slice(0, MAX_PHOTOS)
       .map((photo) => ({ key: photo.id, preview: photo.thumbUrl, status: "done", progress: 1, photo }))
     : [];
   return { values, photos };
-}
-
-/** Rooms whose area type the category lists first (a hint, never a filter — BR-F02-7). */
-function splitRooms(rooms: Room[], category?: Category): { matching: Room[]; others: Room[] } {
-  const areas = new Set(category?.areaTypes ?? []);
-  return { matching: rooms.filter((r) => areas.has(r.areaType)), others: rooms.filter((r) => !areas.has(r.areaType)) };
 }
 
 /** The route entry: the mode comes from the URL and a new mode mounts a fresh form (no state leaks between modes). */
@@ -170,7 +179,9 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   const [matches, setMatches] = useState<{ key: string; room: string; tickets: DuplicateTicket[] }>({ key: "", room: "", tickets: [] });
   const [duplicateDialog, setDuplicateDialog] = useState<DuplicateTicket[] | null>(null);
   const [following, setFollowing] = useState<string | null>(null);
-  const [step, setStep] = useState<StepKey>("problem");
+  const [step, setStep] = useState<StepKey>("location");
+  /** A building change (or restore) dropped a category its type does not use: note in step 2 (CR-025). */
+  const [categoryCleared, setCategoryCleared] = useState(false);
   const [attempted, setAttempted] = useState<StepKey[]>([]);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [master, setMaster] = useState<{ categories: Category[]; buildings: Building[] }>();
@@ -180,6 +191,10 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   const [revision, setRevision] = useState(0);
   const [ready, setReady] = useState(false);
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
+  /** The draft had photos that could not be restored (storage blocked or older than 24 h): `แนบรูปอีกครั้ง`. */
+  const [photosLost, setPhotosLost] = useState(false);
+  /** `กำลังส่งรูป {n}/{m}…` while the submit uploads the kept photos (CR-026 A1). */
+  const [sending, setSending] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -205,16 +220,32 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
 
   useEffect(() => {
     let active = true;
-    Promise.all([getCategories(), getBuildings()]).then(([categories, buildings]) => {
+    Promise.all([getCategories(), getBuildings()]).then(async ([categories, buildings]) => {
       if (!active) return;
-      setMaster({ categories, buildings }); setMasterError(false);
-      // Restore the local draft once per visit (design-system.md "Draft").
+      // Restore the local draft once per visit (design-system.md "Draft"); its photo files come from
+      // IndexedDB, entries older than 24 h are deleted first (CR-026 A1).
       const draft = readDraft<Draft>(storageKey);
+      let kept: { photos: PhotoItem[]; team: PhotoItem[] } | null = null;
+      if (draft?.v === 1 && draft.photoCount) {
+        await purgeExpiredDraftPhotos();
+        const stored = await readDraftPhotos(storageKey).catch(() => null);
+        if (stored) kept = { photos: (stored.groups.photos ?? []).map(keptPhoto), team: (stored.groups.team ?? []).map(keptPhoto) };
+      }
+      if (!active) { kept?.photos.concat(kept.team).forEach((p) => URL.revokeObjectURL(p.preview)); return; }
+      setMaster({ categories, buildings }); setMasterError(false);
       if (draft?.v === 1) {
         const restored = sanitizeDraft(draft, categories, buildings);
-        if (isDirty(restored.values, restored.photos)) {
-          setValues(restored.values); setPhotos(restored.photos); setRestoredAt(draft.savedAt); setStep(draftStep(draft.step));
-          setTeamPhotos(sanitizeDraft({ ...draft, photos: draft.teamPhotos ?? [] }, categories, buildings).photos);
+        const cleared = categoryNotUsed({ ...initial, ...draft.values }, categories, buildings);
+        const photos = [...restored.photos, ...(kept?.photos ?? [])].slice(0, MAX_PHOTOS);
+        const team = [...sanitizeDraft({ ...draft, photos: draft.teamPhotos ?? [] }, categories, buildings).photos, ...(kept?.team ?? [])].slice(0, MAX_PHOTOS);
+        if (isDirty(restored.values, photos) || team.length) {
+          // Open on the saved step, or earlier when an earlier step is no longer complete (CR-025 order).
+          const saved = draftStep(draft.step);
+          const open = firstOpenStep(validate(restored.values, [{ key: "x", preview: "", status: "ready", progress: 0 }]));
+          setValues(restored.values); setPhotos(photos); setRestoredAt(draft.savedAt); setCategoryCleared(cleared);
+          setStep(open && STEPS.findIndex((x) => x.key === open) < STEPS.findIndex((x) => x.key === saved) ? open : saved);
+          setTeamPhotos(team);
+          setPhotosLost((draft.photoCount ?? 0) > (kept ? kept.photos.length + kept.team.length : 0));
         }
       }
       setReady(true);
@@ -226,19 +257,27 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   // cacheComponents keeps a visited route alive (hidden) with its state. Leaving the form means the
   // report was sent or discarded (the draft is already cleared then), so start the next visit fresh.
   useEffect(() => () => {
-    setValues(initial); setPhotos([]); setStep("problem"); setAttempted([]); setServerErrors({}); setSubmitError("");
-    setMasterError(false); setReady(false); setRestoredAt(null);
+    setValues(initial); setPhotos([]); setStep("location"); setAttempted([]); setServerErrors({}); setSubmitError(""); setCategoryCleared(false);
+    setMasterError(false); setReady(false); setRestoredAt(null); setPhotosLost(false); setSending("");
     setTeamPhotos([]); setDuplicateDialog(null); setFollowing(null); setMatches({ key: "", room: "", tickets: [] });
     submitting.current = false; setBusy(false);
   }, []);
 
-  // Save the draft while typing; uploaded photos are kept by id (they live 24 h on the server).
+  // Save the draft while typing. CR-026 A1: the photo files go to IndexedDB (24 h); only uploads of a
+  // pre-A1 draft (no file) stay referenced by id.
   useEffect(() => {
     if (!ready || submitting.current) return;
-    if (!dirty) { clearDraft(storageKey); return; }
-    const done = photos.flatMap((p) => p.status === "done" && p.photo ? [p.photo] : []);
-    writeDraft(storageKey, { v: 1, savedAt: Date.now(), step, values, photos: done, teamPhotos: teamPhotos.flatMap(p => p.status === "done" && p.photo ? [p.photo] : []) } satisfies Draft);
+    if (!dirty) { clearDraft(storageKey); void clearDraftPhotos(storageKey); return; }
+    const uploadedOnly = (items: PhotoItem[]) => items.flatMap((p) => !p.file && p.photo ? [p.photo] : []);
+    const files = (items: PhotoItem[]) => items.flatMap((p) => p.file ? [p.file] : []);
+    const photoCount = files(photos).length + files(teamPhotos).length;
+    writeDraft(storageKey, { v: 1, savedAt: Date.now(), step, values, photos: uploadedOnly(photos), teamPhotos: uploadedOnly(teamPhotos), photoCount } satisfies Draft);
+    void saveDraftPhotos(storageKey, { photos: files(photos), team: files(teamPhotos) });
   }, [ready, dirty, values, photos, teamPhotos, step, storageKey]);
+  /** Sent, reset, discarded or moved on: the draft and its photos go (CR-026 A1). */
+  function dropDraft() {
+    clearDraft(storageKey); void clearDraftPhotos(storageKey);
+  }
 
   const categories = master?.categories ?? [];
   const buildings = master?.buildings ?? [];
@@ -254,9 +293,13 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   // BR-F02-2: explain the level as soon as it is known.
   const priority = category && (values.symptomIds.length || (values.symptomOtherOn && values.symptomOther.trim()))
     ? ticketPriority(category, values.symptomIds) : null;
-  const donePhotos = photos.flatMap((p) => p.status === "done" && p.photo ? [p.photo] : []);
 
-  function update(patch: Partial<Values>) {
+  function update(input: Partial<Values>) {
+    let patch = input;
+    // BR-F02-8 (CR-025): another building whose type does not use the picked category drops it.
+    if (input.buildingId !== undefined && input.buildingId !== values.buildingId && categoryNotUsed({ categoryId: values.categoryId, buildingId: input.buildingId }, categories, buildings)) {
+      patch = { ...input, ...NO_CATEGORY }; setCategoryCleared(true);
+    }
     setValues((old) => ({ ...old, ...patch }));
     setServerErrors((old) => {
       const next = { ...old };
@@ -265,6 +308,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
       if ("categoryId" in patch) { delete next.symptomIds; delete next.symptomOther; delete next.categoryOther; }
       if ("symptomIds" in patch || "symptomOtherOn" in patch) delete next.symptomIds;
       if ("buildingId" in patch) { delete next.floorId; delete next.roomId; }
+      if ("locationDetail" in patch) delete next.duplicateSpot;
       if ("floorId" in patch) delete next.roomId;
       return next;
     });
@@ -272,6 +316,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   /** Changing the category clears its symptoms and typed text; the room stays (CR-014). */
   function pickCategory(id: string) {
     if (id === values.categoryId) return;
+    setCategoryCleared(false);
     update({ categoryId: id, symptomIds: [], symptomOtherOn: false, symptomOther: "", categoryOther: "" });
   }
   function focusStep(next: StepKey, field?: string) {
@@ -297,6 +342,22 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
     if (!last) { go(STEPS[index + 1].key); return; }
 
     submitting.current = true; setBusy(true); setSubmitError(""); setServerErrors({});
+    // CR-026 A1: a blocking duplicate is found before any photo is sent (the server checks again on #5).
+    const blocking = await getDuplicates({ categoryId: values.categoryId, floorId: values.floorId, roomId: values.roomId, locationDetail: values.locationDetail })
+      .then((list) => list.filter((t) => t.blocksReport), () => []);
+    if (blocking.length) { setDuplicateDialog(blocking); submitting.current = false; setBusy(false); return; }
+    let photoIds: string[], teamPhotoIds: string[];
+    try {
+      [photoIds, teamPhotoIds] = await uploadKeptPhotos([{ items: photos, onChange: setPhotos }, { items: team ? teamPhotos : [], onChange: setTeamPhotos }],
+        (n, m) => setSending(`กำลังส่งรูป ${n}/${m}…`));
+    } catch (err: unknown) {
+      const refused = errorCode(err) === "PHOTO_TYPE_NOT_ALLOWED" || errorCode(err) === "PHOTO_TOO_LARGE";
+      const field = photos.some((p) => !p.photo) ? "photoIds" : "teamHandled.photoIds";
+      if (refused) setServerErrors({ [field]: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" });
+      go("send", field); setSubmitError("ลองอีกครั้ง ข้อมูลและรูปในฟอร์มยังอยู่ครบ"); // go() clears the banner
+      setSending(""); submitting.current = false; setBusy(false); return;
+    }
+    setSending("");
     try {
       const ticket = await createTicket({
         categoryId: values.categoryId,
@@ -308,10 +369,10 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
         roomId: values.roomId,
         ...(values.locationDetail.trim() ? { locationDetail: values.locationDetail.trim() } : {}),
         ...(values.details.trim() ? { details: values.details.trim() } : {}),
-        photoIds: donePhotos.map((p) => p.id),
-        teamHandled: team ? { note: values.teamNote.trim(), photoIds: teamPhotos.flatMap(p => p.status === "done" && p.photo ? [p.photo.id] : []) } : null,
+        photoIds,
+        teamHandled: team ? { note: values.teamNote.trim(), photoIds: teamPhotoIds } : null,
       });
-      clearDraft(storageKey);
+      dropDraft();
       // Stays busy until the route is hidden; the effect cleanup above resets the form.
       guard.finish(`/repair/new/done?id=${encodeURIComponent(ticket.id)}`);
     } catch (err: unknown) {
@@ -321,25 +382,29 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
       if (duplicateTickets !== null) {
         setDuplicateDialog(duplicateTickets); submitting.current = false; setBusy(false); return;
       }
-      if (ownId) { toast.error(errorMessage(err)); clearDraft(storageKey); guard.finish(`/repair/tickets/${encodeURIComponent(ownId)}`); return; }
+      if (ownId) { toast.error(errorMessage(err)); dropDraft(); guard.finish(`/repair/tickets/${encodeURIComponent(ownId)}`); return; }
       if (code === "TEAM_HANDLED_NOT_ALLOWED") { toast.error(errorMessage(err)); submitting.current = false; setBusy(false); return; }
       const fields = createTicketFieldErrors(err);
       setServerErrors(fields);
-      setSubmitError(code === "MASTER_DATA_CHANGED" || code === "PHOTO_NOT_FOUND" || code === "FORBIDDEN" ? errorMessage(err) : "ลองอีกครั้ง ข้อมูลในฟอร์มยังอยู่ครบ");
+      setSubmitError(code === "MASTER_DATA_CHANGED" || code === "CATEGORY_NOT_FOR_BUILDING" || code === "PHOTO_NOT_FOUND" || code === "FORBIDDEN" ? errorMessage(err) : "ลองอีกครั้ง ข้อมูลและรูปในฟอร์มยังอยู่ครบ");
       const field = Object.keys(fields)[0];
       if (field && FIELD_STEP[field]) go(FIELD_STEP[field], field);
-      if (code === "PHOTO_NOT_FOUND") { setServerErrors({ photoIds: errorMessage(err) }); go("send", "photoIds"); }
-      if (code === "MASTER_DATA_CHANGED") {
+      // The uploads of this attempt are no longer usable: the next submit sends the kept files again.
+      if (code === "PHOTO_NOT_FOUND") { setPhotos(forgetUploads); setTeamPhotos(forgetUploads); setServerErrors({ photoIds: errorMessage(err) }); go("send", "photoIds"); }
+      if (code === "MASTER_DATA_CHANGED" || code === "CATEGORY_NOT_FOR_BUILDING") {
         // Reload the master and keep what is still valid; open the first step that needs a new pick.
+        // CATEGORY_NOT_FOR_BUILDING (CR-025): the category always goes, even if the reloaded master still lists it.
         setMasterReloading(true);
         try {
           const [cats, blds] = await Promise.all([getCategories(), getBuildings()]);
           setMaster({ categories: cats, buildings: blds });
-          const next = sanitizeValues(values, cats, blds);
+          let next = sanitizeValues(values, cats, blds);
+          if (code === "CATEGORY_NOT_FOR_BUILDING") { next = { ...next, ...NO_CATEGORY }; setCategoryCleared(true); }
           setValues(next);
           setAttempted(STEPS.map((s) => s.key));
-          const bad = Object.keys(validate(next, photos)).find((k) => FIELD_STEP[k] !== "send");
-          go(bad ? FIELD_STEP[bad] : "problem", bad);
+          const errors = validate(next, photos);
+          const open = firstOpenStep(errors) ?? "problem";
+          go(open, Object.keys(errors).find((k) => FIELD_STEP[k] === open));
         } catch { setMasterError(true); }
         finally { setMasterReloading(false); }
       }
@@ -347,28 +412,35 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
     }
   }
   function resetForm() {
-    clearDraft(storageKey);
-    setValues(initial); setPhotos([]); setStep("problem"); setAttempted([]); setServerErrors({}); setSubmitError("");
-    setRestoredAt(null); setResetOpen(false);
+    dropDraft();
+    setValues(initial); setPhotos([]); setStep("location"); setAttempted([]); setServerErrors({}); setSubmitError(""); setCategoryCleared(false);
+    setRestoredAt(null); setPhotosLost(false); setResetOpen(false);
     setTeamPhotos([]); setDuplicateDialog(null);
-    focusStep("problem");
+    focusStep("location");
   }
 
   async function follow(ticket: DuplicateTicket) {
     if (submitting.current) return;
-    if (photos.some(p => p.status !== "done")) {
-      toast.error(photos.some(p => p.status === "uploading") ? "รอให้รูปอัปโหลดเสร็จก่อน" : "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น"); return;
-    }
+    const wait = photoBlocker(photos);
+    if (wait) { toast.error(wait); return; }
     submitting.current = true; setFollowing(ticket.id);
+    let photoIds: string[];
     try {
-      const result = await followTicket(ticket.id, { note: values.details.trim() || undefined, photoIds: donePhotos.map(p => p.id) });
+      // CR-026 A1: the photos of the form go up only now (#3), then #23 attaches them.
+      [photoIds] = await uploadKeptPhotos([{ items: photos, onChange: setPhotos }]);
+    } catch {
+      toast.error("ส่งไม่สำเร็จ ลองอีกครั้ง"); submitting.current = false; setFollowing(null); return;
+    }
+    try {
+      const result = await followTicket(ticket.id, { note: values.details.trim() || undefined, photoIds });
       toast.success(`คุณติดตามเคส ${result.ticketNo} แล้ว`);
-      clearDraft(storageKey); guard.finish(`/repair/tickets/${encodeURIComponent(result.id)}`);
+      dropDraft(); guard.finish(`/repair/tickets/${encodeURIComponent(result.id)}`);
     } catch (err) {
       const code = errorCode(err);
       if (code === "ALREADY_FOLLOWING") {
-        toast.error(errorMessage(err)); clearDraft(storageKey); guard.finish(`/repair/tickets/${encodeURIComponent(ticket.id)}`); return;
+        toast.error(errorMessage(err)); dropDraft(); guard.finish(`/repair/tickets/${encodeURIComponent(ticket.id)}`); return;
       }
+      if (code === "PHOTO_NOT_FOUND") setPhotos(forgetUploads);
       if (code === "TICKET_CLOSED") {
         toast.error(errorMessage(err, { ticketClosed: "follow" }));
         setMatches(old => ({ ...old, tickets: old.tickets.filter(t => t.id !== ticket.id) }));
@@ -380,6 +452,17 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   const duplicateProps = { category: category?.name ?? "", busyId: following, disabled: busy, onFollow: follow,
     onVisit: (ticket: DuplicateTicket) => guard.leave(`/repair/tickets/${encodeURIComponent(ticket.id)}`) };
   const duplicateCard = duplicates.length > 0 ? <DuplicateCard {...duplicateProps} tickets={duplicates} /> : null;
+  // Step 2 (S04 CR-025): the card carries the extra spot, bound to the same value as step 1.
+  const blockingCard = duplicates.some((t) => t.blocksReport);
+  const problemCard = duplicates.length > 0 ? <DuplicateCard {...duplicateProps} tickets={duplicates}>
+    <div data-field="duplicateSpot" className="border-t border-primary/15 pt-3.5">
+      <Label htmlFor="duplicateSpot" required={blockingCard} help={blockingCard ? "จำเป็นเมื่อพบงานที่ตรงกัน" : undefined} optional={!blockingCard}>บอกจุดเพิ่มเติม</Label>
+      <Input id="duplicateSpot" value={values.locationDetail} maxLength={MAX_LOCATION} onChange={(e) => update({ locationDetail: e.target.value })} placeholder="เช่น ฝั่งหน้าต่าง เครื่องที่ 2"
+        aria-invalid={!!(shown.duplicateSpot || shown.locationDetail)} aria-describedby="duplicateSpot-error" className="h-11 rounded-sm bg-card px-3.5 text-base" />
+      <FieldError id="duplicateSpot-error" message={shown.duplicateSpot ?? shown.locationDetail} />
+    </div>
+  </DuplicateCard> : null;
+  const visibleCategories = building ? categories.filter((c) => categoryUsedIn(c, building)) : categories;
   const teamFields = canTeam ? <section hidden={!team} aria-label="งานที่ทีมทำ" className="space-y-4 rounded-lg border bg-muted/30 p-4">
     <div data-field="teamHandled.note">
       <Label htmlFor="team-note" required>สิ่งที่ทีมทำ</Label>
@@ -417,7 +500,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
       {dirty && master && <Button type="button" variant="link" className="h-9 px-0 max-sm:basis-full max-sm:justify-start" disabled={busy || following !== null} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}
     </div>
   </header>;
-  const discard = <AlertDialog open={guard.open} onOpenChange={guard.setOpen}><AlertDialogContent className="top-auto bottom-0 w-full max-w-none translate-y-0 rounded-b-none rounded-t-xl lg:top-1/2 lg:bottom-auto lg:max-w-lg lg:-translate-y-1/2 lg:rounded-xl"><AlertDialogHeader><AlertDialogTitle>ทิ้งข้อมูลที่กรอกไว้?</AlertDialogTitle><AlertDialogDescription>ข้อมูลและรูปที่แนบในหน้านี้จะหายไป</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>กรอกต่อ</AlertDialogCancel><Button variant="destructive" onClick={() => { clearDraft(storageKey); guard.discard(); }}>ทิ้งข้อมูล</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>;
+  const discard = <AlertDialog open={guard.open} onOpenChange={guard.setOpen}><AlertDialogContent className="top-auto bottom-0 w-full max-w-none translate-y-0 rounded-b-none rounded-t-xl lg:top-1/2 lg:bottom-auto lg:max-w-lg lg:-translate-y-1/2 lg:rounded-xl"><AlertDialogHeader><AlertDialogTitle>ทิ้งข้อมูลที่กรอกไว้?</AlertDialogTitle><AlertDialogDescription>ข้อมูลและรูปที่แนบในหน้านี้จะหายไป</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>กรอกต่อ</AlertDialogCancel><Button variant="destructive" onClick={() => { dropDraft(); guard.discard(); }}>ทิ้งข้อมูล</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 
   if (masterError && !master) return <>{header}<ErrorState onRetry={() => { setMasterError(false); setRevision((r) => r + 1); }} />{discard}</>;
   if (!master) return <>{header}<FormSkeleton /></>;
@@ -445,7 +528,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
       <div className="min-w-0">
       {restoredAt && <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/15 bg-secondary px-4 py-3 text-sm text-secondary-foreground" role="status">
         <RotateCcw className="size-4.5 shrink-0" aria-hidden />
-        <p className="min-w-0 flex-1"><b className="font-semibold">กู้ข้อมูลที่กรอกค้างไว้เมื่อ {timeOf(new Date(restoredAt).toISOString())} น. แล้ว</b><span className="block text-xs">เผื่อหน้ารีเฟรชตอนสลับไปเปิดกล้องหรือแอปอื่น</span></p>
+        <p className="min-w-0 flex-1"><b className="font-semibold">กู้ข้อมูลที่กรอกค้างไว้เมื่อ {timeOf(new Date(restoredAt).toISOString())} น. แล้ว</b><span className="block text-xs">{photosLost ? "รูปที่เลือกไว้กู้คืนไม่ได้ แนบรูปอีกครั้ง" : "เผื่อหน้ารีเฟรชตอนสลับไปเปิดกล้องหรือแอปอื่น"}</span></p>
         <Button type="button" variant="link" className="h-9 shrink-0 px-0" onClick={resetForm}>เริ่มใหม่</Button>
       </div>}
 
@@ -472,16 +555,21 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
 
         <fieldset disabled={busy || following !== null || masterReloading} data-testid="report-body"
           className="grid min-w-0 rounded-xl border bg-card p-4 shadow-card disabled:opacity-70 sm:p-6 lg:rounded-none lg:border-0 lg:px-6 lg:py-5 lg:shadow-none">
-          {panel("problem", <>
-            {stepHeading("problem", "ปัญหาที่พบ", "เลือก 1 หมวด แล้วเลือกอาการที่เห็น")}
-            <ProblemStep values={values} categories={categories} category={category} errors={shown}
-              priority={priority && { level: priority.priority, reason: priorityReason({ source: priority.source, symptom: priority.symptom, categoryName: category?.name }) }}
-              onPickCategory={pickCategory} onChange={update} />
-          </>)}
           {panel("location", <>
             {stepHeading("location", "ปัญหาเกิดขึ้นที่ไหน", "เลือกอาคาร ชั้น และห้อง", <RecentPlaces recent={recent} buildings={buildings} onPick={update} />)}
-            <LocationStep values={values} buildings={buildings} building={building} floor={floor} category={category} errors={shown} onChange={update}
-              duplicateCard={duplicateCard} spotRequired={blocked} />
+            <LocationStep values={values} buildings={buildings} building={building} floor={floor} errors={shown} onChange={update} />
+          </>)}
+          {panel("problem", <>
+            {stepHeading("problem", "ปัญหาที่พบ", "เลือก 1 หมวด แล้วเลือกอาการที่เห็น")}
+            <div className="space-y-4">
+              <PlaceLine building={building} floor={floor} room={room} onChange={() => go("location")} />
+              {categoryCleared && !values.categoryId && <p role="status" className="flex items-start gap-2 rounded-lg border border-primary/15 bg-secondary px-3.5 py-2.5 text-sm text-secondary-foreground">
+                <Info className="mt-0.5 size-4 shrink-0" aria-hidden />{CATEGORY_CLEARED}</p>}
+              <ProblemStep values={values} categories={visibleCategories} category={category} errors={shown}
+                priority={priority && { level: priority.priority, reason: priorityReason({ source: priority.source, symptom: priority.symptom, categoryName: category?.name }) }}
+                onPickCategory={pickCategory} onChange={update} />
+              {problemCard}
+            </div>
           </>)}
           {panel("send", <>
             {stepHeading("send", "รูปภาพและตรวจสอบก่อนส่ง", "แนบรูปอย่างน้อย 1 รูป เล่าเพิ่มได้ถ้าต้องการ แล้วตรวจข้อมูลก่อนกดส่ง")}
@@ -497,7 +585,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
           <span className="flex-1 text-center text-xs text-muted-foreground lg:text-[13px]">ขั้นตอน {index + 1} จาก {STEPS.length}</span>
           <Button type="submit" className="h-11 sm:min-w-45" disabled={busy || following !== null || masterReloading}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
-            {last ? team ? "ยืนยันบันทึกงานทีม" : "ยืนยันส่งแจ้งซ่อม" : "ถัดไป"}
+            {sending || (last ? team ? "ยืนยันบันทึกงานทีม" : "ยืนยันส่งแจ้งซ่อม" : "ถัดไป")}
             {!busy && (last ? <Send aria-hidden /> : <ChevronRight aria-hidden />)}
           </Button>
         </div>
@@ -507,7 +595,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
       </p>}
       </div>
       <Summary category={category} values={values} priority={priority} building={building} floor={floor} room={room} me={me} team={team}
-        mode={canTeam} duplicateCard={step === "location" ? null : duplicateCard} onEdit={(key) => go(key)} />
+        mode={canTeam} duplicateCard={step === "send" ? duplicateCard : null} onEdit={(key) => go(key)} />
       <div className="h-4 lg:hidden" aria-hidden />
     </form>
     <AlertDialog open={resetOpen} onOpenChange={setResetOpen}><AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>ล้างข้อมูลในแบบฟอร์ม?</AlertDialogTitle><AlertDialogDescription>ข้อมูลที่กรอกและรูปที่เลือกจะถูกล้าง</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>เก็บไว้ก่อน</AlertDialogCancel><Button onClick={resetForm}>ล้างแบบฟอร์ม</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>
@@ -554,6 +642,16 @@ const choiceCard = (on: boolean, invalid?: boolean) => cn(
   "flex cursor-pointer items-center gap-2.5 rounded-lg border bg-card px-3 text-sm leading-5 outline-none focus-within:ring-2 focus-within:ring-ring",
   on ? "border-primary bg-secondary font-semibold ring-1 ring-primary" : invalid ? "border-destructive" : "hover:border-primary/40",
 );
+
+/** Step 2 (CR-025): where the problem is, with เปลี่ยน back to step 1. */
+function PlaceLine({ building, floor, room, onChange }: { building?: Building; floor?: Floor; room?: Room; onChange: () => void }) {
+  if (!building || !floor || !room) return null;
+  return <div data-testid="place-line" className="flex min-h-11 items-center gap-2.5 rounded-lg bg-muted px-3.5 py-2 text-sm">
+    <MapPin className="size-4 shrink-0 text-primary" aria-hidden />
+    <p className="min-w-0 flex-1"><span className="text-muted-foreground">สถานที่:</span> <b className="font-semibold">{[building.name, floorLabel(floor.name), room.name].filter((x, i, all) => all.indexOf(x) === i).join(" · ")}</b></p>
+    <Button type="button" variant="link" className="h-8 shrink-0 px-0" onClick={onChange} aria-label="เปลี่ยนสถานที่">เปลี่ยน</Button>
+  </div>;
+}
 
 function ProblemStep({ values, categories, category, errors, priority, onPickCategory, onChange }: {
   values: Values; categories: Category[]; category?: Category; errors: Record<string, string>;
@@ -634,9 +732,9 @@ function RecentPlaces({ recent, buildings, onPick }: { recent: RecentPlace[]; bu
   </Popover>;
 }
 
-function LocationStep({ values, buildings, building, floor, category, errors, onChange, duplicateCard, spotRequired }: {
-  values: Values; buildings: Building[]; building?: Building; floor?: Floor; category?: Category; errors: Record<string, string>;
-  onChange: (patch: Partial<Values>) => void; duplicateCard: ReactNode; spotRequired: boolean;
+function LocationStep({ values, buildings, building, floor, errors, onChange }: {
+  values: Values; buildings: Building[]; building?: Building; floor?: Floor; errors: Record<string, string>;
+  onChange: (patch: Partial<Values>) => void;
 }) {
   return <div className="space-y-4">
     <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
@@ -676,44 +774,33 @@ function LocationStep({ values, buildings, building, floor, category, errors, on
     <div data-field="roomId">
       <Label id="room-label" required>ห้องหรือจุดที่เกิด</Label>
       <div>
-        {floor ? <RoomChoice rooms={floor.rooms} category={category} value={values.roomId} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />
+        {floor ? <RoomChoice rooms={floor.rooms} value={values.roomId} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />
           : <p className="grid min-h-23 place-items-center rounded-sm border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground">เลือกอาคารและชั้น แล้วเลือกห้องหรือจุดที่เกิดได้ที่นี่</p>}
         <FieldError id="roomId-error" message={errors.roomId} />
       </div>
     </div>
 
-    {duplicateCard}
-
     <div data-field="locationDetail">
-      <Label htmlFor="locationDetail" required={spotRequired} help={spotRequired ? "จำเป็นเมื่อพบงานที่ตรงกัน" : undefined} optional={!spotRequired}>บอกจุดเพิ่มเติม</Label>
+      <Label htmlFor="locationDetail" optional>บอกจุดเพิ่มเติม</Label>
       <Input id="locationDetail" value={values.locationDetail} maxLength={MAX_LOCATION} onChange={(e) => onChange({ locationDetail: e.target.value })} placeholder="เช่น ฝั่งหน้าต่าง เครื่องที่ 2" aria-invalid={!!errors.locationDetail} aria-describedby="locationDetail-error" className="h-11 rounded-sm bg-card px-3.5 text-base" />
       <FieldError id="locationDetail-error" message={errors.locationDetail} />
     </div>
   </div>;
 }
 
-/** Room cards on every floor (CR-022: no picker for big floors) — matching the category first, then the rest. */
-function RoomChoice({ rooms, category, value, invalid, onPick }: {
-  rooms: Room[]; category?: Category; value: string; invalid: boolean; onPick: (id: string) => void;
+/** Room cards on every floor (CR-022: no picker for big floors), in their normal order (CR-025: the area-type hint is retired). */
+function RoomChoice({ rooms, value, invalid, onPick }: {
+  rooms: Room[]; value: string; invalid: boolean; onPick: (id: string) => void;
 }) {
-  const { matching, others } = splitRooms(rooms, category);
-  const card = (r: Room, caption: boolean) => {
+  const card = (r: Room) => {
     const on = value === r.id;
     return <label key={r.id} className={cn(choiceCard(on, invalid), "min-h-11 rounded-sm py-1.5")}>
       <input type="radio" name="room" value={r.id} checked={on} onChange={() => onPick(r.id)} className="sr-only" />
       <DoorOpen className={cn("size-4 shrink-0", on ? "text-primary" : "text-muted-foreground")} aria-hidden />
       <span className="min-w-0 flex-1">{r.name}</span>
-      {caption && <small className="shrink-0 text-xs font-normal text-muted-foreground">{AREA_LABELS[r.areaType]}</small>}
     </label>;
   };
-  const grid = "grid gap-2 sm:grid-cols-2 lg:grid-cols-3";
-  if (!matching.length || !others.length) {
-    return <div role="radiogroup" aria-labelledby="room-label" aria-describedby="roomId-error" className={grid}>{rooms.map((r) => card(r, matching.length > 0))}</div>;
-  }
-  return <div role="radiogroup" aria-labelledby="room-label" aria-describedby="roomId-error" className="space-y-2.5">
-    <div><p className="mb-1.5 text-xs text-muted-foreground">ห้องที่ตรงกับปัญหา ({category!.name})</p><div className={grid}>{matching.map((r) => card(r, true))}</div></div>
-    <div><p className="mb-1.5 text-xs text-muted-foreground">ห้องอื่นบนชั้นนี้</p><div className={grid}>{others.map((r) => card(r, false))}</div></div>
-  </div>;
+  return <div role="radiogroup" aria-labelledby="room-label" aria-describedby="roomId-error" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{rooms.map(card)}</div>;
 }
 
 function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails, summary, teamFields, team }: {
@@ -722,11 +809,9 @@ function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails
 }) {
   const gallery = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
-  const uploads = usePhotoUploads(photos, onPhotosChange, disabled);
+  const uploads = usePhotoList(photos, onPhotosChange, disabled);
   const [drag, setDrag] = useState(false);
   const [opened, setOpened] = useState<string | null>(null);
-  const done = photos.filter((p) => p.status === "done" && p.photo);
-  const lightboxIndex = done.findIndex((p) => p.key === opened);
   const error = errors.photoIds;
   return <div className="grid items-start gap-5 lg:grid-cols-2">
     <div className="min-w-0" data-field="photoIds">
@@ -754,7 +839,7 @@ function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails
         <p>มุมใกล้: ให้เห็นอาการ · มุมกว้าง: ให้เห็นตำแหน่ง</p>
         <p>แนบอย่างน้อย 1 รูป สูงสุด 5 รูป</p>
       </div>
-      <PhotoLightbox photos={done.map((p) => p.photo!)} index={lightboxIndex < 0 ? null : lightboxIndex} onIndexChange={(i) => setOpened(i === null ? null : done[i].key)} />
+      <PhotoListLightbox items={photos} opened={opened} onOpened={setOpened} />
     </div>
 
     <div className="min-w-0 space-y-4">
@@ -772,7 +857,7 @@ function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails
   </div>;
 }
 
-/** ตรวจสอบก่อนส่ง: ปัญหา · ความเร่งด่วน · สถานที่, each with แก้ไข back to its step (photos are not repeated). */
+/** ตรวจสอบก่อนส่ง: สถานที่ · ปัญหา · ความเร่งด่วน (CR-025 order), each with แก้ไข back to its step (photos are not repeated). */
 function ReviewList({ category, values, priority, building, floor, room, onEdit, team }: {
   category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room; onEdit: (step: StepKey) => void; team: boolean;
 }) {
@@ -788,9 +873,9 @@ function ReviewList({ category, values, priority, building, floor, room, onEdit,
     {step ? <Button type="button" variant="link" className="h-6 px-0 text-sm" onClick={() => onEdit(step)} aria-label={`แก้ไข${label}`}>แก้ไข</Button> : <span />}
   </div>;
   return <dl className="overflow-hidden rounded-lg border bg-card">
+    {row("สถานที่", building && floor ? <>{building.name} · {floorLabel(floor.name)}<span className="block">{room ? <b className="font-semibold">{room.name}</b> : dash}{values.locationDetail.trim() && <span className="text-muted-foreground"> · {values.locationDetail.trim()}</span>}</span></> : dash, "location")}
     {row("ปัญหา", category ? <><b className="font-semibold">{categoryLabel}</b>{symptoms.length > 0 && <span className="block">{symptoms.join(" · ")}</span>}</> : dash, "problem")}
     {row("ความเร่งด่วน", priority ? <span className="flex flex-wrap items-center gap-1.5"><PriorityBadge priority={priority.priority} /><span className="text-muted-foreground">{priority.source === "symptom" ? "จากอาการ" : "ระดับเริ่มต้นของหมวด"}</span></span> : dash)}
-    {row("สถานที่", building && floor ? <>{building.name} · {floorLabel(floor.name)}<span className="block">{room ? <b className="font-semibold">{room.name}</b> : dash}{values.locationDetail.trim() && <span className="text-muted-foreground"> · {values.locationDetail.trim()}</span>}</span></> : dash, "location")}
     {team && row("งานที่ทีมทำ", values.teamNote.trim() || <span className="text-muted-foreground">ยังไม่ได้กรอก</span>, "send")}
   </dl>;
 }
@@ -826,12 +911,12 @@ function Summary({ category, values, priority, building, floor, room, me, onEdit
       </p>}
       <dl>
         {team && row("งานที่ทีมทำ", <span aria-hidden className={soft}><CircleCheck className="size-4" /></span>, values.teamNote.trim() || "ยังไม่ได้กรอก", "send")}
+        {row("สถานที่", <span aria-hidden className={soft}><MapPin className="size-4.5" /></span>,
+          building && floor ? <><b className="font-semibold">{building.name} · {floorLabel(floor.name)}</b><span className="block text-muted-foreground">{room ? room.name : "ยังไม่ได้เลือกห้อง"}{values.locationDetail.trim() && ` · ${values.locationDetail.trim()}`}</span></> : dash, "location")}
         {row("ปัญหาที่พบ", <CategoryTile icon={category?.icon} />,
           category ? <><b className="font-semibold">{categoryLabel}</b>{symptoms.length > 0 && <span className="block text-muted-foreground">{symptoms.join(" · ")}</span>}</> : dash, "problem")}
         {priority && row("ความเร่งด่วน", <span aria-hidden className={soft}><AlertCircle className="size-4.5" /></span>,
           <span className="flex flex-wrap items-center gap-1.5"><PriorityBadge priority={priority.priority} /><span className="text-muted-foreground">{priority.source === "symptom" ? "จากอาการ" : "ระดับเริ่มต้นของหมวด"}</span></span>)}
-        {row("สถานที่", <span aria-hidden className={soft}><MapPin className="size-4.5" /></span>,
-          building && floor ? <><b className="font-semibold">{building.name} · {floorLabel(floor.name)}</b><span className="block text-muted-foreground">{room ? room.name : "ยังไม่ได้เลือกห้อง"}{values.locationDetail.trim() && ` · ${values.locationDetail.trim()}`}</span></> : dash, "location")}
         {row("ผู้แจ้ง", <span aria-hidden className={cn(soft, "rounded-full text-xs font-semibold")}>{initials(me.name)}</span>,
           <><b className="font-semibold">{me.name}</b>{me.department && <span className="block text-muted-foreground">{me.department}</span>}</>)}
       </dl>

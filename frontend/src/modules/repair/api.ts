@@ -68,11 +68,11 @@ import type {
 
 const BASE = "/repair";
 
-/** D-022: limit per uploaded file and the client resize target. */
+/** D-022: limit per uploaded file and the client resize target; JPEG quality 0.25 since CR-026 (D-119). */
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export const MAX_PHOTOS = 5;
 const RESIZE_LONG_EDGE = 1920;
-const RESIZE_QUALITY = 0.85;
+const RESIZE_QUALITY = 0.25;
 
 // ---- #1, #2 master data ----
 
@@ -97,21 +97,27 @@ export async function getRecentPlaces(): Promise<RecentPlace[]> {
 // ---- #3 photo upload ----
 
 /**
- * Uploads one photo (PhotoPicker). Resizes to a 1920px JPEG first (D-022; also drops EXIF/GPS);
- * files the browser cannot decode (e.g. HEIC outside Safari) are sent as they are.
- * Rejects with ApiError `PHOTO_TYPE_NOT_ALLOWED` / `PHOTO_TOO_LARGE` before sending when it can tell.
+ * Prepares a picked photo for the form (PhotoPicker, CR-026 A1): resizes it to a 1920px JPEG at quality 0.25
+ * (D-022 / D-119; also drops EXIF/GPS). Files the browser cannot decode (e.g. HEIC outside Safari) stay as
+ * they are. Nothing is sent. Rejects with ApiError `PHOTO_TYPE_NOT_ALLOWED` / `PHOTO_TOO_LARGE`.
  */
-export async function uploadPhoto(file: File, opts: UploadOptions = {}): Promise<Photo> {
+export async function preparePhoto(file: File): Promise<File> {
   if (!file.type.startsWith("image/") && !/\.(heic|heif)$/i.test(file.name)) {
     throw new ApiError(400, "PHOTO_TYPE_NOT_ALLOWED", "not an image");
   }
   const blob = await resizeForUpload(file);
   if (blob.size > MAX_PHOTO_BYTES) throw new ApiError(400, "PHOTO_TOO_LARGE", "photo over 10 MB");
+  return blob === file ? file : new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg", lastModified: file.lastModified });
+}
 
-  if (env.useMocks) return mockUpload(blob, opts);
-
+/**
+ * #3: uploads one prepared photo (`preparePhoto`). Called only when the user sends a form (CR-026 A1), right
+ * before the action that attaches the ids; see `uploadKeptPhotos` in components/photo-picker.tsx.
+ */
+export async function uploadPhoto(file: File, opts: UploadOptions = {}): Promise<Photo> {
+  if (env.useMocks) return mockUpload(file, opts);
   const form = new FormData();
-  form.append("file", blob, blob === file ? file.name : file.name.replace(/\.[^.]+$/, "") + ".jpg");
+  form.append("file", file, file.name);
   return http.upload<Photo>(`${BASE}/photos`, form, opts);
 }
 

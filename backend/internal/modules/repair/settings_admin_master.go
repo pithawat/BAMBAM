@@ -37,7 +37,6 @@ var CategoryIcons = []string{"wrench", "snowflake", "lightbulb", "zap", "plug", 
 
 var (
 	priorities = []string{"critical", "high", "medium", "low"}
-	areaTypes  = []string{"meeting_room", "restroom", "office", "pantry", "common_area", "parking", "other"}
 )
 
 const (
@@ -59,7 +58,7 @@ type CategoryAdmin struct {
 	SortOrder          int32
 	DefaultPriority    string
 	IsOther            bool
-	AreaTypes          []string
+	BuildingTypeIDs    []uuid.UUID // CR-025; settings Stage 4P lets the admin edit them
 	SymptomCount       int64
 	ActiveSymptomCount int64
 	MasterMeta
@@ -86,7 +85,6 @@ type ContractorTypeAdmin struct {
 // CategoryInput is #33 (Name, Icon, DefaultPriority required) and #34 (nil = unchanged; UpdatedAt required).
 type CategoryInput struct {
 	Name, Icon, DefaultPriority *string
-	AreaTypes                   *[]string
 	IsActive                    *bool
 	UpdatedAt                   time.Time
 }
@@ -191,24 +189,24 @@ func personOf(id *uuid.UUID, code, fTH, lTH, fEN, lEN, dept *string) *people.Ref
 
 // ---- categories (#32–#36) ----
 
-// Categories implements #32: every category (active and inactive) in order, with area types and symptom counts.
+// Categories implements #32: every category (active and inactive) in order, with building types and symptom counts.
 func (a *SettingsAdmin) Categories(ctx context.Context) ([]CategoryAdmin, error) {
 	rows, err := a.q.AdminListCategories(ctx)
 	if err != nil {
 		return nil, err
 	}
-	areas, err := a.q.ListCategoryAreaTypes(ctx)
+	types, err := a.q.ListCategoryBuildingTypes(ctx)
 	if err != nil {
 		return nil, err
 	}
-	by := map[uuid.UUID][]string{}
-	for _, x := range areas {
-		by[x.CategoryID] = append(by[x.CategoryID], x.AreaType)
+	by := map[uuid.UUID][]uuid.UUID{}
+	for _, x := range types {
+		by[x.CategoryID] = append(by[x.CategoryID], x.BuildingTypeID)
 	}
 	out := make([]CategoryAdmin, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, CategoryAdmin{ID: r.ID, Name: r.Name, Icon: r.Icon, SortOrder: r.SortOrder, DefaultPriority: r.DefaultPriority, IsOther: r.IsOther,
-			AreaTypes: nonNil(by[r.ID]), SymptomCount: r.SymptomCount, ActiveSymptomCount: r.ActiveSymptomCount,
+			BuildingTypeIDs: nonNil(by[r.ID]), SymptomCount: r.SymptomCount, ActiveSymptomCount: r.ActiveSymptomCount,
 			MasterMeta: MasterMeta{IsActive: r.IsActive, InUse: r.InUse, UpdatedAt: r.UpdatedAt,
 				UpdatedBy: personOf(r.UpdatedByUserID, r.UpdatedByEmployeeCode, r.UpdatedByFirstNameTh, r.UpdatedByLastNameTh, r.UpdatedByFirstNameEn, r.UpdatedByLastNameEn, r.UpdatedByDepartment)}})
 	}
@@ -235,26 +233,7 @@ func validateCategory(in *CategoryInput, create bool) map[string]string {
 	}
 	oneOf(fields, "icon", in.Icon, CategoryIcons, create)
 	oneOf(fields, "defaultPriority", in.DefaultPriority, priorities, create)
-	if in.AreaTypes != nil {
-		for _, t := range *in.AreaTypes {
-			if !slices.Contains(areaTypes, t) {
-				fields["areaTypes"] = "INVALID"
-			}
-		}
-	}
 	return fields
-}
-
-func (a *SettingsAdmin) setAreaTypes(ctx context.Context, q *repairdb.Queries, id uuid.UUID, list []string) error {
-	if err := q.AdminClearCategoryAreaTypes(ctx, id); err != nil {
-		return err
-	}
-	for _, t := range list {
-		if err := q.AdminInsertCategoryAreaType(ctx, repairdb.AdminInsertCategoryAreaTypeParams{CategoryID: id, AreaType: t}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // CreateCategory implements #33: name unique (case-insensitive), icon from the 12, default priority required; goes last.
@@ -270,10 +249,9 @@ func (a *SettingsAdmin) CreateCategory(ctx context.Context, actor uuid.UUID, in 
 		if err := q.AdminInsertCategory(ctx, repairdb.AdminInsertCategoryParams{ID: id, Name: *in.Name, Icon: *in.Icon, DefaultPriority: *in.DefaultPriority, ActorID: &actor}); err != nil {
 			return err
 		}
-		if in.AreaTypes != nil {
-			if err := a.setAreaTypes(ctx, q, id, *in.AreaTypes); err != nil {
-				return err
-			}
+		// CR-025: visible in every building type until settings Stage 4P adds the pick.
+		if err := q.AdminInsertCategoryAllBuildingTypes(ctx, id); err != nil {
+			return err
 		}
 		return audit.Write(ctx, tx, masterAudit(actor, "create", "category", id, *in.Name, nil, nil))
 	})
@@ -321,21 +299,6 @@ func (a *SettingsAdmin) UpdateCategory(ctx context.Context, actor, id uuid.UUID,
 		changes = diff(changes, "name", cur.Name, next.Name)
 		changes = diff(changes, "icon", cur.Icon, next.Icon)
 		changes = diff(changes, "defaultPriority", cur.DefaultPriority, next.DefaultPriority)
-		if in.AreaTypes != nil {
-			before, err := q.AdminCategoryAreaTypes(ctx, id)
-			if err != nil {
-				return err
-			}
-			after := slices.Clone(*in.AreaTypes)
-			slices.Sort(after)
-			after = slices.Compact(after)
-			if !slices.Equal(before, after) {
-				if err := a.setAreaTypes(ctx, q, id, after); err != nil {
-					return err
-				}
-				changes = diff(changes, "areaTypes", strings.Join(before, ", "), strings.Join(after, ", "))
-			}
-		}
 		action := editAction(changes, cur.IsActive, next.IsActive)
 		if action == "" {
 			return nil
@@ -365,7 +328,7 @@ func (a *SettingsAdmin) DeleteCategory(ctx context.Context, actor, id uuid.UUID)
 		if cur.InUse || used || cur.IsOther {
 			return ErrMasterInUse
 		}
-		for _, step := range []func(context.Context, uuid.UUID) error{q.AdminDeleteCategoryChildren, q.AdminClearCategoryAreaTypes, q.AdminDeleteCategoryLinks, q.AdminDeleteCategory} {
+		for _, step := range []func(context.Context, uuid.UUID) error{q.AdminDeleteCategoryChildren, q.AdminClearCategoryBuildingTypes, q.AdminDeleteCategoryLinks, q.AdminDeleteCategory} {
 			if err := step(ctx, id); err != nil {
 				return err
 			}

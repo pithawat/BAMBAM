@@ -71,6 +71,8 @@ type TxRepository interface {
 	ActiveSymptomPriorities(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error)
 	ActiveFloorInBuilding(ctx context.Context, floorID, buildingID uuid.UUID) (bool, error)
 	ActiveRoomOnFloor(ctx context.Context, roomID, floorID uuid.UUID) (bool, error)
+	// CategoryUsedInBuilding: the category is used in the building's type (CR-025, BR-F02-8).
+	CategoryUsedInBuilding(ctx context.Context, categoryID, buildingID uuid.UUID) (bool, error)
 	LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error)
 	TicketNumberFormat(ctx context.Context) (TicketNumberFormat, error)
 	NextTicketCounter(ctx context.Context, year int) (int64, error)
@@ -299,6 +301,14 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 			return err
 		} else if !ok {
 			return ErrMasterDataChanged
+		}
+		// BR-F02-8 (CR-025): only categories used in the building's type; "อื่น ๆ" is used everywhere.
+		if !cat.IsOther {
+			if ok, err := tx.CategoryUsedInBuilding(ctx, t.CategoryID, t.BuildingID); err != nil {
+				return err
+			} else if !ok {
+				return ErrCategoryNotForBuilding
+			}
 		}
 		k := DuplicateKey{CategoryID: t.CategoryID, FloorID: t.FloorID, RoomID: t.RoomID, Spot: normalizeSpot(in.LocationDetail)}
 		if err := checkDuplicates(ctx, tx, v, k); err != nil {

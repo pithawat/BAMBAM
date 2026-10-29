@@ -32,20 +32,20 @@ UPDATE repair.categories SET name = @name, icon = @icon, default_priority = @def
     updated_by_id = @actor_id, updated_at = now()
 WHERE id = @id;
 
--- name: AdminCategoryAreaTypes :many
-SELECT area_type FROM repair.category_area_types WHERE category_id = @category_id ORDER BY area_type;
+-- name: AdminInsertCategoryAllBuildingTypes :exec
+-- CR-025: until settings Stage 4P lets the admin pick them, a new category is used in every active building type.
+INSERT INTO repair.category_building_types (category_id, building_type_id)
+SELECT @category_id, id FROM platform.building_types WHERE is_active
+ON CONFLICT DO NOTHING;
 
--- name: AdminClearCategoryAreaTypes :exec
-DELETE FROM repair.category_area_types WHERE category_id = @category_id;
-
--- name: AdminInsertCategoryAreaType :exec
-INSERT INTO repair.category_area_types (category_id, area_type) VALUES (@category_id, @area_type) ON CONFLICT DO NOTHING;
+-- name: AdminClearCategoryBuildingTypes :exec
+DELETE FROM repair.category_building_types WHERE category_id = @category_id;
 
 -- name: AdminCategoryHasUsedSymptom :one
 SELECT EXISTS (SELECT 1 FROM repair.ticket_symptoms ts JOIN repair.symptoms s ON s.id = ts.symptom_id WHERE s.category_id = @category_id)::boolean;
 
 -- name: AdminDeleteCategoryChildren :exec
--- Before deleting a category: its (unused) symptoms, area types and asset-type links go with it.
+-- Before deleting a category: its (unused) symptoms, building types and asset-type links go with it.
 DELETE FROM repair.symptoms WHERE category_id = @category_id;
 
 -- name: AdminDeleteCategoryLinks :exec

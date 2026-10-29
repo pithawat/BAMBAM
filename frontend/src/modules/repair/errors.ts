@@ -13,6 +13,7 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   PHOTO_TYPE_NOT_ALLOWED: "รองรับเฉพาะไฟล์รูปภาพ",
   PHOTO_TOO_LARGE: "รูปนี้ใหญ่เกิน 10 MB",
   MASTER_DATA_CHANGED: "ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่",
+  CATEGORY_NOT_FOR_BUILDING: "หมวดงานนี้ไม่มีในอาคารที่เลือก กรุณาเลือกใหม่", // CR-025 (#5)
   TEAM_HANDLED_NOT_ALLOWED: "คุณไม่มีสิทธิ์ทำรายการนี้",
   DUPLICATE_FOUND: "มีคนแจ้งเรื่องนี้ไว้แล้ว ติดตามเคสเดิมแทนได้",
   OWN_TICKET_AWAITING_RATING: "คุณแจ้งเรื่องนี้ไว้แล้ว ช่างซ่อมเสร็จแล้ว ไปประเมินตรวจงานที่งานเดิม",

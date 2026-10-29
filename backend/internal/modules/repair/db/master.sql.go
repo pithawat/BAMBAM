@@ -82,6 +82,27 @@ func (q *Queries) ActiveSymptomPriorities(ctx context.Context, arg ActiveSymptom
 	return items, nil
 }
 
+const categoryUsedInBuilding = `-- name: CategoryUsedInBuilding :one
+SELECT EXISTS (
+    SELECT 1 FROM platform.buildings b
+    JOIN repair.category_building_types cbt ON cbt.building_type_id = b.building_type_id
+    WHERE b.id = $1 AND cbt.category_id = $2
+)
+`
+
+type CategoryUsedInBuildingParams struct {
+	BuildingID uuid.UUID
+	CategoryID uuid.UUID
+}
+
+// CR-025 (BR-F02-8): the category is used in the building's type. The caller skips "อื่น ๆ".
+func (q *Queries) CategoryUsedInBuilding(ctx context.Context, arg CategoryUsedInBuildingParams) (bool, error) {
+	row := q.db.QueryRow(ctx, categoryUsedInBuilding, arg.BuildingID, arg.CategoryID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getSettings = `-- name: GetSettings :one
 SELECT ticket_prefix, ticket_year_format, ticket_digits FROM repair.settings WHERE id
 `
@@ -100,14 +121,18 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 }
 
 const listActiveBuildings = `-- name: ListActiveBuildings :many
-SELECT id, name FROM platform.buildings
-WHERE is_active
-ORDER BY sort_order, name
+SELECT b.id, b.name, bt.id AS building_type_id, bt.name AS building_type_name
+FROM platform.buildings b
+JOIN platform.building_types bt ON bt.id = b.building_type_id
+WHERE b.is_active
+ORDER BY b.sort_order, b.name
 `
 
 type ListActiveBuildingsRow struct {
-	ID   uuid.UUID
-	Name string
+	ID               uuid.UUID
+	Name             string
+	BuildingTypeID   uuid.UUID
+	BuildingTypeName string
 }
 
 func (q *Queries) ListActiveBuildings(ctx context.Context) ([]ListActiveBuildingsRow, error) {
@@ -119,7 +144,12 @@ func (q *Queries) ListActiveBuildings(ctx context.Context) ([]ListActiveBuilding
 	var items []ListActiveBuildingsRow
 	for rows.Next() {
 		var i ListActiveBuildingsRow
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.BuildingTypeID,
+			&i.BuildingTypeName,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -288,21 +318,23 @@ func (q *Queries) ListActiveSymptoms(ctx context.Context) ([]ListActiveSymptomsR
 	return items, nil
 }
 
-const listCategoryAreaTypes = `-- name: ListCategoryAreaTypes :many
-SELECT category_id, area_type FROM repair.category_area_types
-ORDER BY category_id, area_type
+const listCategoryBuildingTypes = `-- name: ListCategoryBuildingTypes :many
+SELECT cbt.category_id, cbt.building_type_id FROM repair.category_building_types cbt
+JOIN platform.building_types bt ON bt.id = cbt.building_type_id AND bt.is_active
+ORDER BY cbt.category_id, bt.sort_order, bt.name
 `
 
-func (q *Queries) ListCategoryAreaTypes(ctx context.Context) ([]RepairCategoryAreaType, error) {
-	rows, err := q.db.Query(ctx, listCategoryAreaTypes)
+// CR-025: the active building types each category is used in (none for "อื่น ๆ" = every type).
+func (q *Queries) ListCategoryBuildingTypes(ctx context.Context) ([]RepairCategoryBuildingType, error) {
+	rows, err := q.db.Query(ctx, listCategoryBuildingTypes)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []RepairCategoryAreaType
+	var items []RepairCategoryBuildingType
 	for rows.Next() {
-		var i RepairCategoryAreaType
-		if err := rows.Scan(&i.CategoryID, &i.AreaType); err != nil {
+		var i RepairCategoryBuildingType
+		if err := rows.Scan(&i.CategoryID, &i.BuildingTypeID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

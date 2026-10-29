@@ -1,6 +1,14 @@
 # S03 — ฟอร์มแจ้งซ่อม
 
-Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19) · page layout changed by CR-019 (approved 2026-10-24) · duplicate card position, step-2 block and locked team mode changed by CR-021 (approved 2026-10-25) · room cards on every floor + steps at their own height by CR-022 (approved 2026-10-26)
+Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19) · page layout changed by CR-019 (approved 2026-10-24) · duplicate card position, step-2 block and locked team mode changed by CR-021 (approved 2026-10-25) · room cards on every floor + steps at their own height by CR-022 (approved 2026-10-26) · place first + categories by building type by CR-025 (approved 2026-10-27)
+
+> **CR-025 (approved 2026-10-27) — place first, categories by building type (overrides every block below where they differ).** Read `../../changes/CR-025.md` first.
+> - **Step order:** `สถานที่ → ปัญหาที่พบ → รูปภาพและส่ง` (step strip, footer `ขั้นตอน n จาก 3`, summary column and the phone review card list สถานที่ · ปัญหาที่พบ · ความเร่งด่วน in that order; each `แก้ไข` → its step).
+> - **Step 1 สถานที่:** heading row + `ที่เคยแจ้ง ▾` · อาคาร + ชั้น · `ห้องหรือจุดที่เกิด *` room cards in their normal order (**no** `ห้องที่ตรงกับปัญหา` / `ห้องอื่นบนชั้นนี้` groups) · `บอกจุดเพิ่มเติม (ไม่บังคับ)`. No duplicate card here any more. `ถัดไป` needs a room.
+> - **Step 2 ปัญหาที่พบ:** a place line above the grid `สถานที่: {อาคาร} · ชั้น {n} · {ห้อง}` with a text button `เปลี่ยน` (→ step 1) · category cards = only categories whose `buildingTypeIds` contain the building's type, plus `อื่น ๆ` (same order as #1) · symptoms, `อาการอื่นๆ`, priority explanation as before · **duplicate card (S04 inline)** under the symptoms once a category is picked, with the CR-021 block and an inline `บอกจุดเพิ่มเติม` field (S04 CR-025).
+> - **Building change:** choosing a building whose type does not use the picked category clears category, symptoms and `อาการอื่นๆ` text; step 2 then shows the inline note (info tone, not error) `หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้ เลือกใหม่อีกครั้ง` until a category is picked. Same note after a draft restore that hits this case.
+> - **Submit error** 422 `CATEGORY_NOT_FOR_BUILDING`: banner `หมวดงานนี้ไม่มีในอาคารที่เลือก กรุณาเลือกใหม่` + go to step 2 with the category cleared and master data refetched.
+> - Team mode (`?mode=team`) keeps the same order; its fields stay in step 3.
 
 > **CR-022 (approved 2026-10-26):** `ห้องหรือจุดที่เกิด` is always room cards (no searchable picker for big floors — replaces the CR-014 "> 10 rooms" rule); no reserved heights (rooms, symptoms and their placeholders grow with their content); desktop renders only the current step and the frame follows its height (replaces CR-014 "body height = the tallest step"), width unchanged.
 

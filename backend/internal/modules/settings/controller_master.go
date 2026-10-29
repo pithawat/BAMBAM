@@ -81,7 +81,7 @@ func (ctl *Controller) Categories(c *gin.Context) {
 }
 
 func categoryInput(req CategoryRequest) repair.CategoryInput {
-	return repair.CategoryInput{Name: req.Name, Icon: req.Icon, DefaultPriority: req.DefaultPriority, AreaTypes: req.AreaTypes, IsActive: req.IsActive, UpdatedAt: at(req.UpdatedAt)}
+	return repair.CategoryInput{Name: req.Name, Icon: req.Icon, DefaultPriority: req.DefaultPriority, IsActive: req.IsActive, UpdatedAt: at(req.UpdatedAt)}
 }
 
 // CreateCategory handles #33.

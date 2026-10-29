@@ -41,19 +41,19 @@ func TestSettingsAdminMaster(t *testing.T) {
 	f := false
 
 	name := "ลิฟต์ " + tag
-	cat, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("door-open"), DefaultPriority: str("high"), AreaTypes: &[]string{"common_area"}})
+	cat, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("door-open"), DefaultPriority: str("high")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM repair.symptoms WHERE category_id = $1`, cat.ID)
-		_, _ = pool.Exec(ctx, `DELETE FROM repair.category_area_types WHERE category_id = $1`, cat.ID)
+		_, _ = pool.Exec(ctx, `DELETE FROM repair.category_building_types WHERE category_id = $1`, cat.ID)
 		_, _ = pool.Exec(ctx, `DELETE FROM repair.categories WHERE id = $1`, cat.ID)
 		_, _ = pool.Exec(ctx, `DELETE FROM repair.contractor_types WHERE name LIKE $1`, "%"+tag)
 		_, _ = pool.Exec(ctx, `DELETE FROM platform.audit_log WHERE actor_user_id = $1`, actor)
 		_, _ = pool.Exec(ctx, `DELETE FROM platform.users WHERE id = $1`, actor)
 	})
-	if len(cat.AreaTypes) != 1 || cat.DefaultPriority != "high" || cat.UpdatedBy == nil {
+	if len(cat.BuildingTypeIDs) != 3 || cat.DefaultPriority != "high" || cat.UpdatedBy == nil {
 		t.Errorf("created = %+v", cat)
 	}
 	var fe *apperr.Error

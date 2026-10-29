@@ -12,30 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const adminCategoryAreaTypes = `-- name: AdminCategoryAreaTypes :many
-SELECT area_type FROM repair.category_area_types WHERE category_id = $1 ORDER BY area_type
-`
-
-func (q *Queries) AdminCategoryAreaTypes(ctx context.Context, categoryID uuid.UUID) ([]string, error) {
-	rows, err := q.db.Query(ctx, adminCategoryAreaTypes, categoryID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var area_type string
-		if err := rows.Scan(&area_type); err != nil {
-			return nil, err
-		}
-		items = append(items, area_type)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const adminCategoryHasUsedSymptom = `-- name: AdminCategoryHasUsedSymptom :one
 SELECT EXISTS (SELECT 1 FROM repair.ticket_symptoms ts JOIN repair.symptoms s ON s.id = ts.symptom_id WHERE s.category_id = $1)::boolean
 `
@@ -63,12 +39,12 @@ func (q *Queries) AdminCategoryNameTaken(ctx context.Context, arg AdminCategoryN
 	return column_1, err
 }
 
-const adminClearCategoryAreaTypes = `-- name: AdminClearCategoryAreaTypes :exec
-DELETE FROM repair.category_area_types WHERE category_id = $1
+const adminClearCategoryBuildingTypes = `-- name: AdminClearCategoryBuildingTypes :exec
+DELETE FROM repair.category_building_types WHERE category_id = $1
 `
 
-func (q *Queries) AdminClearCategoryAreaTypes(ctx context.Context, categoryID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, adminClearCategoryAreaTypes, categoryID)
+func (q *Queries) AdminClearCategoryBuildingTypes(ctx context.Context, categoryID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, adminClearCategoryBuildingTypes, categoryID)
 	return err
 }
 
@@ -101,7 +77,7 @@ const adminDeleteCategoryChildren = `-- name: AdminDeleteCategoryChildren :exec
 DELETE FROM repair.symptoms WHERE category_id = $1
 `
 
-// Before deleting a category: its (unused) symptoms, area types and asset-type links go with it.
+// Before deleting a category: its (unused) symptoms, building types and asset-type links go with it.
 func (q *Queries) AdminDeleteCategoryChildren(ctx context.Context, categoryID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, adminDeleteCategoryChildren, categoryID)
 	return err
@@ -159,17 +135,15 @@ func (q *Queries) AdminInsertCategory(ctx context.Context, arg AdminInsertCatego
 	return err
 }
 
-const adminInsertCategoryAreaType = `-- name: AdminInsertCategoryAreaType :exec
-INSERT INTO repair.category_area_types (category_id, area_type) VALUES ($1, $2) ON CONFLICT DO NOTHING
+const adminInsertCategoryAllBuildingTypes = `-- name: AdminInsertCategoryAllBuildingTypes :exec
+INSERT INTO repair.category_building_types (category_id, building_type_id)
+SELECT $1, id FROM platform.building_types WHERE is_active
+ON CONFLICT DO NOTHING
 `
 
-type AdminInsertCategoryAreaTypeParams struct {
-	CategoryID uuid.UUID
-	AreaType   string
-}
-
-func (q *Queries) AdminInsertCategoryAreaType(ctx context.Context, arg AdminInsertCategoryAreaTypeParams) error {
-	_, err := q.db.Exec(ctx, adminInsertCategoryAreaType, arg.CategoryID, arg.AreaType)
+// CR-025: until settings Stage 4P lets the admin pick them, a new category is used in every active building type.
+func (q *Queries) AdminInsertCategoryAllBuildingTypes(ctx context.Context, categoryID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, adminInsertCategoryAllBuildingTypes, categoryID)
 	return err
 }
 

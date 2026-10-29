@@ -2,10 +2,12 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); next: 4R (CR-024), then 5 · of 8   **Updated:** 2026-10-26 (stages accepted, CR-023 done)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P accepted 2026-10-29; next: settings 4P, 4R (CR-024), 5 (D-121) · of 8   **Updated:** 2026-10-29 (Stage 4P wire)
 
 ## Now
 
+- **CR-025 approved + applied to docs 2026-10-27 (L, D-117 / D-118):** S03 = สถานที่ → ปัญหาที่พบ → รูปภาพและส่ง; building types (`platform.building_types`: สำนักงาน · โกดัง · ภายนอกอาคาร), categories per type (`repair.category_building_types`, อื่น ๆ everywhere), #5 `CATEGORY_NOT_FOR_BUILDING`; duplicate card → step 2; mock warehouse `โกดังเก็บของ 1 (ตัวอย่าง)`; admin side = settings CR-005 / settings Stage 4P. Code = new Stage 4P
+- **CR-026 approved 2026-10-27 (M, D-119) + A1 2026-10-29 (D-120):** photo JPEG quality 0.85 → 0.25 (1920px kept); photos stay in the form and upload only on submit (option A, all photo forms); S03 draft photos in IndexedDB, 24 h expiry — in Stage 4P
 - **CR-024 approved + applied to docs 2026-10-26 (M, D-112):** remove the `executive` role (existing users → `employee`) and the whole notification system (F19-B, S13, bell, P4–P7); new copy in `ui/screens/_common.md` §9. Code, unit / e2e tests and System Atlas = Stage 4R (Claude only)
 
 - **Stages 1 / 2 / 2R / 2N / 3 accepted 2026-10-26** (owner, on the e2e results), tags `repair-stage-1`, `-2`, `-2R`, `-2N`, `-3`; Stage 4 accepted 2026-10-26 (`repair-stage-4`), 3U 2026-10-24, 3D 2026-10-20, 2M 2026-10-19 — every stage up to 4 is accepted. Next stage: 5
@@ -16,7 +18,9 @@
 
 ## Next
 
-0. **Next: Stage 4R (CR-024)** — `/build-stage repair 4R` (Claude builds: migration executive → employee, remove role + bell + notification copy, Go / e2e tests, `/atlas sync repair` + `verify`); start in a fresh session
+0. **Next: settings Stage 4P** (S20 / S22 building types, Claude, D-121) — `/build-stage settings 4P prepare` in a fresh session; then repair 4R. Re-run settings e2e with Docker on
+0. Then Stage 4R (CR-024) — `/build-stage repair 4R` (Claude builds: migration executive → employee, remove role + bell + notification copy, Go / e2e tests, `/atlas sync repair` + `verify`); start in a fresh session
+   - (2026-10-27) System Atlas already follows CR-024 / CR-025 / CR-026: no executive role, no F19-B / bell, 4R + 4P on the timeline (pending, no flows bound — owner's choice), F07 tour added (verify passes); 4R only re-checks with `/atlas sync repair` + `verify` after its FE changes
    - (D-113, 2026-10-26) the backend part is done in settings Stage 1 (migration executive → employee, no executive role, `Viewer.Can`, Go tests); 4R keeps FE copy / bell / toasts, e2e and the Atlas
 0. Then `/build-stage repair 5 prepare` (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
 0. Shared dev DB: run migrations up to `20261026000001` once a writable user exists (dev DB still rejects DDL)
@@ -24,6 +28,8 @@
 
 ## Open issues / questions
 
+- CR-025: real warehouse buildings (names, floors, rooms) — owner to send; mock `โกดังเก็บของ 1 (ตัวอย่าง)` until then (rename in S20 or replace by migration)
+- CR-026: result (S10) / send-back (S08) photos use the same 0.25 quality — owner did not answer whether they should stay sharper
 - F07-2 auto-close (BR-F07-4) has no e2e (owner 2026-10-26: no test case) — so Atlas has no F07 tour (`check` needs every feature of a flow at e2e `pass`)
 - Test data: specs that leave open tickets in อ.1 ห้อง 401 (F03 / F05 / F22) keep piling up in `bambam_e2e`; reset with `test-stack.md` §1 when lists get long
 - Stage 4: migration `20261024000001` must run on the dev DB before the demo (shared dev DB still read-only) 
@@ -64,6 +70,11 @@
 
 ## Stage log
 
+- 2026-10-29: **Stage 4P accepted**, tag `repair-stage-4P` — CR-025 (place first, building types, mock warehouse, #5 422) + CR-026 (0.25, upload on submit, IndexedDB drafts); UI by Claude; e2e repair + Atlas 13 / 13 pass; settings e2e not run (Docker off, D-123)
+- 2026-10-29: Stage 4P wired — UI by Claude (S03 place first, S04 step 2), e2e F02 / F03 / F04 reworked + AC6 / AC7 / draft-photo specs, Atlas tours re-recorded (13 / 13 pass)
+- 2026-10-29: Stage 4P prepare — CR-025 backend (migration `20261029000001`, #1 / #2 / #5 422) + FE contract, CR-026 quality 0.25 + A1 (upload on submit, IndexedDB draft photos); Go lint 0 / tests pass incl. Pg; tsc / eslint pass; HANDOFF ready for Codex; D-122
+- 2026-10-29: CR-026 A1 approved (photos upload on submit, option A; IndexedDB draft photos 24 h) — D-120; order 4P → settings 4P → 4R (D-121)
+- 2026-10-27: CR-025 (place first, building types, L) + CR-026 (photo quality 0.25, M) approved and applied to docs; settings CR-005; D-117–D-119
 - 2026-10-26: Atlas tours F02 / F06 / F08-B / F21 / F22 / F24 (all 12 tours pass); e2e 120 passed
 - 2026-10-26: Stages 1 / 2 / 2R / 2N / 3 accepted (owner, e2e all pass), tags `repair-stage-1` `-2` `-2R` `-2N` `-3`; CR-023 approved + built (D-105)
 - 2026-10-26: e2e coverage round — F06 / F07 / F21 / F24 specs + F02 draft, 118 passed; fixes S18 / S09 desktop header buttons, S18 edit form reset; D-103 (no swiftshader on desktop), D-104 (Atlas `upload`); tours F03 / F04 / F05; CR-023 proposed

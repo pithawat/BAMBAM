@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API, as, auth, confirm, resolve, resolvedTicket, sendBack, tag, uploadVia } from "./helpers";
+import { API, as, auth, confirm, resolve, resolvedTicket, sendBack, tag, attachVia } from "./helpers";
 
 // F07 (Stage 2 / 2R / 2N, CR-005 / CR-008 / CR-009 / CR-012): only the reporter rates a resolved ticket —
 // 1–5 stars required, never preselected — or sends it back with a reason; a send back moves the ticket on to
@@ -61,7 +61,7 @@ test.describe("reporter", () => {
     await dialog.getByRole("button", { name: "ส่งกลับให้แก้" }).click();
     await expect(dialog.getByRole("alert")).toHaveText("กรุณาบอกสิ่งที่ยังไม่เรียบร้อย");
     await dialog.getByLabel(/ยังพบปัญหาอะไร/).fill("ยังมีน้ำหยดเมื่อเปิดแอร์เกิน 1 ชั่วโมง");
-    await uploadVia(page, dialog.locator("input[type=file]").first());
+    await attachVia(page, dialog.locator("input[type=file]").first());
     await dialog.getByRole("button", { name: "ส่งกลับให้แก้" }).click();
     await expect(page.getByText("ส่งกลับให้ช่างแล้ว ช่างจะได้รับแจ้งเตือน")).toBeVisible();
     await expect(nextAction(page)).toContainText("ส่งกลับให้แก้แล้ว");
@@ -92,7 +92,7 @@ test.describe("technician", () => {
     await expect(nextAction(page)).toContainText("ยังมีเสียงดังตอนเปิดแอร์");
     await nextAction(page).getByRole("button", { name: "บันทึกผลอีกครั้ง" }).click();
     const sheet = page.getByRole("dialog", { name: "บันทึกผลการแก้ไข" });
-    await uploadVia(page, sheet.locator("input[type=file]"));
+    await attachVia(page, sheet.locator("input[type=file]"));
     await sheet.getByLabel("ทำอะไรไป").fill("ขันน็อตยึดคอยล์ร้อน เสียงหายแล้ว");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
     await expect(page.getByText("ส่งผลแล้ว ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน")).toBeVisible();

@@ -1,4 +1,4 @@
-// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–4 endpoints, CR-005, CR-008, CR-014, CR-016).
+// Mirrors docs/modules/repair/04-api-contract.md (shared objects + Stage 1–4 endpoints, CR-005, CR-008, CR-014, CR-016, CR-025).
 // Field names are fixed by the contract — change only through a CR.
 
 import type { Ref } from "@/lib/platform/types";
@@ -180,8 +180,12 @@ export type Category = {
   defaultPriority: Priority;
   /** CR-014: the one "อื่น ๆ" category (listed last); only it accepts `categoryOther`. */
   isOther: boolean;
-  /** CR-014: area types where its problems usually happen — S03 lists those rooms first (a hint, never a filter). */
-  areaTypes: AreaType[];
+  /**
+   * CR-025: ids of the building types this category is used in (`Building.buildingType.id`). Empty for the
+   * `isOther` category = every type. S03 shows a category only when it is used in the chosen building's type
+   * (`categoryUsedIn`). Replaces CR-014 `areaTypes`.
+   */
+  buildingTypeIds: string[];
   symptoms: Symptom[];
 };
 
@@ -193,8 +197,12 @@ export type Room = { id: string; name: string; areaType: AreaType };
 /** `rooms`: active rooms by sort order; every floor has `พื้นที่ส่วนกลางชั้น {n}` (CR-014). */
 export type Floor = { id: string; name: string; level: number; rooms: Room[] };
 
-/** Floors ordered by `level`, bottom first. */
-export type Building = { id: string; name: string; floors: Floor[] };
+/** Floors ordered by `level`, bottom first. CR-025: `buildingType` always set (`platform.building_types`). */
+export type Building = { id: string; name: string; buildingType: Ref; floors: Floor[] };
+
+/** BR-F02-8 (CR-025): the category is offered for this building ("อื่น ๆ" always). Same rule as #5. */
+export const categoryUsedIn = (category: Pick<Category, "isOther" | "buildingTypeIds">, building: Pick<Building, "buildingType">) =>
+  category.isOther || category.buildingTypeIds.includes(building.buildingType.id);
 
 // ---- #5 POST /repair/tickets ----
 
@@ -515,6 +523,7 @@ export type RepairErrorCode =
   | "PHOTO_TYPE_NOT_ALLOWED"
   | "PHOTO_TOO_LARGE"
   | "MASTER_DATA_CHANGED"
+  | "CATEGORY_NOT_FOR_BUILDING" // CR-025
   | "TEAM_HANDLED_NOT_ALLOWED"
   | "DUPLICATE_FOUND"
   | "OWN_TICKET_AWAITING_RATING"

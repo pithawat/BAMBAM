@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API, as, assess, auth, bangkokDay, bangkokToday, confirm, newContractor, report, resolve, sendBack, tag, uploadPhoto, uploadVia } from "./helpers";
+import { API, as, assess, auth, bangkokDay, bangkokToday, confirm, newContractor, report, resolve, sendBack, tag, uploadPhoto, attachVia } from "./helpers";
 
 // F21 (Stage 2, CR-005 / CR-006 / CR-008 / CR-009): the one in-house technician sees every open ticket oldest
 // first; เริ่มดำเนินการ sets the expected date and who does the work (ช่างของบริษัท, or a ช่างภายนอก picked or
@@ -61,7 +61,7 @@ test.describe("technician", () => {
     await expect(sheet.getByRole("alert").filter({ hasText: "ถ่ายหรือแนบรูปหลังซ่อมอย่างน้อย 1 รูป" })).toBeVisible();
     await expect(sheet.getByRole("alert").filter({ hasText: "บอกสิ่งที่ทำ" })).toBeVisible();
     await expect(sheet.getByText("คะแนนช่างภายนอก")).toHaveCount(0);
-    await uploadVia(page, sheet.locator("input[type=file]"));
+    await attachVia(page, sheet.locator("input[type=file]"));
     await sheet.getByLabel("ทำอะไรไป").fill("ล้างแผงคอยล์เย็น เติมน้ำยา ทดสอบ 30 นาที");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
     await expect(page.getByText("ส่งผลแล้ว ผู้แจ้งจะได้รับแจ้งเตือนให้ประเมินตรวจงาน")).toBeVisible();
@@ -118,7 +118,7 @@ test.describe("technician", () => {
     // S10: the contractor stars are required for a contractor job (BR-F24-3)
     await nextAction(page).getByRole("button", { name: "บันทึกผลซ่อม" }).click();
     const sheet = page.getByRole("dialog", { name: "บันทึกผลซ่อม" });
-    await uploadVia(page, sheet.locator("input[type=file]"));
+    await attachVia(page, sheet.locator("input[type=file]"));
     await sheet.getByLabel("ทำอะไรไป").fill("ช่างภายนอกเปลี่ยนคอมเพรสเซอร์");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
     await expect(sheet.getByRole("alert").filter({ hasText: "ให้คะแนนช่างภายนอก" })).toBeVisible();

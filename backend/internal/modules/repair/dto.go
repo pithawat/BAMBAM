@@ -41,8 +41,8 @@ type CategoryDTO struct {
 	Name            string       `json:"name"`
 	Icon            string       `json:"icon"`
 	DefaultPriority string       `json:"defaultPriority"`
-	IsOther         bool         `json:"isOther"`   // CR-014
-	AreaTypes       []string     `json:"areaTypes"` // CR-014
+	IsOther         bool         `json:"isOther"`         // CR-014
+	BuildingTypeIDs []uuid.UUID  `json:"buildingTypeIds"` // CR-025; empty for "อื่น ๆ" = every type
 	Symptoms        []SymptomDTO `json:"symptoms"`
 }
 
@@ -77,9 +77,10 @@ type RoomDTO struct {
 }
 
 type BuildingDTO struct {
-	ID     uuid.UUID  `json:"id"`
-	Name   string     `json:"name"`
-	Floors []FloorDTO `json:"floors"`
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	BuildingType RefDTO     `json:"buildingType"` // CR-025
+	Floors       []FloorDTO `json:"floors"`
 }
 
 // CreateTicketRequest = #5 request. Ids stay strings so a bad id becomes a field error, not a bind error.
@@ -282,7 +283,7 @@ func toCategoryDTOs(cats []Category) []CategoryDTO {
 		}
 		out = append(out, CategoryDTO{
 			ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, IsOther: c.IsOther,
-			AreaTypes: nonNil(c.AreaTypes), Symptoms: syms,
+			BuildingTypeIDs: nonNil(c.BuildingTypeIDs), Symptoms: syms,
 		})
 	}
 	return out
@@ -310,7 +311,7 @@ func toBuildingDTOs(blds []Building) []BuildingDTO {
 			}
 			floors = append(floors, FloorDTO{ID: f.ID, Name: f.Name, Level: f.Level, Rooms: rooms})
 		}
-		out = append(out, BuildingDTO{ID: b.ID, Name: b.Name, Floors: floors})
+		out = append(out, BuildingDTO{ID: b.ID, Name: b.Name, BuildingType: RefDTO(b.BuildingType), Floors: floors})
 	}
 	return out
 }

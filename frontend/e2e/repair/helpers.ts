@@ -62,39 +62,48 @@ export async function report(api: APIRequestContext, spot: string, team: { note:
 }
 
 /**
- * S03 as the signed-in user up to the สถานที่ step on PLACE with this extra spot; returns once #22 has answered
- * for this spot (CR-021: a blocking answer stops ถัดไป at this step). `path`: `/repair/new?mode=team` for leads.
+ * S03 as the signed-in user (CR-025: place first): step 1 สถานที่ on PLACE with this extra spot, ถัดไป, step 2 the
+ * category + symptom; returns on step 2 once #22 has answered for this spot (a blocking answer stops ถัดไป there).
+ * `path`: `/repair/new?mode=team` for leads.
  */
 export async function fillPlace(page: Page, spot: string, path = "/repair/new") {
   await page.goto(path);
-  await expect(page.getByText("เลือกหมวดที่ตรงกับปัญหา").filter({ visible: true }).first()).toBeVisible();
+  const s = page.locator('[data-step="location"]');
+  await expect(s.getByRole("heading", { name: "ปัญหาเกิดขึ้นที่ไหน" })).toBeVisible();
   const restart = page.getByRole("button", { name: "เริ่มใหม่" });
   if (await restart.isVisible()) await restart.click();
-  const p = page.locator('[data-step="problem"]');
-  await p.getByText(PLACE.category, { exact: true }).click();
-  await p.getByText(PLACE.symptom, { exact: true }).click();
-  await page.getByRole("button", { name: "ถัดไป" }).click();
-  const s = page.locator('[data-step="location"]');
   await s.getByText(PLACE.building, { exact: true }).click();
   await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText(PLACE.floor, { exact: true }).click();
   await s.getByText(PLACE.room, { exact: true }).click();
+  await s.getByLabel("บอกจุดเพิ่มเติม").fill(spot);
+  await page.getByRole("button", { name: "ถัดไป" }).click();
+  const p = page.locator('[data-step="problem"]');
   const checked = page.waitForResponse((r) => r.url().includes(`${API}/tickets/duplicates`)
     && new URL(r.url()).searchParams.get("locationDetail")?.trim() === spot.trim(), { timeout: 15_000 });
-  await s.getByLabel("บอกจุดเพิ่มเติม").fill(spot);
+  await p.getByText(PLACE.category, { exact: true }).click();
+  await p.getByRole("group", { name: /อาการที่พบ/ }).getByText(PLACE.symptom, { exact: true }).click();
   await checked;
 }
 
-/** From the สถานที่ step: next, attach the report photo, wait until it is uploaded. */
+/** From step 2: next, attach the report photo (kept in the form, CR-026 A1). */
 export async function attachPhoto(page: Page) {
   await page.getByRole("button", { name: "ถัดไป" }).click();
-  await uploadVia(page, page.locator('[data-step="send"]').locator("input[type=file]").first());
+  await attachVia(page, page.locator('[data-step="send"]').locator("input[type=file]").first());
 }
 
-/** Sets a file on the input and waits for the #3 upload to finish. */
-export async function uploadVia(page: Page, input: ReturnType<Page["locator"]>) {
-  const uploaded = page.waitForResponse((r) => r.url().endsWith(`${API}/photos`) && r.request().method() === "POST", { timeout: 15_000 });
+/** Sets a file on the input and waits until its tile is ready (resized, kept in the form — no #3 call until submit). */
+export async function attachVia(page: Page, input: ReturnType<Page["locator"]>) {
+  const ready = page.locator('[data-photo-status="ready"]');
+  const before = await ready.count();
   await input.setInputFiles({ name: "photo.png", mimeType: "image/png", buffer: PNG });
-  expect((await uploaded).status()).toBe(201);
+  await expect(ready).toHaveCount(before + 1, { timeout: 15_000 });
+}
+
+/** Counts #3 uploads on this page (CR-026 A1: none before the form is sent). */
+export function countUploads(page: Page) {
+  const seen = { n: 0 };
+  page.on("request", (r) => { if (r.method() === "POST" && r.url().endsWith(`${API}/photos`)) seen.n++; });
+  return seen;
 }
 
 /** Today in Asia/Bangkok as YYYY-MM-DD (expected-date field of #9). */

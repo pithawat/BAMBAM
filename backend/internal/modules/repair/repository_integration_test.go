@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -349,8 +350,8 @@ func TestPgMasterData(t *testing.T) {
 				}
 			}
 		}
-		if symptoms != 38 || len(cats[5].AreaTypes) != 1 || cats[5].AreaTypes[0] != AreaParking || len(cats[6].AreaTypes) != 0 {
-			t.Fatalf("symptoms=%d parking areas=%v other areas=%v", symptoms, cats[5].AreaTypes, cats[6].AreaTypes)
+		if symptoms != 38 || len(cats[5].BuildingTypeIDs) != 1 || cats[5].BuildingTypeIDs[0] != btOutdoor || len(cats[6].BuildingTypeIDs) != 0 {
+			t.Fatalf("symptoms=%d parking types=%v other types=%v", symptoms, cats[5].BuildingTypeIDs, cats[6].BuildingTypeIDs)
 		}
 	}
 	check()
@@ -360,8 +361,15 @@ func TestPgMasterData(t *testing.T) {
 		t.Fatal(err)
 	}
 	// buildings and floors moved to `platform` later (settings Stage 4, 20261026000003_platform_locations.sql)
-	body := strings.NewReplacer("repair.buildings", "platform.buildings", "repair.floors", "platform.floors").Replace(string(up))
+	// and every building needs a type since CR-025 (20261029000001)
+	body := strings.NewReplacer("repair.buildings", "platform.buildings", "repair.floors", "platform.floors",
+		"(id, name, sort_order) VALUES", "(id, name, sort_order, building_type_id) VALUES",
+		"'พื้นที่ภายนอกอาคาร', 900)", "'พื้นที่ภายนอกอาคาร', 900, '"+btOutdoor.String()+"')").Replace(string(up))
 	start, end := strings.Index(body, "-- ---- master data"), strings.Index(body, "-- +goose Down")
+	// the area type hints were dropped by CR-025 (20261029000001)
+	hints, hintsEnd := strings.Index(body, "-- Area type hints"), strings.Index(body, "-- Every other (sample)")
+	body = body[:hints] + body[hintsEnd:]
+	end -= hintsEnd - hints
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -400,6 +408,92 @@ func TestPgMasterData(t *testing.T) {
 	}
 	if !parking {
 		t.Fatal("no parking room")
+	}
+}
+
+// CR-025 ids from migration 20261029000001.
+var (
+	btOffice    = uuid.MustParse("c025b700-0000-4000-8000-000000000001")
+	btWarehouse = uuid.MustParse("c025b700-0000-4000-8000-000000000002")
+	btOutdoor   = uuid.MustParse("c025b700-0000-4000-8000-000000000003")
+	whBuilding  = uuid.MustParse("c025b1d0-0000-4000-8000-000000000001")
+	whFloor     = uuid.MustParse("c025f100-0000-4000-8000-000000000001")
+	whStore     = uuid.MustParse("c025e000-0000-4000-8000-000000000001")
+	outdoorBld  = uuid.MustParse("c014b1d0-0000-4000-8000-000000000001")
+	catAircon   = uuid.MustParse("c014ca70-0000-4000-8000-000000000002")
+	catElectric = uuid.MustParse("c014ca70-0000-4000-8000-000000000001")
+)
+
+// CR-025: every building has a type (backfill: car park → outdoor, the rest → office, NOT NULL), #1 carries
+// the approved category ↔ type table, the mock warehouse exists, and #5 refuses a category the type has not.
+func TestPgBuildingTypes(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+
+	var nullTypes int
+	if err := p.pool.QueryRow(ctx, `SELECT count(*) FROM platform.buildings WHERE building_type_id IS NULL`).Scan(&nullTypes); err != nil || nullTypes != 0 {
+		t.Fatalf("buildings without type: %d (%v)", nullTypes, err)
+	}
+	if _, err := p.pool.Exec(ctx, `INSERT INTO platform.buildings (name) VALUES ('ไม่มีประเภท')`); err == nil {
+		t.Fatal("a building without a type was accepted")
+	}
+
+	blds, err := p.svc.Buildings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	types := map[uuid.UUID]uuid.UUID{}
+	for _, b := range blds {
+		types[b.ID] = b.BuildingType.ID
+		if b.BuildingType.Name == "" {
+			t.Fatalf("%s: building type without name", b.Name)
+		}
+		if b.ID == whBuilding && (b.Name != "โกดังเก็บของ 1 (ตัวอย่าง)" || len(b.Floors) != 1 || len(b.Floors[0].Rooms) != 2) {
+			t.Fatalf("mock warehouse = %+v", b)
+		}
+	}
+	if types[b1Building] != btOffice || types[outdoorBld] != btOutdoor || types[whBuilding] != btWarehouse {
+		t.Fatalf("types: อาคาร 1=%v outdoor=%v warehouse=%v", types[b1Building], types[outdoorBld], types[whBuilding])
+	}
+
+	cats, err := p.svc.Categories(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]uuid.UUID{
+		"ไฟฟ้าและแสงสว่าง":           {btOffice, btWarehouse, btOutdoor},
+		"ระบบปรับอากาศ":              {btOffice},
+		"ประปาและสุขาภิบาล":          {btOffice, btWarehouse, btOutdoor},
+		"ห้องประชุมและโสตทัศนูปกรณ์": {btOffice},
+		"อาคารและพื้นที่ส่วนกลาง":    {btOffice, btWarehouse},
+		"ลานจอด / ไม้กั้น":           {btOutdoor},
+		"อื่น ๆ": {},
+	}
+	for _, c := range cats {
+		if w, ok := want[c.Name]; ok && !slices.Equal(c.BuildingTypeIDs, w) {
+			t.Errorf("%s: types = %v, want %v", c.Name, c.BuildingTypeIDs, w)
+		}
+	}
+
+	reporter := p.user(t, users.RoleEmployee)
+	report := func(cat uuid.UUID) error {
+		photo, err := p.svc.UploadPhoto(ctx, reporter, p.png)
+		if err != nil {
+			return err
+		}
+		b, f, r := whBuilding, whFloor, whStore
+		_, err = p.svc.CreateTicket(ctx, reporter, CreateTicketInput{CategoryID: &cat, SymptomOther: "ทดสอบ", BuildingID: &b, FloorID: &f, RoomID: &r,
+			LocationDetail: "จุดทดสอบ " + uuid.NewString()[:8], PhotoIDs: []uuid.UUID{photo}})
+		return err
+	}
+	if err := report(catAircon); code(err) != "CATEGORY_NOT_FOR_BUILDING" {
+		t.Fatalf("aircon in the warehouse: %v", err)
+	}
+	if err := report(catElectric); err != nil {
+		t.Fatalf("electric in the warehouse: %v", err)
+	}
+	if err := report(p.other.ID); err != nil {
+		t.Fatalf("อื่น ๆ in the warehouse: %v", err)
 	}
 }
 

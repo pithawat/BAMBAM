@@ -23,7 +23,7 @@ type fakeMaster struct {
 	lastOrder *[]uuid.UUID
 }
 
-var sampleCategory = repair.CategoryAdmin{ID: uuid.New(), Name: "ระบบปรับอากาศ", Icon: "snowflake", DefaultPriority: "medium", AreaTypes: []string{}, ActiveSymptomCount: 5}
+var sampleCategory = repair.CategoryAdmin{ID: uuid.New(), Name: "ระบบปรับอากาศ", Icon: "snowflake", DefaultPriority: "medium", BuildingTypeIDs: []uuid.UUID{}, ActiveSymptomCount: 5}
 
 func (f fakeMaster) Categories(context.Context) ([]repair.CategoryAdmin, error) {
 	return []repair.CategoryAdmin{sampleCategory}, f.err

@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- Duplicate thumbnails are authenticated API URLs. */
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Info, Loader2, Wrench } from "lucide-react";
 import { useIsDesktop } from "@/components/shared/use-media-query";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,8 @@ function DuplicateCases({ tickets, busyId, disabled, onFollow, onVisit }: CasePr
   </div>;
 }
 
-export function DuplicateCard(props: CaseProps & { category: string }) {
+/** `children`: S03 step 2 puts the inline `บอกจุดเพิ่มเติม` field inside the card (S04 CR-025). */
+export function DuplicateCard({ children, ...props }: CaseProps & { category: string; children?: ReactNode }) {
   const titleId = useId();
   const blocking = props.tickets.filter(ticket => ticket.blocksReport);
   const similar = blocking.length === 0;
@@ -85,6 +86,7 @@ export function DuplicateCard(props: CaseProps & { category: string }) {
     </div>
     <DuplicateCases {...props} tickets={tickets} />
     {!similar && <p className="text-[13px] leading-6 text-muted-foreground">{SPOT_HINT}</p>}
+    {children}
   </section>;
 }
 

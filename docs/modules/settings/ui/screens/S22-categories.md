@@ -1,6 +1,6 @@
 # S22 — หมวดงานและอาการ
 
-Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · CR-001 applied 2026-10-26 (block below)
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · CR-001 applied 2026-10-26 (block below) · CR-005 building types (approved 2026-10-27)
 
 - **Flows:** F27 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop (see ../../01-users.md)
@@ -19,7 +19,9 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 > - Category menu: แก้ไขหมวดงาน · เลื่อนขึ้น · เลื่อนลง · ปิดใช้งาน / เปิดใช้งาน · ลบ (approved rules kept: delete disabled when `inUse`; the `isOther` category cannot be deactivated / deleted). Symptom menu: แก้ไขอาการและความเร่งด่วน · เลื่อนขึ้น · เลื่อนลง · ปิดใช้งาน / เปิดใช้งาน · ลบ. Drag handles are not used (order via the menu, BR-ALL-5).
 > - Category dialog: ชื่อหมวดงาน * · ไอคอน * (12-icon picker, below) · ความเร่งด่วนตั้งต้น * (hint ใช้เมื่อผู้แจ้งเลือกแค่ “อาการอื่น ๆ”). Symptom dialog: subtitle = category name · ชื่ออาการ * · ความเร่งด่วน * (default = category default; hint งานจะได้ระดับสูงสุดของอาการที่เลือก · ใช้กับการแจ้งงานใหม่). Duplicate symptom message: ชื่อนี้มีอยู่แล้วในหมวดนี้.
 > - Empty symptoms: ยังไม่มีอาการที่เปิดใช้งาน / หมวดนี้จะไม่แสดงในแบบฟอร์มแจ้งซ่อม จนกว่าจะมีอาการที่เปิดใช้งาน · button เพิ่มอาการ. Last-active-symptom deactivate extra line: นี่คืออาการสุดท้ายที่เปิดใช้งาน หมวดนี้จะไม่แสดงในฟอร์มแจ้งซ่อม.
-> - Area types of a category (repair CR-014) are not in the design: keep them in the category dialog as an optional multi-select under ความเร่งด่วนตั้งต้น.
+> - ~~Area types of a category (repair CR-014) are not in the design: keep them in the category dialog as an optional multi-select under ความเร่งด่วนตั้งต้น.~~ (CR-005)
+
+> **CR-005 (approved 2026-10-27, repair CR-025):** the category dialog replaces the area-type multi-select with `ใช้กับประเภทอาคาร *` (check boxes of active building types, ≥ 1; new category: none ticked; error `เลือกประเภทอาคารอย่างน้อย 1 ประเภท`; hint `ฟอร์มแจ้งซ่อมแสดงหมวดนี้เฉพาะอาคารประเภทที่เลือก`). The `อื่น ๆ` category shows `ใช้ได้กับทุกประเภทอาคาร` instead (read-only). Category header meta line adds `ใช้กับ: {type tags}`. Data: #32–#34 `buildingTypeIds`, #53 for the options.
 
 ## Layout — mobile first
 

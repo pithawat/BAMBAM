@@ -53,6 +53,17 @@ type PlatformAuditLog struct {
 }
 
 type PlatformBuilding struct {
+	ID             uuid.UUID
+	Name           string
+	SortOrder      int32
+	IsActive       bool
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	UpdatedByID    *uuid.UUID
+	BuildingTypeID uuid.UUID
+}
+
+type PlatformBuildingType struct {
 	ID          uuid.UUID
 	Name        string
 	SortOrder   int32
@@ -173,9 +184,9 @@ type RepairCategory struct {
 	UpdatedByID     *uuid.UUID
 }
 
-type RepairCategoryAreaType struct {
-	CategoryID uuid.UUID
-	AreaType   string
+type RepairCategoryBuildingType struct {
+	CategoryID     uuid.UUID
+	BuildingTypeID uuid.UUID
 }
 
 type RepairContractor struct {

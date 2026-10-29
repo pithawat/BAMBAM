@@ -8,7 +8,7 @@
     "docs/modules/repair/03-plan.md",
     "docs/modules/repair/PROGRESS.md"
   ],
-  "roleCount": 6,
+  "roleCount": 4,
   "roleNote": "หัวหน้าแม่บ้านและหัวหน้ารปภ. เป็น 2 role ที่สิทธิ์เท่ากัน",
   "overviewFlow": "OV",
   "roles": [
@@ -51,16 +51,6 @@
         "ดูทุกงาน ปิดงานใดก็ได้พร้อมเหตุผล",
         "จัดวางอุปกรณ์ในห้อง"
       ]
-    },
-    {
-      "actor": "exec",
-      "name": "ผู้บริหาร",
-      "code": "executive",
-      "can": [
-        "Dashboard + โมเดล 3D",
-        "ดูทุกงานแบบอ่านอย่างเดียว",
-        "ดูข้อมูลช่างภายนอก"
-      ]
     }
   ],
   "matrix": {
@@ -68,8 +58,7 @@
       "user",
       "lead",
       "tech",
-      "admin",
-      "exec"
+      "admin"
     ],
     "rows": [
       {
@@ -79,8 +68,7 @@
           "user": true,
           "lead": true,
           "tech": true,
-          "admin": true,
-          "exec": true
+          "admin": true
         }
       },
       {
@@ -90,8 +78,7 @@
           "user": true,
           "lead": true,
           "tech": true,
-          "admin": true,
-          "exec": true
+          "admin": true
         }
       },
       {
@@ -116,8 +103,7 @@
           "user": "ของตัวเอง",
           "lead": "ของตัวเอง",
           "tech": true,
-          "admin": true,
-          "exec": "อ่านอย่างเดียว"
+          "admin": true
         }
       },
       {
@@ -127,8 +113,7 @@
           "user": "เฉพาะผู้แจ้ง",
           "lead": "เฉพาะผู้แจ้ง",
           "tech": "เฉพาะผู้แจ้ง",
-          "admin": "เฉพาะผู้แจ้ง",
-          "exec": "เฉพาะผู้แจ้ง"
+          "admin": "เฉพาะผู้แจ้ง"
         }
       },
       {
@@ -143,24 +128,21 @@
         "flows": "F24",
         "cells": {
           "tech": true,
-          "admin": "ดู",
-          "exec": "ดู"
+          "admin": "ดู"
         }
       },
       {
         "label": "ดูงานทั้งหมด / ปิดงานใดก็ได้",
         "flows": "F22 · F08-B",
         "cells": {
-          "admin": true,
-          "exec": "ดูอย่างเดียว"
+          "admin": true
         }
       },
       {
         "label": "Dashboard + 3D / จัดวางอุปกรณ์",
         "flows": "F23 · F31",
         "cells": {
-          "admin": true,
-          "exec": "Dashboard"
+          "admin": true
         }
       }
     ]
@@ -262,7 +244,7 @@
     {
       "id": "3",
       "short": "Admin งานทั้งหมด",
-      "name": "Admin เห็นทุกงานและปิดงานได้ ผู้บริหารดูอย่างเดียว",
+      "name": "Admin เห็นทุกงานและปิดงานได้ ดูช่างภายนอก",
       "status": "accepted",
       "flows": [
         "F22",
@@ -311,6 +293,28 @@
       "cr": "CR-020 · CR-021 · CR-022"
     },
     {
+      "id": "4R",
+      "short": "ตัดผู้บริหาร + แจ้งเตือน",
+      "name": "ตัด role ผู้บริหารและระบบแจ้งเตือนในหน้าจอ ข้อความ และ e2e · บีบอัดรูปมากขึ้น",
+      "status": "pending",
+      "flows": [],
+      "cr": "CR-024 · CR-026",
+      "note": "จะแก้ F03 F06 F07 F08-B F21 F22 F23 F24 · ส่วน backend (ไม่มี role ผู้บริหาร) ทำแล้วใน settings Stage 1"
+    },
+    {
+      "id": "4P",
+      "short": "เลือกสถานที่ก่อน",
+      "name": "ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร",
+      "status": "accepted",
+      "flows": [
+        "F02",
+        "F03",
+        "F04"
+      ],
+      "cr": "CR-025 · CR-026",
+      "date": "2026-10-29"
+    },
+    {
       "id": "5",
       "short": "สแกน QR",
       "name": "สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้",
@@ -321,12 +325,11 @@
     },
     {
       "id": "6",
-      "short": "หน้าแรก + แจ้งเตือน",
-      "name": "หน้าแรกตาม role และกระดิ่งแจ้งเตือน",
+      "short": "หน้าแรกตาม role",
+      "name": "หน้าแรกตาม role (ไม่มีระบบแจ้งเตือน, CR-024)",
       "status": "pending",
       "flows": [
-        "F01",
-        "F19-B"
+        "F01"
       ]
     },
     {
@@ -405,6 +408,26 @@
       "date": "2026-10-26",
       "after": "4",
       "text": "ชื่อร้านช่างภายนอกห้ามซ้ำ ร้านที่ปิดใช้งานให้เปิดใช้งานแทน"
+    },
+    {
+      "id": "CR-024",
+      "date": "2026-10-26",
+      "after": "4",
+      "text": "ตัด role ผู้บริหาร และระบบแจ้งเตือนทั้งหมด"
+    },
+    {
+      "id": "CR-025",
+      "date": "2026-10-27",
+      "after": "4",
+      "text": "ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน หมวดงานตามประเภทอาคาร",
+      "status": null
+    },
+    {
+      "id": "CR-026",
+      "date": "2026-10-27",
+      "after": "4",
+      "text": "บีบอัดรูปที่อัปโหลดมากขึ้น",
+      "status": null
     }
   ],
   "features": [
@@ -432,7 +455,7 @@
         "all"
       ],
       "stage": "2R",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "แจ้งปัญหา"
     },
@@ -460,7 +483,7 @@
         "all"
       ],
       "stage": "2R",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "แจ้งปัญหา"
     },
@@ -474,7 +497,7 @@
         "all"
       ],
       "stage": "1",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "แจ้งปัญหา"
     },
@@ -559,7 +582,7 @@
         "all"
       ],
       "stage": "2R",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "ติดตามงาน"
     },
@@ -573,7 +596,7 @@
         "all"
       ],
       "stage": "2",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "ติดตามงาน"
     },
@@ -587,22 +610,8 @@
         "all"
       ],
       "stage": "2",
-      "status": "built",
-      "e2e": "none",
-      "group": "ติดตามงาน"
-    },
-    {
-      "id": "F19-1",
-      "name": "กระดิ่งแจ้งเตือน",
-      "desc": "แจ้งเตือนในแอพเฉพาะตัว เมื่องานของเรามีความเคลื่อนไหว กดแล้วไปที่งาน",
-      "flow": "F19-B",
-      "screens": "S13",
-      "roles": [
-        "all"
-      ],
-      "stage": "6",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "ติดตามงาน"
     },
     {
@@ -615,7 +624,7 @@
         "tech"
       ],
       "stage": "3",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "งานช่าง"
     },
@@ -629,7 +638,7 @@
         "tech"
       ],
       "stage": "2R",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "งานช่าง"
     },
@@ -643,38 +652,36 @@
         "tech"
       ],
       "stage": "2R",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "งานช่าง"
     },
     {
       "id": "F24-1",
       "name": "ช่างภายนอก",
-      "desc": "ข้อมูล ประเภท คะแนน และประวัติงาน ช่างเพิ่มและให้คะแนนได้ Admin และผู้บริหารดูได้",
+      "desc": "ข้อมูล ประเภท คะแนน และประวัติงาน ช่างเพิ่มและให้คะแนนได้ Admin ดูได้",
       "flow": "F24",
       "screens": "S18",
       "roles": [
         "tech",
-        "admin",
-        "exec"
+        "admin"
       ],
       "stage": "3",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "งานช่าง"
     },
     {
       "id": "F22-1",
       "name": "งานทั้งหมด",
-      "desc": "ดูทุกงาน แยกแท็บตามขั้น กรอง ค้นหา เรียงเก่าก่อน ผู้บริหารดูได้อย่างเดียว",
+      "desc": "ดูทุกงาน แยกแท็บตามขั้น กรอง ค้นหา เรียงเก่าก่อน",
       "flow": "F22",
       "screens": "S11",
       "roles": [
-        "admin",
-        "exec"
+        "admin"
       ],
       "stage": "3",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "ดูแลภาพรวม"
     },
@@ -688,7 +695,7 @@
         "admin"
       ],
       "stage": "3",
-      "status": "built",
+      "status": "accepted",
       "e2e": "pass",
       "group": "ดูแลภาพรวม"
     },
@@ -699,8 +706,7 @@
       "flow": "F23",
       "screens": "S29",
       "roles": [
-        "admin",
-        "exec"
+        "admin"
       ],
       "stage": "3D",
       "status": "accepted",
@@ -714,8 +720,7 @@
       "flow": "F23",
       "screens": "S29",
       "roles": [
-        "admin",
-        "exec"
+        "admin"
       ],
       "stage": "3D",
       "status": "accepted",
@@ -1269,12 +1274,12 @@
           "l": "user",
           "r": 1,
           "t": "act",
-          "x": "ขั้น 1 ปัญหาที่พบ\nหมวดงาน + อาการ"
+          "x": "ขั้น 1 สถานที่\nอาคาร / ชั้น / ห้อง (บังคับ)"
         },
         {
           "i": "n1",
           "l": "sys",
-          "r": 1,
+          "r": 2,
           "t": "note",
           "x": "ระบบกำหนดความเร่งด่วนจากอาการ พร้อมเหตุผล"
         },
@@ -1283,7 +1288,7 @@
           "l": "user",
           "r": 2,
           "t": "act",
-          "x": "ขั้น 2 สถานที่\nอาคาร / ชั้น / ห้อง (บังคับ)"
+          "x": "ขั้น 2 ปัญหาที่พบ\nหมวดตามประเภทอาคาร + อาการ"
         },
         {
           "i": "a3",
@@ -1334,7 +1339,7 @@
           "l": "sys",
           "r": 7,
           "t": "act",
-          "x": "สร้างงาน สถานะ รับเรื่อง\nแจ้งเตือนช่าง"
+          "x": "สร้างงาน สถานะ รับเรื่อง\nช่างเห็นในงานของช่าง"
         },
         {
           "i": "e1",
@@ -1398,8 +1403,8 @@
         "from": {
           "spec": "frontend/e2e/repair/F02-report-form.spec.ts",
           "tests": [
-            "AC3 + AC5 + demo 1: room required, matching rooms first, review, ticket shows the room",
-            "2R AC2: an unfinished report comes back after a reload with its photo; เริ่มใหม่ clears the draft"
+            "AC5 + demo 1: review in step order, ticket shows the room",
+            "2R AC2 + CR-026 A1: an unfinished report comes back after a reload with its photo (IndexedDB); เริ่มใหม่ clears it"
           ]
         },
         "aliases": {
@@ -1440,39 +1445,16 @@
           },
           {
             "node": "a1",
-            "title": "ขั้น 1 ปัญหาที่พบ",
-            "desc": "เลือกหมวด ระบบปรับอากาศ แล้วเลือกอาการ แอร์ไม่เย็น",
-            "expect": "ระบบบอกความเร่งด่วนจากอาการพร้อมเหตุผล — ผู้แจ้งไม่ต้องเลือกเอง",
-            "do": [
-              {
-                "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
-                }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              }
-            ],
-            "highlight": "@next"
-          },
-          {
-            "node": "a2",
-            "title": "ขั้น 2 สถานที่",
+            "title": "ขั้น 1 สถานที่",
             "desc": "เลือก อาคาร 1 · ชั้น 4 แล้วลองกด ถัดไป ทั้งที่ยังไม่เลือกห้อง",
             "expect": "ห้องหรือจุดที่เกิดบังคับ — ระบบเตือนให้เลือกห้อง",
             "do": [
+              {
+                "see": {
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
+                }
+              },
               {
                 "click": {
                   "text": "อาคาร 1",
@@ -1495,10 +1477,10 @@
             "highlight": "@next"
           },
           {
-            "node": "a2",
+            "node": "a1",
             "title": "เลือกห้อง + บอกจุดเพิ่มเติม",
-            "desc": "ห้องที่ตรงกับหมวดขึ้นก่อน เลือก อ.1 ห้อง 401 แล้วบอกจุด \"Atlas {{run}}\"",
-            "expect": "ถ้ามีงานในห้องนี้ที่ยังไม่ปิด ระบบแสดงการ์ดให้ดู (F03)",
+            "desc": "เลือก อ.1 ห้อง 401 แล้วบอกจุด \"Atlas {{run}}\"",
+            "expect": "ถัดไป ไปขั้น ปัญหาที่พบ พร้อมบรรทัดสถานที่ที่เลือก",
             "do": [
               {
                 "see": {
@@ -1520,6 +1502,39 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              }
+            ],
+            "highlight": "@next"
+          },
+          {
+            "node": "a2",
+            "title": "ขั้น 2 ปัญหาที่พบ",
+            "desc": "เห็นเฉพาะหมวดของอาคารประเภทนี้ เลือก ระบบปรับอากาศ · แอร์ไม่เย็น",
+            "expect": "ระบบบอกความเร่งด่วนจากอาการพร้อมเหตุผล — ผู้แจ้งไม่ต้องเลือกเอง",
+            "do": [
+              {
+                "see": {
+                  "text": "/^สถานที่:/",
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               }
             ],
             "highlight": "@next"
@@ -1670,7 +1685,7 @@
           "l": "user",
           "r": 0,
           "t": "start",
-          "x": "กรอกถึงขั้นสถานที่\nหรือกดส่ง (F02)"
+          "x": "กรอกถึงขั้นปัญหาที่พบ\nหรือกดส่ง (F02)"
         },
         {
           "i": "a1",
@@ -1702,7 +1717,7 @@
           "l": "user",
           "r": 3,
           "t": "act",
-          "x": "เห็นการ์ดเคสที่พบใต้ห้อง\nกด ถัดไป ไม่ผ่าน"
+          "x": "เห็นการ์ดเคสที่พบใต้อาการ\nกด ถัดไป ไม่ผ่าน"
         },
         {
           "i": "d2",
@@ -1798,7 +1813,7 @@
         "from": {
           "spec": "frontend/e2e/repair/F03-duplicate-follow.spec.ts",
           "tests": [
-            "AC6 (CR-021): same spot → card between room and spot, ถัดไป blocked until another spot",
+            "AC4 (CR-025) / AC6 (CR-021): same spot → card in step 2 with the spot field, ถัดไป blocked until another spot",
             "same spot found while filling: the card blocks the step, leaving asks to discard"
           ]
         },
@@ -1819,7 +1834,7 @@
           "card": {
             "role": "region",
             "name": "มีคนแจ้งเรื่องนี้ไว้แล้ว",
-            "within": "@location"
+            "within": "@problem"
           }
         },
         "steps": [
@@ -1833,26 +1848,9 @@
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": "@next"
               },
               {
                 "click": {
@@ -1885,6 +1883,27 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               },
               {
                 "click": "@next"
@@ -1931,38 +1950,15 @@
             "role": "employee",
             "goto": "/repair/new",
             "title": "พนักงานจะแจ้งเรื่องเดียวกัน",
-            "desc": "เลือก ระบบปรับอากาศ · แอร์ไม่เย็น แล้วกด ถัดไป",
-            "expect": "ไปขั้น สถานที่",
+            "desc": "อาคาร 1 · ชั้น 4 · อ.1 ห้อง 401 · บอกจุดเพิ่มเติม \"Atlas {{run}}\" แล้วกด ถัดไป",
+            "expect": "ไปขั้น ปัญหาที่พบ",
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
               },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              }
-            ],
-            "highlight": "@next"
-          },
-          {
-            "node": "a1",
-            "title": "เลือกห้องเดิม จุดเดิม",
-            "desc": "อาคาร 1 · ชั้น 4 · อ.1 ห้อง 401 · บอกจุดเพิ่มเติม \"Atlas {{run}}\"",
-            "expect": "ระบบค้นงานที่ยังไม่ปิดในหมวด ชั้น และห้องเดียวกัน แล้วแสดงการ์ด มีคนแจ้งเรื่องนี้ไว้แล้ว ระหว่างห้องกับจุด",
-            "do": [
               {
                 "click": {
                   "text": "อาคาร 1",
@@ -1994,6 +1990,33 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              }
+            ],
+            "highlight": "@next"
+          },
+          {
+            "node": "a1",
+            "title": "เลือกหมวดเดิม",
+            "desc": "ระบบปรับอากาศ · แอร์ไม่เย็น",
+            "expect": "ระบบค้นงานที่ยังไม่ปิดในหมวด ชั้น และห้องเดียวกัน แล้วแสดงการ์ด มีคนแจ้งเรื่องนี้ไว้แล้ว ใต้อาการ",
+            "do": [
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               }
             ],
             "highlight": "@card",
@@ -2233,7 +2256,7 @@
           {
             "node": "a1",
             "title": "ฟอร์มทีม (เปลี่ยนประเภทไม่ได้)",
-            "desc": "เลือก ระบบปรับอากาศ · แอร์ไม่เย็น แล้วกด ถัดไป",
+            "desc": "อาคาร 1 · ชั้น 4 · อ.1 ห้อง 401 · จุด \"Atlas {{run}}\" แล้วกด ถัดไป",
             "expect": "หัวข้อ บันทึกงานที่ทีมแก้แล้ว · ไม่มีปุ่มสลับไปแจ้งช่าง",
             "do": [
               {
@@ -2244,33 +2267,10 @@
               },
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
               },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              }
-            ],
-            "highlight": "@next"
-          },
-          {
-            "node": "a1",
-            "title": "สถานที่",
-            "desc": "อาคาร 1 · ชั้น 4 · อ.1 ห้อง 401 · จุด \"Atlas {{run}}\"",
-            "expect": "ถัดไป ไปขั้นรูปภาพ",
-            "do": [
               {
                 "click": {
                   "text": "อาคาร 1",
@@ -2302,6 +2302,33 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              }
+            ],
+            "highlight": "@next"
+          },
+          {
+            "node": "a1",
+            "title": "ปัญหาที่พบ",
+            "desc": "เลือก ระบบปรับอากาศ · แอร์ไม่เย็น",
+            "expect": "ถัดไป ไปขั้นรูปภาพ",
+            "do": [
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               }
             ],
             "highlight": "@next"
@@ -2530,26 +2557,9 @@
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": "@next"
               },
               {
                 "click": {
@@ -2582,6 +2592,27 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               },
               {
                 "click": "@next"
@@ -2911,26 +2942,9 @@
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": "@next"
               },
               {
                 "click": {
@@ -2963,6 +2977,27 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               },
               {
                 "click": "@next"
@@ -3267,7 +3302,482 @@
           "t": "a1",
           "lb": "กลับมาให้ประเมิน"
         }
-      ]
+      ],
+      "tour": {
+        "from": {
+          "spec": "frontend/e2e/repair/F07-review.spec.ts",
+          "tests": [
+            "AC4 + AC8: the star tapped opens S08 with that score; no score = no submit; 4 stars closes as ประเมินตรวจงานแล้ว",
+            "AC5: ส่งกลับให้แก้ needs a reason → ส่งกลับให้แก้ step with the same technician",
+            "AC5: after a send back the technician sees the reason, records the fix again; the reporter closes it"
+          ]
+        },
+        "aliases": {
+          "problem": {
+            "css": "[data-step='problem']"
+          },
+          "location": {
+            "css": "[data-step='location']"
+          },
+          "send": {
+            "css": "[data-step='send']"
+          },
+          "next": {
+            "role": "button",
+            "name": "ถัดไป"
+          },
+          "now": {
+            "role": "region",
+            "name": "สิ่งที่เกิดขึ้นตอนนี้"
+          },
+          "progress": {
+            "role": "region",
+            "name": "ความคืบหน้าของงาน"
+          },
+          "assess": {
+            "role": "dialog",
+            "name": "เริ่มดำเนินการ"
+          },
+          "sheet": {
+            "role": "dialog",
+            "name": "/^บันทึกผล/"
+          },
+          "band": {
+            "role": "group",
+            "name": "เลือกคะแนนเพื่อเปิดแบบประเมิน"
+          },
+          "rate": {
+            "role": "dialog",
+            "name": "ประเมินงานซ่อม"
+          },
+          "back": {
+            "role": "dialog",
+            "name": "ส่งกลับให้ช่างแก้ไข"
+          }
+        },
+        "steps": [
+          {
+            "node": "s",
+            "role": "employee",
+            "goto": "/repair/new",
+            "title": "เตรียม: พนักงานแจ้งงานใหม่",
+            "desc": "พนักงานแจ้ง แอร์ไม่เย็น ที่ อาคาร 1 ชั้น 3 · RMC METRO - ท่าหลวง 2 จุด \"Atlas {{run}}\" (ระบบกรอกให้)",
+            "expect": "ได้เลขงาน แล้วเปิดหน้างาน",
+            "do": [
+              {
+                "see": {
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
+                }
+              },
+              {
+                "click": {
+                  "text": "อาคาร 1",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "click": {
+                  "text": "3",
+                  "exact": true,
+                  "within": {
+                    "role": "radiogroup",
+                    "name": "เลือกชั้น",
+                    "within": "@location"
+                  }
+                }
+              },
+              {
+                "click": {
+                  "text": "RMC METRO - ท่าหลวง 2",
+                  "exact": true,
+                  "within": "@location"
+                }
+              },
+              {
+                "fill": {
+                  "label": "บอกจุดเพิ่มเติม",
+                  "within": "@location"
+                },
+                "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "upload": {
+                  "css": "[data-step='send'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": "@send"
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ยืนยันส่งแจ้งซ่อม"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ยืนยันส่งแจ้งซ่อม"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "heading",
+                  "name": "รับเรื่องแล้ว"
+                }
+              },
+              {
+                "click": {
+                  "role": "link",
+                  "name": "ดูงานนี้"
+                }
+              },
+              {
+                "waitFor": "@progress"
+              }
+            ]
+          },
+          {
+            "node": "s",
+            "role": "technician",
+            "title": "เตรียม: ช่างเริ่มดำเนินการ",
+            "desc": "ช่างเปิดงานเดียวกัน เลือกวันคาดเสร็จ พรุ่งนี้ ซ่อมเองโดยช่างของบริษัท",
+            "expect": "สถานะ กำลังดำเนินการ",
+            "do": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "เริ่มดำเนินการ",
+                  "within": "@now"
+                }
+              },
+              {
+                "click": {
+                  "role": "radio",
+                  "name": "/^พรุ่งนี้/",
+                  "within": "@assess"
+                }
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "เริ่มดำเนินการ",
+              "within": "@assess"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "เริ่มดำเนินการ",
+                  "within": "@assess"
+                }
+              },
+              {
+                "see": "/เริ่มดำเนินการแล้ว/"
+              }
+            ]
+          },
+          {
+            "node": "s",
+            "title": "เตรียม: ช่างบันทึกผลซ่อม",
+            "desc": "รูปหลังซ่อม + สิ่งที่ทำ แล้วส่งผล งานจะไปรอผู้แจ้งประเมินตรวจงาน",
+            "expect": "สถานะ เสร็จ · รอประเมินตรวจงาน",
+            "do": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "บันทึกผลซ่อม",
+                  "within": "@now"
+                }
+              },
+              {
+                "upload": {
+                  "css": "[role='dialog'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": "@sheet"
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              },
+              {
+                "fill": {
+                  "label": "ทำอะไรไป",
+                  "within": "@sheet"
+                },
+                "text": "ล้างแผงคอยล์เย็น เปลี่ยนท่อน้ำทิ้ง"
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ส่งผลการซ่อม",
+              "within": "@sheet"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ส่งผลการซ่อม",
+                  "within": "@sheet"
+                }
+              },
+              {
+                "see": "/ส่งผลแล้ว/"
+              }
+            ]
+          },
+          {
+            "node": "a1",
+            "role": "employee",
+            "title": "ผู้แจ้งดูผลซ่อม",
+            "desc": "เปิดงานที่ช่างส่งผลแล้ว แท็บ ผลการซ่อม เปิดให้เอง พร้อมรูปหลังซ่อมและสิ่งที่ช่างทำ",
+            "expect": "ขั้นปัจจุบัน รอคุณประเมินตรวจงาน",
+            "highlight": {
+              "role": "tab",
+              "name": "ผลการซ่อม"
+            },
+            "next": false
+          },
+          {
+            "node": "d1",
+            "title": "เรียบร้อยไหม?",
+            "desc": "เรียบร้อย = กดดาวเพื่อประเมิน · ยังไม่เรียบร้อย = ส่งกลับให้แก้",
+            "expect": "แถบดาว 1–5 ยังไม่มีดาวที่ถูกเลือกไว้ก่อน",
+            "highlight": "@band",
+            "next": false
+          },
+          {
+            "node": "a3",
+            "title": "ส่งกลับให้แก้",
+            "desc": "ลองกรณีที่ยังไม่เรียบร้อยก่อน: กด ส่งกลับให้แก้",
+            "expect": "กล่อง ส่งกลับให้ช่างแก้ไข",
+            "highlight": {
+              "role": "button",
+              "name": "/ส่งกลับให้แก้/"
+            }
+          },
+          {
+            "node": "a3",
+            "title": "บอกสิ่งที่ยังไม่เรียบร้อย + รูป",
+            "desc": "เหตุผลบังคับ ไม่ใส่จะขึ้น กรุณาบอกสิ่งที่ยังไม่เรียบร้อย · แนบรูปได้",
+            "expect": "กด ส่งกลับให้แก้ แล้วงานกลับไปที่ช่างคนเดิม",
+            "do": [
+              {
+                "fill": {
+                  "label": "/ยังพบปัญหาอะไร/",
+                  "within": "@back"
+                },
+                "text": "ยังมีน้ำหยดเมื่อเปิดแอร์เกิน 1 ชั่วโมง"
+              },
+              {
+                "upload": {
+                  "css": "[role='dialog'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": "@back"
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ส่งกลับให้แก้",
+              "within": "@back"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ส่งกลับให้แก้",
+                  "within": "@back"
+                }
+              },
+              {
+                "see": "/ส่งกลับให้ช่างแล้ว/"
+              }
+            ]
+          },
+          {
+            "node": "a3",
+            "title": "สถานะ: ส่งกลับให้แก้",
+            "desc": "ความคืบหน้าแสดงเหตุผลที่ส่งกลับ ผู้แจ้งรอช่างแก้ไข",
+            "expect": "ขั้นปัจจุบัน ส่งกลับให้แก้ · มีข้อความ ยังมีน้ำหยด…",
+            "highlight": "@progress",
+            "next": false
+          },
+          {
+            "node": "t1",
+            "role": "technician",
+            "title": "ช่างเห็นเหตุผลที่ส่งกลับ",
+            "desc": "กล่องสิ่งที่เกิดขึ้นตอนนี้บอกว่า ผู้แจ้งส่งกลับให้แก้ พร้อมเหตุผล",
+            "expect": "ปุ่ม บันทึกผลอีกครั้ง",
+            "highlight": {
+              "role": "button",
+              "name": "บันทึกผลอีกครั้ง",
+              "within": "@now"
+            }
+          },
+          {
+            "node": "t1",
+            "title": "ส่งผลการแก้ไข",
+            "desc": "รูปหลังแก้ + สิ่งที่ทำเพิ่ม แล้วส่งผลอีกครั้ง",
+            "expect": "งานกลับไปรอผู้แจ้งประเมินตรวจงาน",
+            "do": [
+              {
+                "upload": {
+                  "css": "[role='dialog'] input[type=file]"
+                }
+              },
+              {
+                "waitFor": {
+                  "role": "button",
+                  "name": "/^ลบรูป 1/",
+                  "within": "@sheet"
+                }
+              },
+              {
+                "notSee": {
+                  "role": "progressbar"
+                }
+              },
+              {
+                "fill": {
+                  "label": "ทำอะไรไป",
+                  "within": "@sheet"
+                },
+                "text": "เปลี่ยนถาดรองน้ำทิ้ง น้ำไม่หยดแล้ว"
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ส่งผลการซ่อม",
+              "within": "@sheet"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ส่งผลการซ่อม",
+                  "within": "@sheet"
+                }
+              },
+              {
+                "see": "/ส่งผลแล้ว/"
+              }
+            ]
+          },
+          {
+            "node": "a1",
+            "role": "employee",
+            "title": "กลับมาให้ประเมินอีกครั้ง",
+            "desc": "งานเดิม เลขเดิม ช่างแก้ไขแล้ว ผู้แจ้งดูผลใหม่",
+            "expect": "ขั้นปัจจุบัน รอคุณประเมินตรวจงาน",
+            "highlight": "@progress",
+            "next": false
+          },
+          {
+            "node": "a2",
+            "title": "ประเมิน 4 ดาว",
+            "desc": "กดดาวบนแถบ แบบประเมินเปิดพร้อมคะแนนนั้น (ดาวบังคับ ไม่เลือกให้ก่อน)",
+            "expect": "แบบประเมินงานซ่อม · 4 / 5 · ดีมาก",
+            "highlight": {
+              "role": "button",
+              "name": "/^ประเมิน 4 ดาว/",
+              "within": "@band"
+            }
+          },
+          {
+            "node": "a2",
+            "title": "ยืนยันผลประเมิน",
+            "desc": "ใส่ความคิดเห็นได้ถ้าต้องการ แล้วกด ยืนยันผลประเมิน",
+            "expect": "ขึ้น ขอบคุณที่ประเมินตรวจงาน งานนี้ปิดแล้ว",
+            "do": [
+              {
+                "fill": {
+                  "label": "/มีอะไรอยากบอกเราเพิ่มเติม/",
+                  "within": "@rate"
+                },
+                "text": "ช่างมาแก้ให้เร็ว ตอนนี้ปกติแล้ว"
+              }
+            ],
+            "highlight": {
+              "role": "button",
+              "name": "ยืนยันผลประเมิน",
+              "within": "@rate"
+            },
+            "next": [
+              {
+                "click": {
+                  "role": "button",
+                  "name": "ยืนยันผลประเมิน",
+                  "within": "@rate"
+                }
+              },
+              {
+                "see": "ขอบคุณที่ประเมินตรวจงาน งานนี้ปิดแล้ว"
+              }
+            ]
+          },
+          {
+            "node": "e1",
+            "title": "ปิดงานแล้ว",
+            "desc": "ความคืบหน้าบอกคะแนนที่ให้ และว่าเคยส่งกลับ 1 ครั้ง · งานตัวอย่างปิดแล้ว ไม่ค้างในระบบ",
+            "expect": "คุณให้ 4 ดาว · ดีมาก",
+            "highlight": "@progress",
+            "next": false
+          }
+        ]
+      }
     },
     {
       "id": "F08-B",
@@ -3386,26 +3896,9 @@
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": "@next"
               },
               {
                 "click": {
@@ -3438,6 +3931,27 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               },
               {
                 "click": "@next"
@@ -3667,75 +4181,6 @@
       ]
     },
     {
-      "id": "F19-B",
-      "name": "แจ้งเตือนเฉพาะตัว (กระดิ่ง)",
-      "actors": [
-        "all"
-      ],
-      "screens": [
-        "S13"
-      ],
-      "lanes": [
-        {
-          "id": "sys"
-        },
-        {
-          "id": "user"
-        }
-      ],
-      "nodes": [
-        {
-          "i": "s",
-          "l": "sys",
-          "r": 0,
-          "t": "start",
-          "x": "งานของเรามีความเคลื่อนไหว\nประเมิน · เสร็จ · ส่งกลับ · ปิด"
-        },
-        {
-          "i": "n",
-          "l": "user",
-          "r": 0,
-          "t": "note",
-          "x": "แจ้งเตือนในแอพเท่านั้น ไม่มี LINE / อีเมลในช่วงแรก"
-        },
-        {
-          "i": "a1",
-          "l": "sys",
-          "r": 1,
-          "t": "act",
-          "x": "สร้างแจ้งเตือน\nเฉพาะคนที่เกี่ยวข้อง"
-        },
-        {
-          "i": "a2",
-          "l": "user",
-          "r": 2,
-          "t": "act",
-          "x": "เห็นตัวเลขบนกระดิ่ง\nกดเปิดรายการ"
-        },
-        {
-          "i": "e1",
-          "l": "user",
-          "r": 3,
-          "t": "end",
-          "x": "กดรายการ → หน้างานนั้น"
-        }
-      ],
-      "edges": [
-        {
-          "f": "s",
-          "t": "a1"
-        },
-        {
-          "f": "a1",
-          "t": "a2"
-        },
-        {
-          "f": "a2",
-          "t": "e1"
-        }
-      ]
-    },
-    {
       "id": "F21",
       "name": "งานช่าง: เริ่มดำเนินการ → บันทึกผล",
       "actors": [
@@ -3939,26 +4384,9 @@
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": "@next"
               },
               {
                 "click": {
@@ -3991,6 +4419,27 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               },
               {
                 "click": "@next"
@@ -4223,8 +4672,7 @@
       "id": "F22",
       "name": "Admin ดูทุกงาน",
       "actors": [
-        "admin",
-        "exec"
+        "admin"
       ],
       "screens": [
         "S11"
@@ -4233,9 +4681,6 @@
         {
           "id": "admin",
           "slots": 3
-        },
-        {
-          "id": "exec"
         }
       ],
       "nodes": [
@@ -4252,13 +4697,6 @@
           "r": 1,
           "t": "act",
           "x": "ทุกงาน เรียงเก่าก่อน\nแท็บตามขั้น กรอง ค้นหา"
-        },
-        {
-          "i": "n",
-          "l": "exec",
-          "r": 1,
-          "t": "note",
-          "x": "ผู้บริหารเห็นหน้าเดียวกัน อ่านอย่างเดียว ไม่มีปุ่ม"
         },
         {
           "i": "d1",
@@ -4358,26 +4796,9 @@
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": "@next"
               },
               {
                 "click": {
@@ -4410,6 +4831,27 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               },
               {
                 "click": "@next"
@@ -4544,8 +4986,7 @@
       "id": "F23",
       "name": "Dashboard + ภาพรวมอาคาร 3D",
       "actors": [
-        "admin",
-        "exec"
+        "admin"
       ],
       "screens": [
         "S29"
@@ -4554,8 +4995,8 @@
         {
           "id": "admin",
           "slots": 2,
-          "label": "Admin / ผู้บริหาร",
-          "sub": "ผู้บริหารดูอย่างเดียว"
+          "label": "Admin",
+          "sub": "admin"
         },
         {
           "id": "sys"
@@ -4798,8 +5239,7 @@
       "name": "ช่างภายนอก",
       "actors": [
         "tech",
-        "admin",
-        "exec"
+        "admin"
       ],
       "screens": [
         "S18",
@@ -4815,7 +5255,7 @@
         },
         {
           "id": "admin",
-          "label": "Admin / ผู้บริหาร",
+          "label": "Admin",
           "sub": "ดูอย่างเดียว"
         }
       ],
@@ -4955,26 +5395,9 @@
             "do": [
               {
                 "see": {
-                  "text": "เลือกหมวดที่ตรงกับปัญหา",
-                  "visible": true
+                  "role": "heading",
+                  "name": "ปัญหาเกิดขึ้นที่ไหน"
                 }
-              },
-              {
-                "click": {
-                  "text": "ระบบปรับอากาศ",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": {
-                  "text": "แอร์ไม่เย็น",
-                  "exact": true,
-                  "within": "@problem"
-                }
-              },
-              {
-                "click": "@next"
               },
               {
                 "click": {
@@ -5007,6 +5430,27 @@
                   "within": "@location"
                 },
                 "text": "Atlas {{run}}"
+              },
+              {
+                "click": "@next"
+              },
+              {
+                "click": {
+                  "text": "ระบบปรับอากาศ",
+                  "exact": true,
+                  "within": "@problem"
+                }
+              },
+              {
+                "click": {
+                  "text": "แอร์ไม่เย็น",
+                  "exact": true,
+                  "within": {
+                    "role": "group",
+                    "name": "/อาการที่พบ/",
+                    "within": "@problem"
+                  }
+                }
               },
               {
                 "click": "@next"
@@ -5207,7 +5651,7 @@
             "node": "a2",
             "title": "ให้คะแนนช่างภายนอก 1–5",
             "desc": "แนบรูปหลังซ่อม บอกสิ่งที่ทำ แล้วให้ 4 ดาว",
-            "expect": "คะแนนเห็นเฉพาะช่าง Admin และผู้บริหาร",
+            "expect": "คะแนนเห็นเฉพาะช่าง และ Admin",
             "do": [
               {
                 "upload": {
@@ -5285,7 +5729,7 @@
           {
             "node": "e1",
             "role": "admin",
-            "title": "Admin / ผู้บริหาร ดูอย่างเดียว",
+            "title": "Admin ดูอย่างเดียว",
             "desc": "สลับเป็น Admin",
             "expect": "รายชื่อ คะแนน และประวัติงาน — ไม่มีปุ่มแก้ไข",
             "highlight": {

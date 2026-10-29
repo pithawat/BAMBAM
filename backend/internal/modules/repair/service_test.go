@@ -30,6 +30,7 @@ type fakeRepo struct {
 	recent   []RecentPlace                    // #28 result
 	floors   map[uuid.UUID]uuid.UUID          // floor → building
 	rooms    map[uuid.UUID]uuid.UUID          // active room → floor (CR-014)
+	notUsed  map[[2]uuid.UUID]bool            // {category, building}: not used in the building's type (CR-025)
 	photos   map[uuid.UUID]*Photo             // all photos
 	photoAt  map[uuid.UUID]time.Time          // created at
 	kinds    map[uuid.UUID]string             // attached photo → kind (report, follow, team …)
@@ -50,7 +51,7 @@ func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
 		cats: map[uuid.UUID]bool{}, catDef: map[uuid.UUID]string{}, catOther: map[uuid.UUID]bool{},
 		symptoms: map[uuid.UUID]uuid.UUID{}, symPrio: map[uuid.UUID]string{},
-		floors: map[uuid.UUID]uuid.UUID{}, rooms: map[uuid.UUID]uuid.UUID{},
+		floors: map[uuid.UUID]uuid.UUID{}, rooms: map[uuid.UUID]uuid.UUID{}, notUsed: map[[2]uuid.UUID]bool{},
 		photos: map[uuid.UUID]*Photo{}, photoAt: map[uuid.UUID]time.Time{}, kinds: map[uuid.UUID]string{},
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
@@ -312,6 +313,10 @@ func (f *fakeRepo) ActiveFloorInBuilding(_ context.Context, floorID, buildingID 
 func (f *fakeRepo) ActiveRoomOnFloor(_ context.Context, roomID, floorID uuid.UUID) (bool, error) {
 	fl, ok := f.rooms[roomID]
 	return ok && fl == floorID, nil
+}
+
+func (f *fakeRepo) CategoryUsedInBuilding(_ context.Context, categoryID, buildingID uuid.UUID) (bool, error) {
+	return !f.notUsed[[2]uuid.UUID{categoryID, buildingID}], nil
 }
 
 func (f *fakeRepo) LockAttachablePhotos(_ context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error) {
@@ -648,6 +653,61 @@ func TestCreateTicketRoomAndOtherRules(t *testing.T) {
 	d, err := f.svc.CreateTicket(ctx, f.reporter, in)
 	if ins := f.repo.inserted[0]; err != nil || ins.RoomID != *in.RoomID || *ins.LocationDetail != "ฝั่งหน้าต่าง" || d.Room == nil {
 		t.Fatalf("room / extra spot not stored: %+v err=%v", ins, err)
+	}
+}
+
+// BR-F02-8 (CR-025): the category must be used in the building's type; "อื่น ๆ" is used in every type.
+// The rule runs after the master data checks and before the duplicate check, in normal and team mode.
+func TestCreateTicketCategoryForBuilding(t *testing.T) {
+	ctx := context.Background()
+	lead := viewerAs(users.RoleHousekeeperLead, uuid.New())
+	normal := func(t *testing.T, f *fixture, v Viewer) CreateTicketInput { return f.input(f.upload(t, v)) }
+	cases := []struct {
+		name    string
+		lead    bool
+		input   func(t *testing.T, f *fixture, v Viewer) CreateTicketInput
+		blocked bool
+		want    string
+	}{
+		{"used in the type", false, normal, false, ""},
+		{"not used in the type", false, normal, true, "CATEGORY_NOT_FOR_BUILDING"},
+		{"team mode, used", true, func(t *testing.T, f *fixture, v Viewer) CreateTicketInput { return f.teamInput(t, v) }, false, ""},
+		{"team mode, not used", true, func(t *testing.T, f *fixture, v Viewer) CreateTicketInput { return f.teamInput(t, v) }, true, "CATEGORY_NOT_FOR_BUILDING"},
+		{"อื่น ๆ is used everywhere", false, func(t *testing.T, f *fixture, v Viewer) CreateTicketInput {
+			in := f.input(f.upload(t, v))
+			in.CategoryID, in.SymptomIDs = &f.other, []uuid.UUID{f.otherSym}
+			return in
+		}, true, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			v := f.reporter
+			if tc.lead {
+				v = lead
+			}
+			in := tc.input(t, f, v)
+			if tc.blocked {
+				f.repo.notUsed[[2]uuid.UUID{*in.CategoryID, f.building}] = true
+			}
+			_, err := f.svc.CreateTicket(ctx, v, in)
+			if code(err) != tc.want || (tc.want == "" && err != nil) {
+				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+			if tc.want != "" && (len(f.repo.inserted) != 0 || len(f.repo.dupLocks) != 0 || len(f.repo.counters) != 0) {
+				t.Fatal("a refused report was inserted, checked for duplicates or used a number")
+			}
+		})
+	}
+
+	// An inactive room is still MASTER_DATA_CHANGED, even when the category is not used there.
+	f := newFixture(t)
+	in := f.input(f.upload(t, f.reporter))
+	r := uuid.New()
+	in.RoomID = &r
+	f.repo.notUsed[[2]uuid.UUID{f.cat, f.building}] = true
+	if _, err := f.svc.CreateTicket(ctx, f.reporter, in); code(err) != "MASTER_DATA_CHANGED" {
+		t.Fatalf("err = %v, want MASTER_DATA_CHANGED first", err)
 	}
 }
 

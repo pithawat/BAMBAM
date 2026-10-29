@@ -130,9 +130,9 @@ type Category struct {
 	ID              uuid.UUID
 	Name            string
 	Icon            string
-	DefaultPriority string   // used when only "อาการอื่นๆ" is picked (CR-008)
-	IsOther         bool     // the one "อื่น ๆ" category; only it takes a typed category name (CR-014)
-	AreaTypes       []string // room area types where its problems usually happen (CR-014)
+	DefaultPriority string      // used when only "อาการอื่นๆ" is picked (CR-008)
+	IsOther         bool        // the one "อื่น ๆ" category; only it takes a typed category name (CR-014)
+	BuildingTypeIDs []uuid.UUID // building types it is used in; empty for "อื่น ๆ" = every type (CR-025)
 	Symptoms        []Symptom
 }
 
@@ -169,9 +169,10 @@ type Room struct {
 }
 
 type Building struct {
-	ID     uuid.UUID
-	Name   string
-	Floors []Floor
+	ID           uuid.UUID
+	Name         string
+	BuildingType Ref // CR-025: always set
+	Floors       []Floor
 }
 
 // Viewer is the logged-in user as the repair service needs it.

@@ -1,6 +1,6 @@
 # ตั้งค่าระบบ (Superadmin) — Build plan
 
-Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · repair CR-014 applied 2026-10-19 (Stage 4 / 5 notes) · CR-001–CR-004 applied 2026-10-26 (rework tasks tagged per stage; design `ui/mockups/CR-001-admin-settings.html`)
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · repair CR-014 applied 2026-10-19 (Stage 4 / 5 notes) · CR-001–CR-004 applied 2026-10-26 (rework tasks tagged per stage; design `ui/mockups/CR-001-admin-settings.html`) · CR-005 applied 2026-10-27 (Stage 4P added)
 
 <!-- Written by Claude in /stage-plan settings (2026-10-16). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -16,6 +16,7 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 | 4 | (CR-001 / CR-002) อาคารและอุปกรณ์: เลือกห้องจากผัง แก้ชื่ออาคาร/ห้อง จัดการอุปกรณ์ในห้อง และประเภทอุปกรณ์ (Admin + Superadmin) | F26 | S20 (redesigned), ~~S21~~ | done — accepted 2026-10-27 (Claude UI, D-115) |
 | 5 | ตั้งค่าหมวดงาน อาการ (Admin + Superadmin, CR-001) และประเภทผู้รับเหมา (Superadmin) ได้ | F27, F28 | S22, S23 | done — accepted 2026-10-27 (Claude UI, D-115) |
 | 6 | edge cases, สิทธิ์ทุก role, มือถือ, a11y และความพร้อม UAT | all | all | done — accepted 2026-10-27 (Claude, D-115) |
+| 4P | **CR-005 (repair CR-025):** ประเภทอาคาร — แท็บ "ประเภทอาคาร" ใน S20, อาคารต้องมีประเภท, หมวดงานต้องระบุ "ใช้กับประเภทอาคาร" ใน S22 (Admin + Superadmin) — after repair 4P backend | F26, F27 | S20, S22 | pending |
 
 (CR-001) Order unchanged. The administration shell (sidebar, drawer, page heading with mascot) is built in Stage 1 so every later stage only adds a page into it. Admin's own pages (4, 5) still follow the identity pages; Admin sees an empty-but-working shell until then.
 
@@ -264,6 +265,33 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 - [x] AC1: Playwright suite for settings green in CI
 - [x] AC2: Every screen shows loading / empty / error / forbidden states with the exact copy
 - [x] AC3: UAT checklist written in `PROGRESS.md` (env codes, sample data, who tests what)
+
+---
+
+## Stage 4P — ประเภทอาคาร (CR-005, repair CR-025)
+
+Status: pending — runs after repair Stage 4P and before repair 4R (D-121); needs the repair Stage 4P backend (the migration with `platform.building_types` and `repair.category_building_types` lives there). Built by Claude (D-115).
+
+**Scope**
+- Flows: F26 (BR-F26-6), F27 (BR-F27-1 CR-005 part) · Screens: S20 (tab `ประเภทอาคาร`, `แก้ไขอาคาร` dialog, type tag), S22 (`ใช้กับประเภทอาคาร *`) · Endpoints: #13, #15, #32–#34, #53–#55
+- Shared code: `platform/queries/locations.sql`, `internal/platform` locations service
+
+**Backend (Claude)**
+- [ ] #13 `buildingType`; #15 `buildingTypeId` (active type, audit)
+- [ ] #53–#55 building types (usage counts, `IN_USE` on deactivate, `NAME_TAKEN`, `VERSION_CONFLICT`, audit `building_type`)
+- [ ] #32–#34 `buildingTypeIds` (required ≥ 1 on create, `NOT_ALLOWED` on `isOther`), drop `areaTypes`; audit diff shows the types
+- [ ] Go tests: service rules + Pg integration (types, mapping, deactivate in use)
+
+**Frontend (Claude)**
+- [ ] `settings/{types,api,mocks}.ts`; S20 tab + dialogs + tag; S22 dialog field + header tags (remove the area-type multi-select); S26 audit labels for `building_type`
+- [ ] e2e: add a building type, change อาคาร 1's type, category without types → error, `อื่น ๆ` locked
+
+**Acceptance criteria**
+- [ ] AC1: S20 `ประเภทอาคาร` lists อาคารสำนักงาน (1 อาคาร), โกดังเก็บของ (1), พื้นที่ภายนอกอาคาร (1); add `โรงงาน` with all categories ticked → it appears in the building dialog select
+- [ ] AC2: Deactivating a type used by an active building shows `ยังมีอาคารใช้ประเภทนี้อยู่ เปลี่ยนประเภทของอาคารก่อน`
+- [ ] AC3: Changing `โกดังเก็บของ 1 (ตัวอย่าง)` to อาคารสำนักงาน → the repair form shows ระบบปรับอากาศ for that building; changing back hides it
+- [ ] AC4: S22 new category without a building type → `เลือกประเภทอาคารอย่างน้อย 1 ประเภท`; `อื่น ๆ` shows `ใช้ได้กับทุกประเภทอาคาร` (no check boxes)
+- [ ] AC5: every change appears in S26; `go test ./...`, `tsc`, `eslint`, `next build`, settings e2e pass
 
 ---
 

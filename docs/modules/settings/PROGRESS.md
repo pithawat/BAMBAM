@@ -6,11 +6,13 @@
 
 ## Now
 
+- **CR-005 approved 2026-10-27 (M, with repair CR-025, D-117 / D-118):** building types (S20 tab ประเภทอาคาร, building type required), categories need `ใช้กับประเภทอาคาร` (S22, replaces area types), #53–#55 — rework **Stage 4P**, after the repair 4P backend (migration lives there)
 - D-115 (owner 2026-10-26): Claude builds the UI of Stages 2–6 back to back; each stage gets its tests + report below; nothing committed / tagged until the owner accepts each stage.
 - Module complete: Stages 1–6 accepted (2–6 on 2026-10-27, one commit, tags `settings-stage-2`…`6`). Atlas synced; no settings tours yet.
 
 ## Next
 
+0. Settings Stage 4P (CR-005) once repair Stage 4P backend is in — `/build-stage settings 4P`
 1. Before UAT: fill the env codes in the UAT checklist; optional `/atlas tour settings <flow>` for UAT scripts.
 2. Owner decisions in Open issues (floor token in suggested asset codes, Next.js upgrade).
 
@@ -28,6 +30,7 @@
 - Owner decisions 2026-10-26: asset type code prefix + mount; S19 removed (both roles land on อาคารและอุปกรณ์; Superadmin Home = S29); floor plans out of settings; S23 + S26 in the sidebar.
 
 ## Open issues / questions
+- (2026-10-29, repair 4P, D-122) `repair.category_area_types` is dropped: S22 `areaTypes` is now a no-op (API answers `[]`, input ignored) and a new category goes into every active building type — settings Stage 4P replaces it with `buildingTypeIds` (the repair side already reads `repair.category_building_types` / `ListCategoryBuildingTypes`)
 
 - Stage 2: deleting a role deletes its demo users, except a demo user that tickets / photos still reference (repair FKs); that one only loses the role (becomes employee). Contract says "deleted with it" — fine for dev/UAT, confirm at wire.
 - Stage 2: role audit rows store `data = { entityName, changes }` (AuditEntry shape) for Stage 3 S26; actor = the session user (demo user when role-switched).
@@ -50,6 +53,7 @@
 
 ## Stage log
 
+- 2026-10-27: CR-005 (building types) approved + applied to docs; Stage 4P added
 - P1 discovery drafted 2026-10-15 · approved 2026-10-16
 - P3 UI spec + P4 plan drafted 2026-10-16 · approved 2026-10-16 (+CR-007, D-052)
 - 2026-10-26: CR-001…CR-004 design delivered, approved and applied to the source docs (D-106–D-111); build remains 0 of 6.

@@ -15,7 +15,7 @@ import { assessTicket, closeTicket, confirmTicket, getContractors, getTicket, ha
 import { assessFieldMessages, errorCode, errorMessage, fieldErrors, handoverFieldMessages, reviewFieldMessages } from "../errors";
 import type { Contractor, TicketDetail, WorkBy } from "../types";
 import { ContractorFormDialog } from "./contractors";
-import { PhotoPicker, type PhotoItem } from "./photo-picker";
+import { forgetUploads, photoBlocker, PhotoPicker, uploadKeptPhotos, type PhotoItem } from "./photo-picker";
 import { RESOLVED_TOAST, ResolveFields } from "./resolve-form";
 import { addDays, dayLabel, RATING_LABELS, shortDate, ticketLocation, ticketTitle, todayBangkok } from "./ticket-presentation";
 
@@ -283,14 +283,27 @@ function SendBackDialog({ ticket, open, onOpenChange, onDone }: DialogProps) {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  /** `กำลังส่งรูป {n}/{m}…` while the submit uploads the kept photos (CR-026 A1). */
+  const [sending, setSending] = useState("");
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) { setErrors({ reason: "กรุณาบอกสิ่งที่ยังไม่เรียบร้อย" }); return; }
-    if (photos.some((p) => p.status === "uploading")) { setErrors({ photoIds: "รอให้รูปอัปโหลดเสร็จก่อน" }); return; }
-    if (photos.some((p) => p.status === "failed")) { setErrors({ photoIds: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" }); return; }
+    const wait = photoBlocker(photos);
+    if (wait) { setErrors({ photoIds: wait }); return; }
     setBusy(true); setErrors({});
-    try { onDone(await sendBackTicket(ticket.id, { reason: reason.trim(), photoIds: photos.map((p) => p.photo!.id) })); setPhotos([]); }
-    catch (err) { setErrors(handleError(err, () => onOpenChange(false))); }
+    let photoIds: string[];
+    try {
+      // CR-026 A1: the photos go up only now (#3), then #9 attaches them.
+      [photoIds] = await uploadKeptPhotos([{ items: photos, onChange: setPhotos }], (n, m) => setSending(`กำลังส่งรูป ${n}/${m}…`));
+    } catch {
+      setErrors({ photoIds: "ส่งไม่สำเร็จ ลองอีกครั้ง" }); setSending(""); setBusy(false); return;
+    }
+    setSending("");
+    try { onDone(await sendBackTicket(ticket.id, { reason: reason.trim(), photoIds })); setPhotos([]); }
+    catch (err) {
+      if (errorCode(err) === "PHOTO_NOT_FOUND") setPhotos(forgetUploads);
+      setErrors(handleError(err, () => onOpenChange(false)));
+    }
     finally { setBusy(false); }
   }
   const tech = ticket.technician?.name;
@@ -306,7 +319,7 @@ function SendBackDialog({ ticket, open, onOpenChange, onDone }: DialogProps) {
           <PhotoPicker value={photos} onChange={setPhotos} disabled={busy} invalid={!!errors.photoIds} />
           <FieldError id="photoIds-error" message={errors.photoIds} /></div>
         <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>ยกเลิก</Button>
-          <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}ส่งกลับให้แก้</Button></DialogFooter>
+          <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}{sending || "ส่งกลับให้แก้"}</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;

@@ -3,18 +3,19 @@ import { API, as, attachPhoto, auth, bangkokToday, fillPlace, placeIds, postTick
 
 // F03 (Stage 4, CR-009 / CR-020 / CR-021): duplicate = same category + floor + room with no extra spot or the
 // same spot → follow the old case; another spot is only similar and can be sent. A duplicate found while filling
-// stops ถัดไป at the สถานที่ step (CR-021); the S04 dialog on send covers a case reported meanwhile. Real API.
+// stops ถัดไป at step 2 ปัญหาที่พบ, where the card carries its own บอกจุดเพิ่มเติม (CR-021, CR-025); the S04 dialog on
+// send covers a case reported meanwhile. Real API.
 
 test.describe("employee", () => {
   test.use({ storageState: auth("employee") });
 
-  test("AC6 (CR-021): same spot → card between room and spot, ถัดไป blocked until another spot", async ({ page, baseURL }, info) => {
+  test("AC4 (CR-025) / AC6 (CR-021): same spot → card in step 2 with the spot field, ถัดไป blocked until another spot", async ({ page, baseURL }, info) => {
     test.slow(); // first visits compile on `next dev`
     const spot = tag(info, "ฝั่งหน้าต่าง");
     const old = await report(await as("security_lead", baseURL), spot);
 
     await fillPlace(page, `  ${spot} `);
-    const location = page.locator('[data-step="location"]');
+    const location = page.locator('[data-step="problem"]');
     const card = location.getByRole("region", { name: "มีคนแจ้งเรื่องนี้ไว้แล้ว" });
     await expect(card).toContainText(old.ticketNo);
     await expect(card).toContainText("จึงแจ้งซ้ำไม่ได้");
@@ -32,6 +33,10 @@ test.describe("employee", () => {
     await expect(location.getByText("กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ")).toHaveCount(0);
     await page.getByRole("button", { name: "ถัดไป" }).click();
     await expect(page.locator('[data-step="send"]').getByRole("heading", { level: 2 })).toBeVisible();
+    // the same value shows in step 1 and in the review
+    await expect(page.locator('[data-step="send"]').locator("dl")).toContainText("แอร์ตัวหน้าห้อง");
+    await page.getByRole("navigation", { name: "ขั้นตอนแจ้งซ่อม" }).getByRole("button", { name: /สถานที่/ }).click();
+    await expect(page.locator('[data-step="location"]').getByLabel("บอกจุดเพิ่มเติม")).toHaveValue(/แอร์ตัวหน้าห้อง/);
   });
 
   test("AC1: a case reported meanwhile → S04 on send → follow → S07 timeline and S06", async ({ page, baseURL }, info) => {
@@ -83,7 +88,7 @@ test.describe("employee", () => {
     await page.goto("/repair/my");
     await fillPlace(page, spot);
     await page.getByRole("button", { name: "ถัดไป" }).click(); // the inline card blocks here (CR-021) …
-    await page.locator('[data-step="location"]').getByRole("region", { name: "มีคนแจ้งเรื่องนี้ไว้แล้ว" })
+    await page.locator('[data-step="problem"]').getByRole("region", { name: "มีคนแจ้งเรื่องนี้ไว้แล้ว" })
       .getByRole("button", { name: "ติดตามเคสนี้" }).waitFor();
     await expect(page.locator('[data-step="send"]')).toBeHidden();
     await page.getByRole("navigation", { name: "เส้นทางหน้า" }).getByRole("link", { name: "แจ้งซ่อม", exact: true }).click(); // … leaving asks first

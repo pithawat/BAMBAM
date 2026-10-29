@@ -42,7 +42,7 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	areas, err := r.q.ListCategoryAreaTypes(ctx)
+	types, err := r.q.ListCategoryBuildingTypes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +50,9 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 	for _, s := range syms {
 		byCat[s.CategoryID] = append(byCat[s.CategoryID], Symptom{ID: s.ID, Name: s.Name, Priority: s.Priority})
 	}
-	areasBy := map[uuid.UUID][]string{}
-	for _, a := range areas {
-		areasBy[a.CategoryID] = append(areasBy[a.CategoryID], a.AreaType)
+	typesBy := map[uuid.UUID][]uuid.UUID{}
+	for _, t := range types {
+		typesBy[t.CategoryID] = append(typesBy[t.CategoryID], t.BuildingTypeID)
 	}
 	out := make([]Category, 0, len(cats))
 	for _, c := range cats {
@@ -61,7 +61,7 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 		}
 		out = append(out, Category{
 			ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, IsOther: c.IsOther,
-			AreaTypes: nonNil(areasBy[c.ID]), Symptoms: nonNil(byCat[c.ID]),
+			BuildingTypeIDs: nonNil(typesBy[c.ID]), Symptoms: nonNil(byCat[c.ID]),
 		})
 	}
 	return out, nil
@@ -94,7 +94,7 @@ func (r *PgRepository) ListBuildings(ctx context.Context) ([]Building, error) {
 	}
 	out := make([]Building, 0, len(blds))
 	for _, b := range blds {
-		out = append(out, Building{ID: b.ID, Name: b.Name, Floors: nonNil(byBld[b.ID])})
+		out = append(out, Building{ID: b.ID, Name: b.Name, BuildingType: Ref{ID: b.BuildingTypeID, Name: b.BuildingTypeName}, Floors: nonNil(byBld[b.ID])})
 	}
 	return out, nil
 }
@@ -587,6 +587,10 @@ func (r *pgTxRepository) ActiveFloorInBuilding(ctx context.Context, floorID, bui
 
 func (r *pgTxRepository) ActiveRoomOnFloor(ctx context.Context, roomID, floorID uuid.UUID) (bool, error) {
 	return r.q.ActiveRoomOnFloor(ctx, repairdb.ActiveRoomOnFloorParams{RoomID: roomID, FloorID: floorID})
+}
+
+func (r *pgTxRepository) CategoryUsedInBuilding(ctx context.Context, categoryID, buildingID uuid.UUID) (bool, error) {
+	return r.q.CategoryUsedInBuilding(ctx, repairdb.CategoryUsedInBuildingParams{CategoryID: categoryID, BuildingID: buildingID})
 }
 
 func (r *pgTxRepository) LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error) {

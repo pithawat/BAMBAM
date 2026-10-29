@@ -127,11 +127,11 @@ S06 uses a richer row: 56px photo thumb + title + location + mini progress (S06 
 ```
 
 - Picking opens the OS chooser (camera or gallery): `<input type="file" accept="image/*" multiple>`. No `capture` attribute, so the user can choose either.
-- Upload starts right after picking, so submit is quick. Tile states:
+- ~~Upload starts right after picking, so submit is quick.~~ (CR-026 A1) Picking only resizes the photo and keeps the file in the form: tile = local preview + remove ✕, no request yet. The form's submit button uploads the kept photos (#3) one by one with the label `กำลังส่งรูป {n}/{m}…`, then sends the action; on failure: `ส่งไม่สำเร็จ ลองอีกครั้ง`, form and photos stay, the failed tile gets the red overlay. S03 keeps draft photos in IndexedDB for 24 h (`03-plan.md` Stage 4P). Tile states during submit:
   - uploading: thumbnail dimmed + progress ring
   - done: thumbnail + remove button (✕, 32px hit area, aria-label "ลบรูป")
   - failed: red overlay, `AlertCircle` + "ลองใหม่" (tap retries)
-- Resize on the client before upload (long edge 1920px, JPEG) — proposal, confirm in `/stage-plan`.
+- Resize on the client before upload (long edge 1920px, JPEG ~~0.85~~ quality **0.25** — CR-026, D-119).
 - Max 5 photos; the add tile hides at 5/5. Tapping a done tile opens the lightbox.
 - Messages:
 

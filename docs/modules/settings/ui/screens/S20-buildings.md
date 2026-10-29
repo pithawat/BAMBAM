@@ -1,6 +1,6 @@
 # S20 — อาคารและอุปกรณ์ (CR-001 / CR-002)
 
-Status: APPROVED (2026-10-16) — user approved screens + plan · rewritten by CR-001 / CR-002 2026-10-26 (owner approved the design `../mockups/CR-001-admin-settings.html`); the original "อาคารและชั้น" spec is kept at the end for history
+Status: APPROVED (2026-10-16) — user approved screens + plan · rewritten by CR-001 / CR-002 2026-10-26 (owner approved the design `../mockups/CR-001-admin-settings.html`); the original "อาคารและชั้น" spec is kept at the end for history · CR-005 building types (approved 2026-10-27)
 
 - **Flows:** F26 (see ../../02-flows.md)
 - **Persona:** Admin and Superadmin on desktop (see ../../01-users.md)
@@ -9,6 +9,8 @@ Status: APPROVED (2026-10-16) — user approved screens + plan · rewritten by C
 - **Route:** `/settings/buildings` — tab in `?tab=` (`assets` default · `asset-types`); selection in `?building=&floor=&room=` (replace, no new history entry). `/settings` redirects here.
 - **Mockup:** `../mockups/CR-001-admin-settings.html#places` (desktop / mobile, asset dialog with inline type, rename dialogs); `?tab=types#places` for the types tab; screenshots `../mockups/CR-001-assets/places-*.png`, `asset-*.png`
 - **Data:** `getPlanBuildings` (#13), `renameBuilding` (#15), `renameRoom` (#27), `listRoomAssets` (#46), `createAsset` (#47), `updateAsset` (#48), `suggestAssetCode` (#49), `listAssetTypes` (#50), `createAssetType` (#51), `updateAssetType` (#52)
+
+> **CR-005 (approved 2026-10-27, repair CR-025) — building types.** (1) New tab `ประเภทอาคาร` (`?tab=building-types`, after `ประเภทอุปกรณ์`, same table pattern): columns ชื่อประเภทอาคาร · อาคาร (`{n}`) · หมวดงาน (`{n} หมวด`) · สถานะ · row menu `แก้ไขชื่อ` / `ปิดใช้งาน` / `เปิดใช้งาน`; primary `เพิ่มประเภทอาคาร`. Add dialog: `ชื่อประเภทอาคาร *` + `หมวดงานที่ใช้ได้` (check boxes of active categories except อื่น ๆ, all ticked; hint `หมวด “อื่น ๆ” ใช้ได้กับทุกประเภทอาคาร`). Deactivate blocked while used: `ยังมีอาคารใช้ประเภทนี้อยู่ เปลี่ยนประเภทของอาคารก่อน`; else confirm `ปิดใช้งานประเภทอาคารนี้? หมวดงานที่ใช้เฉพาะประเภทนี้จะไม่แสดงในฟอร์มแจ้งซ่อม`. Empty: `ยังไม่มีประเภทอาคาร`. (2) Building rename dialog → `แก้ไขอาคาร`: `ชื่ออาคาร *` + `ประเภทอาคาร *` (select of active types); note `เปลี่ยนประเภทแล้วมีผลกับงานแจ้งใหม่เท่านั้น`. (3) The building header / picker shows the type as a small tag. Data: #53–#55, #15 `buildingTypeId`. Access: `settings.locations.manage`.
 
 ## Layout — mobile first
 

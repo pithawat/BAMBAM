@@ -1,6 +1,6 @@
 # ระบบแจ้งซ่อม — Build plan
 
-Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19) · Stage 3 reduced + S09 sort rework by CR-015 (2026-10-19) · Stage 3D added, Stage 7 replaced by CR-016 (2026-10-19) · Stage 3U (UI refresh) added by CR-019 (2026-10-24) · CR-024 applied 2026-10-26 (Stage 4R added; Stage 6 without notifications)
+Status: APPROVED (2026-10-14) · re-planned by CR-005 (2026-10-15) · re-planned by CR-008 (2026-10-16) · Stage 2N added by CR-010 / CR-011 (2026-10-18) · Stage 2M added by CR-014 (2026-10-19) · Stage 3 reduced + S09 sort rework by CR-015 (2026-10-19) · Stage 3D added, Stage 7 replaced by CR-016 (2026-10-19) · Stage 3U (UI refresh) added by CR-019 (2026-10-24) · CR-024 applied 2026-10-26 (Stage 4R added; Stage 6 without notifications) · CR-025 applied 2026-10-27 (Stage 4P added) · CR-026 applied 2026-10-27, amendment A1 2026-10-29 (Stage 4P; 4P runs before 4R, D-121)
 
 <!-- Written by Claude in /stage-plan (2026-10-14). Stages are vertical slices that can be demoed.
      Each stage should fit in one focused session (Claude part + Codex part).
@@ -22,6 +22,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 3D | **CR-016:** หน้าแรก Admin ~~/ ผู้บริหาร~~ (CR-024 → 4R) = dashboard ตัวเลขสำคัญ + โมเดล 3D อาคาร 1 กลางหน้า (ชั้น → ผังห้อง → หมุดงานค้าง) · อุปกรณ์ (แอร์ ไมค์ ลำโพง ทีวี) วางในห้องด้วย drag and drop · บล็อกจองรถ / ห้องเป็นข้อมูลตัวอย่าง | F23, F31 | S29 (+ asset dialog) | done — accepted 2026-10-20, tag `repair-stage-3D` |
 | 3U | **CR-019 rework:** หน้าตาใหม่ตามต้นแบบ `bam-workplace-mascot-v4-refined.html` — S06 ตารางเดียว + ตัวกรองสถานะ · S07 กล่องเดียว + แท็บ · S03 สองคอลัมน์ + สรุป · S29 ขัดเกลา · มาสคอตเสือทั้งแอป | F02, F06, F07, F23 | S03, S06, S07, S29, S01, shared states | done (2026-10-24, `repair-stage-3U`) |
 | 4 | ระบบจับงานซ้ำให้ติดตามเคสเดิม (การ์ดในฟอร์มระหว่างกรอก, CR-008) หัวหน้าทีมบันทึกงานที่ทีมทำเอง (โหมดทีมในฟอร์ม) และส่งต่อให้ช่างได้ | F03, F04, F05 | S04 (inline + fallback), S03 (team step), S05 variants, S07 + S11 (hand over); CR-021: S03 / S04 / S06 relayout | done (2026-10-26, `repair-stage-4`) |
+| 4P | **CR-025 rework:** ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร (สำนักงาน · โกดัง · ภายนอกอาคาร) · การ์ดงานซ้ำย้ายไปขั้นปัญหาที่พบ · โกดังตัวอย่าง 1 หลัง + **CR-026:** รูป quality 0.25 และเก็บรูปไว้ในฟอร์มจนกดส่ง (ทุกฟอร์มที่แนบรูป) | F02, F03, F04, F07, F21 | S03, S04, S08, S10, PhotoPicker | pending — next (D-121) |
 | 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | pending |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
@@ -405,6 +406,52 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 
 ---
 
+## Stage 4P — CR-025 rework: place first, categories by building type (CR-025)
+
+Status: done — accepted 2026-10-29 (tag `repair-stage-4P`). UI built by Claude (owner request). Covers CR-025 and CR-026 (quality + amendment A1). Settings Stage 4P (S20 / S22 admin screens, settings CR-005) follows this stage's backend.
+
+**Scope**
+- Flows: F02 (steps สถานที่ → ปัญหาที่พบ → รูปภาพและส่ง, BR-F02-1 CR-025 part, BR-F02-7 hint retired, BR-F02-8), F03 (BR-F03-2: inline card in step ปัญหาที่พบ + inline `บอกจุดเพิ่มเติม`), F04 team mode (same order)
+- Screens: S03 (CR-025 block), S04 inline (CR-025 block)
+- Endpoints: #1 (`buildingTypeIds`, no `areaTypes`), #2 (`buildingType`), #5 (422 `CATEGORY_NOT_FOR_BUILDING`)
+- Out of this stage: admin screens (settings Stage 4P); real warehouse buildings (owner list); QR prefill order (Stage 5 note)
+
+**Backend (Claude)**
+- [x] Migration `…_repair_cr025_building_types.sql`: `platform.building_types` (id, name unique lower, sort_order, is_active, created / updated, `updated_by_id`) + 3 rows with stable ids (อาคารสำนักงาน · โกดังเก็บของ · พื้นที่ภายนอกอาคาร); `platform.buildings.building_type_id` (add nullable → backfill: พื้นที่ภายนอกอาคาร → outdoor, every other building → office → NOT NULL + FK); `repair.category_building_types (category_id, building_type_id, PK both)` with the CR-025 table; mock warehouse `โกดังเก็บของ 1 (ตัวอย่าง)` (type โกดังเก็บของ) + floor `1` + rooms `พื้นที่เก็บสินค้า` (`other`), `พื้นที่ส่วนกลางชั้น 1` (`common_area`); drop `repair.category_area_types`; Down reverses (recreates the CR-014 hint rows, drops the mock warehouse only if no ticket uses it)
+- [x] sqlc: `repair/queries/master.sql` (#1 types per category, #2 building type), `settings_admin.sql` (stop reading `category_area_types`), `platform/queries/locations.sql` (shared — stage report)
+- [x] #1 `buildingTypeIds` (empty for `isOther`); #2 `buildingType`
+- [x] #5 create (+ team handled): category must be used in the building's type unless `isOther` → 422 `CATEGORY_NOT_FOR_BUILDING`; checked after `MASTER_DATA_CHANGED`, before the duplicate check
+- [x] Tests: service (allowed / not allowed, `isOther` always allowed, team mode), Pg integration (migration backfill, NOT NULL, mapping rows, mock warehouse), #1 / #2 shape
+
+**Frontend contract (Claude)**
+- [x] `types.ts` / `mocks.ts` / `api.ts` / `errors.ts`: `buildingTypeIds`, `buildingType`, new error copy; mocks filter categories and include the mock warehouse; HANDOFF → `READY FOR CODEX — Stage 4P`
+
+**Photos — CR-026 (Claude, shared PhotoPicker)**
+- [x] (CR-026) Photo upload quality: `RESIZE_QUALITY` 0.85 → **0.25** in `modules/repair/api.ts` (long edge stays 1920px; every PhotoPicker upload: S03, S04 follow, S08, S10); update the D-022 comment
+- [x] (CR-026 A1) PhotoPicker keeps resized files in the form (local preview tiles, no upload on pick); a shared submit helper uploads the kept photos with #3 (`กำลังส่งรูป n/m…`) then calls the action — S03 (#5, incl. team `รูปหลังทำ`), S04 follow (#23), S08 send back (#9), S10 result (#10); retry re-uses photos already uploaded in the attempt; duplicate / validation checks run before any upload
+- [x] (CR-026 A1) S03 draft photos in IndexedDB (per user + mode, with `savedAt`); entries older than 24 h are deleted when the app starts and when the form opens; cleared on submit / `เริ่มใหม่` / logout; storage blocked → restore without photos + `แนบรูปอีกครั้ง`
+- [x] e2e: helpers `attachPhoto` / `uploadVia` (upload happens on submit), F02 draft restore brings photos back, no #3 call before submit
+
+**Frontend UI (Codex)**
+- [x] S03 step order สถานที่ → ปัญหาที่พบ → รูปภาพและส่ง (step strip, footer, summary column, review card order); step 1 plain room cards (no matching-room groups); step 2 filtered category grid + place line; clear note when the building type changes; draft restore clears a category that is no longer allowed
+- [x] S04 inline duplicate card in step 2 with the inline `บอกจุดเพิ่มเติม` field (same state as step 1); CR-021 block message moves with it
+
+**Wiring + e2e (Claude)**
+- [x] e2e `F02-report-form.spec.ts` (order, warehouse hides ระบบปรับอากาศ / ห้องประชุมและโสตฯ / ลานจอด, building change clears category, API 422), `F03-duplicate-follow.spec.ts` (card in step 2 + inline spot), `F04-team-handled.spec.ts`, `F22-admin-tickets.spec.ts`, helper `fillPlace`
+- [x] Atlas: re-record tours that fill S03 (F02, F03, F04, F05), `/atlas sync repair`, `cli verify`
+
+**Acceptance criteria**
+- [x] AC1: S03 opens on สถานที่; ถัดไป without a room shows `เลือกห้องหรือจุดที่เกิด`; step 2 names the chosen place above the grid
+- [x] AC2: อาคาร 1 shows every category except ลานจอด / ไม้กั้น; `โกดังเก็บของ 1 (ตัวอย่าง)` shows ไฟฟ้าและแสงสว่าง · ประปาและสุขาภิบาล · อาคารและพื้นที่ส่วนกลาง · อื่น ๆ; พื้นที่ภายนอกอาคาร shows ไฟฟ้าและแสงสว่าง · ประปาและสุขาภิบาล · ลานจอด / ไม้กั้น · อื่น ๆ
+- [x] AC3: Pick ระบบปรับอากาศ in อาคาร 1, go back to the warehouse → category and symptoms cleared with `หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้ เลือกใหม่อีกครั้ง`; the API rejects ระบบปรับอากาศ in the warehouse with `CATEGORY_NOT_FOR_BUILDING`
+- [x] AC4: A matching open ticket shows the duplicate card in step 2; ถัดไป is blocked until the inline `บอกจุดเพิ่มเติม` differs (or ติดตามเคส); the value shows in step 1 and the review
+- [x] AC5: Draft restore, ที่เคยแจ้ง and team mode work in the new order; desktop frame / phone 375px as CR-022
+- [x] AC6 (CR-026): a 4000×3000 phone photo uploads as a 1920px JPEG encoded at quality 0.25 (clearly smaller than before); S07 shows it; HEIC the browser cannot decode still uploads unchanged
+- [x] AC7 (CR-026 A1): picking photos sends no request; ยืนยันส่งแจ้งซ่อม uploads them then creates the ticket; a failed upload shows `ส่งไม่สำเร็จ ลองอีกครั้ง` and keeps form + photos; refresh within 24 h restores the photos, after 24 h the draft photos are gone; same submit behaviour in S04 / S08 / S10
+- [x] AC8: `go vet`, `go test ./...`, `golangci-lint`, `tsc`, `eslint`, `next build`, full e2e and Atlas `verify` pass
+
+---
+
 ## Stage 4R — CR-024 rework: no executive role, no notifications (CR-024)
 
 **Scope**
@@ -444,6 +491,7 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 - Out of this stage: F13-A (printing QR labels) — phase 1 labels are generated outside the app from the URL format in the contract (D-024)
 
 **Backend (Claude)**
+- [ ] (CR-025) The prefilled form opens on step 2 ปัญหาที่พบ (place + category filled); a prefilled category not used in the asset's building type is dropped
 - [ ] ~~Migration `assets`~~ — created in Stage 3D (CR-016: `platform.assets`, room only, category via `asset_type_categories`); here: #25 lookup returns `room` + type, S03 prefills, ticket stores `asset_id` + `asset_code`
 - [ ] Endpoint 25; tests
 
@@ -581,7 +629,7 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 ## Decisions recorded with this plan (DECISIONS.md)
 
 - D-021 IDs are UUIDs (not guessable in URLs; tickets are shown by `ticketNo`)
-- D-022 Photos: `PhotoStore` interface, phase 1 local directory (`PHOTO_STORAGE_DIR`, persistent volume), max 10 MB, client resize 1920px JPEG, unattached photos deleted after 24 h
+- D-022 Photos: `PhotoStore` interface, phase 1 local directory (`PHOTO_STORAGE_DIR`, persistent volume), max 10 MB, client resize 1920px JPEG (quality 0.25, CR-026 / D-119), photos uploaded only on submit (CR-026 A1 / D-120), unattached photos deleted after 24 h
 - D-023 Platform screens: S01, S14, S15 + AppShell in Stage 0; S02 Home ~~and S13 notifications (+ `platform.notifications`)~~ (CR-024) in repair Stage 6
 - D-024 QR content = `{FRONTEND_URL}/repair/new?asset={code}`; F13-A label printing stays outside the app in phase 1
 - D-025 Drag-and-drop library `@dnd-kit/sortable` (dropped by CR-005 — no queue); S12 rendered as data-driven SVG (no 3D library)
@@ -592,5 +640,6 @@ Frontend only (no API / DB change); Claude builds it (no Codex handoff, D-093). 
 - Real seed files (categories, the technician's account, buildings / floors, assets) — needed by Stage 8 at the latest; sample data until then · categories / symptoms arrived 2026-10-19 (CR-014)
 - (CR-014) Real room list per floor (name + area type) — who supplies it? Sample rooms (seed.go, dev/UAT) until then
 - ~~(CR-014) ลานจอด / ไม้กั้น has no building / floor~~ — answered 2026-10-19: building `พื้นที่ภายนอกอาคาร` → floor / room `ลานจอดรถ` (D-075); real zones still open
+- (CR-025) Real warehouse buildings (names, floors, rooms) — the mock `โกดังเก็บของ 1 (ตัวอย่าง)` stands in until the owner's list
 - Deploy target for UAT / production (affects `PHOTO_STORAGE_DIR` volume and backups)
 - Floor count / names / rear building for S12 — needed before Stage 7

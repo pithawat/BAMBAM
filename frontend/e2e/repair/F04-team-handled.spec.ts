@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { API, as, attachPhoto, auth, fillPlace, postTicket, tag, uploadVia } from "./helpers";
+import { API, as, attachPhoto, auth, fillPlace, postTicket, tag, attachVia } from "./helpers";
 
 // F04 (Stage 4, CR-021): team leads record a job the team already fixed — closed at once, never reaches the
 // technician (BR-F04-1/2/3). The team form opens only from S06 บันทึกงานที่ทีมแก้แล้ว (?mode=team, no switch). Real API.
@@ -39,7 +39,7 @@ test.describe("housekeeper lead", () => {
     await expect(page.getByText("แนบรูปหลังทำอย่างน้อย 1 รูป").first()).toBeVisible();
 
     await page.getByLabel("สิ่งที่ทีมทำ").fill("เช็ดพื้นและวางป้ายระวังลื่นแล้ว");
-    await uploadVia(page, page.locator('[data-field="teamHandled.photoIds"] input[type=file]'));
+    await attachVia(page, page.locator('[data-field="teamHandled.photoIds"] input[type=file]'));
     await page.getByRole("button", { name: "ยืนยันบันทึกงานทีม" }).click();
     await expect(page).toHaveURL(/\/repair\/new\/done\?id=/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { name: "บันทึกงานทีมเรียบร้อย" })).toBeVisible();

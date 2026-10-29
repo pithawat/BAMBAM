@@ -1,8 +1,87 @@
-# UI handoff — ระบบแจ้งซ่อม — Stages 1–4
+# UI handoff — ระบบแจ้งซ่อม — Stages 1–4P
 
-Status: ACCEPTED — Stage 4 (2026-10-26, tag `repair-stage-4`; incl. CR-021 / CR-022 built by Claude). Codex has nothing to build until Stage 5 prepare. Before: BUILT BY CLAUDE — Stage 4 CR-021 rework (2026-10-25, waiting for user acceptance with Stage 4: S03 / S04 / S06 relayout, built by Claude with the Impeccable skill — Codex has nothing to build; files below are Claude-owned until this note changes). Before: WIRED — Stage 4 (2026-10-25, Claude: real API + e2e F03 / F04 / F05), waiting for user acceptance. Earlier: UI DONE — Stage 4 by Codex (2026-10-24: S03 team mode + duplicate card, S04, S05 team variant, S07 / S11 hand over — section "Stage 4" below). Earlier: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+Status: BUILT BY CLAUDE — Stage 4P (2026-10-29, owner asked Claude to build the UI instead of Codex; wired + e2e; waiting for acceptance). Codex has nothing to build. Before: READY FOR CODEX — Stage 4P. Before: ACCEPTED — Stage 4 (2026-10-26, tag `repair-stage-4`; incl. CR-021 / CR-022 built by Claude). Codex has nothing to build until Stage 5 prepare. Before: BUILT BY CLAUDE — Stage 4 CR-021 rework (2026-10-25, waiting for user acceptance with Stage 4: S03 / S04 / S06 relayout, built by Claude with the Impeccable skill — Codex has nothing to build; files below are Claude-owned until this note changes). Before: WIRED — Stage 4 (2026-10-25, Claude: real API + e2e F03 / F04 / F05), waiting for user acceptance. Earlier: UI DONE — Stage 4 by Codex (2026-10-24: S03 team mode + duplicate card, S04, S05 team variant, S07 / S11 hand over — section "Stage 4" below). Earlier: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
 
 > **CR-024 (approved 2026-10-26):** no `executive` role and no notifications. Stage 4R (`03-plan.md`) is built by Claude — Codex has nothing to build for it; the files it touches (incl. `components/shared/app-navbar.tsx`, `bell-button.tsx`, `modules/repair/components/**`) are Claude-owned until Stage 4R is accepted. Copy changes: `screens/_common.md` §9.
+
+> **CR-025 (approved 2026-10-27):** S03 place-first with categories filtered by building type, S04 inline card in step 2 — **Stage 4P, ready for Codex (section below)**. CR-026 (quality 0.25 + A1 upload on submit) is already built by Claude. 4P runs before 4R (D-121).
+
+## Stage 4P (2026-10-29) — READY FOR CODEX: S03 place first + categories by building type, S04 card in step 2 (CR-025)
+
+Goal: `../03-plan.md` Stage 4P "Frontend UI (Codex)" + AC1–AC5. The backend (#1 `buildingTypeIds`, #2 `buildingType`, #5 422 `CATEGORY_NOT_FOR_BUILDING`), `types.ts` / `mocks.ts` / `api.ts` / `errors.ts` and the CR-026 photo work (PhotoPicker keeps photos in the form, upload on submit, S03 draft photos in IndexedDB) are done. Build the UI against the mocks.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md` §5 (PhotoPicker, CR-026 A1)
+2. `../changes/CR-025.md` "S03 behaviour" · `../03-plan.md` Stage 4P · `../02-flows.md` F02 (BR-F02-1, BR-F02-8), F03 BR-F03-2
+3. Screens — the **CR-025 box at the top first** (it overrides every older box where they differ): `S03-report-form.md`, `S04-duplicate-found.md`. The CR-021 / CR-022 boxes still give the frame, block rule, locked team mode and step heights.
+
+### Already done by Claude in `components/report-form.tsx` (keep it)
+
+- Step 1 room cards are a plain list in their normal order (`RoomChoice`; the `ห้องที่ตรงกับปัญหา` groups and `AREA_LABELS` are gone).
+- CR-026 A1 photos: `usePhotoList` / `photoBlocker` / `uploadKeptPhotos` / `forgetUploads` (`components/photo-picker.tsx`); `submit()` checks #22 for a blocking duplicate, then uploads the kept photos (button label `กำลังส่งรูป {n}/{m}…` from `sending`), then calls #5; `follow()` uploads then calls #23; draft photos in IndexedDB (`lib/draft-photos.ts`, `photoCount` in the draft, `photosLost` → `รูปที่เลือกไว้กู้คืนไม่ได้ แนบรูปอีกครั้ง` in the restored banner); `dropDraft()` instead of `clearDraft`. Move this code with the step swap; do not change its behaviour. S08 / S10 (`ticket-actions.tsx`, `resolve-form.tsx`) are done too.
+
+### What to build
+
+| Screen | Where | What |
+|---|---|---|
+| S03 order | `components/report-form.tsx` | `STEPS` = `location` (สถานที่) → `problem` (ปัญหาที่พบ) → `send` (รูปภาพและส่ง); the form opens on สถานที่; `FIELD_STEP`, `draftStep` (old drafts: map their step to the new order, a restored draft opens on the first step that is not complete), step strip, footer `ขั้นตอน n จาก 3`, reset / unmount (`setStep("location")`), `go(...)` after `MASTER_DATA_CHANGED`. Review card (phone) and the desktop summary column list **สถานที่ · ปัญหาที่พบ · ความเร่งด่วน** (+ team row as today), each `แก้ไข` → its step |
+| S03 step 1 | same | Heading + `ที่เคยแจ้ง ▾` · อาคาร + ชั้น · `ห้องหรือจุดที่เกิด *` · `บอกจุดเพิ่มเติม (ไม่บังคับ)`. **No duplicate card here.** `ถัดไป` without a room → `เลือกห้องหรือจุดที่เกิด` (validation already exists) |
+| S03 step 2 | same | Place line above the grid `สถานที่: {อาคาร} · ชั้น {n} · {ห้อง}` + text button `เปลี่ยน` (→ step 1). Category cards = `categories.filter((c) => categoryUsedIn(c, building))` (`types.ts`; keeps #1 order, `อื่น ๆ` always last). Symptoms / `อาการอื่นๆ` / priority explanation unchanged. The **S04 inline card** under the symptoms once a category is picked (same `DuplicateCard`, same #22 call and CR-021 block); when it blocks, the card contains the spot field `บอกจุดเพิ่มเติม * จำเป็นเมื่อพบงานที่ตรงกัน` bound to `values.locationDetail` (same value as step 1 — one state, two inputs with different ids), `ถัดไป` puts `กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ` under it and focuses it. So `locationDetail` / the block error now belongs to step `problem` while the card shows (FIELD_STEP / focus) |
+| S03 building change | same | Picking a building (step 1, `ที่เคยแจ้ง`, or draft restore) whose type does not use the picked category → clear `categoryId`, `symptomIds`, `symptomOtherOn`, `symptomOther`, `categoryOther`, and show in step 2 the info-tone note `หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้ เลือกใหม่อีกครั้ง` until a category is picked. A category that is still used stays selected. `sanitizeValues` must apply the same rule (draft restore, master reload) |
+| S03 submit error | same | 422 `CATEGORY_NOT_FOR_BUILDING`: banner `errorMessage(err)` (= `หมวดงานนี้ไม่มีในอาคารที่เลือก กรุณาเลือกใหม่`, already set by `submit()`) + refetch #1 / #2 (as for `MASTER_DATA_CHANGED`), clear the category and go to step 2 |
+| S03 team mode | same | `?mode=team`: same order; team fields stay in step 3 |
+| S04 | `components/duplicate-dialog.tsx` (card) + report-form | The inline card moves to step 2 with the inline spot field above; the CR-021 block message moves with it. Summary column shows the card on steps 2–3 (not on step 1). The submit-time dialog is unchanged |
+
+### Data — `modules/repair/api.ts` / `types.ts`
+
+| Function / field | # | Notes |
+|---|---|---|
+| `getCategories()` → `Category.buildingTypeIds: string[]` | 1 | empty for `isOther` = every type; `areaTypes` is gone |
+| `getBuildings()` → `Building.buildingType: Ref` | 2 | always set |
+| `categoryUsedIn(category, building)` | — | the filter (same rule as the server) |
+| `createTicket(req)` | 5 | new 422 `CATEGORY_NOT_FOR_BUILDING` (`errorMessage` copy in `errors.ts`) |
+| `getDuplicates(...)`, `followTicket(...)` | 22, 23 | unchanged |
+| `preparePhoto` / `uploadPhoto` | 3 | used only through `photo-picker.tsx` helpers — never call `uploadPhoto` on pick |
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`)
+
+- อาคาร 1 (and the sample office buildings): every category except ลานจอด / ไม้กั้น · `โกดังเก็บของ 1 (ตัวอย่าง)` ชั้น 1 (`พื้นที่เก็บสินค้า`, `พื้นที่ส่วนกลางชั้น 1`): ไฟฟ้าและแสงสว่าง · ประปาและสุขาภิบาล · อาคารและพื้นที่ส่วนกลาง · อื่น ๆ · พื้นที่ภายนอกอาคาร: ไฟฟ้าและแสงสว่าง · ประปาและสุขาภิบาล · ลานจอด / ไม้กั้น · อื่น ๆ.
+- Clear-note case: อาคาร 1 → ระบบปรับอากาศ → back to step 1 → โกดังเก็บของ 1 (ตัวอย่าง). `createTicket` in mock mode refuses a category the building type does not use (422), after the master checks and before the duplicate check.
+- Duplicate cases from Stage 4 still work (pick the place first, then the category): อาคารฝั่ง Office ชั้น 5 `ห้องประชุม 5A` + ระบบปรับอากาศ → blocking card in step 2.
+- Mock photos are `blob:` URLs: after a full reload in mock mode they come back from IndexedDB as local files.
+
+### You may edit (Stage 4P)
+
+- `frontend/src/modules/repair/components/report-form.tsx`, `components/duplicate-dialog.tsx`
+- This file: Stage 4P checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,priority,plan-geometry}.ts`, `components/photo-picker.tsx`, `components/resolve-form.tsx`, `components/ticket-actions.tsx`, `src/lib/**`, `components/shared/**`, backend, other docs.
+
+### Done when (Codex fills the Stage 4P checklist below)
+
+- [ ] AC1: S03 opens on สถานที่; ถัดไป without a room shows `เลือกห้องหรือจุดที่เกิด`; step 2 shows the place line + `เปลี่ยน`
+- [ ] AC2: the three mock building types show exactly the categories listed above
+- [ ] AC3: building change clears category + symptoms with the note; a mock 422 shows the banner and goes to step 2
+- [ ] AC4: blocking duplicate card in step 2; ถัดไป blocked until the inline `บอกจุดเพิ่มเติม` differs (or ติดตามเคส); the value shows in step 1, the summary and the review
+- [ ] AC5: draft restore (values + photos), ที่เคยแจ้ง and team mode work in the new order; desktop frame (CR-022) and phone 375 px, no horizontal scroll
+- [ ] Photos still send only on `ยืนยันส่งแจ้งซ่อม` (no #3 call on pick) and the label `กำลังส่งรูป n/m…` shows
+- [ ] `npm run lint && npm run typecheck` pass
+
+### Stage 4P checklist results (Codex fills)
+
+| Screen | All items pass? | Notes |
+|---|---|---|
+| S03 | Yes (Claude, real API) | e2e F02 AC1–AC7 + draft photos 24 h, desktop + mobile |
+| S04 | Yes (Claude, real API) | e2e F03 card in step 2 + inline spot, value shared with step 1 / review |
+
+### Differences from spec — Stage 4P (Claude)
+
+- The step-2 inline `บอกจุดเพิ่มเติม` stays in the card while the card shows (also after it turns "similar"), so it does not vanish while typing; required only while a case blocks.
+- Desktop summary column shows the duplicate card on step 3 only (step 2 already shows it in the panel).
+
+### Open questions — Stage 4P (Codex fills — never guess)
+
 
 ## Stage 4 (2026-10-24) — UI DONE: duplicate check + follow (F03), team mode (F04), hand over (F05)
 
