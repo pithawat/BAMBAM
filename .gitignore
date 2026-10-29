@@ -25,3 +25,12 @@ docs/.obsidian/plugins/
 .DS_Store
 Thumbs.db
 .claude/settings.local.json
+
+# SSO handoff from RMC SSO Admin (contains Client Secret) — never commit
+bam-sso-handoff.md
+
+# playwright demo-user sessions
+frontend/e2e/.auth/
+
+# repair photos in development (PHOTO_STORAGE_DIR default)
+backend/data/

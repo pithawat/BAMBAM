@@ -1,0 +1,30 @@
+/* Proposal only. Reuse the existing standalone preview and current theme values. */
+:root { --bg:#F5F7FA; --ink:#172033; --muted:#5B6676; --violet:#B93D0A; --green:#0B7A5E; }
+.review-card.action-review { --review-accent:#B93D0A; --review-soft:color-mix(in srgb,var(--review-accent) 5%,white); border:1px solid color-mix(in srgb,var(--review-accent) 30%,white); border-top:4px solid var(--review-accent); background:var(--review-soft); gap:20px 32px; }
+.action-review .review-intro { align-items:flex-start; }
+.action-review .review-icon { background:white; color:var(--review-accent); width:48px; height:48px; }
+.action-review h2 { font-size:20px; line-height:30px; }
+.action-review p { font-size:14px; line-height:23px; max-width:510px; }
+.action-review .review-picker { min-width:260px; display:flex; flex-direction:column; align-items:stretch; gap:8px; }
+.action-review .review-open { background:var(--review-accent); color:white; border:1px solid var(--review-accent); min-height:52px; padding:12px 24px; gap:10px; font-size:17px; font-weight:600; border-radius:8px; box-shadow:0 3px 6px rgb(185 61 10 / .12); }
+.action-review .review-open:hover { filter:brightness(.92); }
+.action-review .review-open svg { width:20px; height:20px; }
+.action-review .review-open svg:last-child { margin-left:auto; }
+.action-review .shortcut-label { font-size:12px; color:var(--muted); margin-top:2px; }
+.action-review .quick-stars { justify-content:center; gap:6px; }
+.action-review .quick-stars button { background:white; border:1px solid var(--line); border-radius:8px; color:var(--muted); width:44px; height:44px; }
+.action-review .quick-stars button:hover { color:var(--review-accent); border-color:var(--review-accent); }
+.action-review button:focus-visible { outline:2px solid var(--review-accent); outline-offset:4px; }
+.action-review .review-bottom { border-color:color-mix(in srgb,var(--review-accent) 16%,white); }
+.action-review .review-bottom button { background:transparent; }
+.action-review .review-bottom button:hover { color:var(--review-accent); }
+.ticket-step { color:var(--violet); background:color-mix(in srgb,var(--violet) 8%,white); }
+.preview-bar strong { white-space:normal; }
+@media(max-width:700px) {
+  .review-card.action-review { grid-template-columns:1fr; gap:16px; }
+  .action-review h2 { font-size:18px; line-height:28px; }
+  .action-review .review-icon { width:40px; height:40px; }
+  .action-review .review-picker { width:100%; min-width:0; }
+  .action-review .review-open { width:100%; }
+  .action-review .review-bottom { flex-direction:column; align-items:flex-start; padding:12px 0 6px; }
+}

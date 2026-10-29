@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S25 ผู้ใช้ · BAMBAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Anuphan:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --radius:1.25rem;
+  --background:#F2F5FF; --foreground:#0E1736;
+  --card:#FFFFFF; --primary:#2741FA; --primary-foreground:#FFFFFF;
+  --secondary:#E7ECFF; --secondary-foreground:#1A2FC9;
+  --muted:#EAEEFA; --muted-foreground:#535D82;
+  --destructive:#DC2626; --border:#DFE5F5; --input:#CDD6EE; --ring:#2741FA;
+  --success:#067647; --warning:#B54708; --svc-repair:#F97316; --svc-car:#0EA5A4; --svc-room:#8B5CF6;
+  --brand-gradient:linear-gradient(120deg,#1075FA 0%,#2741FA 52%,#7930FA 100%);
+  --shadow-card:0 12px 30px -14px rgba(39,65,250,.22),0 2px 6px rgba(14,23,54,.04);
+  --shadow-float:0 18px 36px -16px rgba(39,65,250,.35);
+  --shadow-brand:0 10px 20px -10px rgba(39,65,250,.7);
+  --font-head:"Prompt",sans-serif; --font-body:"Anuphan",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);color:#14182a;background:#E3E6EE;line-height:1.6}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.ico{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;display:inline-block;vertical-align:middle}
+.ico.sm{width:16px;height:16px}.ico.xs{width:13px;height:13px}
+/* presentation chrome */
+.page-head{max-width:1880px;margin:0 auto;padding:36px 32px 4px}
+.kicker{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#5b6176}
+.page-head h1{font:700 32px/1.35 var(--font-head);color:#0f1222;margin:6px 0 8px}
+.page-head p{max-width:980px;color:#383e52;font-size:15.5px}
+.page-head code,.cap code{font-size:12px;background:#d8dce6;padding:1px 6px;border-radius:4px}
+.sec{max-width:1880px;margin:0 auto;padding:26px 32px}
+.sec>h2{font:600 20px/1.4 var(--font-head);color:#0f1222}
+.sec>.sub{color:#4a5068;font-size:14px;margin:2px 0 16px}
+.stage{display:flex;gap:32px;align-items:flex-start;overflow-x:auto;padding:6px 6px 26px}
+.cap{font-size:12.5px;color:#4a5068;margin-bottom:10px;max-width:1280px}
+.cap b{color:#0f1222;font-weight:600}
+.desk{width:1280px;height:860px;border-radius:14px;overflow:hidden;background:var(--background);color:var(--foreground);box-shadow:0 30px 60px -24px rgba(16,19,40,.45);flex:none;display:flex;flex-direction:column}
+.desk.short{height:600px}
+.chrome{height:38px;background:#e8eaf0;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid #d3d7e0;flex:none}
+.chrome>i{width:11px;height:11px;border-radius:50%;background:#ff5f57}.chrome>i+i{background:#febc2e}.chrome>i+i+i{background:#28c840}
+.chrome .url{margin-left:16px;width:420px;height:24px;border-radius:6px;background:#fff;font:12px/24px -apple-system,"Segoe UI",sans-serif;color:#555b6e;padding:0 12px}
+.vp{flex:1;min-height:0;display:flex;position:relative}
+.phone{box-sizing:content-box;width:375px;height:812px;border:10px solid #0f121b;border-radius:52px;overflow:hidden;position:relative;background:var(--background);color:var(--foreground);box-shadow:0 30px 60px -24px rgba(16,19,40,.45);flex:none}
+.phone .scr{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding-bottom:120px}
+.statusbar{height:46px;display:flex;align-items:center;justify-content:space-between;padding:4px 28px 0 34px;font:600 14.5px/1 -apple-system,"Segoe UI",sans-serif}
+.home-ind{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#0f121b;z-index:30}
+.uat{height:28px;background:#FEF3C7;color:#713F12;font-size:12px;display:flex;align-items:center;gap:6px;padding:0 16px}
+.uat b{font-size:10.5px;letter-spacing:.06em;background:#FDE68A;border-radius:999px;padding:2px 6px}
+/* components */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 20px;border-radius:999px;font:600 15px/1 var(--font-head);border:1px solid transparent;white-space:nowrap}
+.btn.sm{height:36px;padding:0 14px;font-size:13.5px}
+.btn-default{background:var(--primary);color:#fff;box-shadow:var(--shadow-brand)}
+.btn-outline{background:#fff;border-color:var(--input)}
+.btn-ghost{color:var(--foreground)}
+.btn-destructive{background:var(--destructive);color:#fff}
+.btn:focus-visible,.cb:focus-visible,.sw:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.card{background:var(--card);border-radius:24px;box-shadow:var(--shadow-card)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;line-height:1.7;white-space:nowrap}
+.b-sys{background:var(--secondary);color:var(--secondary-foreground)}
+.b-muted{background:var(--muted);color:var(--muted-foreground)}
+.b-dark{background:var(--foreground);color:#fff}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-radius:16px;font-size:13.5px;line-height:1.55}
+.alert.info{background:#fff;border:1px solid var(--border);color:var(--muted-foreground)}
+.alert.info .ico{color:var(--primary)}
+.alert.warn{background:#FFF7ED;border:1px solid #FED7AA;color:#7C2D12}
+.alert.warn .ico{color:var(--warning)}
+.seg{display:inline-flex;background:#fff;border-radius:999px;padding:4px;box-shadow:0 1px 2px rgba(14,23,54,.06);border:1px solid var(--border)}
+.seg button{height:36px;padding:0 18px;border-radius:999px;font:600 13.5px/1 var(--font-head);color:var(--muted-foreground)}
+.seg button.on{background:var(--foreground);color:#fff}
+.seg button .n{opacity:.7;margin-left:4px}
+/* checkbox + switch */
+.cb{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--input);background:#fff;display:inline-flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s}
+.cb .ico{width:15px;height:15px;stroke-width:3;color:#fff;opacity:0}
+.cb.on{background:var(--primary);border-color:var(--primary)}
+.cb.on .ico{opacity:1}
+.cb.lock{background:color-mix(in srgb,var(--primary) 40%,#fff);border-color:transparent;cursor:not-allowed}
+.cb.lock .ico{opacity:1}
+.sw{width:46px;height:28px;border-radius:999px;background:var(--input);position:relative;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(14,23,54,.25);transition:left .15s}
+.sw.on{background:var(--primary)}
+.sw.on::after{left:21px}
+.sw.lock{background:color-mix(in srgb,var(--primary) 40%,#fff);cursor:not-allowed}
+.dot-chg{width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block}
+/* sidebar */
+.sb{width:256px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;flex:none}
+.sb .logo{height:68px;display:flex;align-items:center;gap:10px;padding:0 22px;font:700 19px/1 var(--font-head)}
+.sb .logo span{width:34px;height:34px;border-radius:11px;background:var(--brand-gradient);display:inline-block;box-shadow:var(--shadow-brand)}
+.sb nav{flex:1;overflow-y:auto;padding:4px 14px 14px;scrollbar-width:thin}
+.sb .grp{font:600 11.5px/1 var(--font-head);color:var(--muted-foreground);letter-spacing:.04em;padding:16px 10px 8px}
+.sb a{display:flex;align-items:center;gap:11px;height:40px;padding:0 12px;border-radius:16px;font-size:14px;color:var(--foreground);text-decoration:none}
+.sb a .ico{width:18px;height:18px;color:var(--muted-foreground)}
+.sb a.on{background:var(--secondary);color:var(--secondary-foreground);font-weight:600}
+.sb a.on .ico{color:var(--secondary-foreground)}
+.sb a .soon{margin-left:auto;font-size:10.5px;background:var(--muted);color:var(--muted-foreground);border-radius:999px;padding:1px 7px}
+.sb a.dis{color:var(--muted-foreground)}
+.sb .me{border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:center}
+.av{width:38px;height:38px;border-radius:50%;background:var(--secondary);color:var(--secondary-foreground);display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--font-head);flex:none}
+.sb .me b{display:block;font-size:13.5px;line-height:1.3}
+.sb .me small{font-size:12px;color:var(--muted-foreground)}
+/* main */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.top{height:84px;display:flex;align-items:center;gap:14px;padding:0 32px;background:#fff;border-bottom:1px solid var(--border);flex:none}
+.top h1{font:600 24px/1.3 var(--font-head)}
+.top p{font-size:13.5px;color:var(--muted-foreground)}
+.top .sp{flex:1}
+.rs{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;border:1.5px dashed #F59E0B;background:#FFFBEB;color:#713F12;border-radius:999px;padding:6px 12px 6px 8px}
+.rs b{font-size:10.5px;letter-spacing:.06em;background:#FDE68A;border-radius:999px;padding:2px 6px}
+.bell{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative}
+.bell i{position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--destructive);border:2px solid #fff}
+.content{flex:1;overflow-y:auto;padding:22px 32px 110px;scrollbar-width:thin}
+.toolbar{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.toolbar .sp{flex:1}
+.syshead{display:flex;align-items:center;gap:10px;margin:20px 0 12px}
+.syshead h2{font:600 18px/1.3 var(--font-head)}
+.svc{width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FDBA74,var(--svc-repair) 70%);display:flex;align-items:center;justify-content:center;color:#fff}
+.svc .ico{width:17px;height:17px}
+/* matrix */
+.mx{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+.mxcard{overflow:hidden;margin-bottom:16px}
+.mx th{background:var(--muted);font:600 13.5px/1.3 var(--font-head);color:var(--foreground);height:52px;text-align:center;padding:0 8px}
+.mx th:first-child{text-align:left;padding-left:22px;width:260px;font-size:15px}
+.mx th .ti{display:inline-flex;align-items:center;gap:5px}
+.mx th .ti button{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:var(--muted-foreground)}
+.mx th .ti button:hover{background:#fff}
+.mx td{height:56px;border-top:1px solid var(--border);text-align:center}
+.mx td:first-child{text-align:left;padding-left:22px}
+.mx td.cell{cursor:pointer}
+.mx td.cell:hover{background:#F7F9FF}
+.mx td.chg{background:var(--secondary)}
+.mx td.chg .wrap{position:relative;display:inline-flex}
+.mx td.chg .wrap::after{content:"";position:absolute;top:-4px;right:-5px;width:8px;height:8px;border-radius:50%;background:var(--warning);border:2px solid var(--secondary)}
+.mx tr.locked td{background:#F8F9FD}
+.mx tr.locked td.cell{cursor:not-allowed}
+.mx tr.flash td{animation:flash 1.6s ease}
+@keyframes flash{0%,60%{background:var(--secondary)}100%{background:#fff}}
+.rname{display:flex;align-items:center;gap:7px;font-weight:500}
+.rname .ico{color:var(--muted-foreground)}
+.rname small{font-size:12.5px;color:var(--muted-foreground);font-weight:400}
+.future{font-size:13.5px;color:var(--muted-foreground);display:flex;align-items:center;gap:8px;padding:6px 4px}
+.tip{position:absolute;z-index:40;background:var(--foreground);color:#fff;font-size:12.5px;line-height:1.5;padding:8px 11px;border-radius:12px;max-width:240px;pointer-events:none;box-shadow:var(--shadow-float);display:none}
+/* save bar */
+.savebar{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;background:#fff;border-radius:999px;box-shadow:var(--shadow-float),0 0 0 1px var(--border);display:flex;align-items:center;gap:10px;padding:8px 8px 8px 22px;font-size:14.5px;z-index:20}
+.savebar b{font:600 14.5px/1 var(--font-head)}
+.savebar[hidden]{display:none}
+/* dialog */
+.overlay{position:absolute;inset:0;background:rgba(14,23,54,.42);display:flex;align-items:center;justify-content:center;z-index:50}
+.overlay[hidden]{display:none}
+.dlg{width:520px;background:#fff;border-radius:24px;box-shadow:0 30px 70px -20px rgba(14,23,54,.45);padding:24px}
+.dlg h3{font:600 20px/1.35 var(--font-head);margin-bottom:6px}
+.dlg .body{font-size:14.5px;color:var(--muted-foreground)}
+.dlg .acts{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.sum{margin:14px 0 4px;display:flex;flex-direction:column;gap:10px}
+.sum div{background:var(--muted);border-radius:16px;padding:11px 14px;font-size:14px;line-height:1.6}
+.sum b{font-weight:600}
+.sum .add{color:var(--success);font-weight:500}
+.sum .rem{color:var(--destructive);font-weight:500}
+.field{margin-top:14px}
+.field label{display:block;font-size:13.5px;font-weight:500;margin-bottom:6px}
+.field label i{color:var(--destructive);font-style:normal}
+.inp{height:52px;border-radius:16px;border:1px solid var(--input);display:flex;align-items:center;padding:0 16px;font-size:15px;background:#fff}
+.inp.ph{color:var(--muted-foreground)}
+.inp.ta{height:84px;align-items:flex-start;padding-top:13px}
+.inp.pick{justify-content:space-between}
+.hint{font-size:12.5px;color:var(--muted-foreground);margin-top:5px}
+.dlgstage{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.dlgstage .dlg{position:relative}
+/* table (role tab) */
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+.tbl th{background:var(--muted);font:600 13.5px/1 var(--font-head);text-align:left;height:48px;padding:0 18px}
+.tbl th:first-child{border-radius:14px 0 0 14px}.tbl th:last-child{border-radius:0 14px 14px 0}
+.tbl td{height:62px;padding:0 18px;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl a{color:var(--secondary-foreground);font-weight:500;text-decoration:none}
+.kebab{width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--muted-foreground)}
+.kebab:hover{background:var(--muted)}
+/* mobile */
+.mbar{height:56px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1px solid var(--border)}
+.mbar b{font:600 17px/1 var(--font-head)}
+.mbar button{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.mpad{padding:14px 16px 0}
+.mrow{display:flex;align-items:center;gap:12px;min-height:66px;padding:10px 16px;border-top:1px solid var(--border)}
+.mrow:first-of-type{border-top:0}
+.mrow .t{flex:1;min-width:0}
+.mrow .t b{display:block;font-weight:500;font-size:15px;line-height:1.35}
+.mrow .t small{display:block;font-size:12.5px;color:var(--muted-foreground);line-height:1.45;margin-top:2px}
+.mcardh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;font:600 15px/1.3 var(--font-head)}
+.msave{position:absolute;left:12px;right:12px;bottom:26px;background:#fff;border-radius:22px;box-shadow:var(--shadow-float),0 0 0 1px var(--border);display:flex;align-items:center;gap:10px;padding:10px 10px 10px 18px;z-index:20}
+.msave b{font:600 14px/1 var(--font-head);flex:1}
+.note{max-width:1880px;margin:0 auto;padding:4px 32px 48px;font-size:12.5px;color:#4a5068}
+.tb{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.search{height:44px;width:360px;border-radius:999px;border:1px solid var(--input);background:#fff;display:flex;align-items:center;gap:8px;padding:0 16px;font-size:14.5px;color:var(--muted-foreground)}
+.search.val{color:var(--foreground)}
+.fpill{height:40px;border-radius:999px;border:1px solid var(--input);background:#fff;display:inline-flex;align-items:center;gap:6px;padding:0 14px;font-size:13.5px;font-weight:500}
+.count{margin-left:auto;font-size:13.5px;color:var(--muted-foreground)}
+.ucell{display:flex;align-items:center;gap:11px}
+.ucell b{display:block;font-weight:600;font-size:14.5px;line-height:1.3}
+.ucell small{display:block;font-size:12.5px;color:var(--muted-foreground)}
+.tbl td small{display:block;font-size:12.5px;color:var(--muted-foreground);line-height:1.4}
+.tbl tr.sel td{background:var(--secondary)}
+.code{font:600 12.5px/1 var(--font-head);letter-spacing:.02em}
+.pager{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:12px 8px 4px;font-size:13.5px;color:var(--muted-foreground)}
+.pager button{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.pager .on{background:var(--foreground);color:#fff;font:600 13px/1 var(--font-head)}
+.sheet{position:absolute;top:0;right:0;bottom:0;width:480px;background:#fff;box-shadow:-24px 0 50px -20px rgba(14,23,54,.35);z-index:40;display:flex;flex-direction:column}
+.sheet .sh-h{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 0 24px}
+.sheet .sh-b{flex:1;overflow-y:auto;padding:8px 24px 24px}
+.who{display:flex;gap:14px;align-items:center;margin:6px 0 18px}
+.who .av{width:56px;height:56px;font-size:17px}
+.who b{display:block;font:600 19px/1.35 var(--font-head)}
+.sect{font:600 13.5px/1 var(--font-head);color:var(--muted-foreground);margin:18px 0 8px}
+.kv{display:grid;grid-template-columns:120px 1fr;row-gap:9px;font-size:14px}
+.kv span{color:var(--muted-foreground)}
+.rolebox{display:flex;align-items:center;justify-content:space-between;background:var(--muted);border-radius:16px;padding:12px 12px 12px 16px}
+.rolebox b{font:600 16px/1.3 var(--font-head)}
+.why{font-size:12.5px;color:var(--muted-foreground);margin-top:6px;display:flex;gap:6px;align-items:center}
+.hist{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:13.5px;border-left:2px solid var(--border);margin-left:6px;padding-left:16px}
+.hist li{position:relative;line-height:1.5}
+.hist li::before{content:"";position:absolute;left:-22px;top:6px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--primary)}
+.hist small{display:block;color:var(--muted-foreground);font-size:12.5px}
+.choices{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.choice{min-height:48px;border-radius:16px;border:1px solid var(--input);display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:14px;background:#fff}
+.choice.on{background:var(--foreground);color:#fff;border-color:var(--foreground)}
+.choice small{font-size:11.5px;color:var(--muted-foreground)}
+.confirm{margin-top:14px;background:var(--muted);border-radius:16px;padding:12px 14px;font-size:14px}
+.confirm b{font-weight:600}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <span class="kicker">BAMBAM · ตั้งค่าระบบ · P3 mockup</span>
+  <h1>S25 — ผู้ใช้</h1>
+  <p>รายชื่อทุกคนที่เคยเข้าใช้ผ่าน SSO ค้นหาด้วยชื่อ รหัสพนักงาน หรืออีเมล กดแถวเพื่อเปิดแผงรายละเอียดด้านขวา แล้วเปลี่ยน role ได้ ข้อมูลจาก SSO แก้ไม่ได้ เปลี่ยน role ของตัวเองไม่ได้ และคนที่ server กำหนดเป็น Superadmin ก็เปลี่ยนไม่ได้</p>
+</div>
+
+<section class="sec">
+  <h2>1 · Desktop — ตาราง + แผงรายละเอียดของ ธนากร</h2>
+  <p class="sub">Spec: <code>screens/S25-users.md</code> · 20 คนต่อหน้า เรียงตามชื่อ · URL เก็บ q / role / page / user</p>
+  <div class="stage">
+    <div class="desk">
+      <div class="chrome"><i></i><i></i><i></i><div class="url">bambam.cpac.co.th/settings/users?user=…</div></div>
+      <div class="vp">
+        <aside class="sb">
+          <div class="logo"><span></span>BAMBAM</div>
+          <nav>
+            <a href="#"><i data-i="house"></i>หน้าแรก</a>
+            <a href="#"><i data-i="clipboard"></i>ติดตามงานซ่อม</a>
+            <a href="#"><i data-i="bell"></i>แจ้งเตือน</a>
+            <div class="grp">บริการ</div>
+            <a href="#"><i data-i="wrench"></i>แจ้งซ่อม</a>
+            <a href="#" class="dis"><i data-i="car"></i>จองรถ<span class="soon">เร็วๆ นี้</span></a>
+            <a href="#" class="dis"><i data-i="door"></i>จองห้องประชุม<span class="soon">เร็วๆ นี้</span></a>
+            <div class="grp">งานช่าง</div>
+            <a href="#"><i data-i="wrench"></i>งานซ่อม</a>
+            <a href="#"><i data-i="hardhat"></i>ช่างภายนอก</a>
+            <div class="grp">จัดการงานซ่อม</div>
+            <a href="#"><i data-i="list"></i>งานทั้งหมด</a>
+            <a href="#"><i data-i="map"></i>ภาพรวมอาคาร</a>
+            <div class="grp">ตั้งค่าระบบ</div>
+            <a href="S20-buildings.html"><i data-i="building"></i>อาคารและชั้น</a>
+            <a href="#"><i data-i="tags"></i>หมวดงานและอาการ</a>
+            <a href="#"><i data-i="hardhat"></i>ประเภทผู้รับเหมา</a>
+            <a href="S24-roles-permissions.html"><i data-i="shield"></i>Role และสิทธิ์</a>
+            <a href="#" class="on"><i data-i="users"></i>ผู้ใช้</a>
+            <a href="#"><i data-i="history"></i>ประวัติการเปลี่ยนแปลง</a>
+          </nav>
+          <div class="me"><div class="av">ณอ</div><div><b>ณัฐพล อินทรวงศ์</b><small>Superadmin</small></div></div>
+        </aside>
+        <div class="main">
+          <header class="top">
+            <div><h1>ผู้ใช้</h1><p>ทุกคนที่เคยเข้าใช้ BAMBAM ผ่าน SSO ปรับ role ได้ที่นี่</p></div>
+            <div class="sp"></div><span class="bell"><i data-i="bell"></i><i></i></span>
+          </header>
+          <div class="content" style="padding-bottom:30px">
+            <div class="tb">
+              <div class="search"><i data-i="search" class="sm"></i>ค้นหาชื่อ รหัสพนักงาน หรืออีเมล</div>
+              <span class="fpill"><i data-i="shield" class="sm"></i>Role: ทั้งหมด<i data-i="down" class="sm"></i></span>
+              <span class="count">421 คน</span>
+            </div>
+            <div class="card" style="padding:10px">
+              <table class="tbl">
+                <thead><tr><th>ชื่อ</th><th style="width:120px">รหัสพนักงาน</th><th>แผนก / ตำแหน่ง</th><th style="width:200px">Role</th><th style="width:130px">เข้าใช้ล่าสุด</th><th style="width:40px"></th></tr></thead>
+                <tbody id="uRows"></tbody>
+              </table>
+              <div class="pager"><button aria-label="หน้าก่อน"><i data-i="left" class="sm"></i></button><button class="on">1</button><button>2</button><button>3</button>…<button>22</button><button aria-label="หน้าถัดไป"><i data-i="right" class="sm"></i></button></div>
+            </div>
+          </div>
+          <aside class="sheet" aria-label="รายละเอียดผู้ใช้">
+            <div class="sh-h"><span class="sect" style="margin:0">ผู้ใช้</span><button class="kebab" aria-label="ปิด"><i data-i="x"></i></button></div>
+            <div class="sh-b">
+              <div class="who"><div class="av">ธพ</div><div><b>ธนากร พึ่งบุญ</b><span class="badge b-sys">ช่างเทคนิค</span></div></div>
+              <div class="sect">ข้อมูลจาก SSO (แก้ไม่ได้)</div>
+              <div class="kv"><span>รหัสพนักงาน</span><b class="code">EMP0231</b><span>อีเมล</span><div>thanakorn.p@example.co.th</div><span>แผนก</span><div>ฝ่ายอาคารสถานที่</div><span>ฝ่าย</span><div>สายงานบริหารทั่วไป</div><span>ตำแหน่ง</span><div>ช่างเทคนิคอาวุโส</div><span>เข้าใช้ล่าสุด</span><div>16 ต.ค. 2569 09:20</div></div>
+              <div class="sect">Role</div>
+              <div class="rolebox"><b>ช่างเทคนิค</b><button class="btn btn-default sm">เปลี่ยน role</button></div>
+              <div class="sect">ประวัติ role</div>
+              <ul class="hist">
+                <li>พนักงานทั่วไป → ช่างเทคนิค<small>15 ต.ค. 2569 14:02 · โดยณัฐพล อินทรวงศ์</small></li>
+                <li>เข้าใช้ครั้งแรก (พนักงานทั่วไป)<small>14 ต.ค. 2569 09:10</small></li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>2 · เปลี่ยน role และกรณีที่เปลี่ยนไม่ได้</h2>
+  <p class="sub">7 role → ตัวเลือกแบบปุ่มตาราง (ChoiceField 6–12) · ปุ่ม "เปลี่ยน role" กดได้เมื่อเลือก role ที่ต่างจากเดิม</p>
+  <div class="dlgstage">
+    <div><p class="cap"><b>เปลี่ยน role</b> — เลือก Admin</p>
+      <div class="dlg" style="width:500px">
+        <h3>เปลี่ยน role</h3>
+        <div class="field"><label>Role ใหม่ <i>*</i></label><div class="choices" id="ch1"></div></div>
+        <div class="confirm">เปลี่ยน <b>ธนากร พึ่งบุญ</b> จาก <b>ช่างเทคนิค</b> เป็น <b>Admin</b></div>
+        <div class="acts"><button class="btn btn-outline">ยกเลิก</button><button class="btn btn-default">เปลี่ยน role</button></div>
+      </div></div>
+    <div><p class="cap"><b>เลือก Superadmin</b> — มีคำเตือนเพิ่ม</p>
+      <div class="dlg" style="width:500px">
+        <h3>เปลี่ยน role</h3>
+        <div class="field"><label>Role ใหม่ <i>*</i></label><div class="choices" id="ch2"></div></div>
+        <div class="alert warn" style="margin-top:12px"><i data-i="alert" class="sm"></i><div>ผู้ใช้นี้จะตั้งค่าระบบและเปลี่ยนสิทธิ์ของทุกคนได้</div></div>
+        <div class="confirm">เปลี่ยน <b>ธนากร พึ่งบุญ</b> จาก <b>ช่างเทคนิค</b> เป็น <b>Superadmin</b></div>
+        <div class="acts"><button class="btn btn-outline">ยกเลิก</button><button class="btn btn-default">เปลี่ยน role</button></div>
+      </div></div>
+    <div><p class="cap"><b>เปิดดูตัวเอง</b> (Superadmin ที่ server กำหนด)</p>
+      <div class="card" style="width:420px;padding:20px 22px">
+        <div class="who"><div class="av">ณอ</div><div><b>ณัฐพล อินทรวงศ์</b><span class="badge b-dark">Superadmin</span> <span class="badge b-sys"><i data-i="lock" class="xs"></i>กำหนดโดยระบบ</span></div></div>
+        <div class="sect">Role</div>
+        <div class="rolebox"><b>Superadmin</b><button class="btn btn-default sm" disabled style="opacity:.45">เปลี่ยน role</button></div>
+        <p class="why"><i data-i="info" class="xs"></i>เปลี่ยน role ของตัวเองไม่ได้</p>
+      </div></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>3 · Mobile (375px)</h2>
+  <p class="sub">แถวกดแล้วเปิด bottom sheet สูง 90% เนื้อหาเดียวกับแผงด้านขวาบน desktop</p>
+  <div class="stage">
+    <div><p class="cap"><b>รายการ</b></p>
+      <div class="phone"><div class="scr">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="mbar"><button aria-label="กลับ"><i data-i="left"></i></button><b>ผู้ใช้</b><span style="width:44px"></span></div>
+        <div class="mpad">
+          <div class="search" style="width:100%"><i data-i="search" class="sm"></i>ค้นหาชื่อ รหัส หรืออีเมล</div>
+          <div style="display:flex;align-items:center;margin:10px 0"><span class="fpill"><i data-i="shield" class="sm"></i>Role: ทั้งหมด<i data-i="down" class="sm"></i></span><span class="count">421 คน</span></div>
+          <div class="card" id="mUsers"></div>
+        </div>
+      </div><div class="home-ind"></div></div></div>
+    <div><p class="cap"><b>Bottom sheet</b> ของ ธนากร</p>
+      <div class="phone"><div class="scr" style="background:rgba(14,23,54,.42)">
+        <div class="statusbar" style="color:#fff"><span>9:41</span><span>●●●</span></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;top:82px;background:#fff;border-radius:26px 26px 0 0;padding:10px 20px 30px;overflow:hidden">
+          <div style="width:44px;height:5px;border-radius:3px;background:var(--input);margin:0 auto 10px"></div>
+          <div class="who"><div class="av">ธพ</div><div><b>ธนากร พึ่งบุญ</b><span class="badge b-sys">ช่างเทคนิค</span></div></div>
+          <div class="sect">ข้อมูลจาก SSO (แก้ไม่ได้)</div>
+          <div class="kv" style="grid-template-columns:110px 1fr;font-size:13.5px"><span>รหัสพนักงาน</span><b class="code">EMP0231</b><span>แผนก</span><div>ฝ่ายอาคารสถานที่</div><span>ตำแหน่ง</span><div>ช่างเทคนิคอาวุโส</div><span>เข้าใช้ล่าสุด</span><div>09:20</div></div>
+          <div class="sect">Role</div>
+          <div class="rolebox"><b>ช่างเทคนิค</b><button class="btn btn-default sm">เปลี่ยน role</button></div>
+          <div class="sect">ประวัติ role</div>
+          <ul class="hist"><li>พนักงานทั่วไป → ช่างเทคนิค<small>15 ต.ค. 2569 14:02 · โดยณัฐพล อินทรวงศ์</small></li><li>เข้าใช้ครั้งแรก (พนักงานทั่วไป)<small>14 ต.ค. 2569 09:10</small></li></ul>
+        </div>
+      </div><div class="home-ind"></div></div></div>
+  </div>
+</section>
+
+<p class="note">Mockup only — not production code. Names are fictional (<code>screens/_common.md</code> §7).</p>
+
+<script>
+const ICONS={
+house:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+clipboard:'<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+bell:'<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+car:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+door:'<path d="M11 20H2"/><path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"/><path d="M11 4H8a2 2 0 0 0-2 2v14"/><path d="M14 12h.01"/><path d="M22 20h-3"/>',
+hardhat:'<path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/>',
+list:'<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
+building:'<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
+tags:'<path d="m15 5 6.3 6.3a2.4 2.4 0 0 1 0 3.4L17 19"/><path d="M9.586 5.586A2 2 0 0 0 8.172 5H3a1 1 0 0 0-1 1v5.172a2 2 0 0 0 .586 1.414L8.29 18.29a2.426 2.426 0 0 0 3.42 0l3.58-3.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="6.5" cy="9.5" r=".5"/>',
+shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+history:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+lock:'<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+check:'<path d="M20 6 9 17l-5-5"/>',
+plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+down:'<path d="m6 9 6 6 6-6"/>',
+left:'<path d="m15 18-6-6 6-6"/>',
+right:'<path d="m9 18 6-6-6-6"/>',
+more:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
+};
+function ico(n,c){return `<svg class="ico ${c||''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`}
+function paintIcons(root){root.querySelectorAll('i[data-i]').forEach(el=>{el.outerHTML=ico(el.dataset.i,el.className)})}
+
+Object.assign(ICONS,{search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'});
+const U=[
+ ['กิตติพัฒน์ แสงทอง','กส','EMP0342','kittipat.s@example.co.th','ฝ่ายจัดซื้อ','เจ้าหน้าที่จัดซื้อ','พนักงานทั่วไป','เมื่อวาน 16:48'],
+ ['ณัฐพล อินทรวงศ์','ณอ','EMP0105','nattapon.i@example.co.th','ฝ่ายเทคโนโลยีสารสนเทศ','เจ้าหน้าที่ระบบ','Superadmin','08:41',true],
+ ['ธนากร พึ่งบุญ','ธพ','EMP0231','thanakorn.p@example.co.th','ฝ่ายอาคารสถานที่','ช่างเทคนิคอาวุโส','ช่างเทคนิค','09:20',false,true],
+ ['ประเสริฐ วงศ์ไทย','ปว','EMP0012','prasert.w@example.co.th','ฝ่ายอาคารสถานที่','ผู้อำนวยการฝ่าย','ผู้บริหาร','13 ต.ค. 10:05'],
+ ['ปวีณา ศรีสุข','ปศ','EMP0158','paweena.s@example.co.th','ศูนย์จัดการงานอาคาร','หัวหน้าศูนย์','Admin','10:42'],
+ ['มาลี ทองดี','มท','EMP0420','malee.t@example.co.th','ฝ่ายอาคารสถานที่','หัวหน้าแม่บ้าน','หัวหน้าแม่บ้าน','07:55'],
+ ['วรรณา สุขประเสริฐ','วส','EMP0388','wanna.s@example.co.th','ฝ่ายบัญชี','นักบัญชี','พนักงานทั่วไป','10:15'],
+ ['สมศักดิ์ แก้วกล้า','สก','EMP0451','somsak.k@example.co.th','ฝ่ายอาคารสถานที่','หัวหน้ารปภ.','หัวหน้ารปภ.','เมื่อวาน 18:02']
+];
+const roleBadge=(r,env)=>`<span class="badge ${r==='Superadmin'?'b-dark':'b-sys'}">${r}</span>${env?` <span class="badge b-sys">${ico('lock','xs')}กำหนดโดยระบบ</span>`:''}`;
+document.getElementById('uRows').innerHTML=U.map(u=>`<tr class="${u[9]?'sel':''}"><td><div class="ucell"><div class="av">${u[1]}</div><div><b>${u[0]}</b><small>${u[3]}</small></div></div></td><td class="code">${u[2]}</td><td>${u[4]}<small>${u[5]}</small></td><td>${roleBadge(u[6],u[8])}</td><td style="color:var(--muted-foreground)">${u[7]}</td><td>${ico('right','sm')}</td></tr>`).join('');
+document.getElementById('mUsers').innerHTML=U.map(u=>`<div class="mrow"><div class="av">${u[1]}</div><div class="t"><b>${u[0]}</b><small><span class="code">${u[2]}</span> · ${u[4]}</small><div style="margin-top:4px">${roleBadge(u[6],u[8])}</div></div>${ico('right','sm')}</div>`).join('');
+const R=['พนักงานทั่วไป','หัวหน้าแม่บ้าน','หัวหน้ารปภ.','ช่างเทคนิค','Admin','ผู้บริหาร','Superadmin'];
+const ch=(sel)=>R.map(r=>`<div class="choice ${r===sel?'on':''}">${r}${r==='ช่างเทคนิค'?'<small>ปัจจุบัน</small>':''}${r===sel?ico('check','sm'):''}</div>`).join('');
+document.getElementById('ch1').innerHTML=ch('Admin');
+document.getElementById('ch2').innerHTML=ch('Superadmin');
+paintIcons(document);
+</script>
+</body>
+</html>

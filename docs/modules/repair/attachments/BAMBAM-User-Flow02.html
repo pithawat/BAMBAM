@@ -1,0 +1,1546 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>BAMBAM User Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: reference handbook. Plain header, sticky role filter, overview swimlane, grouped index,
+   then one section per feature: swimlane diagrams on a blueprint grid, a text outline, and findings. */
+:root{
+  --bg:#f1f4f8; --surface:#ffffff; --surface-2:#e9eff6; --canvas:#f8fafc; --grid:rgba(21,44,70,.055);
+  --ink:#13283f; --muted:#56697e; --line:#d5dee8; --line-strong:#b6c4d3;
+  --accent:#1561d6; --accent-ink:#114fae; --accent-bg:#e7effc;
+  --edge:#6a7e94; --edge-ink:#3f5268;
+  --start:#1b8350; --start-bg:#e5f4eb; --end-bg:#17304d; --end-fg:#f4f8fc;
+  --dec:#bb840f; --dec-bg:#fff5df;
+  --warn:#b2470b; --warn-bg:#fff0e2; --warn-bd:#f0b07c;
+  --ask:#a1206b; --ask-bg:#fcedf5; --ask-bd:#e9a2c8;
+  --ok:#1b774a; --ok-bg:#e3f4ea; --demo:#8b5a0c; --demo-bg:#fff0d3; --ext:#24519d; --ext-bg:#e5eefc; --pend:#5b6775; --pend-bg:#ebeef2;
+  --l-user:#2360c4; --l-user-bg:rgba(35,96,196,.05); --l-user-bd:rgba(35,96,196,.42);
+  --l-lead:#0b7d6d; --l-lead-bg:rgba(11,125,109,.055); --l-lead-bd:rgba(11,125,109,.45);
+  --l-admin:#5042c2; --l-admin-bg:rgba(80,66,194,.05); --l-admin-bd:rgba(80,66,194,.42);
+  --l-sys:#536780; --l-sys-bg:rgba(83,103,128,.065); --l-sys-bd:rgba(83,103,128,.45);
+  --l-ext:#85652a; --l-ext-bg:rgba(133,101,42,.065); --l-ext-bd:rgba(133,101,42,.45);
+  --l-state:#536780; --l-state-bg:rgba(83,103,128,.03); --l-state-bd:rgba(83,103,128,.5);
+  --bar:rgba(241,244,248,.9);
+  --f-display:"Bai Jamjuree","IBM Plex Sans Thai",Thonburi,Tahoma,system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Thai","Noto Sans Thai",Thonburi,Tahoma,system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --nfs:12.5px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1621; --surface:#152130; --surface-2:#1c2a3c; --canvas:#111b28; --grid:rgba(190,215,255,.05);
+    --ink:#e2eaf3; --muted:#9aaec2; --line:#273749; --line-strong:#3b4f67;
+    --accent:#6ea8ff; --accent-ink:#9cc4ff; --accent-bg:rgba(110,168,255,.14);
+    --edge:#8297ae; --edge-ink:#bccbdb;
+    --start:#55c98d; --start-bg:rgba(60,190,120,.14); --end-bg:#dce7f4; --end-fg:#0f1e31;
+    --dec:#e3b44c; --dec-bg:rgba(227,180,76,.13);
+    --warn:#ffad73; --warn-bg:rgba(255,140,60,.13); --warn-bd:rgba(255,160,100,.45);
+    --ask:#f29ccb; --ask-bg:rgba(240,120,190,.13); --ask-bd:rgba(240,150,200,.42);
+    --ok:#5fd09a; --ok-bg:rgba(60,190,120,.14); --demo:#f0c060; --demo-bg:rgba(240,190,90,.14); --ext:#8fb8ff; --ext-bg:rgba(110,160,255,.14); --pend:#a9b5c3; --pend-bg:rgba(170,185,200,.12);
+    --l-user:#7aa9ff; --l-user-bg:rgba(122,169,255,.05); --l-user-bd:rgba(122,169,255,.5);
+    --l-lead:#45c9b5; --l-lead-bg:rgba(69,201,181,.055); --l-lead-bd:rgba(69,201,181,.5);
+    --l-admin:#a39bff; --l-admin-bg:rgba(163,155,255,.055); --l-admin-bd:rgba(163,155,255,.5);
+    --l-sys:#a3b3c5; --l-sys-bg:rgba(163,179,197,.05); --l-sys-bd:rgba(163,179,197,.45);
+    --l-ext:#d3ad66; --l-ext-bg:rgba(211,173,102,.055); --l-ext-bd:rgba(211,173,102,.5);
+    --l-state:#a3b3c5; --l-state-bg:rgba(163,179,197,.03); --l-state-bd:rgba(163,179,197,.55);
+    --bar:rgba(14,22,33,.88);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1621; --surface:#152130; --surface-2:#1c2a3c; --canvas:#111b28; --grid:rgba(190,215,255,.05);
+  --ink:#e2eaf3; --muted:#9aaec2; --line:#273749; --line-strong:#3b4f67;
+  --accent:#6ea8ff; --accent-ink:#9cc4ff; --accent-bg:rgba(110,168,255,.14);
+  --edge:#8297ae; --edge-ink:#bccbdb;
+  --start:#55c98d; --start-bg:rgba(60,190,120,.14); --end-bg:#dce7f4; --end-fg:#0f1e31;
+  --dec:#e3b44c; --dec-bg:rgba(227,180,76,.13);
+  --warn:#ffad73; --warn-bg:rgba(255,140,60,.13); --warn-bd:rgba(255,160,100,.45);
+  --ask:#f29ccb; --ask-bg:rgba(240,120,190,.13); --ask-bd:rgba(240,150,200,.42);
+  --ok:#5fd09a; --ok-bg:rgba(60,190,120,.14); --demo:#f0c060; --demo-bg:rgba(240,190,90,.14); --ext:#8fb8ff; --ext-bg:rgba(110,160,255,.14); --pend:#a9b5c3; --pend-bg:rgba(170,185,200,.12);
+  --l-user:#7aa9ff; --l-user-bg:rgba(122,169,255,.05); --l-user-bd:rgba(122,169,255,.5);
+  --l-lead:#45c9b5; --l-lead-bg:rgba(69,201,181,.055); --l-lead-bd:rgba(69,201,181,.5);
+  --l-admin:#a39bff; --l-admin-bg:rgba(163,155,255,.055); --l-admin-bd:rgba(163,155,255,.5);
+  --l-sys:#a3b3c5; --l-sys-bg:rgba(163,179,197,.05); --l-sys-bd:rgba(163,179,197,.45);
+  --l-ext:#d3ad66; --l-ext-bg:rgba(211,173,102,.055); --l-ext-bd:rgba(211,173,102,.5);
+  --l-state:#a3b3c5; --l-state-bg:rgba(163,179,197,.03); --l-state-bd:rgba(163,179,197,.55);
+  --bar:rgba(14,22,33,.88);
+  color-scheme:dark;
+}
+@media (max-width:640px){ :root{ --nfs:11.5px } }
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+body{background:var(--bg); color:var(--ink); font:15px/1.7 var(--f-body); -webkit-font-smoothing:antialiased}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+h1,h2,h3,h4{font-family:var(--f-display); line-height:1.3; text-wrap:balance; margin:0}
+p{margin:0}
+.wrap{max-width:1180px; margin-inline:auto; padding-inline:clamp(16px,3vw,32px)}
+.ico{width:1em; height:1em; flex:none; vertical-align:-.12em}
+
+/* header */
+.top{padding-block:44px 30px; display:grid; gap:22px}
+.eyebrow{font:500 12px/1.4 var(--f-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+.top h1{font-size:clamp(30px,4.4vw,46px); font-weight:700; margin-top:8px}
+.lead{max-width:64ch; color:var(--muted); font-size:16px; margin-top:12px}
+.facts{display:flex; flex-wrap:wrap; gap:8px 10px}
+.fact{display:inline-flex; align-items:center; gap:7px; padding:4px 12px; border-radius:999px; background:var(--surface); border:1px solid var(--line); font-size:13.5px}
+.fact b{font:600 14px var(--f-mono); font-variant-numeric:tabular-nums}
+.fact.w{color:var(--warn); border-color:var(--warn-bd); background:var(--warn-bg)}
+.fact.q{color:var(--ask); border-color:var(--ask-bd); background:var(--ask-bg)}
+.basis{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr)); gap:12px}
+.note-box{padding:14px 16px; border-radius:12px; background:var(--surface); border:1px solid var(--line); font-size:14px; color:var(--muted); min-width:0}
+.note-box strong{color:var(--ink); display:block; font-size:14.5px; margin-bottom:2px}
+
+/* sticky bar */
+.bar{position:sticky; top:env(safe-area-inset-top,0px); z-index:30; background:var(--bar); -webkit-backdrop-filter:saturate(1.4) blur(10px); backdrop-filter:saturate(1.4) blur(10px); border-block:1px solid var(--line)}
+.bar .wrap{display:flex; align-items:center; gap:8px 18px; flex-wrap:wrap; padding-block:9px}
+.bar nav{display:flex; gap:18px; flex-wrap:wrap}
+.bar nav a{color:var(--ink); text-decoration:none; font-weight:500; font-size:14px}
+.bar nav a:hover{color:var(--accent-ink)}
+.bar .ctl{margin-left:auto; display:flex; gap:10px; flex-wrap:wrap}
+.bar label{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted)}
+select{font:inherit; font-size:14px; color:var(--ink); background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; padding:6px 10px; max-width:100%}
+@media (max-width:760px){
+  .bar nav{display:none}
+  .bar .ctl{margin-left:0; width:100%}
+  .bar label{flex:1 1 150px; min-width:0}
+  .bar label > span{display:none}
+  .bar select{width:100%}
+}
+
+/* sections */
+.block{padding-block:40px 6px; scroll-margin-top:calc(env(safe-area-inset-top,0px) + 64px)}
+.block > h2{font-size:clamp(22px,2.6vw,27px); font-weight:700}
+.sub{color:var(--muted); margin:6px 0 18px; max-width:72ch}
+
+/* legend */
+.legend{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); gap:12px}
+.lg{display:grid; grid-template-columns:132px minmax(0,1fr); gap:14px; align-items:center; padding:12px 14px; background:var(--surface); border:1px solid var(--line); border-radius:12px}
+.lg p{font-size:13.5px; color:var(--muted); line-height:1.6}
+.lg .nd{position:relative; width:100%}
+.lg .n-dec{height:64px}
+.lg .demo-mk{display:flex; gap:6px; justify-content:center}
+.lg svg.ln{width:100%; height:34px; overflow:visible}
+
+/* index */
+.group{margin-top:24px}
+.group h3{font-size:16px; font-weight:600; margin-bottom:10px; color:var(--ink)}
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,262px),1fr)); gap:12px}
+.card{display:flex; flex-direction:column; gap:6px; padding:14px 16px; background:var(--surface); border:1px solid var(--line); border-radius:12px; text-decoration:none; color:inherit; transition:border-color .15s, opacity .15s; min-width:0}
+.card:hover{border-color:var(--accent)}
+.card .row{display:flex; justify-content:space-between; gap:8px; align-items:center}
+.card .fid{font:500 12.5px var(--f-mono); color:var(--muted)}
+.card h4{font-size:16.5px; font-weight:600}
+.card p{font-size:13.5px; color:var(--muted); line-height:1.6}
+.card .meta{margin-top:auto; padding-top:4px; display:flex; flex-wrap:wrap; gap:6px 10px; font-size:12.5px; color:var(--muted); align-items:center}
+.card.dim{opacity:.34}
+#filter-info{font-size:13.5px; color:var(--muted)}
+
+/* badges & markers */
+.badge{font-size:12px; font-weight:600; border-radius:999px; padding:1px 10px; white-space:nowrap; font-family:var(--f-body)}
+.b-ok{background:var(--ok-bg); color:var(--ok)}
+.b-demo{background:var(--demo-bg); color:var(--demo)}
+.b-ext{background:var(--ext-bg); color:var(--ext)}
+.b-pending{background:var(--pend-bg); color:var(--pend)}
+.mk{display:inline-flex; align-items:center; gap:2px; font:600 10.5px/1 var(--f-mono); padding:3px 6px 3px 4px; border-radius:999px; white-space:nowrap}
+.mk.w{background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn-bd)}
+.mk.q{background:var(--ask-bg); color:var(--ask); border:1px solid var(--ask-bd)}
+
+/* feature sections */
+.feat{margin-top:44px; padding-top:40px; border-top:1px solid var(--line); scroll-margin-top:calc(env(safe-area-inset-top,0px) + 56px)}
+.feat-head{display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 16px; align-items:start}
+.feat-id{font:600 15px/1.2 var(--f-mono); color:var(--accent-ink); background:var(--accent-bg); border-radius:8px; padding:6px 9px; margin-top:3px}
+.feat-head h3{font-size:clamp(22px,2.6vw,28px); font-weight:700; display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center}
+.feat-head .sum{margin-top:6px; color:var(--muted); max-width:70ch}
+.meta3{grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:10px; margin:16px 0 0}
+.meta3 > div{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 14px; min-width:0}
+.meta3 dt{font-size:12px; color:var(--muted); font-weight:500}
+.meta3 dd{margin:2px 0 0; font-size:14px}
+.chip{display:inline-block; font-size:12.5px; line-height:1.7; padding:0 8px; border-radius:6px; background:var(--surface-2); color:var(--ink); margin:2px 4px 2px 0}
+.chip.declared{background:transparent; border:1px dashed var(--line-strong); color:var(--muted)}
+@media (max-width:560px){ .feat-head{grid-template-columns:1fr} .feat-id{justify-self:start} }
+
+/* diagram */
+figure.flow{margin:24px 0 0; scroll-margin-top:calc(env(safe-area-inset-top,0px) + 64px)}
+figure.flow figcaption{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; margin-bottom:10px; font:600 16px/1.4 var(--f-display)}
+figure.flow figcaption small{font:400 12.5px var(--f-mono); color:var(--muted)}
+.dg-scroll{overflow-x:auto; border:1px solid var(--line); border-radius:14px; background:var(--canvas)}
+.dg{position:relative; margin-inline:auto; background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size:24px 24px}
+.scroll-hint{font-size:12.5px; color:var(--muted); margin:6px 2px 0}
+.lane{position:absolute; top:0; bottom:0; background:var(--c-bg); border-left:1px dashed var(--line-strong)}
+.lane.first{border-left:0}
+.lane-h{position:absolute; inset:0 0 auto 0; display:flex; flex-direction:column; justify-content:center; padding:6px 12px; border-top:3px solid var(--c); border-bottom:1px solid var(--line); background:linear-gradient(var(--c-bg),var(--c-bg)),var(--canvas)}
+.lane-h b{font:600 14px/1.35 var(--f-display); color:var(--c)}
+.lane-h small{font:400 11px/1.45 var(--f-mono); color:var(--muted)}
+.c-user{--c:var(--l-user); --c-bg:var(--l-user-bg); --c-bd:var(--l-user-bd)}
+.c-lead{--c:var(--l-lead); --c-bg:var(--l-lead-bg); --c-bd:var(--l-lead-bd)}
+.c-admin{--c:var(--l-admin); --c-bg:var(--l-admin-bg); --c-bd:var(--l-admin-bd)}
+.c-sys{--c:var(--l-sys); --c-bg:var(--l-sys-bg); --c-bd:var(--l-sys-bd)}
+.c-ext{--c:var(--l-ext); --c-bg:var(--l-ext-bg); --c-bd:var(--l-ext-bd)}
+.c-state{--c:var(--l-state); --c-bg:var(--l-state-bg); --c-bd:var(--l-state-bd)}
+
+.edges{position:absolute; left:0; top:0; z-index:1; overflow:visible; pointer-events:none}
+.edges path{fill:none; stroke:var(--edge); stroke-width:1.6; stroke-linejoin:round; stroke-linecap:round}
+.edges path.dash{stroke-dasharray:5 5}
+.el{position:absolute; z-index:2; font:500 11px/1.55 var(--f-body); color:var(--edge-ink); background:var(--canvas); border:1px solid var(--line-strong); border-radius:999px; padding:0 7px; white-space:nowrap}
+
+.nd{position:absolute; z-index:3; font-size:var(--nfs); line-height:1.45; color:var(--ink); text-align:center}
+.nd .in{display:flex; flex-direction:column; align-items:center; gap:4px}
+.nd .tx{white-space:pre-line; overflow-wrap:break-word}
+.n-act{background:var(--surface); border:1.25px solid var(--c-bd); border-radius:10px; padding:9px 10px}
+.n-start{background:var(--start-bg); border:1.5px solid var(--start); border-radius:22px; padding:8px 12px; font-weight:500}
+.n-end{background:var(--end-bg); color:var(--end-fg); border-radius:22px; padding:9px 12px; font-weight:500}
+.n-link{display:block; background:var(--surface); border:1.5px dashed var(--accent); border-radius:12px; padding:8px 10px; color:var(--accent-ink); text-decoration:none; font-weight:500}
+.n-link:hover{background:var(--accent-bg)}
+.n-link .go{font:600 11.5px/1.3 var(--f-mono)}
+.n-note{background:var(--surface-2); border:1px dashed var(--line-strong); border-radius:8px; padding:8px 11px; color:var(--muted); text-align:left}
+.n-note .in{align-items:flex-start}
+.n-state{background:var(--surface); border:1.5px solid var(--c-bd); border-radius:10px; padding:8px 10px}
+.n-state .code{font:600 12px/1.4 var(--f-mono); color:var(--ink); overflow-wrap:anywhere}
+.n-state .tx{color:var(--muted)}
+.n-dec{display:flex; align-items:center; justify-content:center}
+.n-dec .dia{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
+.n-dec polygon{fill:var(--dec-bg); stroke:var(--dec); stroke-width:1.5; vector-effect:non-scaling-stroke}
+.n-dec .in{position:relative; font-weight:500; max-width:var(--dtw,92px)}
+.chips{display:flex; gap:4px; justify-content:center; flex-wrap:wrap}
+.chips a{font:500 10.5px/1.6 var(--f-mono); padding:0 6px; border-radius:6px; border:1px solid var(--line-strong); color:var(--accent-ink); background:var(--surface); text-decoration:none}
+.chips a:hover{border-color:var(--accent)}
+.mks{position:absolute; top:-10px; right:-8px; display:flex; gap:3px}
+
+/* outline + findings */
+details.outline{margin-top:10px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:0 16px}
+details.outline summary{cursor:pointer; padding:10px 0; font-weight:500; color:var(--accent-ink); font-size:14px}
+details.outline ol{margin:0 0 14px; padding-left:26px; display:grid; gap:7px; font-size:14px}
+details.outline li::marker{font-family:var(--f-mono); color:var(--muted); font-size:12.5px}
+.who{font-size:12px; font-weight:600; color:var(--c); margin-right:6px}
+.k{font:500 11px/1.5 var(--f-mono); color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 5px; margin-right:6px; white-space:nowrap}
+.nx{color:var(--muted); font-size:13px; margin-left:4px}
+.nx b{font-weight:600; color:var(--edge-ink)}
+details.outline .mk{margin-left:4px; vertical-align:1px}
+
+.finds{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr)); gap:12px; margin-top:16px}
+.fbox{border-radius:12px; padding:14px 16px; background:var(--surface); border:1px solid var(--line); min-width:0}
+.fbox h4{display:flex; gap:8px; align-items:center; font-size:15px; font-weight:600}
+.fbox.w h4{color:var(--warn)}
+.fbox.q h4{color:var(--ask)}
+.fbox ol,.fbox ul{list-style:none; padding:0; margin:10px 0 0; display:grid; gap:9px; font-size:14px}
+.fbox li{display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px; align-items:start}
+.fbox li .mk{margin-top:3px}
+.fbox.n li{grid-template-columns:1fr; color:var(--muted)}
+
+.feat-foot{display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:16px; font-size:13px; color:var(--muted); align-items:center}
+.feat-foot code{font:12px var(--f-mono); background:var(--surface-2); padding:1px 6px; border-radius:5px; color:var(--ink); overflow-wrap:anywhere}
+.rel a{font:500 12.5px var(--f-mono); text-decoration:none; border:1px solid var(--line-strong); border-radius:6px; padding:0 6px; margin-right:4px; background:var(--surface)}
+.rel a:hover{border-color:var(--accent)}
+.up{margin-left:auto; font-size:13px; text-decoration:none}
+
+.sla{margin-top:18px; overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface)}
+.sla table{border-collapse:collapse; width:100%; min-width:560px; font-size:13.5px}
+.sla th,.sla td{padding:9px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top}
+.sla thead th{background:var(--surface-2); font-weight:600; font-size:12.5px}
+.sla tbody tr:last-child td{border-bottom:0}
+.sla td{font-variant-numeric:tabular-nums}
+.sla .cap{padding:10px 12px; font-size:12.5px; color:var(--muted); border-top:1px solid var(--line)}
+
+:target > .feat-head .feat-id, figure:target figcaption{animation:flash 1.8s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 6px var(--accent-bg)}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){ :target > .feat-head .feat-id, figure:target figcaption{animation:none} }
+
+footer.end{margin-top:56px; padding-block:22px 40px; border-top:1px solid var(--line); font-size:13px; color:var(--muted)}
+.b-req{color:var(--accent-ink);background:var(--accent-bg)}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0,0.8 L10,5 L0,9.2 Z" style="fill:var(--edge)"/>
+    </marker>
+  </defs>
+</svg>
+
+<header class="wrap top">
+  <div>
+    <div class="eyebrow">BAMBAM · Workplace Service Assistant</div>
+    <h1>User Flow ทุกฟีเจอร์</h1>
+    <p class="lead">ผู้ใช้แต่ละ role กดอะไร แล้วระบบหรือคนถัดไปทำอะไรต่อจนจบ flow แผนภาพแบ่งคอลัมน์ตามผู้ทำขั้นตอน (swimlane) และมาร์กจุดที่โค้ดยังไม่ตรงกับเจตนาไว้บนกล่อง</p>
+  </div>
+  <div class="facts" id="facts"></div>
+  <div class="basis">
+    <div class="note-box"><strong>อ้างอิงโค้ดเดิมและข้อกำหนดปรับปรุง</strong>ปรับตามข้อกำหนดวันที่ 13 ต.ค. 2569: Login ผ่าน SSO รับ username / role, Admin ปิดได้ทุก Ticket และ F05 ส่งกลับคิวเดิมเท่านั้น ส่วนที่ปรับเป็น flow ที่ต้องการ ยังไม่ได้ยืนยันการพัฒนาในแอปจริง · สรุปจากรายงานสำรวจ Feature / Role / Permission วันที่ 9 ต.ค. 2569 ซึ่งอ่านจาก working tree ของ bambam-ai-app ส่วนอื่นอ้างอิงพฤติกรรมตามโค้ดและคู่มือ ไม่ใช่ผลทดสอบเว็บ Production</div>
+    <div class="note-box"><strong>BAMBAM ยังเป็น POC</strong>งานซ่อม คำขอจัดห้อง และข้อมูลที่แก้ อยู่ในเบราว์เซอร์ที่ใช้งาน ยังไม่มี backend กลาง ขั้นตอนที่ส่งต่อระหว่าง role จึงยังไม่ถึงผู้ใช้ที่เปิดจากเครื่องอื่น</div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="wrap">
+    <nav aria-label="ส่วนของหน้า"><a href="#how">วิธีอ่าน</a><a href="#overview">ภาพรวม</a><a href="#index">สารบัญ</a></nav>
+    <div class="ctl">
+      <label for="role"><span>ดูตาม role</span>
+        <select id="role" aria-label="ดู flow ตาม role">
+          <option value="">ทุก role</option>
+        </select>
+      </label>
+      <label for="jump"><span>ไปที่</span>
+        <select id="jump" aria-label="ไปที่ฟีเจอร์">
+          <option value="">เลือกฟีเจอร์…</option>
+        </select>
+      </label>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="block" id="how">
+    <h2>วิธีอ่านแผนภาพ</h2>
+    <p class="sub">อ่านจากบนลงล่าง แต่ละคอลัมน์คือผู้ทำขั้นตอนนั้น เช่น ผู้แจ้ง หัวหน้าทีม Admin ระบบ BAMBAM หรือระบบภายนอก กล่องเปลี่ยนคอลัมน์เมื่องานถูกส่งต่อให้คนหรือระบบอื่น</p>
+    <div class="legend">
+      <div class="lg"><div class="nd n-start c-user"><span class="in"><span class="tx">กด "แจ้งซ่อม"</span></span></div><p>จุดเริ่ม: สิ่งที่ผู้ใช้กด หรือเหตุการณ์ที่ทำให้ flow เริ่ม</p></div>
+      <div class="lg"><div class="nd n-act c-user"><span class="in"><span class="tx">เลือกอาคาร / ชั้น</span></span></div><p>ขั้นตอน: สิ่งที่คนหรือระบบในคอลัมน์นั้นทำ</p></div>
+      <div class="lg"><div class="nd n-dec c-sys"><svg class="dia" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="50,1.5 98.5,50 50,98.5 1.5,50"/></svg><span class="in"><span class="tx">พบงานซ้ำ?</span></span></div><p>ทางแยก: เงื่อนไขที่พาไปคนละทาง ป้ายบนเส้นบอกว่าเป็นทางไหน</p></div>
+      <div class="lg"><div class="nd n-end c-user"><span class="in"><span class="tx">งานปิด (closed)</span></span></div><p>จุดจบ: ผลลัพธ์สุดท้ายของ flow</p></div>
+      <div class="lg"><a class="nd n-link c-user" href="#F07"><span class="in"><span class="tx">ยืนยันตรวจรับ</span><span class="go">F07 →</span></span></a><p>ไปต่อที่ฟีเจอร์อื่น กดเพื่อเลื่อนไปที่ flow นั้น</p></div>
+      <div class="lg"><div class="nd n-note c-sys"><span class="in"><span class="tx">หมายเหตุประกอบขั้นตอน</span></span></div><p>หมายเหตุ: ข้อมูลเสริมที่ไม่ใช่ขั้นตอน</p></div>
+      <div class="lg"><div class="demo-mk"><span class="mk w" data-ico="w">1</span><span class="mk q" data-ico="q">1</span></div><p>สีส้มคือจุดที่โค้ดต่างจากเจตนา สีชมพูคือเรื่องที่รายงานไม่ระบุ ควรยืนยันกับโค้ด เลขตรงกับรายการใต้แผนภาพ</p></div>
+      <div class="lg"><svg class="ln" viewBox="0 0 132 34" aria-hidden="true"><path d="M4 9H124" style="fill:none;stroke:var(--edge);stroke-width:1.6" marker-end="url(#arw)"/><path d="M4 26H124" style="fill:none;stroke:var(--edge);stroke-width:1.6;stroke-dasharray:5 5" marker-end="url(#arw)"/></svg><p>เส้นทึบคือลำดับขั้นตอน เส้นประคือทางเลือกหรือการรอ ชิปอย่าง <span class="chips" style="display:inline-flex"><a href="#F02">F02</a></span> พาไปฟีเจอร์ที่เกี่ยวข้อง</p></div>
+    </div>
+  </section>
+
+  <section class="block" id="overview">
+    <h2>ภาพรวม: วงจรงานซ่อม</h2>
+    <p class="sub">เส้นทางหลักที่ร้อยหลายฟีเจอร์เข้าด้วยกัน ตั้งแต่ผู้ใช้แจ้งปัญหาจนผู้แจ้งตรวจรับงาน กดชิปบนกล่องเพื่อดู flow ละเอียดของขั้นตอนนั้น</p>
+    <div id="ov"></div>
+  </section>
+
+  <section class="block" id="index">
+    <h2>สารบัญ flow</h2>
+    <p class="sub" id="filter-info"></p>
+    <div id="groups"></div>
+  </section>
+
+  <div id="features"></div>
+
+  <footer class="end">ปรับ flow ตามข้อกำหนด 13 ต.ค. 2569 · สร้างจากรายงาน feature-role-permission-summary.html (สำรวจ 9 ต.ค. 2569) · เลขบรรทัดอ้างอิง working tree ณ วันที่สำรวจ · แผนภาพนี้ไม่ได้แก้พฤติกรรมของแอป</footer>
+</main>
+
+<script>
+/* BAMBAM user-flow data
+   Source: feature-role-permission-summary.html (survey 9 Oct 2569, AS-IS from code)
+   Grid: node.l = lane id, node.r = row, node.s = slot inside lane (default centred)
+   Edge: f/t = node ids, l = label, fs/ts = side (t,b,l,r), dash, lp = label placement,
+         via = waypoints {x: absolute slot units (k+0.5 = slot centre), y: row units (r = gap above row r, r+0.5 = row centre)} */
+
+const ALL = ['employee','housekeeper_lead','security_lead','admin','technician','executive'];
+const LEADS = ['housekeeper_lead','security_lead'];
+
+const ROLES = [
+  {id:'employee', label:'พนักงานทั่วไป'},
+  {id:'housekeeper_lead', label:'หัวหน้าแม่บ้าน'},
+  {id:'security_lead', label:'หัวหน้ารปภ.'},
+  {id:'admin', label:'Admin'},
+  {id:'technician', label:'ช่างเทคนิค', declared:false},
+  {id:'executive', label:'ผู้บริหาร', declared:false}
+];
+
+const STATUS = {req:'ข้อกำหนดใหม่', ok:'มีโค้ด UI', demo:'เดโม', ext:'ลิงก์ภายนอก', pending:'ยังไม่เชื่อม'};
+
+const LANES = {
+  user:  {label:'ผู้ใช้ / ผู้แจ้ง', sub:'ทุก role', c:'user'},
+  lead:  {label:'หัวหน้าทีม', sub:'แม่บ้าน · รปภ.', c:'lead'},
+  admin: {label:'Admin', sub:'admin', c:'admin'},
+  sys:   {label:'ระบบ BAMBAM', sub:'ทำงานในเบราว์เซอร์', c:'sys'},
+  ext:   {label:'ระบบภายนอก', sub:'นอก BAMBAM', c:'ext'},
+  main:  {label:'เส้นทางหลัก', sub:'สถานะ Ticket', c:'state'},
+  side:  {label:'ส่งต่อ / พักงาน', sub:'สถานะ Ticket', c:'state'}
+};
+
+const GROUPS = [
+  {title:'เริ่มใช้งาน', items:['F01']},
+  {title:'แจ้งซ่อม → ปิดงาน', items:['F02','F03','F04','F05','F06','F07']},
+  {title:'Admin จัดการงาน', items:['F08','F09','F10','F11']},
+  {title:'อุปกรณ์ ผังอาคาร และผู้ใช้', items:['F12','F13','F14','F15']},
+  {title:'แชทและบริการ', items:['F16','F17','F18']},
+  {title:'ทั่วไป และส่วนที่ยังไม่เชื่อม', items:['F19','F20']}
+];
+
+/* ---------- Overview: the whole repair lifecycle ---------- */
+const OVERVIEW = {
+  key:'OV', name:'วงจรงานซ่อมตั้งแต่แจ้งจนปิดงาน',
+  lanes:[{id:'user'},{id:'lead'},{id:'sys'},{id:'admin', label:'Admin / ทีมช่าง', sub:'admin'}],
+  nodes:[
+    {id:'s',  l:'user', r:0, t:'start', x:'พบปัญหา กด "แจ้งซ่อม"\nหรือสแกน QR ที่อุปกรณ์หรือถ่ายรูป', links:['F02','F13']},
+    {id:'a1', l:'user', r:1, t:'act', x:'กรอกหมวด อาการ อาคาร ชั้น\nรายละเอียด และแนบรูป', links:['F02']},
+    {id:'d1', l:'sys', r:2, t:'dec', x:'พบงานเปิดซ้ำ\nจุดเดียวกัน?', links:['F03']},
+    {id:'e1', l:'user', r:2, t:'end', x:'ติดตามเคสเดิมแทน\n(เป็น subscriber)', links:['F03']},
+    {id:'d2', l:'sys', r:3, t:'dec', x:'หัวหน้าทีม\nเลือกทำเอง?', links:['F04']},
+    {id:'e2', l:'lead', r:3, t:'end', x:'บันทึกผล → closed ทันที\nไม่มีแบบประเมิน', links:['F04','F05']},
+    {id:'a2', l:'sys', r:4, t:'act', x:'สร้าง Ticket (new)\nตั้ง Priority + SLA deadline', links:['F09'], g:[4]},
+    {id:'n1', l:'sys', r:5, t:'note', x:'ระหว่างที่งานยังเปิด หน้าเว็บตรวจ SLA ทุก 60 วินาที เกินกำหนด → ยกระดับ', links:['F09'], g:[2]},
+    {id:'a3', l:'admin', r:5, t:'act', x:'เริ่มงาน / มอบหมาย\nผู้รับผิดชอบ + วันเสร็จ', links:['F08']},
+    {id:'a4', l:'admin', r:6, t:'act', x:'ลงพื้นที่ วินิจฉัย ซ่อม\n(on_site / diagnosing)', g:[1]},
+    {id:'d3', l:'admin', r:7, t:'dec', x:'ต้องรออะไหล่ /\nภายนอก / อนุมัติ?'},
+    {id:'a5', l:'sys', r:7, t:'act', x:'พัก SLA\n(waiting_parts / external / approval)'},
+    {id:'a6', l:'admin', r:8, t:'act', x:'บันทึกผล + รูปหลังซ่อม\n+ ค่าใช้จ่าย → resolved', links:['F08','F10']},
+    {id:'a7', l:'user', r:9, t:'act', x:'ผู้แจ้งตรวจรับงาน\nให้ 1–5 ดาว หรือไม่ให้คะแนน', links:['F07'], g:[3]},
+    {id:'e3', l:'user', r:10, t:'end', x:'งานปิด (closed)\nข้อมูลเข้า Insights', links:['F11']},
+    {id:'ac', l:'admin', r:9, t:'link', x:'Admin ปิด Ticket ได้ทุกงาน\nจากทุกสถานะที่ยังไม่ปิด', to:'F08-B'}
+  ],
+  edges:[
+    {f:'s', t:'a1'},
+    {f:'a1', t:'d1', fs:'r', ts:'t'},
+    {f:'d1', t:'e1', fs:'l', ts:'r', l:'ซ้ำ'},
+    {f:'d1', t:'d2', l:'ไม่ซ้ำ'},
+    {f:'d2', t:'e2', fs:'l', ts:'r', l:'ใช่'},
+    {f:'d2', t:'a2', l:'ไม่ใช่'},
+    {f:'a2', t:'a3', fs:'r', ts:'t'},
+    {f:'a3', t:'a4'},
+    {f:'a4', t:'d3'},
+    {f:'d3', t:'a5', fs:'l', ts:'r', l:'ใช่'},
+    {f:'a5', t:'a4', fs:'t', ts:'l', l:'พร้อมทำต่อ', lp:'end'},
+    {f:'d3', t:'a6', l:'ไม่'},
+    {f:'a6', t:'a7'},
+    {f:'a7', t:'e3'}, {f:'ac', t:'e3'}
+  ],
+  gaps:[
+    'ข้อกำหนดใหม่: ช่างเทคนิคเข้าสู่ระบบตาม role ที่ได้รับจาก SSO (F01); การบันทึกผ่าน Admin เป็นเส้นทางเดิมในรายงาน',
+    'ตรวจ SLA เฉพาะตอนมีคนเปิดหน้าเว็บ ไม่พบ background job ฝั่งเซิร์ฟเวอร์ (ดู F09)',
+    'ปุ่มตรวจรับไม่ได้เช็กว่าผู้กดเป็นผู้แจ้งงานนั้น (Finding 02)',
+    'Ticket อยู่ใน React state ของเบราว์เซอร์ ยังไม่มีฐานข้อมูลกลาง (Finding 07)'
+  ]
+};
+
+/* ---------- Features ---------- */
+const FEATURES = [
+
+{ id:'F01', title:'เข้าสู่ระบบผ่าน SSO และโปรไฟล์', status:'req', roles:ALL,
+  summary:'เข้าสู่ระบบผ่าน SSO โดยรับ username และ role จาก SSO แล้วแสดงเมนูตามสิทธิ์ที่ได้รับ',
+  start:'เปิดเว็บ BAMBAM', end:'เข้าหน้าแรกตาม role จาก SSO · ดูโปรไฟล์ · ออกจากระบบ',
+  evidence:'ข้อกำหนดปรับปรุง 13 ต.ค. 2569 · แทน Login เดโมเดิม',
+  flows:[{ key:'F01', name:'เข้าสู่ระบบผ่าน SSO รับ username และ role',
+    lanes:[{id:'user', slots:3},{id:'sys', sub:'รับตัวตนและสิทธิ์จาก SSO'},{id:'ext', label:'ระบบ SSO', sub:'ยืนยันตัวตน'}],
+    nodes:[
+      {id:'s', l:'user', r:0, t:'start', x:'เปิดเว็บ BAMBAM'},
+      {id:'a1', l:'user', r:1, t:'act', x:'กดเข้าสู่ระบบผ่าน SSO'},
+      {id:'sso', l:'ext', r:2, t:'act', x:'ยืนยันตัวตนผ่าน SSO\nส่งผลกลับ BAMBAM'},
+      {id:'d1', l:'sys', r:3, t:'dec', x:'SSO สำเร็จ และมี\nusername / role\nที่ระบบรองรับ?'},
+      {id:'x1', l:'user', r:3, t:'end', x:'เข้าไม่ได้: แสดงข้อผิดพลาด\nให้ลองใหม่ / ติดต่อผู้ดูแล'},
+      {id:'a2', l:'sys', r:4, t:'act', x:'รับ username และ role\nจาก SSO เพื่อกำหนดสิทธิ์'},
+      {id:'a3', l:'user', r:5, t:'act', x:'เข้าหน้าแรก (Services)\nเห็นเมนูตาม role จาก SSO'},
+      {id:'k1', l:'user', s:0, r:6, t:'link', x:'ใช้บริการต่าง ๆ\nF02–F19', to:'index'},
+      {id:'a4', l:'user', s:1, r:6, t:'act', x:'กดออกจากระบบ'},
+      {id:'a5', l:'user', s:2, r:6, t:'act', x:'ดู username / role จาก SSO\nแก้ข้อมูลโปรไฟล์เสริม'},
+      {id:'e1', l:'sys', r:7, t:'end', x:'สิ้นสุดการใช้งาน BAMBAM\nกลับหน้าเข้าสู่ระบบ'},
+      {id:'e2', l:'user', s:2, r:8, t:'end', x:'บันทึกโปรไฟล์เสริม / ภาษา\nบนเครื่องนี้ (พฤติกรรมเดิม)'}
+    ],
+    edges:[
+      {f:'s',t:'a1'}, {f:'a1',t:'sso'}, {f:'sso',t:'d1'},
+      {f:'d1',t:'x1',fs:'l',ts:'r',l:'ไม่ผ่าน'}, {f:'d1',t:'a2',l:'ผ่าน'},
+      {f:'a2',t:'a3'}, {f:'a3',t:'k1'}, {f:'a3',t:'a4'}, {f:'a3',t:'a5'},
+      {f:'a4',t:'e1'}, {f:'a5',t:'e2'}
+    ]}],
+  gaps:[],
+  notes:['SSO เป็นแหล่งข้อมูล username และ role ไม่กำหนด role จากข้อความใน username และไม่ใช้บัญชีตัวอย่าง', 'username และ role ไม่แก้จากหน้าโปรไฟล์ ส่วนข้อมูลเสริมคงพฤติกรรมเดิม'],
+  related:['F19']
+},
+
+{ id:'F02', title:'แจ้งซ่อม', status:'ok', roles:ALL,
+  summary:'ผู้ใช้ทุก role แจ้งปัญหาผ่านฟอร์ม ระบบตรวจงานซ้ำ แยกงานที่หัวหน้าทีมทำเอง แล้วสร้าง Ticket เข้าคิว Admin',
+  start:'กด "แจ้งซ่อม" หรือสแกน QR', end:'ได้เลข Ticket และงานเข้าคิว Dispatch (หรือแยกไป F03 / F04)',
+  evidence:'page.tsx:2343–2478',
+  flows:[{ key:'F02', name:'แจ้งซ่อมจนได้เลข Ticket',
+    lanes:[{id:'user', label:'ผู้แจ้ง', slots:2},{id:'sys'}],
+    nodes:[
+      {id:'s1', l:'user', s:0, r:0, t:'start', x:'กด "แจ้งซ่อม"\n(หน้าแรก / เมนู / แชท)'},
+      {id:'s2', l:'user', s:1, r:0, t:'start', x:'สแกน QR ที่อุปกรณ์หรือถ่ายรูป', links:['F13']},
+      {id:'a1', l:'user', r:1, t:'act', x:'เปิดฟอร์มแจ้งซ่อม\n(มาจาก QR: กรอกข้อมูลอุปกรณ์ให้)'},
+      {id:'a2', l:'user', r:2, t:'act', x:'เลือกหมวดงาน\nและอาการ (เลือกได้หลายข้อ)'},
+      {id:'a3', l:'user', r:3, t:'act', x:'เลือกอาคาร / ชั้น\nกรอกรายละเอียด + แนบรูป'},
+      {id:'a4', l:'user', r:4, t:'act', x:'กด "ส่ง"'},
+      {id:'d1', l:'sys', r:5, t:'dec', x:'พบงานเปิดซ้ำ\nจุดเดียวกัน?'},
+      {id:'k1', l:'user', r:5, t:'link', x:'ติดตามเคสเดิมแทน', to:'F03'},
+      {id:'d2', l:'sys', r:6, t:'dec', x:'หัวหน้าทีม\nเลือกทำเอง?'},
+      {id:'k2', l:'user', r:6, t:'link', x:'ปิดงานภายในทีม', to:'F04'},
+      {id:'a5', l:'sys', r:7, t:'act', x:'ตั้ง Priority\n(เข้าเงื่อนไขฉุกเฉิน → Critical)'},
+      {id:'a6', l:'sys', r:8, t:'act', x:'สร้างเลข Ticket สถานะ new\nคำนวณ SLA deadline', g:[1]},
+      {id:'e1', l:'user', r:9, t:'end', x:'ผู้แจ้งได้เลข Ticket\nติดตามได้ใน Tracking', links:['F06']},
+      {id:'k3', l:'sys', r:9, t:'link', x:'งานเข้าคิว Dispatch', to:'F08'}
+    ],
+    edges:[
+      {f:'s1', t:'a1'}, {f:'s2', t:'a1'},
+      {f:'a1', t:'a2'}, {f:'a2', t:'a3'}, {f:'a3', t:'a4'},
+      {f:'a4', t:'d1', fs:'r', ts:'t'},
+      {f:'d1', t:'k1', fs:'l', ts:'r', l:'ซ้ำ'},
+      {f:'d1', t:'d2', l:'ไม่ซ้ำ'},
+      {f:'d2', t:'k2', fs:'l', ts:'r', l:'ใช่'},
+      {f:'d2', t:'a5', l:'ไม่ใช่'},
+      {f:'a5', t:'a6'},
+      {f:'a6', t:'e1'}, {f:'a6', t:'k3'}
+    ]}],
+  gaps:['Ticket เก็บใน React state ของเบราว์เซอร์ ยังไม่ได้บันทึกลงฐานข้อมูลกลาง (Finding 07)'],
+  related:['F03','F04','F13','F16']
+},
+
+{ id:'F03', title:'ตรวจงานซ้ำและติดตามเคสเดิม', status:'ok', roles:ALL,
+  summary:'ก่อนสร้าง Ticket ระบบหางานที่ยังเปิดอยู่ในจุดเดียวกัน ถ้าพบจะให้ผู้แจ้งติดตามเคสเดิมแทน',
+  start:'ส่งฟอร์มแจ้งซ่อม', end:'ผู้แจ้งเป็น subscriber ของเคสเดิม หรือไปสร้าง Ticket ใหม่',
+  evidence:'page.tsx:2398–2439',
+  flows:[{ key:'F03', name:'ตรวจงานซ้ำ',
+    lanes:[{id:'user', label:'ผู้แจ้ง'},{id:'sys', slots:2}],
+    nodes:[
+      {id:'s',  l:'user', r:0, t:'start', x:'ส่งฟอร์มแจ้งซ่อม\n(ขั้นตอนใน F02)'},
+      {id:'a1', l:'sys', s:0, r:1, t:'act', x:'ค้นงานที่ยังเปิดอยู่: อาคาร/ชั้น\nเดียวกัน + กลุ่มหมวดเดียวกัน'},
+      {id:'d1', l:'sys', s:0, r:2, t:'dec', x:'พบงานซ้ำ?'},
+      {id:'k1', l:'sys', s:1, r:2, t:'link', x:'สร้าง Ticket ใหม่\nตามขั้นตอนเดิม', to:'F02'},
+      {id:'a2', l:'sys', s:0, r:3, t:'act', x:'เพิ่มผู้แจ้งเป็น subscriber\nของเคสเดิม + บันทึกกิจกรรม', q:[1]},
+      {id:'e1', l:'user', r:4, t:'end', x:'ผู้แจ้งติดตามเคสเดิม\nแทนการเปิดเคสใหม่', links:['F06'], g:[1]}
+    ],
+    edges:[
+      {f:'s', t:'a1'},
+      {f:'a1', t:'d1'},
+      {f:'d1', t:'k1', fs:'r', ts:'l', l:'ไม่ซ้ำ'},
+      {f:'d1', t:'a2', l:'ซ้ำ'},
+      {f:'a2', t:'e1'}
+    ]}],
+  gaps:['กระดิ่งแจ้งเตือนยังไม่กรองตามผู้รับ ผู้ติดตาม (subscriber) จึงยังไม่ได้แจ้งเตือนเฉพาะตัว (ดู F19)'],
+  questions:['ผู้แจ้งต้องกดยืนยันการติดตามเอง หรือระบบผูกให้อัตโนมัติ และยังเลือกเปิดเคสใหม่แทนได้หรือไม่ — รายงานไม่ระบุ ควรเปิดดู page.tsx:2398–2439'],
+  related:['F02','F06']
+},
+
+{ id:'F04', title:'งานที่ทีมดำเนินการเอง', status:'ok', roles:LEADS,
+  summary:'หัวหน้าแม่บ้าน/รปภ. บันทึกงานที่ทีมแก้เองได้ แล้วปิดงานทันทีโดยไม่ผ่านช่าง',
+  start:'หัวหน้าทีมแจ้งงานที่ทีมแก้ได้เอง', end:'งาน closed ทันที ไม่มีแบบประเมิน',
+  evidence:'page.tsx:2345, 2443–2471, 2768–2769',
+  flows:[{ key:'F04', name:'หัวหน้าทีมปิดงานเอง',
+    lanes:[{id:'lead', slots:2},{id:'sys'}],
+    nodes:[
+      {id:'s',  l:'lead', s:0, r:0, t:'start', x:'หัวหน้าแม่บ้าน / รปภ.\nพบงานที่ทีมแก้ได้'},
+      {id:'a1', l:'lead', s:0, r:1, t:'act', x:'เปิดฟอร์มแจ้งซ่อม\nกรอกข้อมูลงาน', links:['F02']},
+      {id:'d1', l:'lead', s:0, r:2, t:'dec', x:'ทีมแก้เอง\nได้ไหม?'},
+      {id:'k1', l:'lead', s:1, r:2, t:'link', x:'เปิดงานให้ช่าง\nเข้าคิวปกติ', to:'F08'},
+      {id:'a2', l:'lead', s:0, r:3, t:'act', x:'เลือก "ทีมดำเนินการเอง"\nบันทึกสิ่งที่ทำ แล้วส่ง'},
+      {id:'a3', l:'sys', r:4, t:'act', x:'บันทึกเป็นงานทีมทำเอง\nสถานะ closed ทันที'},
+      {id:'e1', l:'lead', s:0, r:5, t:'end', x:'จบ: ไม่มีแบบประเมิน\nนับในหมวดงานทีมทำเอง', links:['F11']},
+      {id:'k2', l:'sys', r:5, t:'link', x:'ภายหลังต้องใช้ช่าง\nส่งต่อได้', to:'F05'}
+    ],
+    edges:[
+      {f:'s', t:'a1'}, {f:'a1', t:'d1'},
+      {f:'d1', t:'k1', fs:'r', ts:'l', l:'ไม่ได้'},
+      {f:'d1', t:'a2', l:'ได้'},
+      {f:'a2', t:'a3', fs:'r', ts:'t'},
+      {f:'a3', t:'e1'},
+      {f:'a3', t:'k2', dash:true, l:'ถ้าจำเป็น'}
+    ]}],
+  gaps:[],
+  notes:['ปุ่มบันทึกงานทีมทำเองเป็นของหัวหน้าแม่บ้านและหัวหน้ารปภ. ส่วน Admin สามารถปิด Ticket ใดก็ได้ตาม F08-B รวมงานทีมทำเอง'],
+  related:['F02','F05','F11']
+},
+
+{ id:'F05', title:'ส่งต่องานให้ช่าง', status:'req', roles:LEADS.concat(['admin']),
+  summary:'งานที่ทีมทำเองแล้วแต่ยังต้องใช้ช่าง ส่ง Ticket เดิมกลับคิวเท่านั้น ไม่มีการเปิดเคสใหม่จากการส่งต่อ',
+  start:'งานที่ทีมทำเองต้องใช้ช่างต่อ', end:'Ticket เดิมกลับคิว waiting_assignment ให้ Admin มอบหมาย',
+  evidence:'ข้อกำหนดปรับปรุง 13 ต.ค. 2569 · ส่งกลับคิวเดิมเท่านั้น',
+  flows:[{ key:'F05', name:'ส่ง Ticket เดิมกลับคิวให้ช่าง',
+    lanes:[{id:'lead'},{id:'sys'},{id:'admin'}],
+    nodes:[
+      {id:'s1',l:'lead',r:0,t:'start',x:'งานที่ทีมทำเองไปแล้ว\nแต่ยังต้องใช้ช่าง'},
+      {id:'s2',l:'admin',r:0,t:'start',x:'Admin เปิดงานทีม\nใน Dispatch'},
+      {id:'a1',l:'lead',r:1,t:'act',x:'เปิด Ticket เดิมใน Tracking',links:['F06']},
+      {id:'b1',l:'admin',r:1,t:'act',x:'กดส่งต่อให้ช่าง'},
+      {id:'a2',l:'lead',r:2,t:'act',x:'กดส่งต่อให้ช่าง',g:[1]},
+      {id:'a3',l:'sys',r:3,t:'act',x:'Ticket เดิมกลับเข้าคิว\nwaiting_assignment\nคงเลข Ticket และประวัติเดิม'},
+      {id:'n1',l:'lead',r:3,t:'note',x:'ส่งต่อกลับคิวเดิมเท่านั้น\nไม่มีการสร้าง Ticket ใหม่'},
+      {id:'a4',l:'admin',r:4,t:'act',x:'เลือก Ticket เดิมใน Dispatch\nมอบหมายช่าง',links:['F08']},
+      {id:'e1',l:'admin',r:5,t:'end',x:'เข้าสู่วงจรซ่อมปกติ\nAdmin ปิด Ticket ได้ทุกงาน',links:['F07','F08-B']}
+    ],
+    edges:[
+      {f:'s1',t:'a1'}, {f:'a1',t:'a2'}, {f:'a2',t:'a3'},
+      {f:'s2',t:'b1'}, {f:'b1',t:'a3'}, {f:'a3',t:'a4'}, {f:'a4',t:'e1'}
+    ]}],
+  gaps:['จากรายงานเดิม ปุ่มส่งต่อยังไม่ตรวจว่าผู้กดเป็นหัวหน้าทีมเจ้าของงาน'],
+  notes:['ทั้งหัวหน้าทีมและ Admin ใช้เส้นทางเดียวกัน: ส่ง Ticket เดิมกลับคิว ไม่มีตัวเลือกเปิดเคสใหม่'],
+  related:['F04','F06','F08','F09']
+},
+
+{ id:'F06', title:'ติดตามงานและประวัติ', status:'ok', roles:ALL,
+  summary:'ค้นหาและเปิดดูรายละเอียดงาน แล้วไปต่อที่การตรวจรับหรือการส่งต่อตามสถานะงาน',
+  start:'กดการ์ดหรือเมนู "ติดตามงาน"', end:'ดูความคืบหน้า · ไปตรวจรับ (F07) · ไปส่งต่อ (F05)',
+  evidence:'page.tsx:2256–2258, 2689–3227',
+  flows:[{ key:'F06', name:'ค้นหาและเปิดดูงาน',
+    lanes:[{id:'user', slots:3},{id:'sys'}],
+    nodes:[
+      {id:'s',  l:'user', r:0, t:'start', x:'กดการ์ด "ติดตามงาน"\n(หน้าแรก / แถบมือถือ / เมนู)', g:[2]},
+      {id:'a1', l:'sys', r:1, t:'act', x:'แสดงรายการงานซ่อม\nและคำขอจัดห้อง', g:[1]},
+      {id:'a2', l:'user', r:2, t:'act', x:'ค้นเลขงาน / ชื่อ / สถานที่\nกรองสถานะ + ช่วงวัน'},
+      {id:'a3', l:'user', r:3, t:'act', x:'กดเปิดงานที่ต้องการ'},
+      {id:'a4', l:'sys', r:4, t:'act', x:'แสดง Timeline รูปก่อน–หลัง\nข้อมูล SLA + ปุ่มตามสถานะ'},
+      {id:'k1', l:'user', s:0, r:5, t:'link', x:'งาน resolved:\nยืนยันตรวจรับ', to:'F07'},
+      {id:'e1', l:'user', s:1, r:5, t:'end', x:'งานยังดำเนินอยู่:\nดูความคืบหน้า'},
+      {id:'k2', l:'user', s:2, r:5, t:'link', x:'งานทีมทำเอง (หัวหน้าทีม):\nส่งต่อช่าง', to:'F05'}
+    ],
+    edges:[
+      {f:'s', t:'a1', fs:'r', ts:'t'},
+      {f:'a1', t:'a2'},
+      {f:'a2', t:'a3'},
+      {f:'a3', t:'a4', fs:'r', ts:'t'},
+      {f:'a4', t:'k1'}, {f:'a4', t:'e1'}, {f:'a4', t:'k2'}
+    ]}],
+  gaps:[
+    'รายการไม่ได้กรองตามผู้แจ้งหรือผู้รับผิดชอบ ทุกคนเห็นงานของทุกคน ขณะที่คู่มือบอกว่าเป็นงานของตัวเอง (Finding 02)',
+    'เมนูหลักซ่อน Tracking สำหรับ Admin / Executive แต่ยังเข้าได้จากการ์ดหน้าแรกและแถบมือถือ (Finding 08)'
+  ],
+  related:['F05','F07','F17']
+},
+
+{ id:'F07', title:'ยืนยันตรวจรับและประเมิน', status:'ok', roles:ALL,
+  summary:'ผู้แจ้งตรวจรับงาน resolved และให้คะแนนเพื่อปิดงานได้ อีกเส้นทางหนึ่งคือ Admin ปิดได้ทุก Ticket โดยตรง (F08-B)',
+  start:'งานอยู่สถานะ resolved', end:'งาน closed พร้อมคะแนน (หรือไม่ให้คะแนน)',
+  evidence:'page.tsx:2702–2719, 2756–2765, 3138–3173',
+  flows:[{ key:'F07', name:'ตรวจรับและให้คะแนน',
+    lanes:[{id:'user', label:'ผู้แจ้ง', slots:2},{id:'sys'}],
+    nodes:[
+      {id:'s',  l:'user', r:0, t:'start', x:'เปิดงานสถานะ resolved\nใน Tracking', links:['F06']},
+      {id:'a1', l:'user', r:1, t:'act', x:'กด "ยืนยันตรวจรับ"', g:[1], q:[1]},
+      {id:'d1', l:'user', r:2, t:'dec', x:'ให้คะแนน\nไหม?'},
+      {id:'a2', l:'user', s:0, r:3, t:'act', x:'เลือก 1–5 ดาว'},
+      {id:'n1', l:'user', s:1, r:3, t:'note', x:'งานภายในทีม (ทีมทำเอง) ไม่มีแบบประเมิน'},
+      {id:'a3', l:'sys', r:4, t:'act', x:'เปลี่ยนสถานะเป็น closed\nบันทึกคะแนน (ถ้ามี)'},
+      {id:'e1', l:'user', r:5, t:'end', x:'งานปิดเรียบร้อย\nคะแนนไปที่ Insights', links:['F11']}
+    ],
+    edges:[
+      {f:'s', t:'a1'}, {f:'a1', t:'d1'},
+      {f:'d1', t:'a2', l:'ให้'},
+      {f:'d1', t:'a3', fs:'r', ts:'t', l:'ไม่ให้'},
+      {f:'a2', t:'a3'},
+      {f:'a3', t:'e1'}
+    ]}],
+  gaps:['ไม่ตรวจว่าผู้กดเป็นผู้แจ้ง ใครเห็นงานใน Tracking ก็กดตรวจรับและให้คะแนนได้ (Finding 02)'],
+  questions:['ถ้าผู้แจ้งไม่พอใจผลงาน รายงานไม่ได้ระบุทางส่งกลับให้แก้ไข (reopen)'],
+  notes:['Admin ปิด Ticket ได้ทุกงานโดยไม่ต้องรอขั้นตอนตรวจรับนี้ (F08-B)'],
+  related:['F06','F08','F11']
+},
+
+{ id:'F08', title:'ศูนย์จัดการงาน / Dispatch', status:'req', roles:['admin'],
+  summary:'Admin รับงาน มอบหมาย ติดตาม บันทึกผล และสามารถปิด Ticket ได้ทุกงาน ไม่จำกัดผู้แจ้งหรือผู้รับผิดชอบ',
+  start:'Admin เปิดศูนย์จัดการงาน', end:'งาน resolved รอตรวจรับ หรือ Admin ปิด Ticket เป็น closed ได้โดยตรง',
+  evidence:'รายงานเดิม page.tsx:7122–7789 · เพิ่มสิทธิ์ Admin ปิดทุก Ticket ตามข้อกำหนด 13 ต.ค. 2569',
+  flows:[{ key:'F08', name:'มอบหมายและติดตามงานซ่อม',
+    lanes:[{id:'admin'},{id:'sys', slots:2}],
+    nodes:[
+      {id:'s',  l:'admin', r:0, t:'start', x:'เข้า Admin Hub\n→ ศูนย์จัดการงาน'},
+      {id:'d0', l:'sys', s:0, r:1, t:'dec', x:'role = admin?'},
+      {id:'x0', l:'sys', s:1, r:1, t:'end', x:'เปลี่ยนหน้ากลับ\n(client guard)', g:[1]},
+      {id:'a1', l:'admin', r:2, t:'act', x:'ดูคิวงาน\nค้นหา / กรอง'},
+      {id:'a2', l:'admin', r:3, t:'act', x:'เลือกงาน → เริ่มงาน / มอบหมาย\nเลือกผู้รับผิดชอบ + วันเสร็จ'},
+      {id:'a3', l:'sys', s:0, r:4, t:'act', x:'สถานะ assigned / in_progress\nบันทึกเวลา + activity log'},
+      {id:'a4', l:'admin', r:5, t:'act', x:'ระหว่างทำงาน: เปลี่ยน\nผู้รับผิดชอบ / เลื่อนกำหนด'},
+      {id:'d1', l:'admin', r:6, t:'dec', x:'ต้องรออะไหล่ /\nภายนอก / อนุมัติ?'},
+      {id:'a5', l:'sys', s:0, r:6, t:'act', x:'พัก SLA\n(waiting_parts / external / approval)'},
+      {id:'a6', l:'admin', r:7, t:'act', x:'บันทึกผลซ่อม + รูปหลังซ่อม\n+ ค่าใช้จ่าย', links:['F10']},
+      {id:'a7', l:'sys', s:0, r:8, t:'act', x:'สถานะ → resolved', g:[2]},
+      {id:'k1', l:'sys', s:0, r:9, t:'link', x:'รอผู้แจ้งตรวจรับ', to:'F07'}
+    ],
+    edges:[
+      {f:'s', t:'d0'},
+      {f:'d0', t:'x0', fs:'r', ts:'l', l:'ไม่ใช่'},
+      {f:'d0', t:'a1', l:'ใช่'},
+      {f:'a1', t:'a2'},
+      {f:'a2', t:'a3'},
+      {f:'a3', t:'a4'},
+      {f:'a4', t:'d1'},
+      {f:'d1', t:'a5', fs:'r', ts:'l', l:'ใช่'},
+      {f:'a5', t:'a4', fs:'t', ts:'r', l:'SLA เดินต่อ', lp:'end'},
+      {f:'d1', t:'a6', l:'ไม่'},
+      {f:'a6', t:'a7'},
+      {f:'a7', t:'k1'}
+    ]},
+    { key:'F08-B', name:'Admin ปิด Ticket ได้ทุกงาน',
+      lanes:[{id:'admin'},{id:'sys'}],
+      nodes:[
+        {id:'s',l:'admin',r:0,t:'start',x:'เลือก Ticket ที่ยังไม่ปิด\nได้ทุกงาน / ทุกสถานะ'},
+        {id:'a1',l:'admin',r:1,t:'act',x:'กดปิด Ticket\nไม่จำกัดผู้แจ้ง / ผู้รับผิดชอบ'},
+        {id:'a2',l:'sys',r:2,t:'act',x:'เปลี่ยน Ticket เดิม\nเป็น closed'},
+        {id:'e1',l:'admin',r:3,t:'end',x:'ปิดงานเรียบร้อย\nไม่ต้องรอผู้แจ้งตรวจรับ'}
+      ],
+      edges:[{f:'s',t:'a1'},{f:'a1',t:'a2'},{f:'a2',t:'e1'}]
+    }],
+  gaps:[
+    'กันสิทธิ์ด้วย client guard (useEffect เปลี่ยนหน้า) ไม่มี API / RLS ฝั่งเซิร์ฟเวอร์ (Finding 05)',
+    'ข้อความแจ้งอีเมลใน Dispatch เป็นการแสดงผลและ log บนหน้าจอ ไม่พบการส่งอีเมลจริง (Finding 06)'
+  ],
+  notes:['ข้อกำหนด 13 ต.ค. 2569: Admin ปิดได้ทุก Ticket รวมงานทีมและงานส่งต่อ โดยไม่ต้องผ่าน resolved ก่อน', 'Admin ยังมีปุ่มส่งต่องานทีมแบบสำรอง (F05) และแก้สถานะเคสจากผังอาคารได้ (F14)'],
+  related:['F05','F09','F10','F14']
+},
+
+{ id:'F09', title:'สถานะงานและ SLA', status:'req', roles:['admin'], rolesNote:'ระบบอัตโนมัติ + ผู้แก้ไขงาน',
+  summary:'วงจรสถานะของ Ticket และการตรวจ SLA อัตโนมัติขณะหน้าเว็บเปิดอยู่',
+  start:'สร้าง Ticket / หน้าเว็บเปิดอยู่', end:'closed หรือถูกยกระดับเมื่อเกิน SLA',
+  evidence:'page.tsx:25–47, 98–115, 105–210, 260–287, 290–423, 1514–1540',
+  sla:true,
+  flows:[
+    { key:'F09-A', name:'A · State diagram: สถานะของ Ticket', kind:'state',
+      lanes:[{id:'main'},{id:'side', slots:2}],
+      nodes:[
+        {id:'s1', l:'main', r:0, t:'start', x:'แจ้งซ่อม (F02)'},
+        {id:'s2', l:'side', s:0, r:5, t:'start', x:'หัวหน้าทีมทำเอง (F04)\nหรือ Admin ปิดทุก Ticket\nจากทุกสถานะ (F08-B)', links:['F08-B']},
+        {id:'n',  l:'main', r:1, t:'state', x:'new\nสร้าง Ticket'},
+        {id:'as', l:'main', r:2, t:'state', x:'assigned / in_progress\nAdmin เริ่ม / มอบหมาย'},
+        {id:'wa', l:'side', s:1, r:2, t:'state', x:'waiting_assignment\nงานทีมกลับเข้าคิว'},
+        {id:'os', l:'main', r:3, t:'state', x:'on_site / diagnosing\nทีมช่างลงพื้นที่ / วินิจฉัย'},
+        {id:'wp', l:'side', s:1, r:3, t:'state', x:'waiting_parts · external · approval\nพัก SLA'},
+        {id:'rs', l:'main', r:4, t:'state', x:'resolved\nดำเนินการเสร็จ'},
+        {id:'cl', l:'main', r:5, t:'state', x:'closed\nปิดงาน'},
+        {id:'nt', l:'side', s:0.5, w:2, r:6, t:'note', x:'สถานะอื่นในนิยาม: ai_analyzing · temporary_control · waiting_confirmation · escalated · cancelled และสถานะเดิม pending / in-progress / review / completed', q:[1]}
+      ],
+      edges:[
+        {f:'s1', t:'n'},
+        {f:'n', t:'as', l:'Admin เริ่ม / มอบหมาย', lp:'mid'},
+        {f:'wa', t:'as', fs:'l', ts:'r', l:'Admin มอบหมาย'},
+        {f:'as', t:'os', l:'ทีมช่างอัปเดต', lp:'mid'},
+        {f:'os', t:'wp', fs:'r', ts:'l', fo:-11, tof:-11, l:'รอของ / รออนุมัติ'},
+        {f:'wp', t:'os', fs:'l', ts:'r', fo:11, tof:11, l:'ทำต่อ: SLA เดินต่อ'},
+        {f:'os', t:'rs', l:'บันทึกผลซ่อม', lp:'mid'},
+        {f:'rs', t:'cl', l:'ผู้แจ้งตรวจรับ (F07)', lp:'mid'},
+        {f:'s2', t:'cl', fs:'l', ts:'r'},
+        {f:'cl', t:'wa', fs:'b', ts:'r', via:[{x:0.5, y:6.0},{x:3.0, y:6.0},{x:3.0, y:2.5}], l:'งานทีมทำเอง: ส่งต่อช่าง (F05)', lp:'mid', dash:true}
+      ]},
+    { key:'F09-B', name:'B · ตรวจ SLA อัตโนมัติ',
+      lanes:[{id:'sys', slots:2, sub:'ทำงานเฉพาะหน้าเว็บที่เปิดอยู่'}],
+      nodes:[
+        {id:'s',  l:'sys', s:0, r:0, t:'start', x:'มีผู้ใช้เปิดหน้าเว็บ BAMBAM'},
+        {id:'a1', l:'sys', s:0, r:1, t:'act', x:'ทุก 60 วินาที:\nตรวจงานที่ยังไม่ปิด', g:[1]},
+        {id:'a2', l:'sys', s:0, r:2, t:'act', x:'เทียบกับ SLA Matrix\nPriority + เวลาทำการ − ช่วงพัก', g:[2]},
+        {id:'d1', l:'sys', s:0, r:3, t:'dec', x:'เกินกำหนด?'},
+        {id:'a3', l:'sys', s:1, r:3, t:'act', x:'รอรอบถัดไป'},
+        {id:'a4', l:'sys', s:0, r:4, t:'act', x:'ยกระดับงาน (escalate)'},
+        {id:'e1', l:'sys', s:0, r:5, t:'end', x:'งานถูกยกระดับ', q:[2]}
+      ],
+      edges:[
+        {f:'s', t:'a1'}, {f:'a1', t:'a2'}, {f:'a2', t:'d1'},
+        {f:'d1', t:'a3', fs:'r', ts:'l', l:'ยังไม่'},
+        {f:'a3', t:'a1', fs:'t', ts:'r', l:'วนรอบใหม่', lp:'end'},
+        {f:'d1', t:'a4', l:'เกิน'},
+        {f:'a4', t:'e1'}
+      ]}
+  ],
+  gaps:[
+    'ตรวจ SLA เฉพาะตอนมีคนเปิดหน้าเว็บ ไม่พบ background job ฝั่งเซิร์ฟเวอร์ ถ้าไม่มีใครเปิดเว็บ งานจะไม่ถูกตรวจ',
+    'ยังมี SLA_HOURS เดิม (2/4/24/72 ชม.) และ logic overdue แยก ตัวเลขบนจออาจคนละเกณฑ์กับ Matrix และการคำนวณใช้เวลาของเครื่อง ไม่ได้ล็อก timezone'
+  ],
+  questions:[
+    'สถานะ ai_analyzing · temporary_control · waiting_confirmation · escalated · cancelled เกิดจากปุ่มหรือเงื่อนไขใด — รายงานระบุว่ารองรับในโค้ด แต่ไม่ได้ระบุทางที่ทำให้เกิด',
+    'ยกระดับแล้วเปลี่ยนสถานะเป็น escalated หรือแจ้งใครต่อ — รายงานไม่ระบุ'
+  ],
+  notes:['Admin ปิด Ticket ใดก็ได้จากทุกสถานะเป็น closed (F08-B); F05 เปลี่ยน Ticket เดิมจากงานทีมกลับเป็น waiting_assignment เท่านั้น', 'บาง handler ใช้สถานะเดิม (legacy) และข้ามขั้นระหว่างทางได้ เส้นในแผนภาพคือเส้นทางทั่วไปตามรายงาน'],
+  related:['F02','F04','F05','F07','F08']
+},
+
+{ id:'F10', title:'ค่าใช้จ่ายงานซ่อม', status:'ok', roles:['admin'],
+  summary:'ตอนจบงาน Admin เลือกประเภทงบและบันทึกค่าใช้จ่าย ก่อนส่งให้ผู้แจ้งตรวจรับ',
+  start:'Admin บันทึกผลซ่อมใน Dispatch', end:'ค่าใช้จ่ายถูกบันทึก งานเป็น resolved',
+  evidence:'page.tsx:7417–7438',
+  flows:[{ key:'F10', name:'บันทึกค่าใช้จ่าย',
+    lanes:[{id:'admin', slots:2},{id:'sys'}],
+    nodes:[
+      {id:'s',  l:'admin', s:0, r:0, t:'start', x:'บันทึกผลซ่อม\nใน Dispatch', links:['F08']},
+      {id:'a1', l:'admin', s:0, r:1, t:'act', x:'เลือกประเภทงบ:\nGA / CAPEX / ไม่มีค่าใช้จ่าย'},
+      {id:'d1', l:'admin', s:0, r:2, t:'dec', x:'เป็น GA\nหรือ CAPEX?'},
+      {id:'a2', l:'admin', s:0, r:3, t:'act', x:'กรอกจำนวนเงิน\nและรายละเอียด'},
+      {id:'a3', l:'sys', r:4, t:'act', x:'บันทึกค่าใช้จ่ายกับงาน\nสถานะ resolved'},
+      {id:'k1', l:'sys', r:5, t:'link', x:'รอผู้แจ้งตรวจรับ', to:'F07'}
+    ],
+    edges:[
+      {f:'s', t:'a1'}, {f:'a1', t:'d1'},
+      {f:'d1', t:'a2', l:'ใช่'},
+      {f:'d1', t:'a3', fs:'r', ts:'t', l:'ไม่มีค่าใช้จ่าย'},
+      {f:'a2', t:'a3'},
+      {f:'a3', t:'k1'}
+    ]}],
+  gaps:[],
+  related:['F08','F07']
+},
+
+{ id:'F11', title:'Insights / Dashboard', status:'ok', roles:['admin','executive'],
+  summary:'Admin (และผู้บริหารตามนิยาม role) ดูสรุปผลการทำงานและส่งออก Excel',
+  start:'กดเมนู Insights', end:'ดูแดชบอร์ด · ได้ไฟล์ Excel',
+  evidence:'page.tsx:1496, 1510, 3229–4038',
+  flows:[{ key:'F11', name:'ดูแดชบอร์ดและส่งออก',
+    lanes:[{id:'admin', label:'Admin / ผู้บริหาร', sub:'admin · executive'},{id:'sys', slots:2}],
+    nodes:[
+      {id:'s',  l:'admin', r:0, t:'start', x:'กดเมนู Insights', g:[1]},
+      {id:'d0', l:'sys', s:0, r:1, t:'dec', x:'role = admin\nหรือ executive?'},
+      {id:'x0', l:'sys', s:1, r:1, t:'end', x:'เปลี่ยนหน้ากลับ\n(client guard)', g:[2]},
+      {id:'a1', l:'sys', s:0.5, w:2, r:2, t:'act', x:'สรุปจากงานในระบบ: KPI · แนวโน้ม · SLA\nผลงานผู้รับผิดชอบ · จุดแจ้งซ้ำ · งานทีมทำเอง\nความพึงพอใจ · ความตรงกันของคำวินิจฉัย'},
+      {id:'a2', l:'admin', r:3, t:'act', x:'ดูแดชบอร์ด'},
+      {id:'d1', l:'admin', r:4, t:'dec', x:'ต้องการ\nไฟล์ Excel?'},
+      {id:'a3', l:'sys', s:0, r:4, t:'act', x:'สร้างไฟล์ Excel'},
+      {id:'e1', l:'admin', r:5, t:'end', x:'จบการดู'},
+      {id:'e2', l:'sys', s:0, r:5, t:'end', x:'ดาวน์โหลดไฟล์'}
+    ],
+    edges:[
+      {f:'s', t:'d0'},
+      {f:'d0', t:'x0', fs:'r', ts:'l', l:'ไม่ใช่'},
+      {f:'d0', t:'a1', l:'ใช่'},
+      {f:'a1', t:'a2'},
+      {f:'a2', t:'d1'},
+      {f:'d1', t:'a3', fs:'r', ts:'l', l:'ใช่'},
+      {f:'d1', t:'e1', l:'ไม่'},
+      {f:'a3', t:'e2'}
+    ]}],
+  gaps:[
+    'ข้อกำหนดใหม่: executive เข้าถึงตาม role ที่ได้รับจาก SSO (F01)',
+    'กันสิทธิ์ด้วย client guard ฝั่งเบราว์เซอร์เท่านั้น (Finding 05)'
+  ],
+  related:['F07','F09']
+},
+
+{ id:'F12', title:'คลังอุปกรณ์', status:'ok', roles:['admin'],
+  summary:'Admin ดูแลทะเบียนอุปกรณ์ เพิ่ม แก้ไข นำเข้า และส่งออกข้อมูล',
+  start:'Admin เปิดแท็บอุปกรณ์', end:'รายการอัปเดตบนหน้าจอ · ได้ไฟล์ Excel',
+  evidence:'page.tsx:4209–4320, 4370–4758',
+  flows:[
+    { key:'F12-A', name:'A · ค้นหา เพิ่ม และแก้ไขอุปกรณ์',
+      lanes:[{id:'admin', slots:2},{id:'sys'}],
+      nodes:[
+        {id:'s',  l:'admin', r:0, t:'start', x:'Admin Hub → แท็บอุปกรณ์'},
+        {id:'a1', l:'sys', r:1, t:'act', x:'โหลดข้อมูลตั้งต้นจาก CSV\n(bam-assets.csv)'},
+        {id:'a2', l:'admin', r:2, t:'act', x:'ค้น / กรอง / เปลี่ยนหน้า'},
+        {id:'d1', l:'admin', r:3, t:'dec', x:'เพิ่มใหม่ หรือ\nแก้ของเดิม?'},
+        {id:'a3', l:'admin', s:0, r:4, t:'act', x:'กรอกข้อมูลอุปกรณ์ใหม่\n(ระบบสร้าง Asset ID)'},
+        {id:'a4', l:'admin', s:1, r:4, t:'act', x:'เปิดอุปกรณ์\nแก้ข้อมูล / ดูประวัติ'},
+        {id:'a5', l:'sys', r:5, t:'act', x:'อัปเดตรายการบนหน้าจอ', g:[1]},
+        {id:'e1', l:'admin', r:6, t:'end', x:'เห็นข้อมูลใหม่ในตาราง\n(ยังไม่บันทึกถาวร)'}
+      ],
+      edges:[
+        {f:'s', t:'a1', fs:'r', ts:'t'},
+        {f:'a1', t:'a2'},
+        {f:'a2', t:'d1'},
+        {f:'d1', t:'a3', l:'เพิ่มใหม่', lp:1},
+        {f:'d1', t:'a4', l:'แก้ไข', lp:1},
+        {f:'a3', t:'a5'}, {f:'a4', t:'a5'},
+        {f:'a5', t:'e1'}
+      ]},
+    { key:'F12-B', name:'B · นำเข้า / ส่งออก Excel',
+      lanes:[{id:'admin'},{id:'sys', slots:2}],
+      nodes:[
+        {id:'s',  l:'admin', r:0, t:'start', x:'อยู่ในแท็บอุปกรณ์'},
+        {id:'d1', l:'admin', r:1, t:'dec', x:'นำเข้า หรือ\nส่งออก?'},
+        {id:'a1', l:'admin', r:2, t:'act', x:'เลือกไฟล์ Excel\nที่จะนำเข้า'},
+        {id:'b1', l:'sys', s:1, r:2, t:'act', x:'สร้างไฟล์ Excel\nจากรายการปัจจุบัน'},
+        {id:'a2', l:'sys', s:0, r:3, t:'act', x:'อ่านไฟล์ แล้วอัปเดต\nรายการบนหน้าจอ', g:[1]},
+        {id:'b2', l:'sys', s:1, r:3, t:'end', x:'ดาวน์โหลดไฟล์ Excel'},
+        {id:'e1', l:'admin', r:4, t:'end', x:'รายการอัปเดต\n(ยังไม่บันทึกถาวร)'}
+      ],
+      edges:[
+        {f:'s', t:'d1'},
+        {f:'d1', t:'a1', l:'นำเข้า'},
+        {f:'d1', t:'b1', fs:'r', ts:'t', l:'ส่งออก'},
+        {f:'a1', t:'a2'},
+        {f:'b1', t:'b2'},
+        {f:'a2', t:'e1'}
+      ]}
+  ],
+  gaps:['ข้อมูลที่เพิ่ม แก้ หรือนำเข้า อยู่ใน state ของหน้าจอ ไม่ได้บันทึกถาวรในฐานข้อมูล (Finding 07)'],
+  related:['F13']
+},
+
+{ id:'F13', title:'ป้าย QR และกรอกข้อมูลจาก QR', status:'ok', roles:ALL,
+  summary:'Admin ทำป้าย QR ติดอุปกรณ์ ผู้ใช้สแกนแล้วได้ฟอร์มแจ้งซ่อมที่กรอกข้อมูลอุปกรณ์ไว้แล้ว',
+  start:'Admin สร้างป้าย · ผู้ใช้สแกน QR', end:'ป้ายติดที่อุปกรณ์ · ฟอร์มแจ้งซ่อมถูกกรอกให้',
+  evidence:'page.tsx:1599–1668, 4630–4756',
+  flows:[
+    { key:'F13-A', name:'A · Admin สร้างป้าย QR',
+      lanes:[{id:'admin'},{id:'sys'}],
+      nodes:[
+        {id:'s',  l:'admin', r:0, t:'start', x:'คลังอุปกรณ์\nเลือกอุปกรณ์', links:['F12']},
+        {id:'a1', l:'admin', r:1, t:'act', x:'กดสร้างป้าย QR'},
+        {id:'a2', l:'sys', r:2, t:'act', x:'สร้างป้ายพร้อม QR\n(ลิงก์เว็บ + ข้อมูลอุปกรณ์)'},
+        {id:'a3', l:'admin', r:3, t:'act', x:'พิมพ์ หรือดาวน์โหลดป้าย'},
+        {id:'e1', l:'admin', r:4, t:'end', x:'นำป้ายไปติดที่อุปกรณ์'}
+      ],
+      edges:[
+        {f:'s', t:'a1'}, {f:'a1', t:'a2'}, {f:'a2', t:'a3'}, {f:'a3', t:'e1'}
+      ]},
+    { key:'F13-B', name:'B · ผู้ใช้สแกน QR แจ้งซ่อม',
+      lanes:[{id:'user'},{id:'sys', slots:2}],
+      nodes:[
+        {id:'s',  l:'user', r:0, t:'start', x:'สแกน QR ที่อุปกรณ์\nด้วยกล้องมือถือ'},
+        {id:'a1', l:'sys', r:1, t:'act', x:'เปิดเว็บ BAMBAM\nพร้อมค่าในลิงก์ (query)', q:[1]},
+        {id:'d1', l:'sys', r:2, t:'dec', x:'มีแค่ asset id\nในลิงก์?'},
+        {id:'a2', l:'sys', s:0, r:3, t:'act', x:'กรอกฟอร์ม\nจากค่าในลิงก์'},
+        {id:'a3', l:'sys', s:1, r:3, t:'act', x:'ค้น asset id ในไฟล์ CSV\nแล้วกรอกข้อมูลให้', g:[1], q:[2]},
+        {id:'a4', l:'user', r:4, t:'act', x:'ตรวจข้อมูล เลือกอาการ\nแนบรูป แล้วกดส่ง'},
+        {id:'k1', l:'user', r:5, t:'link', x:'ต่อ flow แจ้งซ่อม\n(ตรวจซ้ำ → สร้าง Ticket)', to:'F02'}
+      ],
+      edges:[
+        {f:'s', t:'a1'}, {f:'a1', t:'d1'},
+        {f:'d1', t:'a2', l:'ไม่ใช่', lp:1},
+        {f:'d1', t:'a3', l:'ใช่', lp:1},
+        {f:'a2', t:'a4'}, {f:'a3', t:'a4'},
+        {f:'a4', t:'k1'}
+      ]}
+  ],
+  gaps:['การค้น asset id ใช้ไฟล์ CSV ตั้งต้น อุปกรณ์ที่เพิ่มหรือแก้ใน F12 อยู่แค่ในหน้าจอ จึงค้นไม่เจอ'],
+  questions:[
+    'สแกนตอนยังไม่ได้ Login ค่าจากลิงก์ยังอยู่หลัง Login หรือไม่ — รายงานไม่ระบุ',
+    'ถ้าไม่พบ asset id ในไฟล์ CSV ระบบทำอย่างไร — รายงานไม่ระบุ'
+  ],
+  related:['F02','F12','F20']
+},
+
+{ id:'F14', title:'ผังอาคารและพื้นที่', status:'ok', roles:ALL,
+  summary:'ทุก role ดูผังและงานซ่อมบนผัง Admin แก้ผังได้ และ Admin / Technician แก้สถานะเคสจากผังได้',
+  start:'กดเมนูผังอาคาร', end:'ดูผัง · ได้ไฟล์ · ผังบันทึกบนเครื่อง · สถานะเคสเปลี่ยน',
+  evidence:'page.tsx:5355–6719 (โดยเฉพาะ 5411, 6064, 6273, 6306)',
+  flows:[
+    { key:'F14-A', name:'A · ดูผังและ Export (ทุก role)',
+      lanes:[{id:'user', slots:2},{id:'sys'}],
+      nodes:[
+        {id:'s',  l:'user', r:0, t:'start', x:'กดเมนูผังอาคาร'},
+        {id:'a1', l:'user', r:1, t:'act', x:'เลือกฝั่ง → อาคาร → ชั้น'},
+        {id:'a2', l:'sys', r:2, t:'act', x:'แสดงผัง 2D / 3D: โซน ห้อง\nหมุดอุปกรณ์ และหมุดงานซ่อม'},
+        {id:'a3', l:'user', r:3, t:'act', x:'ซูม / เลื่อน\nสลับมุมมอง 2D–3D'},
+        {id:'k1', l:'user', s:0, r:4, t:'link', x:'กดหมุดงานซ่อม\nดู flow C', to:'F14-C'},
+        {id:'a4', l:'user', s:1, r:4, t:'act', x:'กด Export\nการใช้พื้นที่', g:[1]},
+        {id:'a5', l:'sys', r:5, t:'act', x:'สร้างไฟล์ Excel\nการใช้พื้นที่'},
+        {id:'e1', l:'user', s:1, r:6, t:'end', x:'ดาวน์โหลดไฟล์'}
+      ],
+      edges:[
+        {f:'s', t:'a1'},
+        {f:'a1', t:'a2', fs:'r', ts:'t'},
+        {f:'a2', t:'a3'},
+        {f:'a3', t:'k1'}, {f:'a3', t:'a4'},
+        {f:'a4', t:'a5'},
+        {f:'a5', t:'e1'}
+      ]},
+    { key:'F14-B', name:'B · Admin แก้ผัง ห้อง และหมุด',
+      lanes:[{id:'admin'},{id:'sys', slots:2}],
+      nodes:[
+        {id:'s',  l:'admin', r:0, t:'start', x:'เปิดผังอาคาร'},
+        {id:'d0', l:'sys', s:0, r:1, t:'dec', x:'role = admin?'},
+        {id:'x0', l:'sys', s:1, r:1, t:'end', x:'ไม่เห็นปุ่มจัดการผัง\n(ดูได้อย่างเดียว)'},
+        {id:'a1', l:'admin', r:2, t:'act', x:'กด "จัดการผัง"'},
+        {id:'a2', l:'admin', r:3, t:'act', x:'เพิ่ม / แก้ไข\nโซน ห้อง และหมุด'},
+        {id:'a3', l:'admin', r:4, t:'act', x:'กดบันทึกผัง'},
+        {id:'a4', l:'sys', s:0, r:5, t:'act', x:'บันทึกลง localStorage\nของเบราว์เซอร์นี้', g:[2]},
+        {id:'e1', l:'admin', r:6, t:'end', x:'ผังใหม่เห็นเฉพาะ\nบนเครื่องนี้'}
+      ],
+      edges:[
+        {f:'s', t:'d0'},
+        {f:'d0', t:'x0', fs:'r', ts:'l', l:'ไม่ใช่'},
+        {f:'d0', t:'a1', l:'ใช่'},
+        {f:'a1', t:'a2'}, {f:'a2', t:'a3'},
+        {f:'a3', t:'a4'},
+        {f:'a4', t:'e1'}
+      ]},
+    { key:'F14-C', name:'C · แก้สถานะเคสจากผัง',
+      lanes:[{id:'user', label:'ผู้ใช้ที่เปิดผัง'},{id:'sys', slots:2}],
+      nodes:[
+        {id:'s',  l:'user', r:0, t:'start', x:'กดหมุดงานซ่อมบนผัง'},
+        {id:'a1', l:'sys', s:0, r:1, t:'act', x:'แสดงรายละเอียดเคส'},
+        {id:'d0', l:'sys', s:0, r:2, t:'dec', x:'role = admin\nหรือ technician?'},
+        {id:'x0', l:'sys', s:1, r:2, t:'end', x:'ดูได้อย่างเดียว'},
+        {id:'a2', l:'user', r:3, t:'act', x:'เปลี่ยนสถานะเคส', g:[3,4]},
+        {id:'a3', l:'sys', s:0, r:4, t:'act', x:'อัปเดตสถานะงาน'},
+        {id:'e1', l:'user', r:5, t:'end', x:'สถานะใหม่แสดงใน\nTracking / Dispatch'}
+      ],
+      edges:[
+        {f:'s', t:'a1'}, {f:'a1', t:'d0'},
+        {f:'d0', t:'x0', fs:'r', ts:'l', l:'ไม่ใช่'},
+        {f:'d0', t:'a2', l:'ใช่'},
+        {f:'a2', t:'a3'},
+        {f:'a3', t:'e1'}
+      ]}
+  ],
+  gaps:[
+    'ปุ่ม Export การใช้พื้นที่ไม่มี role guard ทุก role ส่งออกได้',
+    'ผังที่บันทึกอยู่ใน localStorage ของเบราว์เซอร์นั้น ผู้ใช้เครื่องอื่นไม่เห็น (Finding 07)',
+    'canEditCase = admin หรือ technician ยังไม่ตรวจว่าเป็นช่างที่ได้รับมอบหมายงานนั้น (Finding 05)',
+    'ข้อกำหนดใหม่: technician เข้าถึงตาม role ที่ได้รับจาก SSO (F01)'
+  ],
+  related:['F08','F12']
+},
+
+{ id:'F15', title:'จัดการผู้ใช้', status:'demo', roles:['admin'],
+  summary:'Admin จัดการรายชื่อผู้ใช้บนหน้าจอ ส่วนบัญชีเข้าสู่ระบบ username และ role มาจาก SSO (F01)',
+  start:'Admin เปิดแท็บผู้ใช้', end:'รายชื่อบนจอเปลี่ยน · ได้ไฟล์รายชื่อ',
+  evidence:'page.tsx:7804–7941',
+  flows:[{ key:'F15', name:'เพิ่ม แก้ไข ลบ และส่งออกผู้ใช้',
+    lanes:[{id:'admin', slots:2},{id:'sys'}],
+    nodes:[
+      {id:'s',  l:'admin', r:0, t:'start', x:'Admin Hub → แท็บผู้ใช้'},
+      {id:'a1', l:'admin', r:1, t:'act', x:'ค้นหาผู้ใช้'},
+      {id:'d1', l:'admin', r:2, t:'dec', x:'แก้ข้อมูล\nหรือส่งออก?'},
+      {id:'a2', l:'admin', s:0, r:3, t:'act', x:'กดส่งออกรายชื่อ'},
+      {id:'a3', l:'admin', s:1, r:3, t:'act', x:'เพิ่ม / แก้ไข / ลบผู้ใช้\nrole: user / admin / technician', g:[1]},
+      {id:'e2', l:'admin', s:0, r:4, t:'end', x:'ได้ไฟล์รายชื่อ'},
+      {id:'a4', l:'sys', r:4, t:'act', x:'อัปเดตรายการ\nใน state ของหน้าจอ'},
+      {id:'e1', l:'admin', s:1, r:5, t:'end', x:'รายชื่อบนจอเปลี่ยน แต่ไม่ได้\nสร้างหรือลบบัญชี Login', g:[2]}
+    ],
+    edges:[
+      {f:'s', t:'a1'}, {f:'a1', t:'d1'},
+      {f:'d1', t:'a2', l:'ส่งออก', lp:1},
+      {f:'d1', t:'a3', l:'แก้ข้อมูล', lp:1},
+      {f:'a2', t:'e2'},
+      {f:'a3', t:'a4'},
+      {f:'a4', t:'e1'}
+    ]}],
+  gaps:[
+    'role ในหน้านี้ (user / admin / technician) ไม่ตรงกับ 6 role หลัก และค่าที่ใช้ตอนเพิ่มกับตอนแก้ไขต่างกัน (Finding 04)',
+    'รายชื่อแยกจากบัญชีที่ใช้ Login เพิ่มผู้ใช้ที่นี่ไม่ได้สร้างบัญชี SSO หรือเปลี่ยน role ที่ SSO ส่งมา (F01)'
+  ],
+  related:['F01']
+},
+
+{ id:'F16', title:'ผู้ช่วย BAMBAM (แชท)', status:'demo', roles:ALL,
+  summary:'แชทตอบจาก keyword ให้คำแนะนำเบื้องต้น และพาไปแจ้งซ่อม ขอจัดห้อง หรือบริการภายนอก',
+  start:'กดไอคอนแชท', end:'ได้คำแนะนำ · ไปต่อ F02 / F17 / F18',
+  evidence:'page.tsx:6724–7120, 7219–7234',
+  flows:[{ key:'F16', name:'ถามแชทแล้วไปต่อ',
+    lanes:[{id:'user'},{id:'sys', slots:3, label:'แชทบอท BAMBAM'}],
+    nodes:[
+      {id:'s',  l:'user', r:0, t:'start', x:'กดไอคอนแชท BAMBAM'},
+      {id:'a1', l:'user', r:1, t:'act', x:'พิมพ์คำถาม / กดเมนูลัด\nหรือแนบรูป', g:[2]},
+      {id:'a2', l:'sys', s:1, r:2, t:'act', x:'จับ keyword กับชุดคำตอบ\nที่ตั้งไว้ (knowledge base)', g:[1], q:[1]},
+      {id:'a3', l:'sys', s:0, r:3, t:'act', x:'เรื่องอาการเสีย:\nแนะนำวิธีแก้เบื้องต้น'},
+      {id:'k1', l:'sys', s:1, r:3, t:'link', x:'ขอจัดห้องประชุม', to:'F17'},
+      {id:'k2', l:'sys', s:2, r:3, t:'link', x:'จองห้อง / จองรถ\n/ ขอสิทธิ์', to:'F18'},
+      {id:'a4', l:'user', r:4, t:'act', x:'ยังไม่หาย: กดปุ่ม\n"แจ้งซ่อม" ในแชท'},
+      {id:'k3', l:'user', r:5, t:'link', x:'เปิดฟอร์มแจ้งซ่อม', to:'F02'}
+    ],
+    edges:[
+      {f:'s', t:'a1'},
+      {f:'a1', t:'a2', fs:'r', ts:'t'},
+      {f:'a2', t:'a3'}, {f:'a2', t:'k1'}, {f:'a2', t:'k2'},
+      {f:'a3', t:'a4'},
+      {f:'a4', t:'k3'}
+    ]}],
+  gaps:[
+    'ไม่ได้เรียกโมเดล AI ตอบจาก keyword และข้อความที่กำหนดไว้ (Finding 06)',
+    'แนบรูปได้ แต่ไม่พบการวิเคราะห์ภาพด้วย vision model (Finding 06)'
+  ],
+  questions:['ถ้าคำถามไม่ตรง keyword ใดเลย ระบบตอบอย่างไร — รายงานไม่ระบุ'],
+  related:['F02','F17','F18']
+},
+
+{ id:'F17', title:'คำขอจัดห้องประชุม', status:'ok', roles:ALL,
+  summary:'ผู้ใช้ส่งคำขอจัดห้องผ่านแชท Admin จัดเตรียมแล้วทำเครื่องหมาย ผู้ขอติดตามสถานะใน Tracking',
+  start:'เลือก "ขอจัดห้อง" ในแชท', end:'สถานะคำขอเป็น "จัดเตรียมแล้ว"',
+  evidence:'page.tsx:4324–4370, 6919–6936',
+  flows:[{ key:'F17', name:'ส่งคำขอจนห้องพร้อม',
+    lanes:[{id:'user', label:'ผู้ขอจัดห้อง'},{id:'sys'},{id:'admin'}],
+    nodes:[
+      {id:'s',  l:'user', r:0, t:'start', x:'ในแชท เลือก\n"ขอจัดห้องประชุม"', links:['F16']},
+      {id:'a1', l:'user', r:1, t:'act', x:'เลือกรูปแบบการจัดห้อง'},
+      {id:'a2', l:'user', r:2, t:'act', x:'กรอกผู้จอง วันเวลา จำนวนคน\nหมายเหตุ + แนบรูป'},
+      {id:'a3', l:'user', r:3, t:'act', x:'กดส่งคำขอ'},
+      {id:'a4', l:'sys', r:4, t:'act', x:'สร้างคำขอจัดห้อง\nสถานะรอจัดเตรียม', g:[1]},
+      {id:'a5', l:'user', r:5, t:'act', x:'ติดตามสถานะ\nใน Tracking', links:['F06']},
+      {id:'b1', l:'admin', r:5, t:'act', x:'Admin Hub:\nเห็นคำขอใหม่'},
+      {id:'b2', l:'admin', r:6, t:'act', x:'จัดเตรียมห้อง\nตามรูปแบบที่ขอ'},
+      {id:'b3', l:'admin', r:7, t:'act', x:'กด "จัดเตรียมแล้ว"'},
+      {id:'a6', l:'sys', r:8, t:'act', x:'อัปเดตสถานะคำขอ'},
+      {id:'e1', l:'user', r:9, t:'end', x:'ผู้ขอเห็นสถานะ\n"จัดเตรียมแล้ว"'}
+    ],
+    edges:[
+      {f:'s', t:'a1'}, {f:'a1', t:'a2'}, {f:'a2', t:'a3'},
+      {f:'a3', t:'a4'},
+      {f:'a4', t:'a5'}, {f:'a4', t:'b1'},
+      {f:'b1', t:'b2'}, {f:'b2', t:'b3'},
+      {f:'b3', t:'a6'},
+      {f:'a6', t:'e1'},
+      {f:'a5', t:'e1', dash:true, l:'รอ Admin', lp:'mid'}
+    ]}],
+  gaps:['คำขอเก็บใน React state ของเบราว์เซอร์ ยังไม่มีระบบกลางส่งคำขอไปถึง Admin ที่ใช้เครื่องอื่น (Finding 07)'],
+  related:['F06','F16','F18']
+},
+
+{ id:'F18', title:'บริการภายนอก', status:'ext', roles:ALL,
+  summary:'BAMBAM เปิดลิงก์ไปยังระบบจองห้อง จองรถ และแบบฟอร์มขอสิทธิ์ การอนุมัติจริงเกิดที่ระบบปลายทาง',
+  start:'กดบริการภายนอกจากเมนู การ์ด หรือแชท', end:'ทำรายการและติดตามผลในระบบปลายทาง',
+  evidence:'page.tsx:1717–1718, 6775–6814',
+  flows:[{ key:'F18', name:'เปิดบริการภายนอก',
+    lanes:[{id:'user'},{id:'ext', slots:3}],
+    nodes:[
+      {id:'s',  l:'user', r:0, t:'start', x:'กดบริการจากเมนู / การ์ด\nหรือลิงก์ในแชท', links:['F16']},
+      {id:'a1', l:'user', r:1, t:'act', x:'เลือกบริการที่ต้องการ'},
+      {id:'x1', l:'ext', s:0, r:2, t:'act', x:'จองห้องประชุม\nCPAC / WorkX'},
+      {id:'x2', l:'ext', s:1, r:2, t:'act', x:'จองรถ\nPloishared'},
+      {id:'x3', l:'ext', s:2, r:2, t:'act', x:'ขอสิทธิ์ / สติกเกอร์\nMicrosoft Forms'},
+      {id:'x4', l:'ext', s:1, r:3, t:'act', x:'ทำรายการและอนุมัติ\nในระบบปลายทาง'},
+      {id:'e1', l:'user', r:4, t:'end', x:'ติดตามผล\nที่ระบบปลายทาง'}
+    ],
+    edges:[
+      {f:'s', t:'a1'},
+      {f:'a1', t:'x1'}, {f:'a1', t:'x2'}, {f:'a1', t:'x3'},
+      {f:'x1', t:'x4'}, {f:'x2', t:'x4'}, {f:'x3', t:'x4'},
+      {f:'x4', t:'e1'}
+    ]}],
+  gaps:[],
+  notes:['ส่วนนี้เป็นลิงก์ออกจาก BAMBAM สถานะการจองและการอนุมัติอยู่ที่ระบบปลายทาง'],
+  related:['F16','F17']
+},
+
+{ id:'F19', title:'ภาษา ธีม และแจ้งเตือน', status:'ok', roles:ALL,
+  summary:'สลับภาษาและธีมได้ทันที และดูแจ้งเตือนจากกระดิ่ง',
+  start:'กดสลับภาษา / ธีม หรือกดกระดิ่ง', end:'หน้าเปลี่ยนตามที่เลือก · เห็นรายการแจ้งเตือน',
+  evidence:'page.tsx:1411–1412, 1427–1435, 1461–1489, 2020–2054',
+  flows:[
+    { key:'F19-A', name:'A · สลับภาษาและธีม',
+      lanes:[{id:'user', slots:2},{id:'sys'}],
+      nodes:[
+        {id:'s1', l:'user', s:0, r:0, t:'start', x:'กดสลับภาษา TH / EN'},
+        {id:'s2', l:'user', s:1, r:0, t:'start', x:'กดสลับโหมด\nสว่าง / มืด'},
+        {id:'a1', l:'sys', r:1, t:'act', x:'เปลี่ยนข้อความ / สี\nทั้งหน้าทันที'},
+        {id:'e1', l:'user', r:2, t:'end', x:'ใช้งานต่อได้ทันที\nภาษาที่เลือกถูกจำไว้บนเครื่อง', q:[1]}
+      ],
+      edges:[
+        {f:'s1', t:'a1'}, {f:'s2', t:'a1'},
+        {f:'a1', t:'e1'}
+      ]},
+    { key:'F19-B', name:'B · กระดิ่งแจ้งเตือน',
+      lanes:[{id:'user'},{id:'sys'}],
+      nodes:[
+        {id:'s',  l:'sys', r:0, t:'start', x:'มีงานใหม่ หรือ\nสถานะงานเปลี่ยน'},
+        {id:'a1', l:'sys', r:1, t:'act', x:'คำนวณแจ้งเตือนจาก\nงานทั้งหมดใน state', g:[1]},
+        {id:'a2', l:'user', r:2, t:'act', x:'เห็นตัวเลขบนกระดิ่ง\nกดเปิดดู'},
+        {id:'e1', l:'user', r:3, t:'end', x:'เห็นรายการแจ้งเตือน\n(เหมือนกันทุกคน)', q:[2]}
+      ],
+      edges:[
+        {f:'s', t:'a1'}, {f:'a1', t:'a2'}, {f:'a2', t:'e1'}
+      ]}
+  ],
+  gaps:['กระดิ่งคำนวณจากงานทั้งหมดใน state ไม่กรองตามผู้รับ ทุกคนจึงเห็นรายการเดียวกัน (Finding 08)'],
+  questions:[
+    'รายงานระบุว่าจำภาษาและโปรไฟล์ไว้บนเครื่อง แต่ไม่ได้ระบุว่าจำโหมดสว่าง / มืดด้วยหรือไม่',
+    'กดรายการแจ้งเตือนแล้วพาไปหน้างานหรือไม่ — รายงานไม่ระบุ'
+  ],
+  related:['F01','F03']
+},
+
+{ id:'F20', title:'ส่วนที่ยังไม่เชื่อมใช้งาน', status:'pending', roles:ALL,
+  summary:'ส่วนที่มีบนหน้าจอหรือในโค้ด แต่ยังไม่มีปลายทางให้ใช้งานจริง',
+  start:'กดการ์ด AI Insights หรือ Knowledge', end:'เห็น Coming soon',
+  evidence:'page.tsx:2259–2260, 4209–4212, 7944–8043',
+  flows:[{ key:'F20', name:'การ์ดที่ยังไม่มีปลายทาง',
+    lanes:[{id:'user'},{id:'sys'}],
+    nodes:[
+      {id:'s',  l:'user', r:0, t:'start', x:'กดการ์ด AI Insights\nหรือ Knowledge บนหน้าแรก'},
+      {id:'e1', l:'sys', r:1, t:'end', x:'แสดง Coming soon\nยังไม่มีหน้าปลายทาง'}
+    ],
+    edges:[{f:'s', t:'e1'}]}],
+  gaps:[
+    'มี QRGeneratorPanel และค่าแท็บ qr ใน type แต่ไม่ถูก render ใน Admin Hub การสร้างป้าย QR ที่ใช้ได้อยู่ในคลังอุปกรณ์ (F13)',
+    'คู่มือระบุ Admin Hub 5 แท็บ แต่โค้ด render 4 ส่วน (Finding 08)'
+  ],
+  related:['F13','F11']
+}
+];
+
+</script>
+<script>
+(function(){
+'use strict';
+var $ = function(s, el){ return (el||document).querySelector(s); };
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+var FMAP = {}; FEATURES.forEach(function(f){ FMAP[f.id] = f; });
+var ROLE_LABEL = {}; ROLES.forEach(function(r){ ROLE_LABEL[r.id] = r.label; });
+var DECL = {}; ROLES.forEach(function(r){ if (r.declared) DECL[r.id] = true; });
+var WARN = '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2 14.6 13.6H1.4Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6.4v3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.7" r=".95" fill="currentColor"/></svg>';
+var ASK = '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.2 6.3a1.9 1.9 0 1 1 2.6 1.8c-.6.3-.8.6-.8 1.2v.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".9" fill="currentColor"/></svg>';
+var mq = window.matchMedia('(max-width: 640px)');
+function K(){
+  return mq.matches
+    ? {SLOT:188, NODE:144, PAD:12, HEAD:50, TOP:16, GAP:40, BOT:16, R:7, DTW:82}
+    : {SLOT:232, NODE:172, PAD:16, HEAD:54, TOP:20, GAP:42, BOT:20, R:8, DTW:96};
+}
+var DIAGRAMS = [];
+
+function linkLabel(to){
+  if (to === 'index') return 'สารบัญ';
+  var p = to.split('-');
+  return p[1] ? p[0] + ' · ' + p[1] : p[0];
+}
+function isAll(roles){ return ALL.every(function(r){ return roles.indexOf(r) >= 0; }); }
+function rolesHTML(F){
+  var h = isAll(F.roles) ? '<span class="chip">ทุก role</span>' : F.roles.map(function(r){
+    return DECL[r] ? '<span class="chip declared" title="มีในโค้ด แต่ยัง Login เข้า role นี้ไม่ได้">' + esc(ROLE_LABEL[r]) + ' (นิยาม)</span>'
+                   : '<span class="chip">' + esc(ROLE_LABEL[r]) + '</span>';
+  }).join('');
+  if (F.rolesNote) h += '<span class="chip">' + esc(F.rolesNote) + '</span>';
+  return h;
+}
+function rolesShort(F){
+  if (isAll(F.roles)) return 'ทุก role';
+  return F.roles.map(function(r){ return ROLE_LABEL[r]; }).join(' · ');
+}
+function laneList(flow){
+  var st = 0;
+  return flow.lanes.map(function(l){
+    var b = LANES[l.id];
+    var L = {id:l.id, c:b.c, label:l.label || b.label, sub:l.sub || b.sub, slots:l.slots || 1, start:st};
+    st += L.slots; return L;
+  });
+}
+function markers(n){
+  var h = '';
+  (n.g || []).forEach(function(i){ h += '<span class="mk w" title="จุดที่โค้ดต่างจากเจตนา ข้อ ' + i + '">' + WARN + i + '</span>'; });
+  (n.q || []).forEach(function(i){ h += '<span class="mk q" title="ต้องยืนยันกับโค้ด ข้อ ' + i + '">' + ASK + i + '</span>'; });
+  return h;
+}
+function makeNode(n, L){
+  var isLink = n.t === 'link';
+  var el = document.createElement(isLink ? 'a' : 'div');
+  el.className = 'nd n-' + n.t + ' c-' + L.c;
+  if (isLink) el.href = '#' + n.to;
+  var h = '';
+  if (n.t === 'dec') h += '<svg class="dia" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="50,1.5 98.5,50 50,98.5 1.5,50"/></svg>';
+  h += '<span class="in">';
+  if (n.t === 'state'){
+    var parts = n.x.split('\n');
+    h += '<span class="code">' + esc(parts[0]) + '</span><span class="tx">' + esc(parts.slice(1).join('\n')) + '</span>';
+  } else {
+    h += '<span class="tx">' + esc(n.x) + '</span>';
+  }
+  if (isLink) h += '<span class="go">' + esc(linkLabel(n.to)) + ' →</span>';
+  if (n.links && n.links.length) h += '<span class="chips">' + n.links.map(function(id){
+    return '<a href="#' + id + '" title="' + esc(FMAP[id] ? FMAP[id].title : '') + '">' + id + '</a>';
+  }).join('') + '</span>';
+  h += '</span>';
+  var m = markers(n);
+  if (m) h += '<span class="mks">' + m + '</span>';
+  el.innerHTML = h;
+  return el;
+}
+
+/* ---- outline (text version of a flow) ---- */
+var KIND = {start:'เริ่ม', dec:'ทางแยก', end:'จบ', link:'ไปต่อ', note:'หมายเหตุ', state:'สถานะ'};
+function outlineHTML(flow, lanes){
+  var laneOf = {}; lanes.forEach(function(L){ laneOf[L.id] = L; });
+  var nodes = flow.nodes.map(function(n){
+    var L = laneOf[n.l]; return {n:n, L:L, slot: L.start + (n.s == null ? (L.slots - 1) / 2 : n.s)};
+  }).sort(function(a, b){ return a.n.r - b.n.r || a.slot - b.slot; });
+  var idx = {}; nodes.forEach(function(o, i){ idx[o.n.id] = i + 1; });
+  var items = nodes.map(function(o){
+    var n = o.n, L = o.L;
+    var text = esc(n.x.replace(/\n•\s*/g, ' • ').replace(/\n/g, ' '));
+    var outs = flow.edges.filter(function(e){ return e.f === n.id; });
+    var next = '';
+    if (n.t === 'link') next = 'ไปที่ <a href="#' + n.to + '">' + esc(linkLabel(n.to)) + '</a>';
+    else if (outs.length) next = outs.map(function(e){ return (e.l ? '<b>' + esc(e.l) + '</b> ' : '') + '→ ข้อ ' + idx[e.t]; }).join(' · ');
+    var kind = KIND[n.t] ? '<span class="k">' + KIND[n.t] + '</span>' : '';
+    return '<li><span class="who c-' + L.c + '">' + esc(L.label) + '</span>' + kind + text + markers(n) + (next ? ' <span class="nx">' + next + '</span>' : '') + '</li>';
+  });
+  return '<details class="outline"><summary>อ่านเป็นขั้นตอน (ข้อความ)</summary><ol>' + items.join('') + '</ol></details>';
+}
+
+/* ---- diagram build ---- */
+function buildFlow(flow, F){
+  var lanes = laneList(flow);
+  var fig = document.createElement('figure');
+  fig.className = 'flow';
+  if (flow.key.indexOf('-') > 0) fig.id = flow.key;
+  var title = (F ? F.id + ' ' + F.title + ': ' : '') + flow.name;
+  fig.setAttribute('aria-label', 'แผนภาพ swimlane ' + title);
+  var nSteps = flow.nodes.filter(function(n){ return n.t !== 'note'; }).length;
+  fig.innerHTML = '<figcaption>' + esc(flow.name) + '<small>' + lanes.length + ' คอลัมน์ · ' + nSteps + ' กล่อง</small></figcaption>'
+    + '<div class="dg-scroll"><div class="dg"></div></div><p class="scroll-hint" hidden>เลื่อนซ้าย–ขวาเพื่อดูทั้งแผนภาพ</p>'
+    + outlineHTML(flow, lanes);
+  var dg = $('.dg', fig);
+  lanes.forEach(function(L, i){
+    var d = document.createElement('div');
+    d.className = 'lane c-' + L.c + (i ? '' : ' first');
+    d.innerHTML = '<div class="lane-h"><b>' + esc(L.label) + '</b><small>' + esc(L.sub) + '</small></div>';
+    dg.appendChild(d); L.el = d; L.h = d.firstChild;
+  });
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'edges'); svg.setAttribute('aria-hidden', 'true');
+  dg.appendChild(svg);
+  var laneOf = {}; lanes.forEach(function(L){ laneOf[L.id] = L; });
+  var nodes = flow.nodes.map(function(n){
+    var L = laneOf[n.l];
+    var o = {id:n.id, t:n.t, r:n.r, ws:n.w, L:L, slot: L.start + (n.s == null ? (L.slots - 1) / 2 : n.s)};
+    o.el = makeNode(n, L); dg.appendChild(o.el); return o;
+  });
+  var edges = flow.edges.map(function(e){
+    var o = {}; for (var k in e) o[k] = e[k];
+    if (e.l){ o.lab = document.createElement('span'); o.lab.className = 'el'; o.lab.textContent = e.l; dg.appendChild(o.lab); }
+    return o;
+  });
+  dg._m = {lanes:lanes, nodes:nodes, edges:edges, svg:svg};
+  DIAGRAMS.push(dg);
+  return fig;
+}
+
+function port(n, s, off){
+  off = off || 0;
+  if (s === 't') return {x:n.cx + off, y:n.cy - n.ch / 2};
+  if (s === 'b') return {x:n.cx + off, y:n.cy + n.ch / 2};
+  if (s === 'l') return {x:n.cx - n.cw / 2, y:n.cy + off};
+  return {x:n.cx + n.cw / 2, y:n.cy + off};
+}
+function isH(s){ return s === 'l' || s === 'r'; }
+function route(e, A, B, X, Y, Bd){
+  var fs = e.fs || (B.r > A.r ? 'b' : B.r < A.r ? 'r' : (B.cx > A.cx ? 'r' : 'l'));
+  var ts = e.ts || (fs === 'b' ? 't' : fs === 't' ? 'b' : (B.r === A.r ? (fs === 'r' ? 'l' : 'r') : (B.r > A.r ? 't' : 'r')));
+  var P = port(A, fs, e.fo), Q = port(B, ts, e.tof);
+  var pts = [P], y, cx;
+  if (e.via){
+    var prev = P;
+    e.via.forEach(function(v, i){
+      var w = {x:X(v.x), y:Y(v.y)};
+      if (Math.abs(prev.x - w.x) > .5 && Math.abs(prev.y - w.y) > .5)
+        pts.push((i === 0 ? isH(fs) : true) ? {x:w.x, y:prev.y} : {x:prev.x, y:w.y});
+      pts.push(w); prev = w;
+    });
+    if (Math.abs(prev.x - Q.x) > .5 && Math.abs(prev.y - Q.y) > .5)
+      pts.push(isH(ts) ? {x:prev.x, y:Q.y} : {x:Q.x, y:prev.y});
+    pts.push(Q);
+  } else if (fs === 'b' && ts === 't'){
+    if (Math.abs(P.x - Q.x) < .5) pts.push(Q);
+    else { y = e.bend === 'early' ? Bd(A.r + 1) : Bd(B.r); pts.push({x:P.x, y:y}, {x:Q.x, y:y}, Q); }
+  } else if (isH(fs) && (ts === 't' || ts === 'b')){
+    pts.push({x:Q.x, y:P.y}, Q);
+  } else if (isH(fs) && isH(ts)){
+    if (Math.abs(P.y - Q.y) < .5) pts.push(Q);
+    else { cx = (P.x + Q.x) / 2; pts.push({x:cx, y:P.y}, {x:cx, y:Q.y}, Q); }
+  } else if ((fs === 't' || fs === 'b') && isH(ts)){
+    pts.push({x:P.x, y:Q.y}, Q);
+  } else if (fs === 't' && ts === 'b'){
+    y = Bd(A.r); pts.push({x:P.x, y:y}, {x:Q.x, y:y}, Q);
+  } else pts.push(Q);
+  return pts.filter(function(p, i){ return i === 0 || Math.abs(p.x - pts[i-1].x) > .5 || Math.abs(p.y - pts[i-1].y) > .5; });
+}
+function pathD(pts, r){
+  function f(v){ return Math.round(v * 10) / 10; }
+  var d = 'M' + f(pts[0].x) + ' ' + f(pts[0].y);
+  for (var i = 1; i < pts.length - 1; i++){
+    var a = pts[i-1], b = pts[i], c = pts[i+1];
+    var d1 = Math.hypot(b.x - a.x, b.y - a.y), d2 = Math.hypot(c.x - b.x, c.y - b.y);
+    var rr = Math.min(r, d1 / 2, d2 / 2);
+    var p1 = {x:b.x + (a.x - b.x) / d1 * rr, y:b.y + (a.y - b.y) / d1 * rr};
+    var p2 = {x:b.x + (c.x - b.x) / d2 * rr, y:b.y + (c.y - b.y) / d2 * rr};
+    d += ' L' + f(p1.x) + ' ' + f(p1.y) + ' Q' + f(b.x) + ' ' + f(b.y) + ' ' + f(p2.x) + ' ' + f(p2.y);
+  }
+  var z = pts[pts.length - 1];
+  return d + ' L' + f(z.x) + ' ' + f(z.y);
+}
+function labelPos(e, A, lw, lh){
+  var pts = e.pts, segs = [];
+  for (var i = 0; i < pts.length - 1; i++){
+    var a = pts[i], b = pts[i+1];
+    segs.push({a:a, b:b, len:Math.hypot(b.x - a.x, b.y - a.y), h:Math.abs(b.y - a.y) < .5});
+  }
+  function need(s){ return s.h ? lw + 12 : lh + 10; }
+  function at(s, t){ return {x:s.a.x + (s.b.x - s.a.x) * t, y:s.a.y + (s.b.y - s.a.y) * t}; }
+  function above(s){ var m = at(s, .5); return s.h ? {x:m.x, y:m.y - lh / 2 - 4} : {x:m.x + lw / 2 + 6, y:m.y}; }
+  var mode = e.lp != null ? e.lp : (A.t === 'dec' ? 'start' : 'end'), s, j;
+  if (typeof mode === 'number'){ s = segs[Math.min(mode, segs.length - 1)]; return s.len >= need(s) ? at(s, .5) : above(s); }
+  if (mode === 'mid'){ s = segs.reduce(function(m, x){ return x.len > m.len ? x : m; }); return at(s, .5); }
+  if (mode === 'start'){
+    for (j = 0; j < segs.length; j++){
+      s = segs[j];
+      if (s.len >= need(s)){
+        var want = s.h ? lw / 2 + 14 : lh / 2 + 10;
+        return s.len < want * 2 + 8 ? at(s, .5) : at(s, want / s.len);
+      }
+    }
+  } else {
+    for (j = segs.length - 1; j >= 0; j--){ s = segs[j]; if (s.len >= need(s)) return at(s, .5); }
+  }
+  return above(segs[0]);
+}
+
+function layout(dg){
+  var k = K(), m = dg._m, lanes = m.lanes, nodes = m.nodes, edges = m.edges;
+  var total = lanes.reduce(function(a, L){ return a + L.slots; }, 0);
+  var W = total * k.SLOT + 2 * k.PAD;
+  function X(u){ return k.PAD + u * k.SLOT; }
+  var head = k.HEAD;
+  lanes.forEach(function(L){
+    L.el.style.left = X(L.start) + 'px'; L.el.style.width = (L.slots * k.SLOT) + 'px';
+    L.h.style.height = 'auto';
+    head = Math.max(head, L.h.offsetHeight);
+  });
+  lanes.forEach(function(L){ L.h.style.height = head + 'px'; });
+  nodes.forEach(function(n){
+    n.cw = n.ws ? n.ws * k.SLOT - (k.SLOT - k.NODE) : k.NODE;
+    n.el.style.width = n.cw + 'px';
+    if (n.t === 'dec'){ n.el.style.height = 'auto'; n.el.style.setProperty('--dtw', k.DTW + 'px'); }
+  });
+  nodes.forEach(function(n){
+    if (n.t === 'dec'){
+      var inn = n.el.querySelector('.in');
+      var tw = Math.min(inn.offsetWidth, n.cw * .72), th = inn.offsetHeight;
+      n.ch = Math.round(Math.max(76, Math.min(200, th / (1 - tw / n.cw) + 12)));
+      n.el.style.height = n.ch + 'px';
+    } else n.ch = n.el.offsetHeight;
+  });
+  var maxR = 0; nodes.forEach(function(n){ maxR = Math.max(maxR, n.r); });
+  var rowH = []; for (var r = 0; r <= maxR; r++) rowH[r] = 30;
+  nodes.forEach(function(n){ rowH[n.r] = Math.max(rowH[n.r], n.ch); });
+  var rowTop = [], y = head + k.TOP;
+  for (r = 0; r <= maxR; r++){ rowTop[r] = y; y += rowH[r] + k.GAP; }
+  rowTop[maxR + 1] = y;
+  function Bd(rr){
+    var t = rr <= maxR + 1 ? rowTop[rr] : rowTop[maxR + 1] + (rr - maxR - 1) * (30 + k.GAP);
+    return t - k.GAP / 2;
+  }
+  function Y(v){ var rr = Math.floor(v), f = v - rr; return Bd(rr) + (Bd(rr + 1) - Bd(rr)) * f; }
+  var H = rowTop[maxR] + rowH[maxR] + k.BOT;
+  nodes.forEach(function(n){
+    n.cx = X(n.slot + .5); n.cy = rowTop[n.r] + rowH[n.r] / 2;
+    n.el.style.left = (n.cx - n.cw / 2) + 'px'; n.el.style.top = (n.cy - n.ch / 2) + 'px';
+  });
+  var byId = {}; nodes.forEach(function(n){ byId[n.id] = n; });
+  var d = '';
+  edges.forEach(function(e){
+    var A = byId[e.f], B = byId[e.t];
+    e.pts = route(e, A, B, X, Y, Bd);
+    e.pts.forEach(function(p){ H = Math.max(H, p.y + 12); });
+    d += '<path d="' + pathD(e.pts, k.R) + '"' + (e.dash ? ' class="dash"' : '') + ' marker-end="url(#arw)"/>';
+  });
+  m.svg.setAttribute('width', W); m.svg.setAttribute('height', H);
+  m.svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  m.svg.innerHTML = d;
+  edges.forEach(function(e){
+    if (!e.lab) return;
+    var lw = e.lab.offsetWidth, lh = e.lab.offsetHeight;
+    var p = labelPos(e, byId[e.f], lw, lh);
+    e.lab.style.left = (p.x - lw / 2) + 'px'; e.lab.style.top = (p.y - lh / 2) + 'px';
+  });
+  dg.style.width = W + 'px'; dg.style.height = H + 'px';
+  updateHint(dg);
+}
+function updateHint(dg){
+  var sc = dg.parentElement, hint = sc.nextElementSibling;
+  if (hint) hint.hidden = !(sc.scrollWidth > sc.clientWidth + 2);
+}
+function visible(el){ return !el.closest('[hidden]'); }
+function layoutAll(){ DIAGRAMS.forEach(function(dg){ if (visible(dg)) layout(dg); }); }
+
+/* ---- page sections ---- */
+function findingsHTML(gaps, qs, notes){
+  var h = '';
+  if (gaps && gaps.length) h += '<div class="fbox w"><h4>' + WARN + 'จุดที่โค้ดต่างจากเจตนา</h4><ol>' + gaps.map(function(g, i){
+    return '<li><span class="mk w">' + WARN + (i + 1) + '</span><span>' + esc(g) + '</span></li>'; }).join('') + '</ol></div>';
+  if (qs && qs.length) h += '<div class="fbox q"><h4>' + ASK + 'ต้องยืนยันกับโค้ด</h4><ol>' + qs.map(function(g, i){
+    return '<li><span class="mk q">' + ASK + (i + 1) + '</span><span>' + esc(g) + '</span></li>'; }).join('') + '</ol></div>';
+  if (notes && notes.length) h += '<div class="fbox n"><h4>หมายเหตุ</h4><ul>' + notes.map(function(g){ return '<li>' + esc(g) + '</li>'; }).join('') + '</ul></div>';
+  return h ? '<div class="finds">' + h + '</div>' : '';
+}
+var SLA_HTML = '<div class="sla"><table><thead><tr><th scope="col">Priority</th><th scope="col">รับเรื่อง</th><th scope="col">ประเมินหน้างาน</th><th scope="col">แก้ไขเสร็จ</th><th scope="col">เวลาที่นับ</th></tr></thead><tbody>'
+  + '<tr><td>Critical / ฉุกเฉิน</td><td>15 นาที</td><td>30 นาที</td><td>1 ชั่วโมง</td><td>24/7</td></tr>'
+  + '<tr><td>High / สูง</td><td>30 นาที</td><td>2 ชั่วโมง</td><td>1 วันทำการ</td><td>เวลาทำการ</td></tr>'
+  + '<tr><td>Medium / ปกติ</td><td>4 ชั่วโมง</td><td>1 วันทำการ</td><td>3 วันทำการ</td><td>เวลาทำการ</td></tr>'
+  + '<tr><td>Low / ต่ำ</td><td>1 วันทำการ</td><td>2 วันทำการ</td><td>6 วันทำการ</td><td>เวลาทำการ</td></tr>'
+  + '</tbody></table><p class="cap">SLA Master Matrix ที่ใช้สร้าง deadline ในขั้น "เทียบกับ SLA Matrix" · เวลาทำการ จันทร์–ศุกร์ 08:30–17:30 และรายการวันหยุด (page.tsx:98–115, 126–210)</p></div>';
+
+function featureSection(F){
+  var sec = document.createElement('section');
+  sec.className = 'feat'; sec.id = F.id; sec.setAttribute('data-roles', F.roles.join(' '));
+  sec.innerHTML = '<header class="feat-head"><span class="feat-id">' + F.id + '</span><div><h3>' + esc(F.title)
+    + ' <span class="badge b-' + F.status + '">' + STATUS[F.status] + '</span></h3><p class="sum">' + esc(F.summary) + '</p></div>'
+    + '<dl class="meta3"><div><dt>ใครใช้</dt><dd>' + rolesHTML(F) + '</dd></div><div><dt>เริ่มเมื่อ</dt><dd>' + esc(F.start)
+    + '</dd></div><div><dt>จบเมื่อ</dt><dd>' + esc(F.end) + '</dd></div></dl></header>';
+  F.flows.forEach(function(fl){ sec.appendChild(buildFlow(fl, F)); });
+  var tail = '';
+  if (F.sla) tail += SLA_HTML;
+  tail += findingsHTML(F.gaps, F.questions, F.notes);
+  tail += '<div class="feat-foot"><span>อ้างอิง <code>' + esc(F.evidence) + '</code></span>'
+    + (F.related && F.related.length ? '<span class="rel">เกี่ยวข้อง ' + F.related.map(function(id){ return '<a href="#' + id + '" title="' + esc(FMAP[id].title) + '">' + id + '</a>'; }).join('') + '</span>' : '')
+    + '<a class="up" href="#index">↑ สารบัญ</a></div>';
+  sec.insertAdjacentHTML('beforeend', tail);
+  return sec;
+}
+function indexHTML(){
+  return GROUPS.map(function(g){
+    return '<div class="group"><h3>' + esc(g.title) + '</h3><div class="cards">' + g.items.map(function(id){
+      var F = FMAP[id], gN = (F.gaps || []).length, qN = (F.questions || []).length;
+      return '<a class="card" href="#' + id + '" data-roles="' + F.roles.join(' ') + '"><span class="row"><span class="fid">' + id
+        + '</span><span class="badge b-' + F.status + '">' + STATUS[F.status] + '</span></span><h4>' + esc(F.title) + '</h4><p>' + esc(F.summary) + '</p>'
+        + '<span class="meta">' + (F.flows.length > 1 ? '<span>' + F.flows.length + ' flow</span>' : '')
+        + (gN ? '<span class="mk w" title="จุดที่โค้ดต่างจากเจตนา">' + WARN + gN + '</span>' : '')
+        + (qN ? '<span class="mk q" title="ต้องยืนยันกับโค้ด">' + ASK + qN + '</span>' : '')
+        + '<span>' + esc(rolesShort(F)) + '</span></span></a>';
+    }).join('') + '</div></div>';
+  }).join('');
+}
+
+/* ---- render ---- */
+var gapsN = 0, qsN = 0, flowsN = 1;
+FEATURES.forEach(function(F){ gapsN += (F.gaps || []).length; qsN += (F.questions || []).length; flowsN += F.flows.length; });
+$('#facts').innerHTML = '<span class="fact"><b>' + FEATURES.length + '</b> ฟีเจอร์</span><span class="fact"><b>' + flowsN + '</b> แผนภาพ</span>'
+  + '<span class="fact"><b>6</b> role · รับสิทธิ์จาก SSO</span>'
+  + '<span class="fact w">' + WARN + '<b>' + gapsN + '</b> จุดที่โค้ดต่างจากเจตนา</span>'
+  + '<span class="fact q">' + ASK + '<b>' + qsN + '</b> เรื่องที่ต้องยืนยันกับโค้ด</span>';
+document.querySelectorAll('[data-ico]').forEach(function(el){ el.insertAdjacentHTML('afterbegin', el.getAttribute('data-ico') === 'w' ? WARN : ASK); });
+
+var ov = $('#ov');
+ov.appendChild(buildFlow(OVERVIEW, null));
+ov.insertAdjacentHTML('beforeend', findingsHTML(OVERVIEW.gaps));
+$('#groups').innerHTML = indexHTML();
+var feats = $('#features');
+FEATURES.forEach(function(F){ feats.appendChild(featureSection(F)); });
+
+var roleSel = $('#role'), jumpSel = $('#jump'), info = $('#filter-info');
+ROLES.forEach(function(r){ roleSel.insertAdjacentHTML('beforeend', '<option value="' + r.id + '">' + esc(r.label) + (r.declared ? ' (นิยาม)' : '') + '</option>'); });
+FEATURES.forEach(function(F){ jumpSel.insertAdjacentHTML('beforeend', '<option value="' + F.id + '">' + F.id + ' ' + esc(F.title) + '</option>'); });
+
+function applyRole(r){
+  var shown = 0;
+  document.querySelectorAll('.card').forEach(function(c){ c.classList.toggle('dim', !!r && c.getAttribute('data-roles').split(' ').indexOf(r) < 0); });
+  document.querySelectorAll('.feat').forEach(function(s){
+    var on = !r || s.getAttribute('data-roles').split(' ').indexOf(r) >= 0;
+    s.hidden = !on; if (on) shown++;
+  });
+  info.textContent = r
+    ? 'แสดง ' + shown + ' จาก ' + FEATURES.length + ' ฟีเจอร์ที่ ' + ROLE_LABEL[r] + ' ใช้งาน' + (DECL[r] ? ' · role นี้มีในโค้ดแต่ยัง Login เข้าไม่ได้' : '') + ' (การ์ดสีจางคือฟีเจอร์ที่ไม่เกี่ยวข้อง)'
+    : 'ทั้งหมด ' + FEATURES.length + ' ฟีเจอร์ จัดกลุ่มตามขั้นตอนการใช้งาน เลือก role ที่แถบด้านบนเพื่อดูเฉพาะ flow ของ role นั้น';
+  try { localStorage.setItem('bambam-flow-role', r); } catch (err) {}
+  layoutAll();
+}
+roleSel.addEventListener('change', function(){ applyRole(roleSel.value); });
+
+function goTo(id){
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (el.closest('[hidden]')){ roleSel.value = ''; applyRole(''); }
+  el.scrollIntoView({block:'start'});
+}
+jumpSel.addEventListener('change', function(){
+  var id = jumpSel.value; if (!id) return;
+  if (location.hash === '#' + id) goTo(id); else location.hash = id;
+});
+window.addEventListener('hashchange', function(){
+  var id = decodeURIComponent(location.hash.slice(1));
+  var el = id && document.getElementById(id);
+  if (el && el.closest('[hidden]')) goTo(id);
+  if (FMAP[id]) jumpSel.value = id;
+});
+
+var saved = '';
+try { saved = localStorage.getItem('bambam-flow-role') || ''; } catch (err) {}
+if (saved && ROLE_LABEL[saved]) roleSel.value = saved;
+applyRole(roleSel.value);
+
+function relayout(){ layoutAll(); }
+if (mq.addEventListener) mq.addEventListener('change', relayout); else if (mq.addListener) mq.addListener(relayout);
+var rt;
+window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(function(){ DIAGRAMS.forEach(function(dg){ if (visible(dg)) updateHint(dg); }); }, 120); });
+if (document.fonts && document.fonts.addEventListener){
+  var ft; document.fonts.addEventListener('loadingdone', function(){ clearTimeout(ft); ft = setTimeout(layoutAll, 60); });
+}
+if (document.fonts && document.fonts.ready){
+  document.fonts.ready.then(function(){
+    layoutAll();
+    var id = decodeURIComponent(location.hash.slice(1));
+    if (id && document.getElementById(id)) goTo(id);
+  });
+}
+})();
+</script>
+
+</body></html>

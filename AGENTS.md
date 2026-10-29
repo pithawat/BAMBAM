@@ -92,6 +92,17 @@ A change to anything APPROVED (flow, screen, plan, contract) is a CR. Never edit
 - **Codex**: builds UI from `docs/modules/<m>/ui/HANDOFF.md` against mocks. Does not change backend, contract or docs, except the HANDOFF checklist and "Open questions".
 - During a stage, never edit files the other agent owns (listed in `HANDOFF.md`).
 
+### Handoff loop (one stage)
+
+The user carries prompts between the agents. Both work in this same repo and read these same files.
+
+1. **Claude** runs `/build-stage <m> <n> prepare`: backend, `types.ts` / `mocks.ts` / `api.ts`, and `ui/HANDOFF.md` with `Status: READY FOR CODEX — Stage <n>`. Claude ends its reply with the exact Codex prompt in a code block and copies it to `PROGRESS.md` → Next:
+   `Use the implement-ui skill. Read docs/modules/<m>/ui/HANDOFF.md and implement the Stage <n> screens. Follow it exactly.`
+2. **Codex** (the user pastes that prompt): reads `docs/modules/<m>/PROGRESS.md` and `HANDOFF.md`. If HANDOFF is not `READY FOR CODEX` for that stage, stop and tell the user. Otherwise build with `.agents/skills/implement-ui`, then set `Status: UI DONE — Stage <n>, waiting for Claude wire` and tell the user to run `/build-stage <m> <n> wire` in Claude Code.
+3. **Claude** runs `/build-stage <m> <n> wire`: review, connect the real API, e2e, stage report.
+
+HTML mockups (`ui/mockups/*.html`) come from Claude in P3 and are only a visual reference. The real UI is built by Codex in P5. Codex does not write phase documents (P1–P4): flows, screen specs, mockups, plan, contract.
+
 ## 9. Definition of done
 
 - Build, lint, typecheck and tests pass (commands in `backend/AGENTS.md`, `frontend/AGENTS.md`).

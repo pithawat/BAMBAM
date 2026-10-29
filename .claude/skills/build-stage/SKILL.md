@@ -18,8 +18,8 @@ Module `$0`, stage `$1`, part `$2`.
    - `modules/$0/api.ts`: real calls via `lib/http.ts`; returns mocks when `NEXT_PUBLIC_USE_MOCKS=true`
    - empty route folders for this stage's screens if they don't exist
    - run `npm run typecheck`
-3. **Handoff:** update `ui/HANDOFF.md` for stage $1 (screens, editable paths).
-4. Update `PROGRESS.md` (Now: waiting for Codex UI). Tell the user in Thai: what the backend covers, test result, and the exact Codex prompt:
+3. **Handoff:** update `ui/HANDOFF.md` for stage $1 (screens, editable paths) and set its `Status:` line to `READY FOR CODEX — Stage $1`.
+4. Update `PROGRESS.md` (Now: waiting for Codex UI; Next: the Codex prompt below). Tell the user in Thai: what the backend covers, test result, and the exact Codex prompt in a code block:
    > Use the implement-ui skill. Read docs/modules/$0/ui/HANDOFF.md and implement the Stage $1 screens. Follow it exactly.
 
    Then stop.
