@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { deleteCategory, deleteSymptom, getCategories, getSymptoms, reorderCategories, reorderSymptoms, updateCategory, updateSymptom } from "../../api";
-import type { CategoryAdmin, SymptomAdmin } from "../../types";
+import { deleteCategory, deleteSymptom, getBuildingTypes, getCategories, getSymptoms, reorderCategories, reorderSymptoms, updateCategory, updateSymptom } from "../../api";
+import { Badge } from "@/components/ui/badge";
+import type { BuildingTypeAdmin, CategoryAdmin, SymptomAdmin } from "../../types";
 import { ConfirmDialog, type Confirm } from "../confirm-dialog";
 import { SettingsHeading } from "../settings-heading";
 import { errorCode, GENERIC_ERROR, panelClass } from "../settings-ui";
@@ -52,17 +53,22 @@ export function CategoriesScreen({ categoryId }: { categoryId?: string }) {
   const [symptomsError, setSymptomsError] = useState(false);
   const [symptomsRevision, setSymptomsRevision] = useState(0);
   const [categoryDialog, setCategoryDialog] = useState<CategoryAdmin | "new" | null>(null);
+  const [buildingTypes, setBuildingTypes] = useState<BuildingTypeAdmin[]>([]);
   const [symptomDialog, setSymptomDialog] = useState<{ open: boolean; symptom?: SymptomAdmin }>({ open: false });
   const [confirm, setConfirm] = useState<Confirm | null>(null);
 
   useEffect(() => {
     let active = true;
-    getCategories().then(
-      (list) => { if (active) { setCategories(list); setError(undefined); } },
+    Promise.all([getCategories(), getBuildingTypes()]).then(
+      ([list, types]) => { if (active) { setCategories(list); setBuildingTypes(types); setError(undefined); } },
       (err: unknown) => { if (active) setError(err); },
     );
     return () => { active = false; };
   }, [revision]);
+
+  function reloadBuildingTypes() {
+    getBuildingTypes().then(setBuildingTypes, () => undefined);
+  }
 
   const visibleCategories = (categories ?? []).filter((c) => showInactive || c.isActive || c.id === selectedId);
   const selected = categories?.find((c) => c.id === selectedId) ?? visibleCategories[0];
@@ -240,7 +246,8 @@ export function CategoriesScreen({ categoryId }: { categoryId?: string }) {
         </section>
         <CategoryDialog target={categoryDialog} onOpenChange={(o) => !o && setCategoryDialog(null)}
           onSaved={(c) => { setCategoryDialog(null); select(c.id); reloadCategories().catch(() => undefined); }}
-          fetchFresh={async (id) => (await reloadCategories()).find((c) => c.id === id) ?? null} />
+          fetchFresh={async (id) => (await reloadCategories()).find((c) => c.id === id) ?? null}
+          buildingTypes={buildingTypes} onTypesStale={reloadBuildingTypes} />
       </>
     );
   }
@@ -314,6 +321,16 @@ export function CategoriesScreen({ categoryId }: { categoryId?: string }) {
                 <p className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
                   ความเร่งด่วนตั้งต้น <PriorityBadge priority={selected.defaultPriority} className="text-xs" /> ใช้เมื่อเลือก “อาการอื่น ๆ”
                 </p>
+                <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[13px] text-muted-foreground" data-testid="category-building-types">
+                  ใช้กับ:
+                  {selected.isOther ? (
+                    <Badge variant="outline" className="font-normal">ทุกประเภทอาคาร</Badge>
+                  ) : (
+                    buildingTypes.filter((t) => selected.buildingTypeIds.includes(t.id)).map((t) => (
+                      <Badge key={t.id} variant="outline" className="font-normal">{t.name}</Badge>
+                    ))
+                  )}
+                </p>
               </div>
 
               <div className="flex items-center gap-2 border-b px-4 py-3 lg:px-5">
@@ -380,6 +397,8 @@ export function CategoriesScreen({ categoryId }: { categoryId?: string }) {
         onOpenChange={(o) => !o && setCategoryDialog(null)}
         onSaved={(c, added) => { setCategoryDialog(null); if (added) select(c.id); reloadCategories().catch(() => undefined); }}
         fetchFresh={async (id) => (await reloadCategories()).find((c) => c.id === id) ?? null}
+        buildingTypes={buildingTypes}
+        onTypesStale={reloadBuildingTypes}
       />
       <SymptomDialog
         category={selected ?? null}

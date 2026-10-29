@@ -29,6 +29,10 @@ type RepairMaster interface {
 	CreateContractorType(ctx context.Context, actor uuid.UUID, in repair.ContractorTypeInput) (repair.ContractorTypeAdmin, error)
 	UpdateContractorType(ctx context.Context, actor, id uuid.UUID, in repair.ContractorTypeInput) (repair.ContractorTypeAdmin, error)
 	DeleteContractorType(ctx context.Context, actor, id uuid.UUID) error
+	// Stage 4P (CR-005): which categories each building type uses.
+	BuildingTypeCategories(ctx context.Context) (map[uuid.UUID][]uuid.UUID, error)
+	CheckTypeCategories(ctx context.Context, ids []uuid.UUID) error
+	LinkBuildingType(ctx context.Context, typeID uuid.UUID, categoryIDs []uuid.UUID) error
 }
 
 func (s *Service) need(v Viewer, perm string) error {

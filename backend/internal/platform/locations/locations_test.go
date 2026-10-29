@@ -75,11 +75,11 @@ func TestRenames(t *testing.T) {
 		_, _ = pool.Exec(ctx, `DELETE FROM platform.users WHERE id = $1`, actor)
 	})
 
-	renamed, err := svc.RenameBuilding(ctx, actor, b.ID, b.Name+" "+suffix, b.UpdatedAt)
+	renamed, err := svc.UpdateBuilding(ctx, actor, b.ID, BuildingInput{Name: b.Name + " " + suffix, UpdatedAt: b.UpdatedAt})
 	if err != nil || renamed.ID != b.ID || renamed.Name != b.Name+" "+suffix || renamed.UpdatedBy == nil {
 		t.Fatalf("rename building = %+v, %v", renamed, err)
 	}
-	if _, err := svc.RenameBuilding(ctx, actor, b.ID, "อีกชื่อ", b.UpdatedAt); !errors.Is(err, ErrVersionConflict) {
+	if _, err := svc.UpdateBuilding(ctx, actor, b.ID, BuildingInput{Name: "อีกชื่อ", UpdatedAt: b.UpdatedAt}); !errors.Is(err, ErrVersionConflict) {
 		t.Errorf("stale building: %v", err)
 	}
 	if _, err := svc.RenameRoom(ctx, actor, r1.ID, r2.Name, r1.UpdatedAt); !errors.Is(err, ErrNameTaken) {

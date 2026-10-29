@@ -6,23 +6,21 @@ import { toast } from "sonner";
 import { CATEGORY_ICONS } from "@/components/shared/category-icon";
 import { PRIORITY_LABEL } from "@/components/shared/priority-indicator";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { createCategory, createSymptom, updateCategory, updateSymptom } from "../../api";
-import type { CategoryAdmin, PlanRoom, Priority, SymptomAdmin } from "../../types";
+import type { BuildingTypeAdmin, CategoryAdmin, Priority, SymptomAdmin } from "../../types";
 import { ConflictAlert, conflictText, FieldLabel, FormError } from "../places/place-dialogs";
 import { errorCode, errorFields, GENERIC_ERROR, sheetOnMobile } from "../settings-ui";
 
-// S22 dialogs (CR-001 block, CR-008 / CR-014): category (name, icon, default priority, area types) and symptom
+// S22 dialogs (CR-001 block, CR-008, CR-005): category (name, icon, default priority, building types) and symptom
 // (name, priority). Errors as one line at the top of the form.
 
 export const PRIORITIES: Priority[] = ["critical", "high", "medium", "low"];
 
-type AreaType = PlanRoom["areaType"];
-export const AREA_LABELS: Record<AreaType, string> = {
-  meeting_room: "ห้องประชุม", restroom: "ห้องน้ำ", office: "สำนักงาน", pantry: "Pantry", common_area: "พื้นที่ส่วนกลาง", parking: "ลานจอด", other: "อื่นๆ",
-};
+const NO_TYPE_TEXT = "เลือกประเภทอาคารอย่างน้อย 1 ประเภท";
 
 function PriorityChoice({ value, onChange, labelledBy }: { value: Priority; onChange: (p: Priority) => void; labelledBy: string }) {
   return (
@@ -50,13 +48,17 @@ type CategoryProps = {
   onOpenChange: (open: boolean) => void;
   onSaved: (c: CategoryAdmin, added: boolean) => void;
   fetchFresh: (id: string) => Promise<CategoryAdmin | null>;
+  /** CR-005: the `ใช้กับประเภทอาคาร *` check boxes (active types). */
+  buildingTypes: BuildingTypeAdmin[];
+  /** Refetch types after a type was just deactivated (buildingTypeIds INVALID). */
+  onTypesStale?: () => void;
 };
 
-export function CategoryDialog({ target, onOpenChange, onSaved, fetchFresh }: CategoryProps) {
+export function CategoryDialog({ target, onOpenChange, onSaved, fetchFresh, buildingTypes, onTypesStale }: CategoryProps) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("wrench");
   const [priority, setPriority] = useState<Priority>("medium");
-  const [areas, setAreas] = useState<AreaType[]>([]);
+  const [typeIds, setTypeIds] = useState<string[]>([]);
   const [version, setVersion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ text: string; updatedAt: string } | null>(null);
@@ -69,7 +71,7 @@ export function CategoryDialog({ target, onOpenChange, onSaved, fetchFresh }: Ca
       setName(c?.name ?? "");
       setIcon(c?.icon ?? "wrench");
       setPriority(c?.defaultPriority ?? "medium");
-      setAreas(c?.areaTypes ?? []);
+      setTypeIds(c?.buildingTypeIds ?? []); // new category: none ticked
       setVersion(c?.updatedAt ?? "");
       setError(null);
       setConflict(null);
@@ -82,28 +84,35 @@ export function CategoryDialog({ target, onOpenChange, onSaved, fetchFresh }: Ca
     const n = name.trim();
     if (!n) return setError("กรุณากรอกชื่อ");
     if ([...n].length > 100) return setError("ชื่อยาวได้ไม่เกิน 100 ตัวอักษร");
+    const isOther = !!editing?.isOther;
+    if (!isOther && typeIds.length === 0) return setError(NO_TYPE_TEXT);
     setBusy(true);
     setError(null);
     try {
       if (editing) {
-        const sameAreas = [...areas].sort().join() === [...editing.areaTypes].sort().join();
+        const sameTypes = [...typeIds].sort().join() === [...editing.buildingTypeIds].sort().join();
         const c = await updateCategory(editing.id, {
           updatedAt: version,
           ...(n !== editing.name ? { name: n } : {}),
           ...(icon !== editing.icon ? { icon } : {}),
           ...(priority !== editing.defaultPriority ? { defaultPriority: priority } : {}),
-          ...(!sameAreas ? { areaTypes: areas } : {}),
+          ...(!isOther && !sameTypes ? { buildingTypeIds: typeIds } : {}),
         });
         toast.success("บันทึกแล้ว");
         onSaved(c, false);
       } else {
-        const c = await createCategory({ name: n, icon, defaultPriority: priority, areaTypes: areas });
+        const c = await createCategory({ name: n, icon, defaultPriority: priority, buildingTypeIds: typeIds });
         toast.success("เพิ่มหมวดงานแล้ว");
         onSaved(c, true);
       }
     } catch (err) {
-      const text = nameError(err, "ชื่อนี้มีอยู่แล้ว");
-      if (text) setError(text);
+      const types = errorFields(err).buildingTypeIds;
+      const text = types ? null : nameError(err, "ชื่อนี้มีอยู่แล้ว");
+      if (types === "MIN_ITEMS") setError(NO_TYPE_TEXT);
+      else if (types) {
+        toast.error(GENERIC_ERROR);
+        onTypesStale?.();
+      } else if (text) setError(text);
       else if (editing && errorCode(err) === "VERSION_CONFLICT") {
         const fresh = await fetchFresh(editing.id).catch(() => null);
         if (fresh) setConflict({ text: conflictText(fresh.updatedBy, fresh.updatedAt), updatedAt: fresh.updatedAt });
@@ -145,21 +154,32 @@ export function CategoryDialog({ target, onOpenChange, onSaved, fetchFresh }: Ca
             <PriorityChoice value={priority} onChange={setPriority} labelledBy="cat-priority-label" />
             <p className="text-xs text-muted-foreground">ใช้เมื่อผู้แจ้งเลือกแค่ “อาการอื่น ๆ”</p>
           </div>
-          <div className="space-y-1.5">
-            <FieldLabel id="cat-area-label">ประเภทพื้นที่ที่มักเกิด</FieldLabel>
-            <div role="group" aria-labelledby="cat-area-label" className="flex flex-wrap gap-2">
-              {(Object.keys(AREA_LABELS) as AreaType[]).map((a) => {
-                const on = areas.includes(a);
-                return (
-                  <button key={a} type="button" aria-pressed={on} onClick={() => setAreas((x) => (on ? x.filter((y) => y !== a) : [...x, a]))}
-                    className={cn("min-h-10 rounded-full border px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
-                      on ? "border-primary bg-secondary font-semibold text-primary" : "bg-card text-muted-foreground hover:bg-muted")}>
-                    {AREA_LABELS[a]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <fieldset className="space-y-1.5">
+            {editing?.isOther ? (
+              <>
+                <legend className="text-sm font-semibold">ใช้กับประเภทอาคาร</legend>
+                <p className="text-sm text-muted-foreground">ใช้ได้กับทุกประเภทอาคาร</p>
+              </>
+            ) : (
+              <>
+                <legend className="text-sm font-semibold">ใช้กับประเภทอาคาร<span className="text-destructive"> *</span></legend>
+                <ul className="grid gap-1 sm:grid-cols-2">
+                  {buildingTypes.filter((t) => t.isActive).map((t) => {
+                    const on = typeIds.includes(t.id);
+                    return (
+                      <li key={t.id}>
+                        <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-2 text-sm hover:bg-muted">
+                          <Checkbox checked={on} onCheckedChange={(v) => setTypeIds((x) => (v ? [...x, t.id] : x.filter((y) => y !== t.id)))} />
+                          {t.name}
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-xs text-muted-foreground">ฟอร์มแจ้งซ่อมแสดงหมวดนี้เฉพาะอาคารประเภทที่เลือก</p>
+              </>
+            )}
+          </fieldset>
           <DialogFooter className="-mx-5 -mb-5 px-5">
             <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>ยกเลิก</Button>
             <Button type="submit" disabled={busy || !!conflict}>

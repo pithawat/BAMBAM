@@ -3,6 +3,8 @@ package settings
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/pithawat/BAMBAM/backend/internal/platform/assets"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/locations"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/people"
@@ -12,11 +14,18 @@ import (
 
 // PlanBuildingResponse = `PlanBuilding`.
 type PlanBuildingResponse struct {
-	ID        string              `json:"id"`
-	Name      string              `json:"name"`
-	UpdatedAt time.Time           `json:"updatedAt"`
-	UpdatedBy *people.Ref         `json:"updatedBy"`
-	Floors    []PlanFloorResponse `json:"floors"`
+	ID           string              `json:"id"`
+	Name         string              `json:"name"`
+	BuildingType RefResponse         `json:"buildingType"` // CR-005
+	UpdatedAt    time.Time           `json:"updatedAt"`
+	UpdatedBy    *people.Ref         `json:"updatedBy"`
+	Floors       []PlanFloorResponse `json:"floors"`
+}
+
+// RefResponse is `{ id, name }`.
+type RefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type PlanFloorResponse struct {
@@ -42,7 +51,7 @@ func newPlanRoomResponse(r locations.Room) PlanRoomResponse {
 }
 
 func newPlanBuildingResponse(b locations.Building) PlanBuildingResponse {
-	out := PlanBuildingResponse{ID: b.ID.String(), Name: b.Name, UpdatedAt: b.UpdatedAt.UTC(), UpdatedBy: b.UpdatedBy, Floors: make([]PlanFloorResponse, 0, len(b.Floors))}
+	out := PlanBuildingResponse{ID: b.ID.String(), Name: b.Name, BuildingType: RefResponse{ID: b.Type.ID.String(), Name: b.Type.Name}, UpdatedAt: b.UpdatedAt.UTC(), UpdatedBy: b.UpdatedBy, Floors: make([]PlanFloorResponse, 0, len(b.Floors))}
 	for _, f := range b.Floors {
 		fr := PlanFloorResponse{ID: f.ID.String(), Name: f.Name, Level: f.Level, Rooms: make([]PlanRoomResponse, 0, len(f.Rooms))}
 		for _, r := range f.Rooms {
@@ -53,10 +62,50 @@ func newPlanBuildingResponse(b locations.Building) PlanBuildingResponse {
 	return out
 }
 
-// RenameRequest is #15 / #27.
+// RenameRequest is #27.
 type RenameRequest struct {
 	Name      string     `json:"name"`
 	UpdatedAt *time.Time `json:"updatedAt"`
+}
+
+// BuildingRequest is #15: rename + (CR-005) building type.
+type BuildingRequest struct {
+	Name           string     `json:"name"`
+	BuildingTypeID *string    `json:"buildingTypeId"`
+	UpdatedAt      *time.Time `json:"updatedAt"`
+}
+
+// BuildingTypeAdminResponse = `BuildingTypeAdmin` (CR-005).
+type BuildingTypeAdminResponse struct {
+	ID            string      `json:"id"`
+	Name          string      `json:"name"`
+	IsActive      bool        `json:"isActive"`
+	SortOrder     int32       `json:"sortOrder"`
+	BuildingCount int64       `json:"buildingCount"`
+	CategoryIDs   []string    `json:"categoryIds"`
+	UpdatedAt     time.Time   `json:"updatedAt"`
+	UpdatedBy     *people.Ref `json:"updatedBy"`
+}
+
+func newBuildingTypeAdminResponse(t BuildingTypeAdmin) BuildingTypeAdminResponse {
+	return BuildingTypeAdminResponse{ID: t.ID.String(), Name: t.Name, IsActive: t.IsActive, SortOrder: t.SortOrder, BuildingCount: t.BuildingCount,
+		CategoryIDs: idStrings(t.CategoryIDs), UpdatedAt: t.UpdatedAt.UTC(), UpdatedBy: t.UpdatedBy}
+}
+
+func idStrings(ids []uuid.UUID) []string {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, id.String())
+	}
+	return out
+}
+
+// BuildingTypeRequest is #54 (name, categoryIds) and #55 (name?, isActive?, updatedAt).
+type BuildingTypeRequest struct {
+	Name        *string    `json:"name"`
+	CategoryIDs *[]string  `json:"categoryIds"`
+	IsActive    *bool      `json:"isActive"`
+	UpdatedAt   *time.Time `json:"updatedAt"`
 }
 
 // AssetAdminResponse = `AssetAdmin`.

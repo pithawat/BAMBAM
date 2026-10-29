@@ -41,7 +41,17 @@ func TestSettingsAdminMaster(t *testing.T) {
 	f := false
 
 	name := "ลิฟต์ " + tag
-	cat, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("door-open"), DefaultPriority: str("high")})
+	office := uuid.MustParse("c025b700-0000-4000-8000-000000000001")
+	store := uuid.MustParse("c025b700-0000-4000-8000-000000000002")
+	ids := func(v ...uuid.UUID) *[]uuid.UUID { return &v }
+	var fe *apperr.Error
+	if _, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("door-open"), DefaultPriority: str("high")}); !errors.As(err, &fe) || fe.Fields["buildingTypeIds"] != "MIN_ITEMS" {
+		t.Errorf("no building type: %v", err)
+	}
+	if _, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("door-open"), DefaultPriority: str("high"), BuildingTypeIDs: ids(uuid.New())}); !errors.As(err, &fe) || fe.Fields["buildingTypeIds"] != "INVALID" {
+		t.Errorf("unknown building type: %v", err)
+	}
+	cat, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("door-open"), DefaultPriority: str("high"), BuildingTypeIDs: ids(office, office)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,14 +63,25 @@ func TestSettingsAdminMaster(t *testing.T) {
 		_, _ = pool.Exec(ctx, `DELETE FROM platform.audit_log WHERE actor_user_id = $1`, actor)
 		_, _ = pool.Exec(ctx, `DELETE FROM platform.users WHERE id = $1`, actor)
 	})
-	if len(cat.BuildingTypeIDs) != 3 || cat.DefaultPriority != "high" || cat.UpdatedBy == nil {
+	if len(cat.BuildingTypeIDs) != 1 || cat.BuildingTypeIDs[0] != office || cat.DefaultPriority != "high" || cat.UpdatedBy == nil {
 		t.Errorf("created = %+v", cat)
 	}
-	var fe *apperr.Error
+	cat, err = a.UpdateCategory(ctx, actor, cat.ID, CategoryInput{BuildingTypeIDs: ids(store, office), UpdatedAt: cat.UpdatedAt})
+	if err != nil || len(cat.BuildingTypeIDs) != 2 {
+		t.Errorf("types update = %+v, %v", cat.BuildingTypeIDs, err)
+	}
+	var diff string
+	_ = pool.QueryRow(ctx, `SELECT data->'changes'->0->>'after' FROM platform.audit_log WHERE actor_user_id = $1 AND target_id = $2 AND action = 'update'`, actor, cat.ID.String()).Scan(&diff)
+	if diff != "อาคารสำนักงาน, โกดังเก็บของ" {
+		t.Errorf("audit types = %q", diff)
+	}
+	if _, err := a.UpdateCategory(ctx, actor, cat.ID, CategoryInput{BuildingTypeIDs: ids(), UpdatedAt: cat.UpdatedAt}); !errors.As(err, &fe) || fe.Fields["buildingTypeIds"] != "MIN_ITEMS" {
+		t.Errorf("empty types: %v", err)
+	}
 	if _, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("snow"), DefaultPriority: str("x")}); !errors.As(err, &fe) || fe.Fields["icon"] != "INVALID" || fe.Fields["defaultPriority"] != "INVALID" {
 		t.Errorf("validation: %v", err)
 	}
-	if _, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("wrench"), DefaultPriority: str("low")}); !errors.Is(err, ErrMasterNameTaken) {
+	if _, err := a.CreateCategory(ctx, actor, CategoryInput{Name: str(name), Icon: str("wrench"), DefaultPriority: str("low"), BuildingTypeIDs: ids(office)}); !errors.Is(err, ErrMasterNameTaken) {
 		t.Errorf("duplicate category: %v", err)
 	}
 
@@ -130,6 +151,9 @@ func TestSettingsAdminMaster(t *testing.T) {
 		all, _ := a.Categories(ctx)
 		for _, c := range all {
 			if c.ID == other {
+				if _, err := a.UpdateCategory(ctx, actor, other, CategoryInput{BuildingTypeIDs: ids(office), UpdatedAt: c.UpdatedAt}); !errors.As(err, &fe) || fe.Fields["buildingTypeIds"] != "NOT_ALLOWED" {
+					t.Errorf("other with types: %v", err)
+				}
 				if _, err := a.UpdateCategory(ctx, actor, other, CategoryInput{IsActive: &f, UpdatedAt: c.UpdatedAt}); !errors.As(err, &fe) || fe.Fields["isActive"] != "INVALID" {
 					t.Errorf("deactivate other: %v", err)
 				}
@@ -190,4 +214,30 @@ func containsType(rows []repairdb.ListContractorTypesRow, id uuid.UUID) bool {
 		}
 	}
 	return false
+}
+
+// settings CR-005: a new category needs ≥ 1 building type; a PATCH may leave them out but not send none.
+func TestValidateCategoryBuildingTypes(t *testing.T) {
+	str := func(s string) *string { return &s }
+	none := []uuid.UUID{}
+	if f := validateCategory(&CategoryInput{Name: str("ลิฟต์"), Icon: str("wrench"), DefaultPriority: str("low")}, true); f["buildingTypeIds"] != "MIN_ITEMS" {
+		t.Errorf("create without types: %v", f)
+	}
+	if f := validateCategory(&CategoryInput{}, false); len(f) != 0 {
+		t.Errorf("patch without types: %v", f)
+	}
+	if f := validateCategory(&CategoryInput{BuildingTypeIDs: &none}, false); f["buildingTypeIds"] != "MIN_ITEMS" {
+		t.Errorf("patch with none: %v", f)
+	}
+	names := typeNames{order: []uuid.UUID{uuid.New(), uuid.New()}, name: map[uuid.UUID]string{}}
+	names.name[names.order[0]], names.name[names.order[1]] = "อาคารสำนักงาน", "โกดังเก็บของ"
+	if got, ok := names.pick([]uuid.UUID{names.order[1], names.order[1]}); !ok || len(got) != 1 {
+		t.Errorf("dedupe: %v %v", got, ok)
+	}
+	if _, ok := names.pick([]uuid.UUID{uuid.New()}); ok {
+		t.Error("unknown type accepted")
+	}
+	if l := names.label([]uuid.UUID{names.order[1], names.order[0]}); l != "อาคารสำนักงาน, โกดังเก็บของ" {
+		t.Errorf("label = %q", l)
+	}
 }

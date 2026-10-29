@@ -68,8 +68,8 @@ func bindRename(c *gin.Context) (RenameRequest, bool) {
 	return req, true
 }
 
-// RenameBuilding handles #15 PATCH /api/v1/settings/buildings/{id}.
-func (ctl *Controller) RenameBuilding(c *gin.Context) {
+// UpdateBuilding handles #15 PATCH /api/v1/settings/buildings/{id} (rename, CR-005 building type).
+func (ctl *Controller) UpdateBuilding(c *gin.Context) {
 	v, ok := viewer(c)
 	if !ok {
 		return
@@ -78,11 +78,26 @@ func (ctl *Controller) RenameBuilding(c *gin.Context) {
 	if !ok {
 		return
 	}
-	req, ok := bindRename(c)
-	if !ok {
+	var req BuildingRequest
+	if !bindJSON(c, &req) {
 		return
 	}
-	b, err := ctl.svc.RenameBuilding(c.Request.Context(), v, id, req.Name, *req.UpdatedAt)
+	fields := map[string]string{}
+	if req.UpdatedAt == nil {
+		fields["updatedAt"] = "REQUIRED"
+	}
+	if req.BuildingTypeID != nil && *req.BuildingTypeID == "" {
+		fields["buildingTypeId"] = "REQUIRED"
+	}
+	var typeID *uuid.UUID
+	if _, done := fields["buildingTypeId"]; !done {
+		typeID = optionalID(fields, "buildingTypeId", req.BuildingTypeID)
+	}
+	if len(fields) > 0 {
+		httpx.Error(c, apperr.Validation(fields))
+		return
+	}
+	b, err := ctl.svc.UpdateBuilding(c.Request.Context(), v, id, locations.BuildingInput{Name: req.Name, TypeID: typeID, UpdatedAt: *req.UpdatedAt})
 	if err != nil {
 		httpx.Error(c, err)
 		return

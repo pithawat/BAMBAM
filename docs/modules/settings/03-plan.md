@@ -270,21 +270,21 @@ Order rationale: everything depends on permission checks (1). The matrix is the 
 
 ## Stage 4P — ประเภทอาคาร (CR-005, repair CR-025)
 
-Status: pending — runs after repair Stage 4P and before repair 4R (D-121); needs the repair Stage 4P backend (the migration with `platform.building_types` and `repair.category_building_types` lives there). Built by Claude (D-115).
+Status: done (accepted 2026-10-29, tag `settings-stage-4P`) — runs after repair Stage 4P and before repair 4R (D-121); needs the repair Stage 4P backend (the migration with `platform.building_types` and `repair.category_building_types` lives there). Built by Claude (D-115).
 
 **Scope**
 - Flows: F26 (BR-F26-6), F27 (BR-F27-1 CR-005 part) · Screens: S20 (tab `ประเภทอาคาร`, `แก้ไขอาคาร` dialog, type tag), S22 (`ใช้กับประเภทอาคาร *`) · Endpoints: #13, #15, #32–#34, #53–#55
 - Shared code: `platform/queries/locations.sql`, `internal/platform` locations service
 
 **Backend (Claude)**
-- [ ] #13 `buildingType`; #15 `buildingTypeId` (active type, audit)
-- [ ] #53–#55 building types (usage counts, `IN_USE` on deactivate, `NAME_TAKEN`, `VERSION_CONFLICT`, audit `building_type`)
-- [ ] #32–#34 `buildingTypeIds` (required ≥ 1 on create, `NOT_ALLOWED` on `isOther`), drop `areaTypes`; audit diff shows the types
-- [ ] Go tests: service rules + Pg integration (types, mapping, deactivate in use)
+- [x] #13 `buildingType`; #15 `buildingTypeId` (active type, audit)
+- [x] #53–#55 building types (usage counts, `IN_USE` on deactivate, `NAME_TAKEN`, `VERSION_CONFLICT`, audit `building_type`)
+- [x] #32–#34 `buildingTypeIds` (required ≥ 1 on create, `NOT_ALLOWED` on `isOther`), drop `areaTypes`; audit diff shows the types
+- [x] Go tests: service rules + Pg integration (types, mapping, deactivate in use)
 
 **Frontend (Claude)**
-- [ ] `settings/{types,api,mocks}.ts`; S20 tab + dialogs + tag; S22 dialog field + header tags (remove the area-type multi-select); S26 audit labels for `building_type`
-- [ ] e2e: add a building type, change อาคาร 1's type, category without types → error, `อื่น ๆ` locked
+- [x] `settings/{types,api,mocks}.ts`; S20 tab + dialogs + tag; S22 dialog field + header tags (remove the area-type multi-select); S26 audit labels for `building_type`
+- [x] e2e: add a building type, change อาคาร 1's type, category without types → error, `อื่น ๆ` locked
 
 **Acceptance criteria**
 - [ ] AC1: S20 `ประเภทอาคาร` lists อาคารสำนักงาน (1 อาคาร), โกดังเก็บของ (1), พื้นที่ภายนอกอาคาร (1); add `โรงงาน` with all categories ticked → it appears in the building dialog select

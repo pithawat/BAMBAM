@@ -12,6 +12,36 @@ import (
 	"github.com/google/uuid"
 )
 
+const adminActiveBuildingTypes = `-- name: AdminActiveBuildingTypes :many
+SELECT id, name FROM platform.building_types WHERE is_active ORDER BY sort_order, name
+`
+
+type AdminActiveBuildingTypesRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+// settings Stage 4P (CR-005): the active building types a category may be used in, with names for the audit diff.
+func (q *Queries) AdminActiveBuildingTypes(ctx context.Context) ([]AdminActiveBuildingTypesRow, error) {
+	rows, err := q.db.Query(ctx, adminActiveBuildingTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdminActiveBuildingTypesRow
+	for rows.Next() {
+		var i AdminActiveBuildingTypesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const adminCategoryHasUsedSymptom = `-- name: AdminCategoryHasUsedSymptom :one
 SELECT EXISTS (SELECT 1 FROM repair.ticket_symptoms ts JOIN repair.symptoms s ON s.id = ts.symptom_id WHERE s.category_id = $1)::boolean
 `
@@ -37,6 +67,18 @@ func (q *Queries) AdminCategoryNameTaken(ctx context.Context, arg AdminCategoryN
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const adminClearCategoryActiveBuildingTypes = `-- name: AdminClearCategoryActiveBuildingTypes :exec
+DELETE FROM repair.category_building_types cbt
+USING platform.building_types bt
+WHERE cbt.category_id = $1 AND bt.id = cbt.building_type_id AND bt.is_active
+`
+
+// Replacing a category's types touches only active types: links to an inactive type stay for when it comes back.
+func (q *Queries) AdminClearCategoryActiveBuildingTypes(ctx context.Context, categoryID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, adminClearCategoryActiveBuildingTypes, categoryID)
+	return err
 }
 
 const adminClearCategoryBuildingTypes = `-- name: AdminClearCategoryBuildingTypes :exec
@@ -135,15 +177,19 @@ func (q *Queries) AdminInsertCategory(ctx context.Context, arg AdminInsertCatego
 	return err
 }
 
-const adminInsertCategoryAllBuildingTypes = `-- name: AdminInsertCategoryAllBuildingTypes :exec
+const adminInsertCategoryBuildingTypes = `-- name: AdminInsertCategoryBuildingTypes :exec
 INSERT INTO repair.category_building_types (category_id, building_type_id)
-SELECT $1, id FROM platform.building_types WHERE is_active
+SELECT $1, unnest($2::uuid[])
 ON CONFLICT DO NOTHING
 `
 
-// CR-025: until settings Stage 4P lets the admin pick them, a new category is used in every active building type.
-func (q *Queries) AdminInsertCategoryAllBuildingTypes(ctx context.Context, categoryID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, adminInsertCategoryAllBuildingTypes, categoryID)
+type AdminInsertCategoryBuildingTypesParams struct {
+	CategoryID      uuid.UUID
+	BuildingTypeIds []uuid.UUID
+}
+
+func (q *Queries) AdminInsertCategoryBuildingTypes(ctx context.Context, arg AdminInsertCategoryBuildingTypesParams) error {
+	_, err := q.db.Exec(ctx, adminInsertCategoryBuildingTypes, arg.CategoryID, arg.BuildingTypeIds)
 	return err
 }
 
@@ -185,6 +231,53 @@ func (q *Queries) AdminInsertSymptom(ctx context.Context, arg AdminInsertSymptom
 		arg.ActorID,
 	)
 	return err
+}
+
+const adminLinkBuildingTypeCategories = `-- name: AdminLinkBuildingTypeCategories :exec
+INSERT INTO repair.category_building_types (category_id, building_type_id)
+SELECT unnest($1::uuid[]), $2
+ON CONFLICT DO NOTHING
+`
+
+type AdminLinkBuildingTypeCategoriesParams struct {
+	CategoryIds    []uuid.UUID
+	BuildingTypeID uuid.UUID
+}
+
+// #54: the categories a new building type uses.
+func (q *Queries) AdminLinkBuildingTypeCategories(ctx context.Context, arg AdminLinkBuildingTypeCategoriesParams) error {
+	_, err := q.db.Exec(ctx, adminLinkBuildingTypeCategories, arg.CategoryIds, arg.BuildingTypeID)
+	return err
+}
+
+const adminListBuildingTypeCategories = `-- name: AdminListBuildingTypeCategories :many
+SELECT building_type_id, category_id FROM repair.category_building_types ORDER BY building_type_id, category_id
+`
+
+type AdminListBuildingTypeCategoriesRow struct {
+	BuildingTypeID uuid.UUID
+	CategoryID     uuid.UUID
+}
+
+// #53 `categoryIds`: every link, active type or not ("อื่น ๆ" never has rows).
+func (q *Queries) AdminListBuildingTypeCategories(ctx context.Context) ([]AdminListBuildingTypeCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, adminListBuildingTypeCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdminListBuildingTypeCategoriesRow
+	for rows.Next() {
+		var i AdminListBuildingTypeCategoriesRow
+		if err := rows.Scan(&i.BuildingTypeID, &i.CategoryID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const adminListCategories = `-- name: AdminListCategories :many

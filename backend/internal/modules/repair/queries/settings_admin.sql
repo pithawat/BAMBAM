@@ -32,14 +32,33 @@ UPDATE repair.categories SET name = @name, icon = @icon, default_priority = @def
     updated_by_id = @actor_id, updated_at = now()
 WHERE id = @id;
 
--- name: AdminInsertCategoryAllBuildingTypes :exec
--- CR-025: until settings Stage 4P lets the admin pick them, a new category is used in every active building type.
+-- name: AdminActiveBuildingTypes :many
+-- settings Stage 4P (CR-005): the active building types a category may be used in, with names for the audit diff.
+SELECT id, name FROM platform.building_types WHERE is_active ORDER BY sort_order, name;
+
+-- name: AdminInsertCategoryBuildingTypes :exec
 INSERT INTO repair.category_building_types (category_id, building_type_id)
-SELECT @category_id, id FROM platform.building_types WHERE is_active
+SELECT @category_id, unnest(@building_type_ids::uuid[])
 ON CONFLICT DO NOTHING;
+
+-- name: AdminClearCategoryActiveBuildingTypes :exec
+-- Replacing a category's types touches only active types: links to an inactive type stay for when it comes back.
+DELETE FROM repair.category_building_types cbt
+USING platform.building_types bt
+WHERE cbt.category_id = @category_id AND bt.id = cbt.building_type_id AND bt.is_active;
 
 -- name: AdminClearCategoryBuildingTypes :exec
 DELETE FROM repair.category_building_types WHERE category_id = @category_id;
+
+-- name: AdminListBuildingTypeCategories :many
+-- #53 `categoryIds`: every link, active type or not ("อื่น ๆ" never has rows).
+SELECT building_type_id, category_id FROM repair.category_building_types ORDER BY building_type_id, category_id;
+
+-- name: AdminLinkBuildingTypeCategories :exec
+-- #54: the categories a new building type uses.
+INSERT INTO repair.category_building_types (category_id, building_type_id)
+SELECT unnest(@category_ids::uuid[]), @building_type_id
+ON CONFLICT DO NOTHING;
 
 -- name: AdminCategoryHasUsedSymptom :one
 SELECT EXISTS (SELECT 1 FROM repair.ticket_symptoms ts JOIN repair.symptoms s ON s.id = ts.symptom_id WHERE s.category_id = @category_id)::boolean;

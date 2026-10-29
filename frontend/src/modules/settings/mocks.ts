@@ -19,6 +19,11 @@ import type {
   PlanFloor,
   PlanRoom,
   RenameInput,
+  UpdateBuildingInput,
+  AuditChange,
+  BuildingTypeAdmin,
+  CreateBuildingTypeInput,
+  UpdateBuildingTypeInput,
   RoomAssetsQuery,
   UpdateAssetInput,
   UpdateAssetTypeInput,
@@ -394,7 +399,7 @@ export function mockAuditAppend(e: Pick<AuditEntry, "action" | "entityType" | "e
 }
 
 const TYPE_FILTER: Record<NonNullable<AuditQuery["type"]>, AuditEntry["entityType"][]> = {
-  master: ["building", "floor", "room", "category", "symptom", "contractor_type", "asset", "asset_type"],
+  master: ["building", "floor", "room", "category", "symptom", "contractor_type", "asset", "asset_type", "building_type"],
   permissions: ["role"],
   users: ["user"],
 };
@@ -431,10 +436,15 @@ const room = (id: string, name: string, areaType: PlanRoom["areaType"] = "meetin
   id: placeId(id), name, areaType, isCommonArea: areaType === "common_area", activeAssetCount: 0, updatedAt: SEED_AT, updatedBy: null,
 });
 
+// Building types (CR-005) = the repair CR-025 seed ids.
+const BT_OFFICE = "c025b700-0000-4000-8000-000000000001";
+const BT_STORE = "c025b700-0000-4000-8000-000000000002";
+const BT_OUTDOOR = "c025b700-0000-4000-8000-000000000003";
+
 const placeStore = {
   buildings: [
     {
-      id: placeId("b1"), name: "อาคาร 1", updatedAt: SEED_AT, updatedBy: null,
+      id: placeId("b1"), name: "อาคาร 1", buildingType: { id: BT_OFFICE, name: "อาคารสำนักงาน" }, updatedAt: SEED_AT, updatedBy: null,
       floors: [
         { id: placeId("f11"), name: "1", level: 1, rooms: [room("r111", "ห้องประชุม 1A"), room("r112", "ห้องประชุม 1B"), room("r113", "พื้นที่ส่วนกลางชั้น 1", "common_area")] },
         { id: placeId("f12"), name: "2", level: 2, rooms: [room("r121", "ฝ่ายบัญชี", "office"), room("r122", "ฝ่ายจัดซื้อ", "office"), room("r123", "พื้นที่ส่วนกลางชั้น 2", "common_area")] },
@@ -442,8 +452,16 @@ const placeStore = {
       ],
     },
     {
-      id: placeId("b2"), name: "อาคาร 2", updatedAt: SEED_AT, updatedBy: null,
+      id: placeId("b2"), name: "อาคาร 2", buildingType: { id: BT_OFFICE, name: "อาคารสำนักงาน" }, updatedAt: SEED_AT, updatedBy: null,
       floors: [{ id: placeId("f21"), name: "1", level: 1, rooms: [room("r211", "ห้องประชุม 1A"), room("r212", "พื้นที่ส่วนกลางชั้น 1", "common_area")] }],
+    },
+    {
+      id: placeId("b3"), name: "โกดังเก็บของ 1 (ตัวอย่าง)", buildingType: { id: BT_STORE, name: "โกดังเก็บของ" }, updatedAt: SEED_AT, updatedBy: null,
+      floors: [{ id: placeId("f31"), name: "1", level: 1, rooms: [room("r311", "พื้นที่เก็บสินค้า", "other"), room("r312", "พื้นที่ส่วนกลางชั้น 1", "common_area")] }],
+    },
+    {
+      id: placeId("b4"), name: "พื้นที่ภายนอกอาคาร", buildingType: { id: BT_OUTDOOR, name: "พื้นที่ภายนอกอาคาร" }, updatedAt: SEED_AT, updatedBy: null,
+      floors: [{ id: placeId("f41"), name: "G", level: 0, rooms: [room("r411", "ลานจอดรถ", "parking")] }],
     },
   ] as PlanBuilding[],
   types: [
@@ -492,18 +510,91 @@ function checkName(name: string) {
   return n;
 }
 
-/** #15 */
-export function mockRenameBuilding(id: string, input: RenameInput, actor: PersonRef): PlanBuilding {
+/** #15 (rename + CR-005 building type) */
+export function mockUpdateBuilding(id: string, input: UpdateBuildingInput, actor: PersonRef): PlanBuilding {
   const b = placeStore.buildings.find((x) => x.id === id);
   if (!b) throw mockErrors.code(404, "BUILDING_NOT_FOUND");
   const name = checkName(input.name);
+  if (input.buildingTypeId === "") throw mockErrors.code(400, "VALIDATION_FAILED", { buildingTypeId: "REQUIRED" });
   if (b.updatedAt !== input.updatedAt) throw mockErrors.code(409, "VERSION_CONFLICT");
-  if (placeStore.buildings.some((x) => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) throw mockErrors.code(409, "NAME_TAKEN");
-  if (name !== b.name) {
-    mockAuditAppend({ action: "update", entityType: "building", entityId: id, entityName: name, changes: [{ field: "name", before: b.name, after: name }] }, actor);
-    Object.assign(b, { name, updatedAt: now(), updatedBy: actor });
+  let type = b.buildingType;
+  if (input.buildingTypeId !== undefined && input.buildingTypeId !== type.id) {
+    const t = typeStore.find((x) => x.id === input.buildingTypeId && x.isActive);
+    if (!t) throw mockErrors.code(400, "VALIDATION_FAILED", { buildingTypeId: "INVALID" });
+    type = { id: t.id, name: t.name };
+  }
+  if (name !== b.name && placeStore.buildings.some((x) => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) throw mockErrors.code(409, "NAME_TAKEN");
+  const changes = [
+    ...(name !== b.name ? [{ field: "name", before: b.name, after: name }] : []),
+    ...(type.id !== b.buildingType.id ? [{ field: "buildingType", before: b.buildingType.name, after: type.name }] : []),
+  ];
+  if (changes.length) {
+    mockAuditAppend({ action: "update", entityType: "building", entityId: id, entityName: name, changes }, actor);
+    Object.assign(b, { name, buildingType: type, updatedAt: now(), updatedBy: actor });
   }
   return withCounts(b);
+}
+
+// ---- Stage 4P: building types (#53–#55, CR-005) ----
+
+const typeStore: Omit<BuildingTypeAdmin, "buildingCount" | "categoryIds">[] = [
+  { id: BT_OFFICE, name: "อาคารสำนักงาน", isActive: true, sortOrder: 1, updatedAt: SEED_AT, updatedBy: null },
+  { id: BT_STORE, name: "โกดังเก็บของ", isActive: true, sortOrder: 2, updatedAt: SEED_AT, updatedBy: null },
+  { id: BT_OUTDOOR, name: "พื้นที่ภายนอกอาคาร", isActive: true, sortOrder: 3, updatedAt: SEED_AT, updatedBy: null },
+];
+
+function typeAdmin(t: (typeof typeStore)[number]): BuildingTypeAdmin {
+  return structuredClone({
+    ...t,
+    buildingCount: placeStore.buildings.filter((b) => b.buildingType.id === t.id).length,
+    categoryIds: masterStore.categories.filter((c) => !c.isOther && c.buildingTypeIds.includes(t.id)).map((c) => c.id),
+  });
+}
+
+/** #53 — active first, in order. */
+export function mockBuildingTypes(): BuildingTypeAdmin[] {
+  return [...typeStore].sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.sortOrder - b.sortOrder).map(typeAdmin);
+}
+
+/** #54 */
+export function mockCreateBuildingType(input: CreateBuildingTypeInput, actor: PersonRef): BuildingTypeAdmin {
+  const name = checkName(input.name);
+  const ids = input.categoryIds ?? [];
+  if (ids.some((id) => !masterStore.categories.some((c) => c.id === id && !c.isOther))) throw mockErrors.code(400, "VALIDATION_FAILED", { categoryIds: "INVALID" });
+  if (typeStore.some((x) => x.name.toLowerCase() === name.toLowerCase())) throw mockErrors.code(409, "NAME_TAKEN");
+  const t = { id: crypto.randomUUID(), name, isActive: true, sortOrder: Math.max(0, ...typeStore.map((x) => x.sortOrder)) + 1, updatedAt: now(), updatedBy: actor };
+  typeStore.push(t);
+  for (const c of masterStore.categories) if (ids.includes(c.id)) c.buildingTypeIds = [...c.buildingTypeIds, t.id];
+  mockAuditAppend({ action: "create", entityType: "building_type", entityId: t.id, entityName: name, changes: [] }, actor);
+  return typeAdmin(t);
+}
+
+/** #55 */
+export function mockUpdateBuildingType(id: string, input: UpdateBuildingTypeInput, actor: PersonRef): BuildingTypeAdmin {
+  const t = typeStore.find((x) => x.id === id);
+  if (!t) throw mockErrors.code(404, "BUILDING_TYPE_NOT_FOUND");
+  const name = input.name !== undefined ? checkName(input.name) : t.name;
+  if (t.updatedAt !== input.updatedAt) throw mockErrors.code(409, "VERSION_CONFLICT");
+  const active = input.isActive ?? t.isActive;
+  if (t.isActive && !active && placeStore.buildings.some((b) => b.buildingType.id === id)) throw mockErrors.code(409, "IN_USE");
+  if (name !== t.name && typeStore.some((x) => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) throw mockErrors.code(409, "NAME_TAKEN");
+  const changes = name !== t.name ? [{ field: "name", before: t.name, after: name }] : [];
+  const action = changes.length ? "update" : active === t.isActive ? null : active ? "activate" : "deactivate";
+  if (action) {
+    Object.assign(t, { name, isActive: active, updatedAt: now(), updatedBy: actor });
+    for (const b of placeStore.buildings) if (b.buildingType.id === id) b.buildingType = { id, name };
+    mockAuditAppend({ action, entityType: "building_type", entityId: id, entityName: name, changes }, actor);
+  }
+  return typeAdmin(t);
+}
+
+const typeLabel = (ids: string[]) => typeStore.filter((t) => ids.includes(t.id)).sort((a, b) => a.sortOrder - b.sortOrder).map((t) => t.name).join(", ");
+
+function checkTypeIds(ids: string[] | undefined, required: boolean): string[] | undefined {
+  if (ids === undefined && !required) return undefined;
+  if (!ids || ids.length === 0) throw mockErrors.code(400, "VALIDATION_FAILED", { buildingTypeIds: "MIN_ITEMS" });
+  if (ids.some((id) => !typeStore.some((t) => t.id === id && t.isActive))) throw mockErrors.code(400, "VALIDATION_FAILED", { buildingTypeIds: "INVALID" });
+  return [...new Set(ids)];
 }
 
 /** #27 */
@@ -673,12 +764,12 @@ const meta = (id: string, name: string, extra: Partial<{ isActive: boolean; inUs
 
 const masterStore = {
   categories: [
-    { ...meta("c1", "ระบบปรับอากาศ", { inUse: true }), icon: "snowflake", sortOrder: 1, defaultPriority: "medium", isOther: false, areaTypes: ["meeting_room", "office"], symptomCount: 0, activeSymptomCount: 0 },
-    { ...meta("c2", "ไฟฟ้าและแสงสว่าง", { inUse: true }), icon: "zap", sortOrder: 2, defaultPriority: "high", isOther: false, areaTypes: [], symptomCount: 0, activeSymptomCount: 0 },
-    { ...meta("c3", "ประปาและสุขภัณฑ์"), icon: "droplets", sortOrder: 3, defaultPriority: "medium", isOther: false, areaTypes: ["restroom"], symptomCount: 0, activeSymptomCount: 0 },
-    { ...meta("c4", "อาคารและเฟอร์นิเจอร์"), icon: "armchair", sortOrder: 4, defaultPriority: "low", isOther: false, areaTypes: [], symptomCount: 0, activeSymptomCount: 0 },
-    { ...meta("c5", "ห้องประชุมและโสตทัศนูปกรณ์"), icon: "presentation", sortOrder: 5, defaultPriority: "medium", isOther: false, areaTypes: ["meeting_room"], symptomCount: 0, activeSymptomCount: 0 },
-    { ...meta("c6", "อื่น ๆ"), icon: "ellipsis", sortOrder: 6, defaultPriority: "medium", isOther: true, areaTypes: [], symptomCount: 0, activeSymptomCount: 0 },
+    { ...meta("c1", "ระบบปรับอากาศ", { inUse: true }), icon: "snowflake", sortOrder: 1, defaultPriority: "medium", isOther: false, buildingTypeIds: [BT_OFFICE], symptomCount: 0, activeSymptomCount: 0 },
+    { ...meta("c2", "ไฟฟ้าและแสงสว่าง", { inUse: true }), icon: "zap", sortOrder: 2, defaultPriority: "high", isOther: false, buildingTypeIds: [BT_OFFICE, BT_STORE, BT_OUTDOOR], symptomCount: 0, activeSymptomCount: 0 },
+    { ...meta("c3", "ประปาและสุขภัณฑ์"), icon: "droplets", sortOrder: 3, defaultPriority: "medium", isOther: false, buildingTypeIds: [BT_OFFICE, BT_STORE, BT_OUTDOOR], symptomCount: 0, activeSymptomCount: 0 },
+    { ...meta("c4", "อาคารและเฟอร์นิเจอร์"), icon: "armchair", sortOrder: 4, defaultPriority: "low", isOther: false, buildingTypeIds: [BT_OFFICE, BT_STORE], symptomCount: 0, activeSymptomCount: 0 },
+    { ...meta("c5", "ห้องประชุมและโสตทัศนูปกรณ์"), icon: "presentation", sortOrder: 5, defaultPriority: "medium", isOther: false, buildingTypeIds: [BT_OFFICE], symptomCount: 0, activeSymptomCount: 0 },
+    { ...meta("c6", "อื่น ๆ"), icon: "ellipsis", sortOrder: 6, defaultPriority: "medium", isOther: true, buildingTypeIds: [], symptomCount: 0, activeSymptomCount: 0 },
   ] as CategoryAdmin[],
   symptoms: [] as SymptomAdmin[],
   types: [
@@ -737,13 +828,14 @@ export function mockCreateCategory(input: CreateCategoryInput, actor: PersonRef)
   const name = masterName(input.name, 100, true)!;
   if (!CAT_ICONS.includes(input.icon)) throw mockErrors.code(400, "VALIDATION_FAILED", { icon: "INVALID" });
   if (!PRIORITIES.includes(input.defaultPriority)) throw mockErrors.code(400, "VALIDATION_FAILED", { defaultPriority: "INVALID" });
+  const types = checkTypeIds(input.buildingTypeIds, true)!;
   if (masterStore.categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) throw mockErrors.code(409, "NAME_TAKEN");
   const c: CategoryAdmin = {
     id: crypto.randomUUID(), name, isActive: true, inUse: false, updatedAt: now(), updatedBy: actor, icon: input.icon, defaultPriority: input.defaultPriority,
-    sortOrder: Math.max(0, ...masterStore.categories.map((x) => x.sortOrder)) + 1, isOther: false, areaTypes: input.areaTypes ?? [], symptomCount: 0, activeSymptomCount: 0,
+    sortOrder: Math.max(0, ...masterStore.categories.map((x) => x.sortOrder)) + 1, isOther: false, buildingTypeIds: types, symptomCount: 0, activeSymptomCount: 0,
   };
   masterStore.categories.push(c);
-  mockAuditAppend({ action: "create", entityType: "category", entityId: c.id, entityName: name, changes: [] }, actor);
+  mockAuditAppend({ action: "create", entityType: "category", entityId: c.id, entityName: name, changes: [{ field: "buildingTypes", after: typeLabel(types) }] }, actor);
   return masterCounts(c);
 }
 
@@ -755,14 +847,17 @@ export function mockUpdateCategory(id: string, input: UpdateCategoryInput, actor
   if (input.icon !== undefined && !CAT_ICONS.includes(input.icon)) throw mockErrors.code(400, "VALIDATION_FAILED", { icon: "INVALID" });
   if (c.updatedAt !== input.updatedAt) throw mockErrors.code(409, "VERSION_CONFLICT");
   if (c.isOther && input.isActive === false) throw mockErrors.code(400, "VALIDATION_FAILED", { isActive: "INVALID" });
+  if (c.isOther && input.buildingTypeIds !== undefined) throw mockErrors.code(400, "VALIDATION_FAILED", { buildingTypeIds: "NOT_ALLOWED" });
+  const types = checkTypeIds(input.buildingTypeIds, false);
   if (name && masterStore.categories.some((x) => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) throw mockErrors.code(409, "NAME_TAKEN");
   const before = { ...c };
   Object.assign(c, {
     ...(name !== undefined ? { name } : {}), ...(input.icon !== undefined ? { icon: input.icon } : {}),
-    ...(input.defaultPriority !== undefined ? { defaultPriority: input.defaultPriority } : {}), ...(input.areaTypes !== undefined ? { areaTypes: input.areaTypes } : {}),
+    ...(input.defaultPriority !== undefined ? { defaultPriority: input.defaultPriority } : {}), ...(types !== undefined ? { buildingTypeIds: types } : {}),
     ...(input.isActive !== undefined ? { isActive: input.isActive } : {}), updatedAt: now(), updatedBy: actor,
   });
-  const changes = (["name", "icon", "defaultPriority"] as const).filter((f) => before[f] !== c[f]).map((f) => ({ field: f, before: String(before[f]), after: String(c[f]) }));
+  const changes: AuditChange[] = (["name", "icon", "defaultPriority"] as const).filter((f) => before[f] !== c[f]).map((f) => ({ field: f, before: String(before[f]), after: String(c[f]) }));
+  if (typeLabel(before.buildingTypeIds) !== typeLabel(c.buildingTypeIds)) changes.push({ field: "buildingTypes", before: typeLabel(before.buildingTypeIds), after: typeLabel(c.buildingTypeIds) });
   mockAuditAppend({ action: changes.length ? "update" : c.isActive ? "activate" : "deactivate", entityType: "category", entityId: id, entityName: c.name, changes }, actor);
   return masterCounts(c);
 }

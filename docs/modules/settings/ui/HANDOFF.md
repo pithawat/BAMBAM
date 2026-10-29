@@ -1,6 +1,6 @@
 # UI handoff — ตั้งค่าระบบ (Admin / Superadmin)
 
-Status: UI DONE + WIRED — Stages 2–5 (2026-10-26, built by Claude per D-115; waiting for owner acceptance). Before: ACCEPTED — Stage 1 (2026-10-26, tag `settings-stage-1`)
+Status: UI DONE + WIRED — Stage 4P (2026-10-29, built by Claude per D-115 / owner; waiting for owner acceptance). Before: ACCEPTED — Stages 1–6 (2026-10-27, tags `settings-stage-1`…`6`)
 
 <!-- Written by Claude (/ui-spec settings 2026-10-16, updated by /build-stage prepare). Codex starts here.
      Only build the screens of the current stage. -->
@@ -28,10 +28,56 @@ Status: UI DONE + WIRED — Stages 2–5 (2026-10-26, built by Claude per D-115;
 | ~~S21 รายละเอียดชั้น~~ | removed (CR-002) | | | |
 | S22 หมวดงานและอาการ | `screens/S22-categories.md` (+ CR-001 block) | `mockups/CR-001-admin-settings.html#categories` | `/settings/categories[/[categoryId]]` | 5 |
 | S23 ประเภทผู้รับเหมา | `screens/S23-contractor-types.md` (+ CR-001 block) | — (`MasterList` in a CR-001 panel) | `/settings/contractor-types` | 5 |
+| S20 tab ประเภทอาคาร + แก้ไขอาคาร · S22 ใช้กับประเภทอาคาร · S26 labels (CR-005) | `screens/S20-buildings.md`, `screens/S22-categories.md` (CR-005 blocks) | — (S20 `ประเภทอุปกรณ์` tab pattern; S22 dialog) | `/settings/buildings?tab=building-types`, `/settings/categories` | 4P |
 
 Known differences from the design that are intentional (CR-001 apply, 2026-10-26): asset type form adds รหัสนำหน้า + ตำแหน่งติดตั้ง (owner); asset type cannot change on edit and inactive assets only offer เปิดใช้งาน (approved repair rules); S22 row menus add เลื่อนขึ้น / เลื่อนลง / ลบ (approved rules); sidebar adds ประเภทผู้รับเหมา and ประวัติการเปลี่ยนแปลง for Superadmin (owner); dev/UAT keep the existing role switcher instead of the prototype's review controls.
 
-## Stage 2 — S24 Role และสิทธิ์ (build this now)
+## Stage 4P — ประเภทอาคาร (CR-005, repair CR-025) (build this now)
+
+Changes to the built S20 / S22 / S26 only. Everything else stays as accepted.
+
+**Spec:** the **CR-005 blocks** at the top of `screens/S20-buildings.md` and `screens/S22-categories.md` (copy is there, use it word for word). No new mockup: the new tab copies the `ประเภทอุปกรณ์` tab (table desktop / cards mobile, same heading action slot, same dialogs).
+
+**Use these (Claude's, read-only for you):**
+
+| Need | Use |
+|---|---|
+| Type list (S20 tab, S22 options, building dialog select) | `getBuildingTypes()` → `BuildingTypeAdmin[]` (active first). Columns: `name` · `buildingCount` (`{n}`) · `categoryIds.length` (`{n} หมวด`) · สถานะ from `isActive`. Selects / check boxes offer `isActive` types only |
+| Add type | `createBuildingType({ name, categoryIds })` — dialog check boxes = `getCategories()` where `isActive && !isOther`, all ticked by default; toast `เพิ่มประเภทอาคาร "{ชื่อ}" แล้ว`, refetch types |
+| Rename / (de)activate type | `updateBuildingType(id, { name? / isActive?, updatedAt })`. Before deactivating: `buildingCount > 0` → the blocked message straight away (no call); else the confirm dialog. The server may still answer `IN_USE` → same blocked message + refetch |
+| Building dialog `แก้ไขอาคาร` | replaces the building rename dialog: `updateBuilding(id, { name, buildingTypeId, updatedAt })` (send both; `buildingTypeId` = the select value). Note `เปลี่ยนประเภทแล้วมีผลกับงานแจ้งใหม่เท่านั้น` under the select |
+| Type tag | `PlanBuilding.buildingType.name` — small tag (`Badge` variant outline) next to the building name in the header / picker |
+| S22 dialog | `ใช้กับประเภทอาคาร *` check boxes (active types, `getBuildingTypes()`); new category: none ticked; send `buildingTypeIds` on create (required) and on edit only when the set changed. Client check: none ticked → `เลือกประเภทอาคารอย่างน้อย 1 ประเภท`. `isOther` category: no check boxes, show `ใช้ได้กับทุกประเภทอาคาร`, never send `buildingTypeIds`. **Remove the area-type chips** (`AREA_LABELS`, `areas` state — Claude left a placeholder sending `buildingTypeIds: []` so the build stays green) |
+| S22 header meta | `ใช้กับ: {type tags}` = names of `category.buildingTypeIds` (in `getBuildingTypes()` order); `isOther` → `ใช้กับ: ทุกประเภทอาคาร` |
+| S26 | `building_type` entity label + `buildingType` / `buildingTypes` field labels are already added in `audit-screen.tsx` — check they render (change a building's type, then open S26) |
+| Tab in the URL | `?tab=building-types` (after `?tab=asset-types`) |
+
+**Error copy** (`ApiError`):
+
+| Code | Where | Show |
+|---|---|---|
+| `VALIDATION_FAILED` `fields.name` `REQUIRED` / `TOO_LONG` | type / building dialog | กรุณากรอกชื่อ · ชื่อยาวได้ไม่เกิน 100 ตัวอักษร |
+| `fields.buildingTypeIds` `MIN_ITEMS` | S22 dialog | เลือกประเภทอาคารอย่างน้อย 1 ประเภท |
+| `fields.buildingTypeIds` `INVALID`, `fields.buildingTypeId` `INVALID`, `fields.categoryIds` `INVALID` | dialog | refetch types / categories, toast ทำรายการไม่สำเร็จ ลองอีกครั้ง (a type or category was just deactivated) |
+| `NAME_TAKEN` | under the name | ชื่อนี้มีอยู่แล้ว |
+| `IN_USE` (#55) | deactivate | ยังมีอาคารใช้ประเภทนี้อยู่ เปลี่ยนประเภทของอาคารก่อน |
+| `VERSION_CONFLICT` | dialog | as the other S20 dialogs (refetch, `ข้อมูลนี้ถูกแก้โดย …`) |
+| `BUILDING_TYPE_NOT_FOUND` / anything else | | refetch, toast ทำรายการไม่สำเร็จ ลองอีกครั้ง |
+
+**Mock mode:** types = อาคารสำนักงาน (อาคาร 1, อาคาร 2) · โกดังเก็บของ (โกดังเก็บของ 1 (ตัวอย่าง)) · พื้นที่ภายนอกอาคาร (พื้นที่ภายนอกอาคาร); every type is used by a building, so deactivate → blocked — add a type first to try a working deactivate. Categories carry `buildingTypeIds` (ระบบปรับอากาศ = อาคารสำนักงาน only). Scenarios as before (`?mock=normal|empty|error|forbidden|slow`).
+
+**Build:**
+
+- [ ] S20 tab `ประเภทอาคาร`: table desktop / cards mobile, primary `เพิ่มประเภทอาคาร`, row menu `แก้ไขชื่อ` / `ปิดใช้งาน` / `เปิดใช้งาน`, inactive rows muted with badge, empty `ยังไม่มีประเภทอาคาร`
+- [ ] Add-type dialog (name + `หมวดงานที่ใช้ได้` check boxes + hint) and rename dialog; deactivate confirm / blocked dialogs
+- [ ] `แก้ไขอาคาร` dialog (name + type select + note) replacing the building rename dialog; type tag on the building header / picker
+- [ ] S22 dialog field `ใช้กับประเภทอาคาร *` (+ `อื่น ๆ` read-only text), area chips removed; header meta `ใช้กับ:` tags
+- [ ] States for the new tab: loading skeleton, error, empty, Forbidden (Admin + Superadmin have access)
+- [ ] Check at 1280px and 375px in mock mode, as Superadmin and Admin
+
+**Acceptance (from `03-plan.md` Stage 4P, UI part, mock mode):** AC1 (tab lists the 3 types with counts; add `โรงงาน` with all categories ticked → appears in the `แก้ไขอาคาร` select), AC2 (deactivate a used type → `ยังมีอาคารใช้ประเภทนี้อยู่ เปลี่ยนประเภทของอาคารก่อน`), AC4 (S22 new category with no type → `เลือกประเภทอาคารอย่างน้อย 1 ประเภท`; `อื่น ๆ` shows `ใช้ได้กับทุกประเภทอาคาร`), AC5 UI part (changes appear in S26). AC3 (repair form follows the type) is Claude's in wire.
+
+## Stage 2 — S24 Role และสิทธิ์ (done, accepted 2026-10-27)
 
 Only `/settings/roles`. Every other settings page keeps its placeholder (S25 / S26 are Stage 3).
 

@@ -58,11 +58,12 @@ const ENTITY: Record<AuditEntityType, { label: string; icon: LucideIcon }> = {
   user: { label: "ผู้ใช้", icon: Users },
   asset: { label: "อุปกรณ์", icon: Box },
   asset_type: { label: "ประเภทอุปกรณ์", icon: Shapes },
+  building_type: { label: "ประเภทอาคาร", icon: Building2 },
 };
 
 const FIELD_LABEL: Record<string, string> = {
   name: "ชื่อ", icon: "ไอคอน", description: "คำอธิบาย", sortOrder: "ลำดับ", code: "รหัส", room: "ห้อง", codePrefix: "รหัสนำหน้า",
-  mount: "ตำแหน่งติดตั้ง", assetType: "ประเภท", priority: "ความเร่งด่วน", defaultPriority: "ความเร่งด่วนเริ่มต้น", areaTypes: "ประเภทพื้นที่",
+  mount: "ตำแหน่งติดตั้ง", assetType: "ประเภท", priority: "ความเร่งด่วน", defaultPriority: "ความเร่งด่วนเริ่มต้น", areaTypes: "ประเภทพื้นที่", buildingType: "ประเภทอาคาร", buildingTypes: "ใช้กับประเภทอาคาร",
 };
 
 /** Where "รายการ" links while the item exists (S26 Interactions). */

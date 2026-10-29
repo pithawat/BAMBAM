@@ -80,8 +80,27 @@ func (ctl *Controller) Categories(c *gin.Context) {
 	httpx.OK(c, categoriesOut(list))
 }
 
-func categoryInput(req CategoryRequest) repair.CategoryInput {
-	return repair.CategoryInput{Name: req.Name, Icon: req.Icon, DefaultPriority: req.DefaultPriority, IsActive: req.IsActive, UpdatedAt: at(req.UpdatedAt)}
+// idList parses an optional id list; a malformed id is `field: INVALID` (nil = not sent).
+func idList(c *gin.Context, field string, raw *[]string) (*[]uuid.UUID, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	ids := make([]uuid.UUID, 0, len(*raw))
+	for _, x := range *raw {
+		id, err := uuid.Parse(x)
+		if err != nil {
+			httpx.Error(c, apperr.Validation(map[string]string{field: "INVALID"}))
+			return nil, false
+		}
+		ids = append(ids, id)
+	}
+	return &ids, true
+}
+
+func categoryInput(c *gin.Context, req CategoryRequest) (repair.CategoryInput, bool) {
+	types, ok := idList(c, "buildingTypeIds", req.BuildingTypeIDs)
+	return repair.CategoryInput{Name: req.Name, Icon: req.Icon, DefaultPriority: req.DefaultPriority, IsActive: req.IsActive,
+		BuildingTypeIDs: types, UpdatedAt: at(req.UpdatedAt)}, ok
 }
 
 // CreateCategory handles #33.
@@ -94,7 +113,11 @@ func (ctl *Controller) CreateCategory(c *gin.Context) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	x, err := ctl.svc.CreateCategory(c.Request.Context(), v, categoryInput(req))
+	in, ok := categoryInput(c, req)
+	if !ok {
+		return
+	}
+	x, err := ctl.svc.CreateCategory(c.Request.Context(), v, in)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -116,7 +139,11 @@ func (ctl *Controller) UpdateCategory(c *gin.Context) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	x, err := ctl.svc.UpdateCategory(c.Request.Context(), v, id, categoryInput(req))
+	in, ok := categoryInput(c, req)
+	if !ok {
+		return
+	}
+	x, err := ctl.svc.UpdateCategory(c.Request.Context(), v, id, in)
 	if err != nil {
 		httpx.Error(c, err)
 		return

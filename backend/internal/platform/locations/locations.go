@@ -1,6 +1,7 @@
 // Package locations owns the shared building plan: buildings → floors → rooms (D-048, moved from repair in
 // settings Stage 4). Structure comes from the plan (CR-002): this package reads the active tree and renames
-// buildings and rooms; nothing here creates, deletes, reorders or deactivates them.
+// buildings and rooms; nothing here creates, deletes, reorders or deactivates them. Building types (CR-005) are
+// edited here too (building_types.go); which categories a type uses belongs to repair.
 package locations
 
 import (
@@ -21,6 +22,8 @@ var (
 	ErrRoomNotFound     = apperr.New(apperr.KindNotFound, "ROOM_NOT_FOUND", "room not found")
 	ErrNameTaken        = apperr.New(apperr.KindConflict, "NAME_TAKEN", "name already used")
 	ErrVersionConflict  = apperr.New(apperr.KindConflict, "VERSION_CONFLICT", "changed by someone else")
+	ErrTypeNotFound     = apperr.New(apperr.KindNotFound, "BUILDING_TYPE_NOT_FOUND", "building type not found")
+	ErrTypeInUse        = apperr.New(apperr.KindConflict, "IN_USE", "an active building has this type")
 )
 
 const nameMax = 100
@@ -45,9 +48,16 @@ type Floor struct {
 	Rooms []Room
 }
 
+// TypeRef is a building's type (#13 `buildingType`, CR-005).
+type TypeRef struct {
+	ID   uuid.UUID
+	Name string
+}
+
 type Building struct {
 	ID        uuid.UUID
 	Name      string
+	Type      TypeRef
 	UpdatedAt time.Time
 	UpdatedBy *people.Ref
 	Floors    []Floor
@@ -64,6 +74,7 @@ func (p Place) ParentName() string { return p.Building + " " + p.Floor + " · " 
 
 type Repository interface {
 	Tree(ctx context.Context) ([]Building, error)
+	Types(ctx context.Context) ([]BuildingType, error)
 	// Place returns ok=false for an unknown or inactive room (or one on an inactive floor / building).
 	Place(ctx context.Context, roomID uuid.UUID) (Place, bool, error)
 	InTx(ctx context.Context, fn func(tx TxRepository) error) error
@@ -71,14 +82,27 @@ type Repository interface {
 
 type TxRepository interface {
 	// LockBuilding returns ErrBuildingNotFound for an unknown or inactive building.
-	LockBuilding(ctx context.Context, id uuid.UUID) (name string, updatedAt time.Time, err error)
+	LockBuilding(ctx context.Context, id uuid.UUID) (LockedBuilding, error)
 	BuildingNameTaken(ctx context.Context, name string, self uuid.UUID) (bool, error)
-	RenameBuilding(ctx context.Context, id uuid.UUID, name string, actor uuid.UUID) error
+	// ActiveType returns ok=false for an unknown or inactive building type.
+	ActiveType(ctx context.Context, id uuid.UUID) (TypeRef, bool, error)
+	UpdateBuilding(ctx context.Context, id uuid.UUID, name string, typeID, actor uuid.UUID) error
 	// LockRoom returns ErrRoomNotFound for an unknown or inactive room.
 	LockRoom(ctx context.Context, id uuid.UUID) (LockedRoom, error)
 	RoomNameTaken(ctx context.Context, floorID uuid.UUID, name string, self uuid.UUID) (bool, error)
 	RenameRoom(ctx context.Context, id uuid.UUID, name string, actor uuid.UUID) error
+	// LockType returns ErrTypeNotFound for an unknown type.
+	LockType(ctx context.Context, id uuid.UUID) (LockedType, error)
+	TypeNameTaken(ctx context.Context, name string, self uuid.UUID) (bool, error)
+	InsertType(ctx context.Context, id uuid.UUID, name string, actor uuid.UUID) error
+	UpdateType(ctx context.Context, id uuid.UUID, name string, active bool, actor uuid.UUID) error
 	Audit(ctx context.Context, e audit.Entry) error
+}
+
+type LockedBuilding struct {
+	Name      string
+	UpdatedAt time.Time
+	Type      TypeRef
 }
 
 type LockedRoom struct {
@@ -124,31 +148,57 @@ func nameChange(before, after string) []audit.Change {
 	return []audit.Change{{Field: "name", Before: &before, After: &after}}
 }
 
-// RenameBuilding implements #15: rename only (id, floors, rooms and assets stay); unique among buildings.
-func (s *Service) RenameBuilding(ctx context.Context, actor, id uuid.UUID, name string, updatedAt time.Time) (Building, error) {
-	name, err := validName(name)
+// BuildingInput is #15: Name required; TypeID nil = unchanged (CR-005).
+type BuildingInput struct {
+	Name      string
+	TypeID    *uuid.UUID
+	UpdatedAt time.Time
+}
+
+// UpdateBuilding implements #15: rename (unique among buildings) and / or change the type to an active one
+// (affects new reports only). The id, floors, rooms and assets stay.
+func (s *Service) UpdateBuilding(ctx context.Context, actor, id uuid.UUID, in BuildingInput) (Building, error) {
+	name, err := validName(in.Name)
 	if err != nil {
 		return Building{}, err
 	}
 	err = s.repo.InTx(ctx, func(tx TxRepository) error {
-		cur, at, err := tx.LockBuilding(ctx, id)
+		cur, err := tx.LockBuilding(ctx, id)
 		if err != nil {
 			return err
 		}
-		if !at.Equal(updatedAt) {
+		if !cur.UpdatedAt.Equal(in.UpdatedAt) {
 			return ErrVersionConflict
 		}
-		if cur == name {
+		next := cur.Type
+		if in.TypeID != nil && *in.TypeID != cur.Type.ID {
+			t, ok, err := tx.ActiveType(ctx, *in.TypeID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return apperr.Validation(map[string]string{"buildingTypeId": "INVALID"})
+			}
+			next = t
+		}
+		changes := []audit.Change{}
+		if cur.Name != name {
+			if taken, err := tx.BuildingNameTaken(ctx, name, id); err != nil || taken {
+				return orErr(err, ErrNameTaken)
+			}
+			changes = nameChange(cur.Name, name)
+		}
+		if next.ID != cur.Type.ID {
+			changes = append(changes, audit.Change{Field: "buildingType", Before: &cur.Type.Name, After: &next.Name})
+		}
+		if len(changes) == 0 {
 			return nil
 		}
-		if taken, err := tx.BuildingNameTaken(ctx, name, id); err != nil || taken {
-			return orErr(err, ErrNameTaken)
-		}
-		if err := tx.RenameBuilding(ctx, id, name, actor); err != nil {
+		if err := tx.UpdateBuilding(ctx, id, name, next.ID, actor); err != nil {
 			return err
 		}
 		return tx.Audit(ctx, audit.Entry{ActorID: &actor, Action: "update", TargetType: "building", TargetID: id.String(),
-			Data: renameData{EntityName: name, Changes: nameChange(cur, name)}})
+			Data: renameData{EntityName: name, Changes: changes}})
 	})
 	if err != nil {
 		return Building{}, err

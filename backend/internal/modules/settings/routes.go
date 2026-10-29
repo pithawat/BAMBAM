@@ -29,7 +29,7 @@ var routes = []route{
 	{"11", "GET", "/audit", []string{PermAudit}, func(c *Controller) gin.HandlerFunc { return c.Audit }},
 	{"12", "GET", "/audit/actors", []string{PermAudit}, func(c *Controller) gin.HandlerFunc { return c.AuditActors }},
 	{"13", "GET", "/buildings", []string{PermLocations, PermAssets}, func(c *Controller) gin.HandlerFunc { return c.Buildings }},
-	{"15", "PATCH", "/buildings/:id", []string{PermLocations}, func(c *Controller) gin.HandlerFunc { return c.RenameBuilding }},
+	{"15", "PATCH", "/buildings/:id", []string{PermLocations}, func(c *Controller) gin.HandlerFunc { return c.UpdateBuilding }},
 	{"27", "PATCH", "/rooms/:id", []string{PermLocations}, func(c *Controller) gin.HandlerFunc { return c.RenameRoom }},
 	{"32", "GET", "/categories", []string{PermCategories}, func(c *Controller) gin.HandlerFunc { return c.Categories }},
 	{"33", "POST", "/categories", []string{PermCategories}, func(c *Controller) gin.HandlerFunc { return c.CreateCategory }},
@@ -52,6 +52,9 @@ var routes = []route{
 	{"50", "GET", "/asset-types", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.AssetTypes }},
 	{"51", "POST", "/asset-types", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.CreateAssetType }},
 	{"52", "PATCH", "/asset-types/:id", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.UpdateAssetType }},
+	{"53", "GET", "/building-types", []string{PermLocations, PermCategories}, func(c *Controller) gin.HandlerFunc { return c.BuildingTypes }},
+	{"54", "POST", "/building-types", []string{PermLocations}, func(c *Controller) gin.HandlerFunc { return c.CreateBuildingType }},
+	{"55", "PATCH", "/building-types/:id", []string{PermLocations}, func(c *Controller) gin.HandlerFunc { return c.UpdateBuildingType }},
 }
 
 // RegisterRoutes mounts the module on /api/v1/settings (behind the auth guard). Each route checks

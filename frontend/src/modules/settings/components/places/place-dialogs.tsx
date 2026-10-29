@@ -8,13 +8,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { createAssetType, renameBuilding, renameRoom, updateAssetType } from "../../api";
-import type { AssetIconName, AssetMount, AssetTypeAdmin, PersonRef } from "../../types";
+import { createAssetType, renameRoom, updateAssetType, updateBuilding } from "../../api";
+import type { AssetIconName, AssetMount, AssetTypeAdmin, BuildingTypeAdmin, PersonRef } from "../../types";
 import { errorCode, errorFields, GENERIC_ERROR, sheetOnMobile } from "../settings-ui";
 
-// S20 dialogs (CR-001 / CR-002): rename building / room, add / edit asset type. Server and validation errors show
+// S20 dialogs (CR-001 / CR-002): edit building (name + CR-005 type) / rename room, add / edit asset type. Server and validation errors show
 // as one line at the top of the form (settings _common.md §6, CR-001 design).
 
 export const MOUNTS: { value: AssetMount; label: string }[] = [
@@ -67,7 +68,7 @@ export function ConflictAlert({ text, onReload }: { text: string; onReload: () =
 // ---- rename ----
 
 export type RenameTarget =
-  | { kind: "building"; id: string; name: string; updatedAt: string }
+  | { kind: "building"; id: string; name: string; updatedAt: string; buildingTypeId: string }
   | { kind: "room"; id: string; name: string; updatedAt: string; context: string };
 
 type RenameProps = {
@@ -76,10 +77,13 @@ type RenameProps = {
   onSaved: () => void;
   /** Fresh name / version after a conflict (the caller refetched the tree). */
   fetchFresh: (target: RenameTarget) => Promise<{ updatedAt: string; updatedBy: PersonRef | null } | null>;
+  /** CR-005: the `ประเภทอาคาร *` select of the building dialog (active types are offered). */
+  buildingTypes?: BuildingTypeAdmin[];
 };
 
-export function RenameDialog({ target, onOpenChange, onSaved, fetchFresh }: RenameProps) {
+export function RenameDialog({ target, onOpenChange, onSaved, fetchFresh, buildingTypes = [] }: RenameProps) {
   const [name, setName] = useState("");
+  const [typeId, setTypeId] = useState("");
   const [version, setVersion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ text: string; updatedAt: string } | null>(null);
@@ -89,6 +93,7 @@ export function RenameDialog({ target, onOpenChange, onSaved, fetchFresh }: Rena
     setSeen(target);
     if (target) {
       setName(target.name);
+      setTypeId(target.kind === "building" ? target.buildingTypeId : "");
       setVersion(target.updatedAt);
       setError(null);
       setConflict(null);
@@ -101,17 +106,25 @@ export function RenameDialog({ target, onOpenChange, onSaved, fetchFresh }: Rena
     const n = name.trim();
     if (!n) return setError("กรุณากรอกชื่อ");
     if ([...n].length > 100) return setError("ชื่อยาวได้ไม่เกิน 100 ตัวอักษร");
+    if (target.kind === "building" && !typeId) return setError("กรุณาเลือกประเภทอาคาร");
     setBusy(true);
     setError(null);
     try {
-      if (target.kind === "building") await renameBuilding(target.id, { name: n, updatedAt: version });
+      if (target.kind === "building") await updateBuilding(target.id, { name: n, buildingTypeId: typeId, updatedAt: version });
       else await renameRoom(target.id, { name: n, updatedAt: version });
-      toast.success("บันทึกชื่อแล้ว");
+      toast.success(target.kind === "building" ? "บันทึกแล้ว" : "บันทึกชื่อแล้ว");
       onSaved();
     } catch (err) {
       const code = errorCode(err);
       if (code === "NAME_TAKEN") setError("ชื่อนี้มีอยู่แล้ว");
-      else if (code === "VALIDATION_FAILED") setError(errorFields(err).name === "TOO_LONG" ? "ชื่อยาวได้ไม่เกิน 100 ตัวอักษร" : "กรุณากรอกชื่อ");
+      else if (code === "VALIDATION_FAILED") {
+        const f = errorFields(err);
+        if (f.buildingTypeId) {
+          // the type was just deactivated: the caller refetches, the select shows active ones
+          toast.error(GENERIC_ERROR);
+          onSaved();
+        } else setError(f.name === "TOO_LONG" ? "ชื่อยาวได้ไม่เกิน 100 ตัวอักษร" : "กรุณากรอกชื่อ");
+      }
       else if (code === "VERSION_CONFLICT") {
         const fresh = await fetchFresh(target).catch(() => null);
         if (fresh) setConflict({ text: conflictText(fresh.updatedBy, fresh.updatedAt), updatedAt: fresh.updatedAt });
@@ -127,7 +140,7 @@ export function RenameDialog({ target, onOpenChange, onSaved, fetchFresh }: Rena
     <Dialog open={!!target} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className={sheetOnMobile}>
         <DialogHeader>
-          <DialogTitle className="font-heading text-lg font-semibold">{building ? "แก้ไขชื่ออาคาร" : "แก้ไขชื่อห้อง / พื้นที่"}</DialogTitle>
+          <DialogTitle className="font-heading text-lg font-semibold">{building ? "แก้ไขอาคาร" : "แก้ไขชื่อห้อง / พื้นที่"}</DialogTitle>
           <DialogDescription className="text-[13.5px]">{target?.kind === "room" ? target.context : "ชื่อที่ใช้แสดงในระบบ"}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} noValidate className="space-y-3">
@@ -138,11 +151,25 @@ export function RenameDialog({ target, onOpenChange, onSaved, fetchFresh }: Rena
             <Input id="rename-name" value={name} onChange={(e) => setName(e.target.value)} className="h-11" aria-describedby="rename-hint" autoFocus />
             <p id="rename-hint" className="text-xs text-muted-foreground">เปลี่ยนชื่อที่แสดง โดยตำแหน่งในผังและอุปกรณ์ยังอยู่ที่เดิม</p>
           </div>
+          {building && (
+            <div className="space-y-1.5">
+              <FieldLabel id="building-type-label" required>ประเภทอาคาร</FieldLabel>
+              <Select value={typeId} onValueChange={setTypeId}>
+                <SelectTrigger aria-labelledby="building-type-label" aria-describedby="building-type-hint" className="h-11 w-full data-[size=default]:h-11">
+                  <SelectValue placeholder="เลือกประเภทอาคาร" />
+                </SelectTrigger>
+                <SelectContent>
+                  {buildingTypes.filter((t) => t.isActive || t.id === typeId).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p id="building-type-hint" className="text-xs text-muted-foreground">เปลี่ยนประเภทแล้วมีผลกับงานแจ้งใหม่เท่านั้น</p>
+            </div>
+          )}
           <DialogFooter className="-mx-5 -mb-5 px-5">
             <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>ยกเลิก</Button>
             <Button type="submit" disabled={busy || !!conflict}>
               {busy && <Loader2 className="animate-spin" aria-hidden />}
-              บันทึกชื่อ
+              {building ? "บันทึก" : "บันทึกชื่อ"}
             </Button>
           </DialogFooter>
         </form>

@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Box, ChevronRight, DoorOpen, Lock, MoreHorizontal, Pencil, Plus, Power, Search, Tags } from "lucide-react";
+import { AlertCircle, Box, Building2, ChevronRight, DoorOpen, Lock, MoreHorizontal, Pencil, Plus, Power, Search, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { AssetIcon } from "@/components/shared/asset-icon";
 import { useCurrentUser } from "@/components/shared/me-provider";
@@ -24,37 +24,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { can, PERM } from "@/lib/platform/permissions";
 import { cn } from "@/lib/utils";
-import { getAssetTypes, getPlanBuildings, getRoomAssets, updateAsset } from "../../api";
-import type { AssetAdmin, AssetTypeAdmin, PlanBuilding } from "../../types";
+import { Badge } from "@/components/ui/badge";
+import { getAssetTypes, getBuildingTypes, getPlanBuildings, getRoomAssets, updateAsset } from "../../api";
+import type { AssetAdmin, AssetTypeAdmin, BuildingTypeAdmin, PlanBuilding } from "../../types";
+import { BuildingTypeDialog, BuildingTypesPanel } from "./building-types";
 import { SettingsHeading } from "../settings-heading";
 import { errorCode, GENERIC_ERROR, panelClass, sheetOnMobile } from "../settings-ui";
 import { AssetDialog, type AssetDialogTarget } from "./asset-dialog";
 import { AssetTypeDialog, mountLabel, RenameDialog, type RenameTarget } from "./place-dialogs";
 
 // S20 อาคารและอุปกรณ์ (F26; spec screens/S20-buildings.md, CR-001 / CR-002; design CR-001-admin-settings.html#places).
-// `?tab=assets|asset-types`, selection `?building=&floor=&room=` (replace, no history entry). Structure comes from the
+// `?tab=assets|asset-types|building-types` (CR-005), selection `?building=&floor=&room=` (replace, no history entry). Structure comes from the
 // building plan: nothing here creates, deletes, reorders or deactivates buildings, floors or rooms.
 
-type Tab = "assets" | "asset-types";
+type Tab = "assets" | "asset-types" | "building-types";
 
 const SUBTITLE: Record<Tab, string> = {
   assets: "เลือกห้องจากผัง แล้วจัดการอุปกรณ์ที่ติดตั้งในห้องนั้น",
   "asset-types": "จัดการประเภทอุปกรณ์ที่เลือกใช้ร่วมกันได้ในทุกอาคาร",
+  "building-types": "กำหนดประเภทอาคาร และหมวดงานที่แจ้งซ่อมได้ในอาคารแต่ละประเภท",
 };
 
 export function PlacesScreen() {
   const me = useCurrentUser();
   const pathname = usePathname();
   const search = useSearchParams();
-  const tab: Tab = search.get("tab") === "asset-types" ? "asset-types" : "assets";
   const canRename = can(me, PERM.settingsLocations);
   const canAssets = can(me, PERM.settingsAssets);
+  const tabParam = search.get("tab");
+  const tab: Tab = tabParam === "asset-types" && canAssets ? "asset-types" : tabParam === "building-types" && canRename ? "building-types" : "assets";
 
   const [tree, setTree] = useState<PlanBuilding[]>();
   const [types, setTypes] = useState<AssetTypeAdmin[]>();
   const [error, setError] = useState<unknown>();
   const [revision, setRevision] = useState(0);
   const [typeDialog, setTypeDialog] = useState<AssetTypeAdmin | "new" | null>(null);
+  const [buildingTypes, setBuildingTypes] = useState<BuildingTypeAdmin[]>();
+  const [btDialog, setBtDialog] = useState<BuildingTypeAdmin | "new" | null>(null);
 
   function setParams(next: Record<string, string | null>) {
     // the current URL (not this render's copy); native history updates it synchronously and Next syncs useSearchParams
@@ -68,16 +74,25 @@ export function PlacesScreen() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([getPlanBuildings(), canAssets ? getAssetTypes() : Promise.resolve([] as AssetTypeAdmin[])]).then(
-      ([t, ty]) => { if (active) { setTree(t); setTypes(ty); setError(undefined); } },
+    Promise.all([
+      getPlanBuildings(),
+      canAssets ? getAssetTypes() : Promise.resolve([] as AssetTypeAdmin[]),
+      canRename ? getBuildingTypes() : Promise.resolve([] as BuildingTypeAdmin[]),
+    ]).then(
+      ([t, ty, bt]) => { if (active) { setTree(t); setTypes(ty); setBuildingTypes(bt); setError(undefined); } },
       (err: unknown) => { if (active) setError(err); },
     );
     return () => { active = false; };
-  }, [revision, canAssets]);
+  }, [revision, canAssets, canRename]);
 
   async function reloadTree() {
     const t = await getPlanBuildings();
     setTree(t);
+    return t;
+  }
+  async function reloadBuildingTypes() {
+    const t = await getBuildingTypes();
+    setBuildingTypes(t);
     return t;
   }
   async function reloadTypes() {
@@ -92,6 +107,8 @@ export function PlacesScreen() {
       subtitle={SUBTITLE[tab]}
       action={tab === "asset-types" && canAssets && types ? (
         <Button className="h-11 px-4" onClick={() => setTypeDialog("new")}><Plus aria-hidden />เพิ่มประเภทอุปกรณ์</Button>
+      ) : tab === "building-types" && buildingTypes ? (
+        <Button className="h-11 px-4" onClick={() => setBtDialog("new")}><Plus aria-hidden />เพิ่มประเภทอาคาร</Button>
       ) : undefined}
     />
   );
@@ -122,10 +139,23 @@ export function PlacesScreen() {
             <span className="rounded-md bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">{types?.length ?? "–"}</span>
           </TabButton>
         )}
+        {canRename && (
+          <TabButton active={tab === "building-types"} onClick={() => setParams({ tab: "building-types" })} icon={Building2}>
+            ประเภทอาคาร
+            <span className="rounded-md bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">{buildingTypes?.length ?? "–"}</span>
+          </TabButton>
+        )}
       </div>
 
-      {!tree || !types ? (
+      {!tree || !types || !buildingTypes ? (
         <PanelSkeleton />
+      ) : tab === "building-types" ? (
+        <BuildingTypesPanel
+          types={buildingTypes}
+          onAdd={() => setBtDialog("new")}
+          onRename={setBtDialog}
+          onChanged={() => { reloadBuildingTypes().catch(() => undefined); }}
+        />
       ) : tab === "asset-types" ? (
         <TypesPanel types={types} onAdd={() => setTypeDialog("new")} onEdit={setTypeDialog} />
       ) : tree.length === 0 || tree.every((b) => b.floors.length === 0) ? (
@@ -141,6 +171,8 @@ export function PlacesScreen() {
           search={search}
           setParams={setParams}
           reloadTree={reloadTree}
+          buildingTypes={buildingTypes}
+          onBuildingSaved={() => { reloadBuildingTypes().catch(() => undefined); }}
           onTypeAdded={() => { reloadTypes().catch(() => undefined); }}
         />
       )}
@@ -150,6 +182,12 @@ export function PlacesScreen() {
         onOpenChange={(o) => !o && setTypeDialog(null)}
         onSaved={() => { setTypeDialog(null); reloadTypes().catch(() => undefined); }}
         fetchFresh={async (id) => (await reloadTypes()).find((t) => t.id === id) ?? null}
+      />
+      <BuildingTypeDialog
+        target={btDialog}
+        onOpenChange={(o) => !o && setBtDialog(null)}
+        onSaved={() => { setBtDialog(null); reloadBuildingTypes().catch(() => undefined); }}
+        fetchFresh={async (id) => (await reloadBuildingTypes()).find((t) => t.id === id) ?? null}
       />
     </>
   );
@@ -196,10 +234,12 @@ type AssetsTabProps = {
   search: { get(name: string): string | null };
   setParams: (next: Record<string, string | null>) => void;
   reloadTree: () => Promise<PlanBuilding[]>;
+  buildingTypes: BuildingTypeAdmin[];
+  onBuildingSaved: () => void;
   onTypeAdded: () => void;
 };
 
-function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloadTree, onTypeAdded }: AssetsTabProps) {
+function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloadTree, buildingTypes, onBuildingSaved, onTypeAdded }: AssetsTabProps) {
   // Selection from the URL with fallbacks: first building, its bottom floor, that floor's first room.
   const building = tree.find((b) => b.id === search.get("building")) ?? tree.find((b) => b.floors.length > 0) ?? tree[0];
   const floor = building.floors.find((f) => f.id === search.get("floor")) ?? building.floors[0];
@@ -290,9 +330,9 @@ function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloa
           <div className="flex items-center justify-between">
             <span id="nav-building" className="text-[13px] font-medium">อาคาร</span>
             {canRename && (
-              <button type="button" onClick={() => setRename({ kind: "building", id: building.id, name: building.name, updatedAt: building.updatedAt })}
+              <button type="button" onClick={() => setRename({ kind: "building", id: building.id, name: building.name, updatedAt: building.updatedAt, buildingTypeId: building.buildingType.id })}
                 className="inline-flex min-h-9 items-center gap-1 rounded-md px-1 text-[13px] text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30">
-                <Pencil className="size-3.5" aria-hidden />แก้ชื่อ
+                <Pencil className="size-3.5" aria-hidden />แก้ไขอาคาร
               </button>
             )}
           </div>
@@ -300,6 +340,7 @@ function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloa
             <SelectTrigger aria-labelledby="nav-building" className="h-11 w-full bg-card data-[size=default]:h-11"><SelectValue /></SelectTrigger>
             <SelectContent>{tree.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
           </Select>
+          <Badge variant="outline" className="font-normal text-muted-foreground" data-testid="building-type-tag">{building.buildingType.name}</Badge>
         </div>
         <div className="space-y-1.5">
           <span id="nav-floor" className="text-[13px] font-medium">ชั้น</span>
@@ -471,7 +512,8 @@ function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloa
       <RenameDialog
         target={rename}
         onOpenChange={(o) => !o && setRename(null)}
-        onSaved={() => { setRename(null); reloadTree().catch(() => undefined); }}
+        onSaved={() => { setRename(null); reloadTree().catch(() => undefined); onBuildingSaved(); }}
+        buildingTypes={buildingTypes}
         fetchFresh={async (t) => {
           const fresh = await reloadTree();
           if (t.kind === "building") return fresh.find((b) => b.id === t.id) ?? null;

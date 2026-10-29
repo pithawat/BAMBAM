@@ -3,7 +3,6 @@ package locations
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -58,8 +57,21 @@ func (r *PgRepository) Tree(ctx context.Context) ([]Building, error) {
 		if ff == nil {
 			ff = []Floor{}
 		}
-		out = append(out, Building{ID: b.ID, Name: b.Name, UpdatedAt: b.UpdatedAt, Floors: ff,
+		out = append(out, Building{ID: b.ID, Name: b.Name, Type: TypeRef{ID: b.BuildingTypeID, Name: b.BuildingTypeName}, UpdatedAt: b.UpdatedAt, Floors: ff,
 			UpdatedBy: people.NewRef(b.UpdatedByUserID, b.UpdatedByEmployeeCode, b.UpdatedByFirstNameTh, b.UpdatedByLastNameTh, b.UpdatedByFirstNameEn, b.UpdatedByLastNameEn, b.UpdatedByDepartment)})
+	}
+	return out, nil
+}
+
+func (r *PgRepository) Types(ctx context.Context) ([]BuildingType, error) {
+	rows, err := r.q.ListBuildingTypes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]BuildingType, 0, len(rows))
+	for _, x := range rows {
+		out = append(out, BuildingType{ID: x.ID, Name: x.Name, SortOrder: x.SortOrder, IsActive: x.IsActive, BuildingCount: x.BuildingCount, UpdatedAt: x.UpdatedAt,
+			UpdatedBy: people.NewRef(x.UpdatedByUserID, x.UpdatedByEmployeeCode, x.UpdatedByFirstNameTh, x.UpdatedByLastNameTh, x.UpdatedByFirstNameEn, x.UpdatedByLastNameEn, x.UpdatedByDepartment)})
 	}
 	return out, nil
 }
@@ -86,20 +98,57 @@ type pgTx struct {
 	q  *platformdb.Queries
 }
 
-func (t *pgTx) LockBuilding(ctx context.Context, id uuid.UUID) (string, time.Time, error) {
+func (t *pgTx) LockBuilding(ctx context.Context, id uuid.UUID) (LockedBuilding, error) {
 	row, err := t.q.LockBuilding(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", time.Time{}, ErrBuildingNotFound
+		return LockedBuilding{}, ErrBuildingNotFound
 	}
-	return row.Name, row.UpdatedAt, err
+	if err != nil {
+		return LockedBuilding{}, err
+	}
+	return LockedBuilding{Name: row.Name, UpdatedAt: row.UpdatedAt, Type: TypeRef{ID: row.BuildingTypeID, Name: row.BuildingTypeName}}, nil
 }
 
 func (t *pgTx) BuildingNameTaken(ctx context.Context, name string, self uuid.UUID) (bool, error) {
 	return t.q.BuildingNameTaken(ctx, platformdb.BuildingNameTakenParams{Name: name, SelfID: self})
 }
 
-func (t *pgTx) RenameBuilding(ctx context.Context, id uuid.UUID, name string, actor uuid.UUID) error {
-	return t.q.RenameBuilding(ctx, platformdb.RenameBuildingParams{ID: id, Name: name, ActorID: &actor})
+func (t *pgTx) ActiveType(ctx context.Context, id uuid.UUID) (TypeRef, bool, error) {
+	row, err := t.q.GetActiveBuildingType(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return TypeRef{}, false, nil
+	}
+	if err != nil {
+		return TypeRef{}, false, err
+	}
+	return TypeRef{ID: row.ID, Name: row.Name}, true, nil
+}
+
+func (t *pgTx) UpdateBuilding(ctx context.Context, id uuid.UUID, name string, typeID, actor uuid.UUID) error {
+	return t.q.UpdateBuilding(ctx, platformdb.UpdateBuildingParams{ID: id, Name: name, BuildingTypeID: typeID, ActorID: &actor})
+}
+
+func (t *pgTx) LockType(ctx context.Context, id uuid.UUID) (LockedType, error) {
+	row, err := t.q.LockBuildingType(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return LockedType{}, ErrTypeNotFound
+	}
+	if err != nil {
+		return LockedType{}, err
+	}
+	return LockedType{Name: row.Name, IsActive: row.IsActive, InUse: row.InUse, UpdatedAt: row.UpdatedAt}, nil
+}
+
+func (t *pgTx) TypeNameTaken(ctx context.Context, name string, self uuid.UUID) (bool, error) {
+	return t.q.BuildingTypeNameTaken(ctx, platformdb.BuildingTypeNameTakenParams{Name: name, SelfID: self})
+}
+
+func (t *pgTx) InsertType(ctx context.Context, id uuid.UUID, name string, actor uuid.UUID) error {
+	return t.q.InsertBuildingType(ctx, platformdb.InsertBuildingTypeParams{ID: id, Name: name, ActorID: &actor})
+}
+
+func (t *pgTx) UpdateType(ctx context.Context, id uuid.UUID, name string, active bool, actor uuid.UUID) error {
+	return t.q.UpdateBuildingType(ctx, platformdb.UpdateBuildingTypeParams{ID: id, Name: name, IsActive: active, ActorID: &actor})
 }
 
 func (t *pgTx) LockRoom(ctx context.Context, id uuid.UUID) (LockedRoom, error) {

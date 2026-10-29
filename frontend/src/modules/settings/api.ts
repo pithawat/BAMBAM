@@ -22,7 +22,10 @@ import {
   mockCreateAsset,
   mockCreateAssetType,
   mockPlanBuildings,
-  mockRenameBuilding,
+  mockUpdateBuilding,
+  mockBuildingTypes,
+  mockCreateBuildingType,
+  mockUpdateBuildingType,
   mockRenameRoom,
   mockRoomAssets,
   mockSuggestCode,
@@ -59,6 +62,10 @@ import type {
   PlanBuilding,
   PlanRoom,
   RenameInput,
+  UpdateBuildingInput,
+  BuildingTypeAdmin,
+  CreateBuildingTypeInput,
+  UpdateBuildingTypeInput,
   RoomAssetsQuery,
   UpdateAssetInput,
   UpdateAssetTypeInput,
@@ -170,10 +177,31 @@ export async function getPlanBuildings(): Promise<PlanBuilding[]> {
   return http.get<PlanBuilding[]>(`${BASE}/buildings`);
 }
 
-/** #15 PATCH /settings/buildings/{id} — rename. Errors: VALIDATION_FAILED, BUILDING_NOT_FOUND, NAME_TAKEN, VERSION_CONFLICT. */
-export async function renameBuilding(id: string, input: RenameInput): Promise<PlanBuilding> {
-  if (env.useMocks) return mockWrite(() => mockRenameBuilding(id, input, mockActor()), PERM.settingsLocations);
+/**
+ * #15 PATCH /settings/buildings/{id} — rename + (CR-005) building type. Errors: VALIDATION_FAILED (name,
+ * buildingTypeId REQUIRED / INVALID), BUILDING_NOT_FOUND, NAME_TAKEN, VERSION_CONFLICT.
+ */
+export async function updateBuilding(id: string, input: UpdateBuildingInput): Promise<PlanBuilding> {
+  if (env.useMocks) return mockWrite(() => mockUpdateBuilding(id, input, mockActor()), PERM.settingsLocations);
   return http.patch<PlanBuilding>(`${BASE}/buildings/${id}`, input);
+}
+
+/** #53 GET /settings/building-types — all types (active first) with building counts and their categories. */
+export async function getBuildingTypes(): Promise<BuildingTypeAdmin[]> {
+  if (env.useMocks) return mockRead(mockBuildingTypes, PERM.settingsLocations, PERM.settingsCategories);
+  return http.get<BuildingTypeAdmin[]>(`${BASE}/building-types`);
+}
+
+/** #54 POST /settings/building-types. Errors: VALIDATION_FAILED (name, categoryIds INVALID), NAME_TAKEN. */
+export async function createBuildingType(input: CreateBuildingTypeInput): Promise<BuildingTypeAdmin> {
+  if (env.useMocks) return mockWrite(() => mockCreateBuildingType(input, mockActor()), PERM.settingsLocations);
+  return http.post<BuildingTypeAdmin>(`${BASE}/building-types`, input);
+}
+
+/** #55 PATCH /settings/building-types/{id}. Errors: as #54 + BUILDING_TYPE_NOT_FOUND, VERSION_CONFLICT, IN_USE (deactivate while an active building has it). */
+export async function updateBuildingType(id: string, input: UpdateBuildingTypeInput): Promise<BuildingTypeAdmin> {
+  if (env.useMocks) return mockWrite(() => mockUpdateBuildingType(id, input, mockActor()), PERM.settingsLocations);
+  return http.patch<BuildingTypeAdmin>(`${BASE}/building-types/${id}`, input);
 }
 
 /** #27 PATCH /settings/rooms/{id} — rename. Errors: VALIDATION_FAILED, ROOM_NOT_FOUND, NAME_TAKEN, VERSION_CONFLICT. */
@@ -232,13 +260,13 @@ export async function getCategories(): Promise<CategoryAdmin[]> {
   return http.get<CategoryAdmin[]>(`${BASE}/categories`);
 }
 
-/** #33 POST /settings/categories. Errors: VALIDATION_FAILED (name / icon / defaultPriority / areaTypes), NAME_TAKEN. */
+/** #33 POST /settings/categories. Errors: VALIDATION_FAILED (name / icon / defaultPriority / buildingTypeIds MIN_ITEMS|INVALID), NAME_TAKEN. */
 export async function createCategory(input: CreateCategoryInput): Promise<CategoryAdmin> {
   if (env.useMocks) return mockWrite(() => mockCreateCategory(input, mockActor()), PERM.settingsCategories);
   return http.post<CategoryAdmin>(`${BASE}/categories`, input);
 }
 
-/** #34 PATCH /settings/categories/{id}. Errors: as #33 + CATEGORY_NOT_FOUND, VERSION_CONFLICT. */
+/** #34 PATCH /settings/categories/{id}. Errors: as #33 (+ buildingTypeIds NOT_ALLOWED on "อื่น ๆ") + CATEGORY_NOT_FOUND, VERSION_CONFLICT. */
 export async function updateCategory(id: string, input: UpdateCategoryInput): Promise<CategoryAdmin> {
   if (env.useMocks) return mockWrite(() => mockUpdateCategory(id, input, mockActor()), PERM.settingsCategories);
   return http.patch<CategoryAdmin>(`${BASE}/categories/${id}`, input);

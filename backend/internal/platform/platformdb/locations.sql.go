@@ -28,6 +28,38 @@ func (q *Queries) BuildingNameTaken(ctx context.Context, arg BuildingNameTakenPa
 	return column_1, err
 }
 
+const buildingTypeNameTaken = `-- name: BuildingTypeNameTaken :one
+SELECT EXISTS (SELECT 1 FROM platform.building_types WHERE lower(name) = lower($1::text) AND id <> $2)::boolean
+`
+
+type BuildingTypeNameTakenParams struct {
+	Name   string
+	SelfID uuid.UUID
+}
+
+func (q *Queries) BuildingTypeNameTaken(ctx context.Context, arg BuildingTypeNameTakenParams) (bool, error) {
+	row := q.db.QueryRow(ctx, buildingTypeNameTaken, arg.Name, arg.SelfID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getActiveBuildingType = `-- name: GetActiveBuildingType :one
+SELECT id, name FROM platform.building_types WHERE id = $1 AND is_active
+`
+
+type GetActiveBuildingTypeRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+func (q *Queries) GetActiveBuildingType(ctx context.Context, id uuid.UUID) (GetActiveBuildingTypeRow, error) {
+	row := q.db.QueryRow(ctx, getActiveBuildingType, id)
+	var i GetActiveBuildingTypeRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const getRoomPlace = `-- name: GetRoomPlace :one
 SELECT r.id, r.floor_id, r.name, f.name AS floor_name, b.id AS building_id, b.name AS building_name
 FROM platform.rooms r
@@ -60,14 +92,97 @@ func (q *Queries) GetRoomPlace(ctx context.Context, id uuid.UUID) (GetRoomPlaceR
 	return i, err
 }
 
+const insertBuildingType = `-- name: InsertBuildingType :exec
+INSERT INTO platform.building_types (id, name, sort_order, updated_by_id)
+VALUES ($1, $2, (SELECT coalesce(max(sort_order), 0) + 1 FROM platform.building_types), $3)
+`
+
+type InsertBuildingTypeParams struct {
+	ID      uuid.UUID
+	Name    string
+	ActorID *uuid.UUID
+}
+
+// A new type goes last.
+func (q *Queries) InsertBuildingType(ctx context.Context, arg InsertBuildingTypeParams) error {
+	_, err := q.db.Exec(ctx, insertBuildingType, arg.ID, arg.Name, arg.ActorID)
+	return err
+}
+
+const listBuildingTypes = `-- name: ListBuildingTypes :many
+
+SELECT t.id, t.name, t.sort_order, t.is_active, t.updated_at,
+       (SELECT count(*) FROM platform.buildings b WHERE b.building_type_id = t.id AND b.is_active)::bigint AS building_count,
+       ub.id AS updated_by_user_id, ub.employee_code AS updated_by_employee_code,
+       ub.first_name_th AS updated_by_first_name_th, ub.last_name_th AS updated_by_last_name_th,
+       ub.first_name_en AS updated_by_first_name_en, ub.last_name_en AS updated_by_last_name_en,
+       ub.department AS updated_by_department
+FROM platform.building_types t
+LEFT JOIN platform.users ub ON ub.id = t.updated_by_id
+ORDER BY t.is_active DESC, t.sort_order, t.name
+`
+
+type ListBuildingTypesRow struct {
+	ID                    uuid.UUID
+	Name                  string
+	SortOrder             int32
+	IsActive              bool
+	UpdatedAt             time.Time
+	BuildingCount         int64
+	UpdatedByUserID       *uuid.UUID
+	UpdatedByEmployeeCode *string
+	UpdatedByFirstNameTh  *string
+	UpdatedByLastNameTh   *string
+	UpdatedByFirstNameEn  *string
+	UpdatedByLastNameEn   *string
+	UpdatedByDepartment   *string
+}
+
+// Building types (settings Stage 4P, CR-005, #53–#55). Which categories a type uses lives in repair.
+// All types, active first, in sort_order; building_count = active buildings of the type.
+func (q *Queries) ListBuildingTypes(ctx context.Context) ([]ListBuildingTypesRow, error) {
+	rows, err := q.db.Query(ctx, listBuildingTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBuildingTypesRow
+	for rows.Next() {
+		var i ListBuildingTypesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.SortOrder,
+			&i.IsActive,
+			&i.UpdatedAt,
+			&i.BuildingCount,
+			&i.UpdatedByUserID,
+			&i.UpdatedByEmployeeCode,
+			&i.UpdatedByFirstNameTh,
+			&i.UpdatedByLastNameTh,
+			&i.UpdatedByFirstNameEn,
+			&i.UpdatedByLastNameEn,
+			&i.UpdatedByDepartment,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlanBuildings = `-- name: ListPlanBuildings :many
 
-SELECT b.id, b.name, b.updated_at,
+SELECT b.id, b.name, b.updated_at, bt.id AS building_type_id, bt.name AS building_type_name,
        ub.id AS updated_by_user_id, ub.employee_code AS updated_by_employee_code,
        ub.first_name_th AS updated_by_first_name_th, ub.last_name_th AS updated_by_last_name_th,
        ub.first_name_en AS updated_by_first_name_en, ub.last_name_en AS updated_by_last_name_en,
        ub.department AS updated_by_department
 FROM platform.buildings b
+JOIN platform.building_types bt ON bt.id = b.building_type_id
 LEFT JOIN platform.users ub ON ub.id = b.updated_by_id
 WHERE b.is_active
 ORDER BY b.sort_order, b.name
@@ -77,6 +192,8 @@ type ListPlanBuildingsRow struct {
 	ID                    uuid.UUID
 	Name                  string
 	UpdatedAt             time.Time
+	BuildingTypeID        uuid.UUID
+	BuildingTypeName      string
 	UpdatedByUserID       *uuid.UUID
 	UpdatedByEmployeeCode *string
 	UpdatedByFirstNameTh  *string
@@ -101,6 +218,8 @@ func (q *Queries) ListPlanBuildings(ctx context.Context) ([]ListPlanBuildingsRow
 			&i.ID,
 			&i.Name,
 			&i.UpdatedAt,
+			&i.BuildingTypeID,
+			&i.BuildingTypeName,
 			&i.UpdatedByUserID,
 			&i.UpdatedByEmployeeCode,
 			&i.UpdatedByFirstNameTh,
@@ -225,19 +344,56 @@ func (q *Queries) ListPlanRooms(ctx context.Context) ([]ListPlanRoomsRow, error)
 }
 
 const lockBuilding = `-- name: LockBuilding :one
-SELECT id, name, updated_at FROM platform.buildings WHERE id = $1 AND is_active FOR UPDATE
+SELECT b.id, b.name, b.updated_at, b.building_type_id, bt.name AS building_type_name
+FROM platform.buildings b JOIN platform.building_types bt ON bt.id = b.building_type_id
+WHERE b.id = $1 AND b.is_active FOR UPDATE OF b
 `
 
 type LockBuildingRow struct {
-	ID        uuid.UUID
-	Name      string
-	UpdatedAt time.Time
+	ID               uuid.UUID
+	Name             string
+	UpdatedAt        time.Time
+	BuildingTypeID   uuid.UUID
+	BuildingTypeName string
 }
 
 func (q *Queries) LockBuilding(ctx context.Context, id uuid.UUID) (LockBuildingRow, error) {
 	row := q.db.QueryRow(ctx, lockBuilding, id)
 	var i LockBuildingRow
-	err := row.Scan(&i.ID, &i.Name, &i.UpdatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.UpdatedAt,
+		&i.BuildingTypeID,
+		&i.BuildingTypeName,
+	)
+	return i, err
+}
+
+const lockBuildingType = `-- name: LockBuildingType :one
+SELECT t.id, t.name, t.is_active, t.updated_at,
+       (EXISTS (SELECT 1 FROM platform.buildings b WHERE b.building_type_id = t.id AND b.is_active))::boolean AS in_use
+FROM platform.building_types t WHERE t.id = $1 FOR UPDATE
+`
+
+type LockBuildingTypeRow struct {
+	ID        uuid.UUID
+	Name      string
+	IsActive  bool
+	UpdatedAt time.Time
+	InUse     bool
+}
+
+func (q *Queries) LockBuildingType(ctx context.Context, id uuid.UUID) (LockBuildingTypeRow, error) {
+	row := q.db.QueryRow(ctx, lockBuildingType, id)
+	var i LockBuildingTypeRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.IsActive,
+		&i.UpdatedAt,
+		&i.InUse,
+	)
 	return i, err
 }
 
@@ -274,21 +430,6 @@ func (q *Queries) LockRoom(ctx context.Context, id uuid.UUID) (LockRoomRow, erro
 	return i, err
 }
 
-const renameBuilding = `-- name: RenameBuilding :exec
-UPDATE platform.buildings SET name = $1, updated_by_id = $2, updated_at = now() WHERE id = $3
-`
-
-type RenameBuildingParams struct {
-	Name    string
-	ActorID *uuid.UUID
-	ID      uuid.UUID
-}
-
-func (q *Queries) RenameBuilding(ctx context.Context, arg RenameBuildingParams) error {
-	_, err := q.db.Exec(ctx, renameBuilding, arg.Name, arg.ActorID, arg.ID)
-	return err
-}
-
 const renameRoom = `-- name: RenameRoom :exec
 UPDATE platform.rooms SET name = $1, updated_by_id = $2, updated_at = now() WHERE id = $3
 `
@@ -319,4 +460,47 @@ func (q *Queries) RoomNameTaken(ctx context.Context, arg RoomNameTakenParams) (b
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const updateBuilding = `-- name: UpdateBuilding :exec
+UPDATE platform.buildings SET name = $1, building_type_id = $2, updated_by_id = $3, updated_at = now() WHERE id = $4
+`
+
+type UpdateBuildingParams struct {
+	Name           string
+	BuildingTypeID uuid.UUID
+	ActorID        *uuid.UUID
+	ID             uuid.UUID
+}
+
+// #15: rename and (CR-005) change the building type.
+func (q *Queries) UpdateBuilding(ctx context.Context, arg UpdateBuildingParams) error {
+	_, err := q.db.Exec(ctx, updateBuilding,
+		arg.Name,
+		arg.BuildingTypeID,
+		arg.ActorID,
+		arg.ID,
+	)
+	return err
+}
+
+const updateBuildingType = `-- name: UpdateBuildingType :exec
+UPDATE platform.building_types SET name = $1, is_active = $2, updated_by_id = $3, updated_at = now() WHERE id = $4
+`
+
+type UpdateBuildingTypeParams struct {
+	Name     string
+	IsActive bool
+	ActorID  *uuid.UUID
+	ID       uuid.UUID
+}
+
+func (q *Queries) UpdateBuildingType(ctx context.Context, arg UpdateBuildingTypeParams) error {
+	_, err := q.db.Exec(ctx, updateBuildingType,
+		arg.Name,
+		arg.IsActive,
+		arg.ActorID,
+		arg.ID,
+	)
+	return err
 }

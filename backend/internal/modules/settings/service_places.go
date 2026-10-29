@@ -16,8 +16,11 @@ import (
 // Locations is the platform building plan: the active tree and renames.
 type Locations interface {
 	Tree(ctx context.Context) ([]locations.Building, error)
-	RenameBuilding(ctx context.Context, actor, id uuid.UUID, name string, updatedAt time.Time) (locations.Building, error)
+	UpdateBuilding(ctx context.Context, actor, id uuid.UUID, in locations.BuildingInput) (locations.Building, error)
 	RenameRoom(ctx context.Context, actor, id uuid.UUID, name string, updatedAt time.Time) (locations.Room, error)
+	Types(ctx context.Context) ([]locations.BuildingType, error)
+	CreateType(ctx context.Context, actor uuid.UUID, name string) (locations.BuildingType, error)
+	UpdateType(ctx context.Context, actor, id uuid.UUID, in locations.TypeInput) (locations.BuildingType, error)
 }
 
 // Assets is the platform equipment service.
@@ -44,12 +47,88 @@ func (s *Service) Buildings(ctx context.Context, v Viewer) ([]locations.Building
 	return s.locations.Tree(ctx)
 }
 
-// RenameBuilding implements #15.
-func (s *Service) RenameBuilding(ctx context.Context, v Viewer, id uuid.UUID, name string, updatedAt time.Time) (locations.Building, error) {
+// UpdateBuilding implements #15 (rename, CR-005 building type).
+func (s *Service) UpdateBuilding(ctx context.Context, v Viewer, id uuid.UUID, in locations.BuildingInput) (locations.Building, error) {
 	if !v.Can(PermLocations) {
 		return locations.Building{}, apperr.ErrForbidden
 	}
-	return s.locations.RenameBuilding(ctx, v.ID, id, name, updatedAt)
+	return s.locations.UpdateBuilding(ctx, v.ID, id, in)
+}
+
+// BuildingTypeAdmin is #53–#55's `BuildingTypeAdmin`: the platform type with the categories used in it (repair).
+type BuildingTypeAdmin struct {
+	locations.BuildingType
+	CategoryIDs []uuid.UUID
+}
+
+func (s *Service) withCategories(ctx context.Context, list []locations.BuildingType) ([]BuildingTypeAdmin, error) {
+	links, err := s.master.BuildingTypeCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]BuildingTypeAdmin, 0, len(list))
+	for _, t := range list {
+		ids := links[t.ID]
+		if ids == nil {
+			ids = []uuid.UUID{}
+		}
+		out = append(out, BuildingTypeAdmin{BuildingType: t, CategoryIDs: ids})
+	}
+	return out, nil
+}
+
+func (s *Service) oneWithCategories(ctx context.Context, t locations.BuildingType, err error) (BuildingTypeAdmin, error) {
+	if err != nil {
+		return BuildingTypeAdmin{}, err
+	}
+	list, err := s.withCategories(ctx, []locations.BuildingType{t})
+	if err != nil {
+		return BuildingTypeAdmin{}, err
+	}
+	return list[0], nil
+}
+
+// BuildingTypes implements #53 (S20 tab; S22 needs the names for its check boxes).
+func (s *Service) BuildingTypes(ctx context.Context, v Viewer) ([]BuildingTypeAdmin, error) {
+	if !v.Can(PermLocations) && !v.Can(PermCategories) {
+		return nil, apperr.ErrForbidden
+	}
+	list, err := s.locations.Types(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.withCategories(ctx, list)
+}
+
+// CreateBuildingType implements #54: categoryIds are checked first (repair), then the type is created (platform)
+// and used in those categories.
+func (s *Service) CreateBuildingType(ctx context.Context, v Viewer, name string, categoryIDs []uuid.UUID) (BuildingTypeAdmin, error) {
+	if !v.Can(PermLocations) {
+		return BuildingTypeAdmin{}, apperr.ErrForbidden
+	}
+	if _, err := locations.ValidTypeName(name); err != nil {
+		return BuildingTypeAdmin{}, err
+	}
+	if err := s.master.CheckTypeCategories(ctx, categoryIDs); err != nil {
+		return BuildingTypeAdmin{}, err
+	}
+	t, err := s.locations.CreateType(ctx, v.ID, name)
+	if err != nil {
+		return BuildingTypeAdmin{}, err
+	}
+	if err := s.master.LinkBuildingType(ctx, t.ID, categoryIDs); err != nil {
+		return BuildingTypeAdmin{}, err
+	}
+	return s.oneWithCategories(ctx, t, nil)
+}
+
+// UpdateBuildingType implements #55.
+func (s *Service) UpdateBuildingType(ctx context.Context, v Viewer, id uuid.UUID, in locations.TypeInput) (BuildingTypeAdmin, error) {
+	if !v.Can(PermLocations) {
+		return BuildingTypeAdmin{}, apperr.ErrForbidden
+	}
+	t, err := s.locations.UpdateType(ctx, v.ID, id, in)
+	return s.oneWithCategories(ctx, t, err)
 }
 
 // RenameRoom implements #27.

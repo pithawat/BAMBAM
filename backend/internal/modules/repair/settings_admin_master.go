@@ -58,7 +58,7 @@ type CategoryAdmin struct {
 	SortOrder          int32
 	DefaultPriority    string
 	IsOther            bool
-	BuildingTypeIDs    []uuid.UUID // CR-025; settings Stage 4P lets the admin edit them
+	BuildingTypeIDs    []uuid.UUID // CR-025 / settings CR-005: active types it is used in; empty for "อื่น ๆ" (every type)
 	SymptomCount       int64
 	ActiveSymptomCount int64
 	MasterMeta
@@ -82,10 +82,12 @@ type ContractorTypeAdmin struct {
 	MasterMeta
 }
 
-// CategoryInput is #33 (Name, Icon, DefaultPriority required) and #34 (nil = unchanged; UpdatedAt required).
+// CategoryInput is #33 (Name, Icon, DefaultPriority, BuildingTypeIDs required) and #34 (nil = unchanged;
+// UpdatedAt required).
 type CategoryInput struct {
 	Name, Icon, DefaultPriority *string
 	IsActive                    *bool
+	BuildingTypeIDs             *[]uuid.UUID // settings CR-005: ≥ 1 active type; not allowed on "อื่น ๆ"
 	UpdatedAt                   time.Time
 }
 
@@ -233,27 +235,92 @@ func validateCategory(in *CategoryInput, create bool) map[string]string {
 	}
 	oneOf(fields, "icon", in.Icon, CategoryIcons, create)
 	oneOf(fields, "defaultPriority", in.DefaultPriority, priorities, create)
+	if (create || in.BuildingTypeIDs != nil) && (in.BuildingTypeIDs == nil || len(*in.BuildingTypeIDs) == 0) {
+		fields["buildingTypeIds"] = "MIN_ITEMS"
+	}
 	return fields
 }
 
-// CreateCategory implements #33: name unique (case-insensitive), icon from the 12, default priority required; goes last.
+// typeNames maps the active building types to their names (in order) for checks and the audit diff.
+type typeNames struct {
+	order []uuid.UUID
+	name  map[uuid.UUID]string
+}
+
+func activeTypes(ctx context.Context, q *repairdb.Queries) (typeNames, error) {
+	rows, err := q.AdminActiveBuildingTypes(ctx)
+	if err != nil {
+		return typeNames{}, err
+	}
+	t := typeNames{name: map[uuid.UUID]string{}}
+	for _, r := range rows {
+		t.order = append(t.order, r.ID)
+		t.name[r.ID] = r.Name
+	}
+	return t, nil
+}
+
+// pick dedupes ids; ok=false when one is not an active type.
+func (t typeNames) pick(ids []uuid.UUID) ([]uuid.UUID, bool) {
+	seen := map[uuid.UUID]bool{}
+	out := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := t.name[id]; !ok {
+			return nil, false
+		}
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out, true
+}
+
+// label is the audit value of a set of types: their names in type order, comma-separated.
+func (t typeNames) label(ids []uuid.UUID) string {
+	names := []string{}
+	for _, id := range t.order {
+		if slices.Contains(ids, id) {
+			names = append(names, t.name[id])
+		}
+	}
+	return strings.Join(names, ", ")
+}
+
+func (a *SettingsAdmin) setCategoryTypes(ctx context.Context, q *repairdb.Queries, id uuid.UUID, ids []uuid.UUID) error {
+	if err := q.AdminClearCategoryActiveBuildingTypes(ctx, id); err != nil {
+		return err
+	}
+	return q.AdminInsertCategoryBuildingTypes(ctx, repairdb.AdminInsertCategoryBuildingTypesParams{CategoryID: id, BuildingTypeIds: ids})
+}
+
+// CreateCategory implements #33: name unique (case-insensitive), icon from the 12, default priority and ≥ 1 active
+// building type required; goes last.
 func (a *SettingsAdmin) CreateCategory(ctx context.Context, actor uuid.UUID, in CategoryInput) (CategoryAdmin, error) {
 	if fields := validateCategory(&in, true); len(fields) > 0 {
 		return CategoryAdmin{}, apperr.Validation(fields)
 	}
 	id := uuid.New()
 	err := a.inTx(ctx, func(q *repairdb.Queries, tx pgx.Tx) error {
+		types, err := activeTypes(ctx, q)
+		if err != nil {
+			return err
+		}
+		ids, ok := types.pick(*in.BuildingTypeIDs)
+		if !ok {
+			return apperr.Validation(map[string]string{"buildingTypeIds": "INVALID"})
+		}
 		if taken, err := q.AdminCategoryNameTaken(ctx, repairdb.AdminCategoryNameTakenParams{Name: *in.Name, SelfID: id}); err != nil || taken {
 			return orErrM(err, ErrMasterNameTaken)
 		}
 		if err := q.AdminInsertCategory(ctx, repairdb.AdminInsertCategoryParams{ID: id, Name: *in.Name, Icon: *in.Icon, DefaultPriority: *in.DefaultPriority, ActorID: &actor}); err != nil {
 			return err
 		}
-		// CR-025: visible in every building type until settings Stage 4P adds the pick.
-		if err := q.AdminInsertCategoryAllBuildingTypes(ctx, id); err != nil {
+		if err := a.setCategoryTypes(ctx, q, id, ids); err != nil {
 			return err
 		}
-		return audit.Write(ctx, tx, masterAudit(actor, "create", "category", id, *in.Name, nil, nil))
+		after := types.label(ids)
+		return audit.Write(ctx, tx, masterAudit(actor, "create", "category", id, *in.Name, nil, []audit.Change{{Field: "buildingTypes", After: &after}}))
 	})
 	if err != nil {
 		return CategoryAdmin{}, err
@@ -261,7 +328,8 @@ func (a *SettingsAdmin) CreateCategory(ctx context.Context, actor uuid.UUID, in 
 	return a.category(ctx, id)
 }
 
-// UpdateCategory implements #34: edit fields and / or (de)activate; the "อื่น ๆ" category is always active.
+// UpdateCategory implements #34: edit fields and / or (de)activate; the "อื่น ๆ" category is always active and used
+// in every building type (no buildingTypeIds). Replacing the types touches only active ones.
 func (a *SettingsAdmin) UpdateCategory(ctx context.Context, actor, id uuid.UUID, in CategoryInput) (CategoryAdmin, error) {
 	if fields := validateCategory(&in, false); len(fields) > 0 {
 		return CategoryAdmin{}, apperr.Validation(fields)
@@ -290,6 +358,36 @@ func (a *SettingsAdmin) UpdateCategory(ctx context.Context, actor, id uuid.UUID,
 		if cur.IsOther && !next.IsActive {
 			return apperr.Validation(map[string]string{"isActive": "INVALID"})
 		}
+		if cur.IsOther && in.BuildingTypeIDs != nil {
+			return apperr.Validation(map[string]string{"buildingTypeIds": "NOT_ALLOWED"})
+		}
+		var typeChange *audit.Change
+		var newTypes []uuid.UUID
+		if in.BuildingTypeIDs != nil {
+			types, err := activeTypes(ctx, q)
+			if err != nil {
+				return err
+			}
+			ids, ok := types.pick(*in.BuildingTypeIDs)
+			if !ok {
+				return apperr.Validation(map[string]string{"buildingTypeIds": "INVALID"})
+			}
+			links, err := q.AdminListBuildingTypeCategories(ctx)
+			if err != nil {
+				return err
+			}
+			var curTypes []uuid.UUID
+			for _, l := range links {
+				if l.CategoryID == id {
+					curTypes = append(curTypes, l.BuildingTypeID)
+				}
+			}
+			before, after := types.label(curTypes), types.label(ids)
+			if before != after {
+				typeChange = &audit.Change{Field: "buildingTypes", Before: &before, After: &after}
+				newTypes = ids
+			}
+		}
 		if next.Name != cur.Name {
 			if taken, err := q.AdminCategoryNameTaken(ctx, repairdb.AdminCategoryNameTakenParams{Name: next.Name, SelfID: id}); err != nil || taken {
 				return orErrM(err, ErrMasterNameTaken)
@@ -299,12 +397,20 @@ func (a *SettingsAdmin) UpdateCategory(ctx context.Context, actor, id uuid.UUID,
 		changes = diff(changes, "name", cur.Name, next.Name)
 		changes = diff(changes, "icon", cur.Icon, next.Icon)
 		changes = diff(changes, "defaultPriority", cur.DefaultPriority, next.DefaultPriority)
+		if typeChange != nil {
+			changes = append(changes, *typeChange)
+		}
 		action := editAction(changes, cur.IsActive, next.IsActive)
 		if action == "" {
 			return nil
 		}
 		if err := q.AdminUpdateCategory(ctx, next); err != nil {
 			return err
+		}
+		if newTypes != nil {
+			if err := a.setCategoryTypes(ctx, q, id, newTypes); err != nil {
+				return err
+			}
 		}
 		return audit.Write(ctx, tx, masterAudit(actor, action, "category", id, next.Name, nil, changes))
 	})

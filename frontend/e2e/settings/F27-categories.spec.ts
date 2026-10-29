@@ -31,7 +31,7 @@ test.describe("admin", () => {
       await dialog.getByLabel("ชื่อหมวดงาน").fill(name);
       await dialog.getByRole("radio", { name: "ประตู / อาคาร" }).click();
       await dialog.getByRole("radio", { name: "สูง" }).click();
-      await dialog.getByRole("button", { name: "พื้นที่ส่วนกลาง" }).click();
+      await dialog.getByRole("checkbox", { name: "อาคารสำนักงาน" }).check(); // CR-005: ≥ 1 building type
       await dialog.getByRole("button", { name: "เพิ่มหมวดงาน" }).click();
       await expect(page.getByText("เพิ่มหมวดงานแล้ว")).toBeVisible();
       await expect(page.getByRole("heading", { name, level: 2 })).toBeVisible();
@@ -86,7 +86,7 @@ test.describe("admin", () => {
       await expect(page.getByText(`ลบ "${name}" แล้ว`)).toBeVisible();
     } finally {
       psql(`DELETE FROM repair.symptoms WHERE category_id IN (SELECT id FROM repair.categories WHERE name = '${name}');
-            DELETE FROM repair.category_area_types WHERE category_id IN (SELECT id FROM repair.categories WHERE name = '${name}');
+            DELETE FROM repair.category_building_types WHERE category_id IN (SELECT id FROM repair.categories WHERE name = '${name}');
             DELETE FROM repair.categories WHERE name = '${name}';`);
     }
   });

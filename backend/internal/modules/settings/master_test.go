@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pithawat/BAMBAM/backend/internal/modules/repair"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/middleware"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/roles"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
@@ -64,6 +65,16 @@ func (f fakeMaster) UpdateContractorType(context.Context, uuid.UUID, uuid.UUID, 
 	return repair.ContractorTypeAdmin{ID: uuid.New()}, f.err
 }
 func (f fakeMaster) DeleteContractorType(context.Context, uuid.UUID, uuid.UUID) error { return f.err }
+func (f fakeMaster) BuildingTypeCategories(context.Context) (map[uuid.UUID][]uuid.UUID, error) {
+	return map[uuid.UUID][]uuid.UUID{officeType.ID: {sampleCategory.ID}}, nil
+}
+func (f fakeMaster) CheckTypeCategories(context.Context, []uuid.UUID) error { return f.err }
+func (f fakeMaster) LinkBuildingType(_ context.Context, _ uuid.UUID, ids []uuid.UUID) error {
+	if f.lastOrder != nil {
+		*f.lastOrder = ids
+	}
+	return nil
+}
 
 func routerWithMaster(role string, m fakeMaster) http.Handler {
 	gin.SetMode(gin.TestMode)
@@ -74,6 +85,8 @@ func routerWithMaster(role string, m fakeMaster) http.Handler {
 	RegisterRoutes(r.Group("/api/v1/settings", middleware.RequireAuth(fixedSession{p})), NewController(svc))
 	return r
 }
+
+var errOtherCategory = apperr.Validation(map[string]string{"categoryIds": "INVALID"})
 
 func TestMasterMapping(t *testing.T) {
 	cases := []struct {
@@ -91,11 +104,36 @@ func TestMasterMapping(t *testing.T) {
 		{"types badge", users.RoleSuperAdmin, "GET", "/contractor-types", "", fakeMaster{}, 200, `"createdByTechnician":true`},
 		{"admin has no contractor types", users.RoleAdmin, "GET", "/contractor-types", "", fakeMaster{}, 403, "FORBIDDEN"},
 		{"bad category id", users.RoleAdmin, "PATCH", "/categories/nope", `{}`, fakeMaster{}, 404, "CATEGORY_NOT_FOUND"},
+		{"category type ids", users.RoleAdmin, "GET", "/categories", "", fakeMaster{}, 200, `"buildingTypeIds":[]`},
+		{"bad building type id", users.RoleAdmin, "POST", "/categories", `{"name":"x","buildingTypeIds":["x"]}`, fakeMaster{}, 400, "buildingTypeIds"},
+		{"types with categories", users.RoleAdmin, "GET", "/building-types", "", fakeMaster{}, 200, `"categoryIds":["` + sampleCategory.ID.String() + `"]`},
+		{"type other category", users.RoleAdmin, "POST", "/building-types", `{"name":"โรงงาน","categoryIds":[]}`, fakeMaster{err: errOtherCategory}, 400, "categoryIds"},
+		{"type blank name", users.RoleAdmin, "POST", "/building-types", `{"name":" "}`, fakeMaster{}, 400, "REQUIRED"},
+		{"type needs updatedAt", users.RoleAdmin, "PATCH", "/building-types/:id", `{"isActive":false}`, fakeMaster{}, 400, "updatedAt"},
+		{"bad type id", users.RoleAdmin, "PATCH", "/building-types/nope", `{}`, fakeMaster{}, 404, "BUILDING_TYPE_NOT_FOUND"},
+		{"employee has no types", users.RoleEmployee, "GET", "/building-types", "", fakeMaster{}, 403, "FORBIDDEN"},
 	}
 	for _, tc := range cases {
 		w := callBody(routerWithMaster(tc.role, tc.m), tc.method, tc.path, tc.body)
 		if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s: %d %s", tc.name, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestCreateBuildingTypeLinksCategories(t *testing.T) {
+	var linked []uuid.UUID
+	r := routerWithMaster(users.RoleAdmin, fakeMaster{lastOrder: &linked})
+	w := callBody(r, "POST", "/building-types", `{"name":"โรงงาน","categoryIds":["`+sampleCategory.ID.String()+`"]}`)
+	if w.Code != http.StatusCreated || len(linked) != 1 || linked[0] != sampleCategory.ID || !strings.Contains(w.Body.String(), `"name":"โรงงาน"`) {
+		t.Errorf("%d %s linked=%v", w.Code, w.Body.String(), linked)
+	}
+	w = callBody(r, "PATCH", "/buildings/:id", `{"name":"อาคาร 1","buildingTypeId":"","updatedAt":"2026-10-20T03:00:00Z"}`)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"buildingTypeId":"REQUIRED"`) {
+		t.Errorf("empty type: %d %s", w.Code, w.Body.String())
+	}
+	w = callBody(r, "PATCH", "/buildings/:id", `{"name":"อาคาร 1","buildingTypeId":"`+officeType.ID.String()+`","updatedAt":"2026-10-20T03:00:00Z"}`)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"buildingType":{"id":"`+officeType.ID.String()+`","name":"อาคารสำนักงาน"}`) {
+		t.Errorf("type change: %d %s", w.Code, w.Body.String())
 	}
 }

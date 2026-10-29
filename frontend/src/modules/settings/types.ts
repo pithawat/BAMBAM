@@ -118,7 +118,7 @@ export type AuditAction =
   | "role_change" | "permissions_change" | "floor_plan_upload" | "floor_plan_delete";
 
 export type AuditEntityType =
-  | "building" | "floor" | "room" | "category" | "symptom" | "contractor_type" | "role" | "user" | "asset" | "asset_type";
+  | "building" | "floor" | "room" | "category" | "symptom" | "contractor_type" | "role" | "user" | "asset" | "asset_type" | "building_type";
 
 /** One `changes` item: `{field, before, after}` or (permissions) `{field, added, removed}`. */
 export type AuditChange = { field: string; before?: string; after?: string; added?: string[]; removed?: string[] };
@@ -157,11 +157,44 @@ export type PlanRoom = {
 /** Floors are bottom first (`level` ascending = the floor buttons); names are read-only. */
 export type PlanFloor = { id: string; name: string; level: number; rooms: PlanRoom[] };
 
-/** `PlanBuilding` (#13, #15 response): active buildings → floors → active rooms. */
-export type PlanBuilding = { id: string; name: string; updatedAt: string; updatedBy: PersonRef | null; floors: PlanFloor[] };
+/** `PlanBuilding` (#13, #15 response): active buildings → floors → active rooms. `buildingType` always set (CR-005). */
+export type PlanBuilding = {
+  id: string;
+  name: string;
+  buildingType: { id: string; name: string };
+  updatedAt: string;
+  updatedBy: PersonRef | null;
+  floors: PlanFloor[];
+};
 
-/** #15 / #27 body. */
+/** #27 body. */
 export type RenameInput = { name: string; updatedAt: string };
+
+/** #15 body: rename + (CR-005) an active building type; the S20 `แก้ไขอาคาร` dialog sends both. */
+export type UpdateBuildingInput = { name: string; buildingTypeId?: string; updatedAt: string };
+
+// ---- Stage 4P: building types (CR-005, #53–#55) ----
+
+/**
+ * `BuildingTypeAdmin` (#53–#55). `buildingCount` = active buildings of the type; `categoryIds` = categories used in
+ * it (the "อื่น ๆ" category is never listed — it is used everywhere).
+ */
+export type BuildingTypeAdmin = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  buildingCount: number;
+  categoryIds: string[];
+  updatedAt: string;
+  updatedBy: PersonRef | null;
+};
+
+/** #54 body. `categoryIds` may be empty (S20 ticks every active category by default). */
+export type CreateBuildingTypeInput = { name: string; categoryIds: string[] };
+
+/** #55 body: rename / (de)activate. Which categories a type uses is edited per category (#34 `buildingTypeIds`). */
+export type UpdateBuildingTypeInput = { name?: string; isActive?: boolean; updatedAt: string };
 
 /** Lucide icon names of an asset type (`components/shared/asset-icon.ts`). */
 export type AssetIconName = "box" | "air-vent" | "mic" | "speaker" | "tv" | "plug" | "droplets" | "armchair";
@@ -220,14 +253,15 @@ export type Priority = "critical" | "high" | "medium" | "low";
 /** `MasterItem`: `inUse` = referenced by a ticket / contractor ever → delete refused (deactivate instead). */
 export type MasterItem = { id: string; name: string; isActive: boolean; inUse: boolean; updatedAt: string; updatedBy: PersonRef | null };
 
-/** `Category` (#32–#36; + CR-008 `defaultPriority`, CR-014 `isOther` / `areaTypes`). */
+/** `Category` (#32–#36; + CR-008 `defaultPriority`, CR-014 `isOther`, CR-005 `buildingTypeIds`). */
 export type CategoryAdmin = MasterItem & {
   icon: string;
   sortOrder: number;
   defaultPriority: Priority;
   /** The "อื่น ๆ" category: always active, never deleted. */
   isOther: boolean;
-  areaTypes: PlanRoom["areaType"][];
+  /** Active building types it is used in (CR-005, replaces `areaTypes`); empty for `isOther` = every type. */
+  buildingTypeIds: string[];
   symptomCount: number;
   activeSymptomCount: number;
 };
@@ -244,10 +278,13 @@ export type ContractorTypeAdmin = MasterItem & {
   createdByTechnician: boolean;
 };
 
-/** #33 body. */
-export type CreateCategoryInput = { name: string; icon: string; defaultPriority: Priority; areaTypes?: PlanRoom["areaType"][] };
-/** #34 body: only the changing fields + `updatedAt`; `isActive` alone = (de)activate. */
-export type UpdateCategoryInput = { name?: string; icon?: string; defaultPriority?: Priority; areaTypes?: PlanRoom["areaType"][]; isActive?: boolean; updatedAt: string };
+/** #33 body. `buildingTypeIds` ≥ 1 active type (400 `buildingTypeIds: MIN_ITEMS|INVALID`). */
+export type CreateCategoryInput = { name: string; icon: string; defaultPriority: Priority; buildingTypeIds: string[] };
+/**
+ * #34 body: only the changing fields + `updatedAt`; `isActive` alone = (de)activate. `buildingTypeIds` ≥ 1 when sent;
+ * never on the `isOther` category (400 `buildingTypeIds: NOT_ALLOWED`).
+ */
+export type UpdateCategoryInput = { name?: string; icon?: string; defaultPriority?: Priority; buildingTypeIds?: string[]; isActive?: boolean; updatedAt: string };
 /** #38 body. */
 export type CreateSymptomInput = { name: string; priority: Priority };
 /** #39 body. */
@@ -278,6 +315,7 @@ export type SettingsErrorCode =
   | "ROLE_NOT_FOUND"
   | "USER_NOT_FOUND"
   | "BUILDING_NOT_FOUND"
+  | "BUILDING_TYPE_NOT_FOUND"
   | "ROOM_NOT_FOUND"
   | "CATEGORY_NOT_FOUND"
   | "SYMPTOM_NOT_FOUND"

@@ -23,21 +23,21 @@ func masterItem(id, name string, m repair.MasterMeta) MasterItemResponse {
 	return MasterItemResponse{ID: id, Name: name, IsActive: m.IsActive, InUse: m.InUse, UpdatedAt: m.UpdatedAt.UTC(), UpdatedBy: m.UpdatedBy}
 }
 
-// CategoryResponse = `Category` (+ CR-008 defaultPriority, CR-014 isOther / areaTypes).
+// CategoryResponse = `Category` (+ CR-008 defaultPriority, CR-014 isOther, CR-005 buildingTypeIds).
 type CategoryResponse struct {
 	MasterItemResponse
 	Icon               string   `json:"icon"`
 	SortOrder          int32    `json:"sortOrder"`
 	DefaultPriority    string   `json:"defaultPriority"`
 	IsOther            bool     `json:"isOther"`
-	AreaTypes          []string `json:"areaTypes"` // always empty since repair CR-025; settings Stage 4P sends buildingTypeIds
+	BuildingTypeIDs    []string `json:"buildingTypeIds"`
 	SymptomCount       int64    `json:"symptomCount"`
 	ActiveSymptomCount int64    `json:"activeSymptomCount"`
 }
 
 func newCategoryResponse(c repair.CategoryAdmin) CategoryResponse {
 	return CategoryResponse{MasterItemResponse: masterItem(c.ID.String(), c.Name, c.MasterMeta), Icon: c.Icon, SortOrder: c.SortOrder,
-		DefaultPriority: c.DefaultPriority, IsOther: c.IsOther, AreaTypes: []string{}, SymptomCount: c.SymptomCount, ActiveSymptomCount: c.ActiveSymptomCount}
+		DefaultPriority: c.DefaultPriority, IsOther: c.IsOther, BuildingTypeIDs: idStrings(c.BuildingTypeIDs), SymptomCount: c.SymptomCount, ActiveSymptomCount: c.ActiveSymptomCount}
 }
 
 // SymptomResponse = `MasterItem` + sortOrder + priority (CR-008).
@@ -71,7 +71,7 @@ type CategoryRequest struct {
 	Name            *string    `json:"name"`
 	Icon            *string    `json:"icon"`
 	DefaultPriority *string    `json:"defaultPriority"`
-	AreaTypes       *[]string  `json:"areaTypes"` // ignored since repair CR-025 (no hint table); replaced in settings Stage 4P
+	BuildingTypeIDs *[]string  `json:"buildingTypeIds"`
 	IsActive        *bool      `json:"isActive"`
 	UpdatedAt       *time.Time `json:"updatedAt"`
 }

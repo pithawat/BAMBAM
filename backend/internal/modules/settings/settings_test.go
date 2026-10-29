@@ -140,7 +140,7 @@ func callBody(r http.Handler, method, path, body string) *httptest.ResponseRecor
 // BR-ALL-1 (CR-001): admin reaches only ข้อมูลกลาง (locations, assets, categories); super_admin
 // reaches every route; every other role gets 403 everywhere.
 func TestRoutePermissions(t *testing.T) {
-	adminRoutes := map[string]bool{"13": true, "15": true, "27": true, "46": true, "47": true, "48": true, "49": true, "50": true, "51": true, "52": true}
+	adminRoutes := map[string]bool{"13": true, "15": true, "27": true, "46": true, "47": true, "48": true, "49": true, "50": true, "51": true, "52": true, "53": true, "54": true, "55": true}
 	for n := 32; n <= 41; n++ {
 		adminRoutes[strconv.Itoa(n)] = true
 	}

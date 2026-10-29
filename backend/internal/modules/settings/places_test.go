@@ -27,8 +27,24 @@ var planRoom = locations.Room{ID: uuid.New(), Name: "พื้นที่ส่
 func (f fakeLocations) Tree(context.Context) ([]locations.Building, error) {
 	return []locations.Building{{ID: uuid.New(), Name: "อาคาร 1", Floors: []locations.Floor{{ID: uuid.New(), Name: "ชั้น 1", Level: 1, Rooms: []locations.Room{planRoom}}}}}, f.err
 }
-func (f fakeLocations) RenameBuilding(_ context.Context, _, id uuid.UUID, name string, _ time.Time) (locations.Building, error) {
-	return locations.Building{ID: id, Name: name, Floors: []locations.Floor{}}, f.err
+func (f fakeLocations) UpdateBuilding(_ context.Context, _, id uuid.UUID, in locations.BuildingInput) (locations.Building, error) {
+	b := locations.Building{ID: id, Name: in.Name, Type: locations.TypeRef{ID: officeType.ID, Name: officeType.Name}, Floors: []locations.Floor{}}
+	if in.TypeID != nil {
+		b.Type.ID = *in.TypeID
+	}
+	return b, f.err
+}
+
+var officeType = locations.BuildingType{ID: uuid.New(), Name: "อาคารสำนักงาน", IsActive: true, SortOrder: 1, BuildingCount: 1}
+
+func (f fakeLocations) Types(context.Context) ([]locations.BuildingType, error) {
+	return []locations.BuildingType{officeType}, f.err
+}
+func (f fakeLocations) CreateType(_ context.Context, _ uuid.UUID, name string) (locations.BuildingType, error) {
+	return locations.BuildingType{ID: officeType.ID, Name: name, IsActive: true}, f.err
+}
+func (f fakeLocations) UpdateType(_ context.Context, _, id uuid.UUID, _ locations.TypeInput) (locations.BuildingType, error) {
+	return locations.BuildingType{ID: id}, f.err
 }
 func (f fakeLocations) RenameRoom(_ context.Context, _, id uuid.UUID, name string, _ time.Time) (locations.Room, error) {
 	return locations.Room{ID: id, Name: name}, f.err
