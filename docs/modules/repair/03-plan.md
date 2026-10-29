@@ -25,6 +25,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 4P | **CR-025 rework:** ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร (สำนักงาน · โกดัง · ภายนอกอาคาร) · การ์ดงานซ้ำย้ายไปขั้นปัญหาที่พบ · โกดังตัวอย่าง 1 หลัง + **CR-026:** รูป quality 0.25 และเก็บรูปไว้ในฟอร์มจนกดส่ง (ทุกฟอร์มที่แนบรูป) | F02, F03, F04, F07, F21 | S03, S04, S08, S10, PhotoPicker | done — accepted 2026-10-29, tag `repair-stage-4P` |
 | 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | done — accepted 2026-10-29, tag `repair-stage-4R` |
 | 3D-2 | **CR-027:** โมเดล 3D อาคาร 2 + มุมมองทั้งพื้นที่ (site view) จาก `Cpac map.png` — เบาที่สุด (D-124) | F23, F31 | S29 | done — accepted 2026-10-29, tag `repair-stage-3D-2` (+ CR-028) |
+| 3D-3 | **CR-030:** โมเดลจริงฝั่งสำนักงานใหญ่ — อาคาร 3, 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี เป็นอาคารจริง (ชั้น ห้อง ผัง อุปกรณ์) | F23, F31 | S29 | pending — next |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
@@ -508,6 +509,29 @@ Status: done — accepted 2026-10-29 (tag `repair-stage-3D-2`, incl. CR-028). Bu
 - [x] AC2: Click อาคาร 2 → its model → pick a floor → rooms, equipment drag and drop (F31) and ticket pins work as for อาคาร 1
 - [x] AC3: Budget check recorded in the stage report: site view draw calls / triangles (`renderer.info`), JS chunk sizes, GPU memory stays flat after 10 enter / leave cycles, 0 frames rendered while idle
 - [x] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F23 / F31 (+ อาคาร 2 case) and Atlas `verify` pass
+
+---
+
+## Stage 3D-3 — office-side models (CR-030)
+
+**Scope**
+- Real buildings + procedural models for map no. 3 อาคาร 3 (72 × 17, 1 floor), 4 อาคาร 4 (38 × 10, 2 floors), 5 TrialMix (≈ 43.5 × 13.7 + ห้องทดสอบหินทราย, 1 floor, type โกดัง), 16 โรงอาหาร (irregular, from the site plan + 233.64 m² dining plan), 17 ห้องประชุม 60 ปี (16 × 5 + ห้องละมาด 10 m²)
+- Sources: `attachments/building plan/3-…`, `4-…`, `5-…`, `17-…pdf`, `attachments/building photos/canteen_meeting_building1.png`; unnamed rooms named by Claude
+- Budget (D-129): site side ≤ 40k triangles / ≤ 120 draw calls; everything else as D-124 (lazy chunk per shape, render on demand, one opened building's own scene)
+
+**Backend (Claude)**
+- [ ] Migration: 5 buildings (types per D-129), floors, `floor_plans`, rooms with `plan_shape` (each floor adds up to its plan area), `model_key` b3 / b4 / b5 / b16 / b17, link `site_blocks`; fix blocks 16 / 17 position / size from the site plan
+- [ ] Pg test: buildings, floors, room areas per floor, links
+
+**Frontend (Claude)**
+- [ ] `scene/building-{three,four,trialmix,canteen,hall60}.ts` + registry keys
+- [ ] Floor plan / footprint for non-rectangular buildings (canteen): plan outline from the rooms instead of W × D where needed
+
+**Acceptance criteria**
+- [ ] AC1: ฝั่งสำนักงานใหญ่ shows 7 real models with markers; each opens → floors → rooms
+- [ ] AC2: Equipment drag and drop and ticket pins work in อาคาร 3 and 4 (F31 case)
+- [ ] AC3: Budget: side 1 ≤ 40k triangles / ≤ 120 draw calls, 0 idle frames, GPU flat over 10 enter / leave cycles
+- [ ] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F02 (new buildings in S03) / F23 / F31 and Atlas `verify` pass
 
 ---
 
