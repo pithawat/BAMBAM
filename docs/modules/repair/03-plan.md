@@ -537,6 +537,31 @@ Status: done — accepted 2026-10-29 (tag `repair-stage-3D-3`). Built by Claude 
 
 ---
 
+## Stage 3D-4 — Riverside models (CR-031)
+
+Status: done — accepted 2026-10-30 (tag `repair-stage-3D-4`, incl. CR-032). Built by Claude (no Codex hand-off). Branch `repair/stage-3D-4`
+
+**Scope**
+- Real buildings + procedural models for map no. 6 Riverside อเนกประสงค์, 7 Riverside 1 (3 floors), 8 Riverside 2 (3 floors), 9 Riverside 3 (2 floors), 10 CCTC (2 floors), 11 CPAC Warehouse 1, 12 CPAC Warehouse 2, 13 CPAC Warehouse 3 (80 × 40, plan size), 18 โรงเรือน CPAC (irregular outline)
+- Types (D-131): 6–10 สำนักงาน, 11–13 + 18 โกดัง; sources `attachments/building plan/6-…` to `13-…`, `18-…`; unnamed rooms named by Claude
+- Budget: side 2 ≤ 20k triangles / ≤ 60 draw calls with light site versions (D-130)
+
+**Backend (Claude)**
+- [x] Migration: 9 buildings, floors, `floor_plans`, rooms with `plan_shape`, `model_key` b6–b13 / b18, `site_blocks` linked + sizes from the plans
+- [x] Pg test: buildings, floors, room areas per floor, links
+
+**Frontend (Claude)**
+- [x] `scene/building-*.ts` × 9 (reuse `lowrise.ts`) + registry keys
+- [x] (CR-032) S29 site ground: roads, walkways, car parks — 2 draw calls per side, unlit, no textures
+
+**Acceptance criteria**
+- [x] AC1: ฝั่ง Riverside shows 9 real models with markers; each opens → floors → rooms
+- [x] AC2: Equipment drag and drop works in two Riverside buildings (F31 case)
+- [x] AC3: Budget: side 2 ≤ 20k triangles / ≤ 60 draw calls, 0 idle frames, GPU flat over 10 enter / leave cycles
+- [x] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F02 / F23 / F31 and Atlas `verify` pass
+
+---
+
 ## Stage 5 — สแกน QR เติมฟอร์ม
 
 **Scope**

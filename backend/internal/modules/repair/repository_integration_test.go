@@ -579,8 +579,13 @@ func TestPgDashboardAndAssets(t *testing.T) {
 	if b1.ModelKey == nil || *b1.ModelKey != "b1" {
 		t.Errorf("อาคาร 1 model key = %v", b1.ModelKey)
 	}
-	if len(o.Site) != 16 || o.Site[1].MapNo != 2 || o.Site[1].BuildingID == nil || *o.Site[1].BuildingID != b2Building || o.Site[5].BuildingID != nil || o.Site[1].Side != 1 || o.Site[5].Side != 2 {
+	if len(o.Site) != 16 || o.Site[1].MapNo != 2 || o.Site[1].BuildingID == nil || *o.Site[1].BuildingID != b2Building || o.Site[1].Side != 1 || o.Site[5].Side != 2 {
 		t.Errorf("site = %+v", o.Site)
+	}
+	for _, s := range o.Site { // CR-031: every map block is a real building now
+		if s.BuildingID == nil {
+			t.Errorf("site block %d has no building", s.MapNo)
+		}
 	}
 	for n := 1; n <= 4; n++ {
 		fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c027f200-0000-4000-8000-00000000000%d", n)))
@@ -635,6 +640,52 @@ func TestPgDashboardAndAssets(t *testing.T) {
 			}
 			if math.Abs(area-want) > 1e-6 {
 				t.Errorf("map no. %d floor %d rooms add up to %.4f m², want %v", w.no, n+1, area, want)
+			}
+		}
+	}
+	// CR-031: the Riverside buildings 6–13 and 18 — 3D keys, floors, office / tenant room areas per floor (one common
+	// area per floor, it and ห้องน้ำ excepted) and site links on side 2.
+	for _, w := range []struct {
+		no     int
+		floors []float64
+	}{{6, []float64{448}}, {7, []float64{204, 204}}, {8, []float64{265.2, 196.05}}, {9, []float64{150, 100}}, {10, []float64{537.03, 592.46}},
+		{11, []float64{1027.5}}, {12, []float64{600}}, {13, []float64{3100}}, {18, []float64{347.9281}}} {
+		id := uuid.MustParse(fmt.Sprintf("c031b1d0-0000-4000-8000-%012d", w.no))
+		var ob *OverviewBuilding
+		for i := range o.Buildings {
+			if o.Buildings[i].ID == id {
+				ob = &o.Buildings[i]
+			}
+		}
+		if ob == nil || !ob.HasModel || ob.ModelKey == nil || *ob.ModelKey != fmt.Sprintf("b%d", w.no) || len(ob.Floors) != len(w.floors) {
+			t.Fatalf("map no. %d = %+v", w.no, ob)
+		}
+		linked := false
+		for _, s := range o.Site {
+			if int(s.MapNo) == w.no {
+				linked = s.BuildingID != nil && *s.BuildingID == id && s.Side == 2 && int(s.Storeys) == len(w.floors)
+			}
+		}
+		if !linked {
+			t.Errorf("site block %d not linked to its building", w.no)
+		}
+		for n, want := range w.floors {
+			fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c031f200-0000-4000-8000-%012d", w.no*100+n+1)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			area, common := 0.0, 0
+			for _, r := range fp.Rooms {
+				switch r.AreaType {
+				case "common_area":
+					common++
+				case "restroom":
+				default:
+					area += shapeArea(r.Shape)
+				}
+			}
+			if math.Abs(area-want) > 1e-6 || common != 1 {
+				t.Errorf("map no. %d floor %d rooms add up to %.4f m² (want %v), %d common areas", w.no, n+1, area, want, common)
 			}
 		}
 	}

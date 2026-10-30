@@ -2,9 +2,13 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29; next: 5 · of 8   **Updated:** 2026-10-29 (Stage 3D-3 accepted)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30; next: 5 · of 8   **Updated:** 2026-10-29 (Stage 3D-4 accepted)
 
 ## Now
+
+- **2026-10-30 mascot proposal, revised by owner:** Keep the EXISTING theme/layout; only change mascot backdrops and related heading surfaces (darker tracking header like existing Home). Done: `output/mascot-theme-options/index.html`, 6 paint options + original across 12 contexts, embedded assets/fonts; 336 viewport checks + 288 geometry comparisons pass in both existing themes at 375/1440. Supersedes `output/home-mascot-redesign/`. Next: owner selects per-page treatments; implementation/CR pending. Production/shared code untouched; details in the preview README.
+
+- **Stage 3D-4 accepted 2026-10-30**, tag `repair-stage-3D-4` (CR-031 + CR-032): Riverside = 9 real models, site roads / walkways / car parks. Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
 
 - **Stage 3D-3 accepted 2026-10-29**, tag `repair-stage-3D-3` (CR-030): office side = 7 real models. Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
 
@@ -31,6 +35,9 @@
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 
 ## Open issues / questions
+
+- 3D-4 owner checks: Warehouse 3 placed 22 m past Warehouse 2 along its long side (real position unknown); Riverside 1 / 2 drawn with 2 floors (the plans' 3rd page is the toilet block — was 3 on the map); CCTC plan is 48 × 17.7 = 849.6 m² vs the sheet's 839.06 / 851.41; room names by Claude (ห้องประชุม Riverside 1 / 2, น.I&T 1–3, WP 1–5, น.WPS 1 / 2, โรงเรือนเพาะปลูก…); floors without a common-area outline have a shapeless common area (Riverside 1 / 3, Warehouses 1–3); site-view markers of Riverside 2 / 3 overlap (zoom in, or keyboard) — e2e opens markers by keyboard; long plans (Warehouse 1 / 3) open cut off at the sides until zoomed out
+- e2e: with the Playwright-started web server, `next dev` stops on every other first start (Next.js security notice) — start the stack by hand (`test-stack.md`) for long runs; F02 desktop needs 15 s for the place step while the 3D specs load the GPU
 
 - 3D-3 owner checks: names by Claude — RMC Excellence Office 1 / 2, RMC Metro 1–3, ทางเดิน (อ.3), ห้องทดสอบก้อนปูน 1 / 2, SB&M 1–6, ฟิตเนส (plan says ฟิสเนส); อ.4 floor 2 drawn on x 0–35 of the 38 m plan, its 3.25 m² closet left in the common area; TrialMix lab placed 3 m east of the shed; canteen outline approximated from plan p.2 (scaled to 233.64 m²); ลานกองของ 337.5 m² (outdoor) not drawn; ห้องประชุม 60 ปี common area has no shape. Go Pg tests must run with `-p 1` (TestRenames collides with repair tests on a shared DB)
 
@@ -83,6 +90,8 @@
 - Mock photo restore: drafts drop photos with `blob:` URLs (mock uploads), so in mock mode a restored draft needs photos again
 
 ## Stage log
+
+- 2026-10-30: **Stage 3D-4 accepted**, tag `repair-stage-3D-4` (CR-031, owner fixes Riverside 2 stairs / CCTC ห้อง 202, CR-032 site ground) — Riverside side: 9 real buildings + light models, side 2 = 44 calls / 5.9k tris; e2e F02 / F23 / F31 pass (load flakes passed alone), Atlas 13 / 13
 
 - 2026-10-29: **Stage 3D-3 accepted**, tag `repair-stage-3D-3` (CR-030) — office side: อาคาร 3 / 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี as real buildings + procedural models; floor plans from outlines; budget 49 calls / 12.5k tris; e2e F02 / F23 / F31 pass (2 parallel-load flakes passed alone), Atlas 13 / 13 (F31 passed on re-run)
 

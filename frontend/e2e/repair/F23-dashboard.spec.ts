@@ -6,6 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 // Runs against the real API (migration 20261020000001: อาคาร 1, 6 floors with traced rooms).
 // CR-027 (migration 20261029000002): S29 opens on the campus site view; อาคาร 2 (4 floors) opens like อาคาร 1.
 // CR-030 (migration 20261029000003): อาคาร 3 / 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี open the same way.
+// CR-031 (migration 20261030000001): the nine Riverside buildings too (side 2).
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 const API = "/api/v1/repair";
 const SITE = "section[aria-label='ภาพรวมพื้นที่ แบบ 3 มิติ']";
@@ -13,11 +14,21 @@ const SITE = "section[aria-label='ภาพรวมพื้นที่ แบ
 type Stats = { mode: string; frames: number; calls: number; triangles: number; geometries: number; textures: number };
 const stats = (page: Page) => page.evaluate(() => (window as unknown as { __s29Engine: { stats: () => Stats } }).__s29Engine.stats());
 
+/** CR-031: Riverside buildings sit on side 2 of the site view. */
+const RIVERSIDE = /Riverside|CCTC|Warehouse|โรงเรือน/;
+const marker = (name: string) => new RegExp(`^${name.replace(/[()]/g, "\\$&")} งานค้าง`);
+async function showSide(page: Page, name: string) {
+  if (RIVERSIDE.test(name)) await page.locator(SITE).getByRole("group", { name: "เลือกฝั่ง" }).getByRole("button", { name: "ฝั่ง Riverside" }).click();
+}
+
 /** S29 → site view → the building's marker → its model. */
 async function openBuilding(page: Page, name: string) {
   await page.goto("/");
   await expect(page.locator(SITE).locator("canvas")).toBeVisible({ timeout: 60_000 }); // lazy three.js chunk
-  await page.locator(SITE).getByRole("button", { name: new RegExp(`^${name} งานค้าง`) }).click();
+  await showSide(page, name);
+  // keyboard: neighbouring markers can overlap on the Riverside side (Riverside 2 / 3)
+  await page.locator(SITE).getByRole("button", { name: marker(name) }).focus();
+  await page.keyboard.press("Enter");
   const card = page.locator(`section[aria-label='${name} แบบ 3 มิติ']`);
   await expect(card.getByRole("group", { name: "เลือกชั้น" })).toBeVisible();
   return card;
@@ -162,6 +173,16 @@ test.describe("admin", () => {
     ["อาคาร TrialMix และห้องทดสอบหินทราย", 1, "RMC METRO ห้องทดสอบหินทราย"],
     ["โรงอาหาร", 1, "พื้นที่ส่วนกลาง"],
     ["ห้องประชุม 60 ปี", 1, "ห้องละมาด"],
+    // CR-031: the Riverside side
+    ["อาคาร Riverside อเนกประสงค์", 1, "ห้อง Fitness"],
+    ["อาคาร Riverside 1", 2, "น.SSB ชั้น 1"],
+    ["อาคาร Riverside 2", 2, "น.SSB ห้องติดตั้ง"],
+    ["อาคาร Riverside 3", 2, "น.SSB ชั้น 1"],
+    ["อาคาร CCTC", 2, "น.I&T 2"],
+    ["CPAC Warehouse 1 (3D print)", 1, "น.3D Printing"],
+    ["CPAC Warehouse 2", 1, "บ.เท็กซ์พลอร์"],
+    ["CPAC Warehouse 3", 1, "SCG Express"],
+    ["อาคารโรงเรือน CPAC", 1, "โรงเรือนเพาะปลูก"],
   ] as const) {
     test(`CR-030 AC1: ${name} → ${floors} floor(s) → floor 1 plan with its rooms → back to the site`, async ({ page, isMobile }) => {
       test.skip(isMobile, "3D is desktop only");
@@ -175,13 +196,14 @@ test.describe("admin", () => {
       await card.getByRole("button", { name: "ภาพอาคาร" }).click();
       await expect(card.getByText(new RegExp(`${floors} ชั้น · งานค้าง`))).toBeVisible();
       await card.getByRole("button", { name: "ภาพรวมพื้นที่" }).click();
-      await expect(page.locator(SITE).getByRole("button", { name: new RegExp(`^${name} งานค้าง`) })).toBeVisible();
+      const side = RIVERSIDE.test(name) ? "ฝั่ง Riverside" : "ฝั่งสำนักงานใหญ่"; // back on the building's own side
+      await expect(page.locator(SITE).getByText(new RegExp(`^${side} · \\d+ อาคาร`))).toBeVisible();
     });
   }
 
   test("CR-027 AC3 / CR-028: budget — a side ≤ 20k triangles, no frames while idle, GPU memory flat over 10 enter / leave cycles", async ({ page, isMobile }) => {
     test.skip(isMobile, "3D is desktop only");
-    test.slow(); // WebGL + model build compete with the other workers
+    test.setTimeout(240_000); // 10 model cycles + both sides while the other workers use the GPU
     await page.goto("/");
     const site = page.locator(SITE);
     await expect(site.locator("canvas")).toBeVisible({ timeout: 60_000 });
@@ -213,6 +235,18 @@ test.describe("admin", () => {
       expect(c.textures).toBeLessThanOrEqual(s0.textures);
       expect(Math.abs(c.geometries - counts[0].geometries)).toBeLessThanOrEqual(1);
     }
+
+    // CR-031: the Riverside side with its nine light models keeps the same budget
+    await site.getByRole("group", { name: "เลือกฝั่ง" }).getByRole("button", { name: "ฝั่ง Riverside" }).click();
+    await expect(site.getByRole("button", { name: /^อาคาร CCTC งานค้าง/ })).toBeVisible();
+    await expect.poll(async () => (await stats(page)).triangles, { timeout: 20_000 }).toBeGreaterThan(2_000);
+    await page.waitForTimeout(1500);
+    const s2 = await stats(page);
+    console.log(`S29 budget side 2: ${s2.calls} draw calls, ${s2.triangles} triangles`);
+    expect(s2.triangles).toBeLessThanOrEqual(20_000);
+    expect(s2.calls).toBeLessThanOrEqual(60);
+    await page.waitForTimeout(1500);
+    expect((await stats(page)).frames).toBe(s2.frames);
   });
 
   test("AC6: phone shows the floor list, no 3D and no horizontal scroll", async ({ page, isMobile }) => {

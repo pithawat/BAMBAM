@@ -9,9 +9,9 @@ const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json
 const API = "/api/v1/repair";
 const CARD = "section[aria-label='อาคาร 1 แบบ 3 มิติ']";
 const SITE = "section[aria-label='ภาพรวมพื้นที่ แบบ 3 มิติ']";
-// อาคาร 1 / 2 by number; CR-030 buildings by map number (floor ids c030f200-…-{no}{level:02})
+// อาคาร 1 / 2 by number; CR-030 / CR-031 buildings by map number (floor ids c030f200 / c031f200-…-{no}{level:02})
 const FLOOR = (level: number, building = 1) => building > 2
-  ? `c030f200-0000-4000-8000-${String(building * 100 + level).padStart(12, "0")}`
+  ? `${[3, 4, 5, 16, 17].includes(building) ? "c030f200" : "c031f200"}-0000-4000-8000-${String(building * 100 + level).padStart(12, "0")}`
   : `${building === 2 ? "c027f200" : "c016f100"}-0000-4000-8000-00000000000${level}`;
 
 // The 3D card needs WebGL: Chrome's new headless keeps it on the GPU (D-103). Only the 3D specs use it.
@@ -26,7 +26,11 @@ async function openFloor(page: Page, level: number, building = "อาคาร 
   await page.getByRole("button", { name: "จัดวางอุปกรณ์" }).click();
   await expect(page.locator(SITE).locator("canvas")).toBeVisible({ timeout: 60_000 }); // lazy three.js chunk
   await page.locator(SITE).evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await page.locator(SITE).getByRole("button", { name: new RegExp(`^${building} งานค้าง`) }).click();
+  if (/Riverside|CCTC|Warehouse|โรงเรือน/.test(building)) { // CR-031: side 2
+    await page.locator(SITE).getByRole("group", { name: "เลือกฝั่ง" }).getByRole("button", { name: "ฝั่ง Riverside" }).click();
+  }
+  await page.locator(SITE).getByRole("button", { name: new RegExp(`^${building} งานค้าง`) }).focus(); // markers can overlap (Riverside 2 / 3)
+  await page.keyboard.press("Enter");
   await card.getByRole("group", { name: "เลือกชั้น" }).getByRole("button", { name: new RegExp(`^ชั้น ${level} `) }).click();
   await expect(card.getByText(new RegExp(`ชั้น ${level} · งานค้าง`))).toBeVisible();
   await expect(page.getByRole("button", { name: "เพิ่มอุปกรณ์" })).toBeVisible({ timeout: 15_000 }); // #30 + model build under load
@@ -163,8 +167,11 @@ test("CR-027: อาคาร 2 — drag a type into a traced room of floor 2, t
   expect((await page.request.post(`${API}/assets/${placed!.id}/deactivate`)).status()).toBe(204);
 });
 
-for (const [building, no, level, room] of [["อาคาร 3", 3, 1, "RMC Metro 2"], ["อาคาร 4", 4, 2, "SB&M 6"]] as const) {
-  test(`CR-030 AC2: ${building} — drag a type into ${room} on floor ${level}, the asset is stored in that room`, async ({ page }) => {
+for (const [building, no, level, room] of [
+  ["อาคาร 3", 3, 1, "RMC Metro 2"], ["อาคาร 4", 4, 2, "SB&M 6"],
+  ["อาคาร Riverside 2", 8, 2, "น.บัญชี"], ["CPAC Warehouse 3", 13, 1, "SCG Express"], // CR-031 AC2
+] as const) {
+  test(`CR-030 / CR-031 AC2: ${building} — drag a type into ${room} on floor ${level}, the asset is stored in that room`, async ({ page }) => {
     test.slow();
     const card = `section[aria-label='${building} แบบ 3 มิติ']`;
     const code = `E2E-C${no}${Date.now().toString(36).toUpperCase()}`;

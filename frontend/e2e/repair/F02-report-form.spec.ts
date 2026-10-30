@@ -12,7 +12,8 @@ const OUTDOOR = "พื้นที่ภายนอกอาคาร";
 
 async function open(page: Page) {
   await page.goto("/repair/new");
-  await expect(step(page, "location").getByRole("heading", { name: "ปัญหาเกิดขึ้นที่ไหน" })).toBeVisible();
+  // 16+ buildings to load while the 3D specs keep the GPU / dev server busy
+  await expect(step(page, "location").getByRole("heading", { name: "ปัญหาเกิดขึ้นที่ไหน" })).toBeVisible({ timeout: 15_000 });
   // A draft from an earlier run would be restored; start clean.
   const restart = page.getByRole("button", { name: "เริ่มใหม่" });
   if (await restart.isVisible()) await restart.click();

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { buildGround } from "./site-ground";
 
 // S29 site view (CR-027, D-124 / D-126, CR-028): the building frames of one side of the campus as
 // low-poly boxes, all merged into ONE vertex-coloured mesh (one draw call), no textures, no shadows.
@@ -73,6 +74,7 @@ export function buildSite(blocks: SiteBlockSpec[]): BuiltSite {
   const bounds = new THREE.Box3();
   for (const p of placed) bounds.union(p.box.clone().applyMatrix4(p.m));
   if (bounds.isEmpty()) bounds.set(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 10, 50));
+  group.add(buildGround(bounds)); // CR-032: roads, walkways, car parks of this side (2 draw calls)
   const center = bounds.getCenter(new THREE.Vector3());
   group.add(new THREE.Mesh( // far past the view: the fog blends its edge into the background
     new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2).translate(center.x, -0.02, center.z),
