@@ -15,8 +15,11 @@ import (
 
 // Duplicates implements endpoint #22: open tickets on the same category + floor + room (BR-F03-1),
 // the ones that block the report first (same or no extra spot, CR-020), then newest first, for the
-// S03 duplicate card. Every role may ask (the reporter has not sent anything yet).
+// S03 duplicate card. Whoever may report or record a team-handled job may ask (settings CR-006).
 func (s *Service) Duplicates(ctx context.Context, v Viewer, k DuplicateKey) ([]Duplicate, error) {
+	if !reports(v) && !isLead(v) {
+		return nil, apperr.ErrForbidden
+	}
 	k.Spot = normalizeSpot(k.Spot)
 	matches, err := s.repo.DuplicateTickets(ctx, k)
 	if err != nil {
@@ -102,6 +105,9 @@ func (s *Service) withDuplicates(ctx context.Context, v Viewer, err error) error
 // photos are added to its timeline as a `subscribed` event (F03). Subscribers see the ticket in S06
 // and see its progress, but never rate it (BR-F03-3).
 func (s *Service) Follow(ctx context.Context, v Viewer, id uuid.UUID, note string, photoIDs []uuid.UUID) (TicketDetail, error) {
+	if !reports(v) {
+		return TicketDetail{}, apperr.ErrForbidden
+	}
 	note = strings.TrimSpace(note)
 	photoIDs = uniqueIDs(photoIDs)
 	fields := map[string]string{}

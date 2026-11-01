@@ -7,11 +7,11 @@ import (
 	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
-// testRegistry is the repair catalog plus the one settings key repair checks (the real settings
-// system is registered in main.go).
+// testRegistry is the repair catalog plus the one settings key repair checks, seeded for admin as
+// the settings catalog does (the real settings system is registered in main.go).
 var testRegistry = permissions.MustRegistry(Permissions, permissions.System{Key: "settings", Groups: []permissions.Group{
-	{Key: "settings", Fixed: true, Permissions: []permissions.Permission{
-		{Key: permAssetsManage, FixedRoles: []string{users.RoleAdmin, users.RoleSuperAdmin}},
+	{Key: "settings", Permissions: []permissions.Permission{
+		{Key: permAssetsManage, Defaults: []string{users.RoleAdmin}},
 	}},
 }})
 

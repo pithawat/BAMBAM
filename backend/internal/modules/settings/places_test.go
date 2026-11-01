@@ -98,7 +98,7 @@ func (fakeRepair) OpenTicketCounts(_ context.Context, ids []uuid.UUID) (map[uuid
 func placesRouter(role string, l fakeLocations, a fakeAssets) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	p := middleware.Principal{UserID: viewerID, Role: role, Permissions: registry.Effective(role, nil)}
+	p := middleware.Principal{UserID: viewerID, Role: role, Permissions: registry.Defaults(role)}
 	svc := NewService(Deps{Roles: fakeRoles{list: []roles.Role{superRole}}, Users: fakeUsers{}, Audit: fakeAudit{}, Locations: l, Assets: a, Repair: fakeRepair{}})
 	RegisterRoutes(r.Group("/api/v1/settings", middleware.RequireAuth(fixedSession{p})), NewController(svc))
 	return r

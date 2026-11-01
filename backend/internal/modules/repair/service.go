@@ -254,6 +254,10 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 	if in.TeamHandled != nil && !isLead(v) {
 		return TicketDetail{}, ErrTeamHandledNotAllowed
 	}
+	// a lead's team-handled record needs only team_handle; a report needs report (settings CR-006)
+	if in.TeamHandled == nil && !reports(v) {
+		return TicketDetail{}, apperr.ErrForbidden
+	}
 	in, fields := validateCreate(in)
 	if len(fields) > 0 {
 		return TicketDetail{}, apperr.Validation(fields)

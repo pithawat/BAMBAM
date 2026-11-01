@@ -11,7 +11,7 @@ import {
 import { Mascot } from "@/components/shared/mascot";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
-import { can, PERM } from "@/lib/platform/permissions";
+import { can, canReport, PERM, repairHome } from "@/lib/platform/permissions";
 import { ErrorState, ForbiddenState } from "@/components/shared/states";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -160,12 +160,16 @@ function sanitizeDraft(d: Draft, categories: Category[], buildings: Building[]):
   return { values, photos };
 }
 
+const REPORT_FORBIDDEN = "บัญชีนี้ไม่มีสิทธิ์แจ้งซ่อม กรุณาติดต่อผู้ดูแลระบบ";
+
 /** The route entry: the mode comes from the URL and a new mode mounts a fresh form (no state leaks between modes). */
 export function ReportForm() {
   const me = useCurrentUser();
   const mode = useSearchParams().get("mode");
   const canTeam = can(me, PERM.ticketTeamHandle);
   const team = canTeam && mode === "team";
+  // settings CR-006: reporting needs `repair.ticket.report`; a lead's team record needs only team_handle (the API agrees)
+  if (!team && !canReport(me)) return <ForbiddenState reason={REPORT_FORBIDDEN} action={{ label: "ไปที่งานซ่อม", href: repairHome(me) }} />;
   return <ReportFormBody key={team ? "team" : "repair"} team={team} canTeam={canTeam} />;
 }
 

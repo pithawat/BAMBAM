@@ -6,7 +6,7 @@
 
 ## Now
 
-- **2026-10-30 mascot proposal, revised by owner:** Keep the EXISTING theme/layout; only change mascot backdrops and related heading surfaces (darker tracking header like existing Home). Done: `output/mascot-theme-options/index.html`, 6 paint options + original across 12 contexts, embedded assets/fonts; 336 viewport checks + 288 geometry comparisons pass in both existing themes at 375/1440. Supersedes `output/home-mascot-redesign/`. Next: owner selects per-page treatments; implementation/CR pending. Production/shared code untouched; details in the preview README.
+- **2026-10-30 mascot proposal, revised by owner:** Keep the EXISTING theme/layout; only change mascot backdrops and related heading surfaces (darker tracking header like existing Home). Done: `output/mascot-theme-options/index.html`, 6 paint options + original across 12 contexts, embedded assets/fonts; 336 viewport checks + 288 geometry comparisons pass in both existing themes at 375/1440. Owner cleanup: only this standalone demo HTML retained; screenshots, supporting files and the superseded Home redesign removed. Next: owner selects per-page treatments; implementation/CR pending. Production/shared code untouched.
 
 - **Stage 3D-4 accepted 2026-10-30**, tag `repair-stage-3D-4` (CR-031 + CR-032): Riverside = 9 real models, site roads / walkways / car parks. Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
 

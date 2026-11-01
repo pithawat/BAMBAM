@@ -1,5 +1,6 @@
 // Mirrors docs/modules/settings/04-api-contract.md. Stage 1: `Role` (#2). Stage 2: roles CRUD + matrix (#3–#7).
-// Later stages add their objects here.
+// Later stages add their objects here. Stage R1 (CR-006): guard rules G1–G3 → `RoleGuard`, `RoleListItem`,
+// `PermissionMatrix.grantable`, `MatrixRole.guard`, `PermissionDef.requires`, #9 reasons, `PERMISSION_GUARD`.
 
 /** `PersonRef` (same as repair). */
 export type PersonRef = { id: string; name: string; department: string | null };
@@ -21,6 +22,26 @@ export type Role = {
   updatedBy: PersonRef | null;
 };
 
+/**
+ * CR-006 guard rule that locks a role for this viewer (never for Superadmin):
+ * `OWN_ROLE` — the viewer's own role ("แก้สิทธิ์ของ role ตัวเองไม่ได้"); `SUPER_ADMIN` — the Superadmin role.
+ */
+export type RoleGuard = "OWN_ROLE" | "SUPER_ADMIN";
+
+/** #2 item (CR-006): `Role` + what this viewer may do with it. */
+export type RoleListItem = Role & {
+  /** Set → no แก้ไข Role / ลบ Role for this viewer (row menu hidden or disabled with the reason). */
+  guard: RoleGuard | null;
+  /** The viewer may give this role to someone in S25 (G2 / G3: never `super_admin`, only roles within their own permissions). */
+  assignable: boolean;
+};
+
+/**
+ * `403 PERMISSION_GUARD` `details.rule` (CR-006) on #3 (copy-from), #4, #5, #7, #10: `OWN_ROLE` · `SUPER_ADMIN` ·
+ * `ESCALATION` (a key the viewer lacks, or a role beyond their permissions).
+ */
+export type GuardRule = RoleGuard | "ESCALATION";
+
 // ---- Stage 2: roles and the permission matrix (F29, #3–#7) ----
 
 /** #3 POST /api/v1/settings/roles. `copyFromRoleId` null / omitted = base permissions only. */
@@ -29,7 +50,7 @@ export type CreateRoleInput = {
   name: string;
   /** ≤ 200 characters. */
   description?: string;
-  /** Copies the source's editable permissions; fixed `settings.*` keys are never copied. */
+  /** Copies the source's permissions. CR-006: a non-Superadmin may only copy a role whose keys are all their own (else ESCALATION). */
   copyFromRoleId?: string | null;
 };
 
@@ -41,15 +62,24 @@ export type UpdateRoleInput = {
 };
 
 /** One permission column. Labels and descriptions come from the module that registers the key. */
-export type PermissionDef = { key: string; label: string; description: string };
+export type PermissionDef = {
+  key: string;
+  label: string;
+  description: string;
+  /**
+   * CR-006: the key that must be ticked first (`repair.building3d.view` → `repair.overview.view`). While the role
+   * lacks it (incl. pending changes) the cell is disabled; unticking the required key also unticks this one.
+   */
+  requires: string | null;
+};
 
-/** One matrix card. `isFixed` (the "ตั้งค่าระบบ" group): every cell is disabled ("กำหนดโดยระบบ"). */
+/** One matrix card. `isFixed`: every cell disabled ("กำหนดโดยระบบ") — no group is fixed since CR-006, keep the branch. */
 export type PermissionGroup = { key: string; name: string; isFixed: boolean; permissions: PermissionDef[] };
 
-/** A system heading ("ระบบแจ้งซ่อม", then "ตั้งค่าระบบ"). */
+/** A system heading: "ระบบแจ้งซ่อม", "การเข้าใช้บริการ" (CR-006), "ตั้งค่าระบบ". */
 export type PermissionSystem = { key: string; name: string; groups: PermissionGroup[] };
 
-/** One matrix row, in `Role` order. `permissions` = effective keys, fixed ones included. */
+/** One matrix row, in `Role` order. `permissions` = effective keys. */
 export type MatrixRole = {
   id: string;
   key: string;
@@ -57,6 +87,8 @@ export type MatrixRole = {
   userCount: number;
   /** `super_admin`: row ticked and disabled. */
   isLocked: boolean;
+  /** CR-006: set → the whole row is disabled for this viewer, with the reason (own role / Superadmin). */
+  guard: RoleGuard | null;
   permissions: string[];
 };
 
@@ -68,6 +100,11 @@ export type PermissionMatrix = {
   updatedBy: PersonRef | null;
   systems: PermissionSystem[];
   roles: MatrixRole[];
+  /**
+   * CR-006 G3: the keys this viewer may tick or untick (Superadmin: every key). Any other column is disabled in every
+   * row with the reason "ให้ได้เฉพาะสิทธิ์ที่คุณมี".
+   */
+  grantable: string[];
 };
 
 /** One changed cell. */
@@ -104,12 +141,18 @@ export type Page<T> = { items: T[]; meta: { page: number; pageSize: number; tota
 /** One #9 `roleHistory` row (newest first); the FE adds "เข้าใช้ครั้งแรก" from `firstLoginAt`. */
 export type RoleHistoryItem = { createdAt: string; from: string; to: string; actor: PersonRef | null };
 
+/**
+ * Why `canChangeRole` is false: `SELF` · `LOCKED_BY_ENV` · (CR-006) `READ_ONLY` — the viewer has `settings.users.view`
+ * only · `SUPER_ADMIN` — the user is a Superadmin and the viewer is not.
+ */
+export type CannotChangeReason = "SELF" | "LOCKED_BY_ENV" | "READ_ONLY" | "SUPER_ADMIN";
+
 /** #9 GET /settings/users/{id}. */
 export type UserDetail = UserSummary & {
   division: string | null;
   firstLoginAt: string;
   canChangeRole: boolean;
-  cannotChangeReason: "SELF" | "LOCKED_BY_ENV" | null;
+  cannotChangeReason: CannotChangeReason | null;
   roleHistory: RoleHistoryItem[];
 };
 

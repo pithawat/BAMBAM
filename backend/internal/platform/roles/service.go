@@ -29,7 +29,7 @@ var (
 	ErrRoleInUse         = apperr.New(apperr.KindConflict, "ROLE_IN_USE", "role still has users")
 	ErrSystemRole        = apperr.New(apperr.KindBusinessRule, "SYSTEM_ROLE", "system role cannot be changed this way")
 	ErrUnknownPermission = apperr.New(apperr.KindInvalid, "UNKNOWN_PERMISSION", "permission key not in the catalog")
-	ErrFixedPermission   = apperr.New(apperr.KindBusinessRule, "FIXED_PERMISSION", "settings permissions are fixed by role")
+	ErrFixedPermission   = apperr.New(apperr.KindBusinessRule, "FIXED_PERMISSION", "permission of a fixed group")
 )
 
 const (
@@ -193,8 +193,9 @@ func validateText(fields map[string]string, field, v string, required bool, max 
 	}
 }
 
-// Create implements #3 (F29 step 4). Copying takes the source's editable permissions; the fixed
-// `settings.*` keys are never copied and a new role never has them (BR-F29-8).
+// Create implements #3 (F29 step 4). Copying takes the source's editable permissions; keys of a
+// fixed group are never copied (BR-F29-8; no group is fixed since settings CR-006). Who may copy
+// what (G3) is checked by the settings module.
 func (s *Service) Create(ctx context.Context, actor uuid.UUID, in CreateInput) (Role, error) {
 	name, desc := strings.TrimSpace(in.Name), strings.TrimSpace(in.Description)
 	fields := map[string]string{}

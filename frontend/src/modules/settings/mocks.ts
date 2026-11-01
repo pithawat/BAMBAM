@@ -1,5 +1,6 @@
 import { ApiError } from "@/lib/http";
 import { MOCK_CUSTOM_ROLE } from "@/lib/platform/mocks";
+import type { Me } from "@/lib/platform/types";
 import type {
   CategoryAdmin,
   ContractorTypeAdmin,
@@ -35,12 +36,16 @@ import type {
   UserDetail,
   UserQuery,
   UserSummary,
+  CannotChangeReason,
   CreateRoleInput,
+  GuardRule,
   MatrixRole,
   PermissionMatrix,
   PermissionSystem,
   PersonRef,
   Role,
+  RoleGuard,
+  RoleListItem,
   SavePermissionsInput,
   UpdateRoleInput,
 } from "./types";
@@ -73,7 +78,7 @@ export function mockScenario(): MockScenario {
 export const mockErrors = {
   server: () => new ApiError(500, "INTERNAL", "mock: server error"),
   forbidden: () => new ApiError(403, "FORBIDDEN", "mock: not allowed"),
-  code: (status: number, code: string, fields: Record<string, string> = {}) => new ApiError(status, code, `mock: ${code}`, fields),
+  code: (status: number, code: string, fields: Record<string, string> = {}, details?: unknown) => new ApiError(status, code, `mock: ${code}`, fields, details),
 };
 
 export const mockPeople = {
@@ -97,6 +102,7 @@ export const mockRoles: Role[] = [
 // ---- Stage 2: permission catalog and matrix (#6) — same copy and order as the Go catalog ----
 
 const P = {
+  report: "repair.ticket.report",
   viewAll: "repair.ticket.view_all",
   work: "repair.ticket.work",
   closeAny: "repair.ticket.close_any",
@@ -104,10 +110,14 @@ const P = {
   handoverAny: "repair.ticket.handover_any",
   contractor: "repair.contractor.manage",
   overview: "repair.overview.view",
+  building3d: "repair.building3d.view",
+  car: "car_booking.use",
+  room: "room_booking.use",
   locations: "settings.locations.manage",
   assets: "settings.assets.manage",
   categories: "settings.categories.manage",
   contractorTypes: "settings.contractor_types.manage",
+  usersView: "settings.users.view",
   users: "settings.users.manage",
   roles: "settings.roles.manage",
   audit: "settings.audit.view",
@@ -119,24 +129,48 @@ export const mockPermissionSystems: PermissionSystem[] = [
     name: "ระบบแจ้งซ่อม",
     groups: [
       {
+        key: "repair.access",
+        name: "การใช้บริการแจ้งซ่อม",
+        isFixed: false,
+        permissions: [
+          { key: P.report, label: "แจ้งซ่อม", description: "แจ้งงานใหม่ สแกน QR แจ้ง และติดตามเคสเดิม", requires: null },
+        ],
+      },
+      {
         key: "repair.ticket",
         name: "งานแจ้งซ่อม",
         isFixed: false,
         permissions: [
-          { key: P.viewAll, label: "ดูทุกงาน", description: "เห็นงานซ่อมทุกงาน รวมชื่อและคะแนนช่างภายนอก" },
-          { key: P.work, label: "ดำเนินการและบันทึกผลซ่อม", description: "งานซ่อมทุกงานส่งถึง role นี้ ประเมินวันคาดว่าเสร็จ และบันทึกผลซ่อม" },
-          { key: P.closeAny, label: "ปิดงานใดก็ได้", description: "ปิดงานได้โดยไม่ต้องรอผู้แจ้งตรวจรับ" },
+          { key: P.viewAll, label: "ดูทุกงาน", description: "เห็นงานซ่อมทุกงาน รวมชื่อและคะแนนช่างภายนอก", requires: null },
+          { key: P.work, label: "ดำเนินการและบันทึกผลซ่อม", description: "งานซ่อมทุกงานส่งถึง role นี้ ประเมินวันคาดว่าเสร็จ และบันทึกผลซ่อม", requires: null },
+          { key: P.closeAny, label: "ปิดงานใดก็ได้", description: "ปิดงานได้โดยไม่ต้องรอผู้แจ้งตรวจรับ", requires: null },
         ],
       },
       {
         key: "repair.team",
-        name: "งานทีมและช่างภายนอก",
+        name: "งานทีม ช่างภายนอก และภาพรวมอาคาร",
         isFixed: false,
         permissions: [
-          { key: P.teamHandle, label: "บันทึกงานทีมทำเอง", description: "บันทึกงานที่ทีมทำเอง และส่งต่องานที่ตัวเองบันทึกให้ช่าง" },
-          { key: P.handoverAny, label: "ส่งต่องานทีมทุกงาน", description: "ส่งต่องานทีมทำเองของทุกคนให้ช่าง" },
-          { key: P.contractor, label: "จัดการช่างภายนอก", description: "เพิ่มและแก้ไขข้อมูลช่างภายนอก" },
-          { key: P.overview, label: "ดูภาพรวมอาคาร", description: "ดู dashboard อาคารและงานที่ยังไม่ปิด" },
+          { key: P.teamHandle, label: "บันทึกงานทีมทำเอง", description: "บันทึกงานที่ทีมทำเอง และส่งต่องานที่ตัวเองบันทึกให้ช่าง", requires: null },
+          { key: P.handoverAny, label: "ส่งต่องานทีมทุกงาน", description: "ส่งต่องานทีมทำเองของทุกคนให้ช่าง", requires: null },
+          { key: P.contractor, label: "จัดการช่างภายนอก", description: "เพิ่มและแก้ไขข้อมูลช่างภายนอก", requires: null },
+          { key: P.overview, label: "ดูภาพรวมอาคาร", description: "ดู dashboard อาคารและงานที่ยังไม่ปิด", requires: null },
+          { key: P.building3d, label: "ดูโมเดล 3D อาคาร", description: "ดูโมเดล 3 มิติของอาคารและภาพรวมพื้นที่ใน dashboard (ต้องมีสิทธิ์ดูภาพรวมอาคาร)", requires: P.overview },
+        ],
+      },
+    ],
+  },
+  {
+    key: "services",
+    name: "การเข้าใช้บริการ",
+    groups: [
+      {
+        key: "services.booking",
+        name: "ระบบจองรถและห้องประชุม",
+        isFixed: false,
+        permissions: [
+          { key: P.car, label: "ใช้ระบบจองรถ", description: "เห็นบริการจองรถในหน้าแรกและเมนู", requires: null },
+          { key: P.room, label: "ใช้ระบบจองห้องประชุม", description: "เห็นบริการจองห้องประชุมในหน้าแรกและเมนู", requires: null },
         ],
       },
     ],
@@ -148,15 +182,16 @@ export const mockPermissionSystems: PermissionSystem[] = [
       {
         key: "settings",
         name: "ตั้งค่าระบบ",
-        isFixed: true,
+        isFixed: false,
         permissions: [
-          { key: P.locations, label: "อาคารและห้อง", description: "แก้ชื่ออาคารและห้องตามผังอาคาร" },
-          { key: P.assets, label: "อุปกรณ์และประเภทอุปกรณ์", description: "เพิ่ม ย้าย แก้ไขอุปกรณ์ในห้องและประเภทอุปกรณ์ รวมการจัดวางใน dashboard" },
-          { key: P.categories, label: "หมวดงานและอาการ", description: "ตั้งค่าหมวดงาน อาการ และความเร่งด่วน" },
-          { key: P.contractorTypes, label: "ประเภทผู้รับเหมา", description: "ตั้งค่าประเภทผู้รับเหมา" },
-          { key: P.users, label: "ผู้ใช้", description: "ค้นหาผู้ใช้และเปลี่ยน role" },
-          { key: P.roles, label: "Role และสิทธิ์", description: "เพิ่ม แก้ ลบ role และติ๊กสิทธิ์" },
-          { key: P.audit, label: "ประวัติการเปลี่ยนแปลง", description: "ดูว่าใครเปลี่ยนอะไรในตั้งค่าระบบ" },
+          { key: P.locations, label: "อาคารและห้อง", description: "แก้ชื่ออาคาร ห้อง และประเภทอาคาร", requires: null },
+          { key: P.assets, label: "อุปกรณ์และประเภทอุปกรณ์", description: "เพิ่ม ย้าย แก้ไขอุปกรณ์ในห้องและประเภทอุปกรณ์ รวมการจัดวางใน dashboard", requires: null },
+          { key: P.categories, label: "หมวดงานและอาการ", description: "ตั้งค่าหมวดงาน อาการ และความเร่งด่วน", requires: null },
+          { key: P.contractorTypes, label: "ประเภทผู้รับเหมา", description: "ตั้งค่าประเภทผู้รับเหมา", requires: null },
+          { key: P.usersView, label: "ดูรายชื่อผู้ใช้", description: "ดูรายชื่อผู้ใช้และ role ของแต่ละคน (อ่านอย่างเดียว)", requires: null },
+          { key: P.users, label: "เปลี่ยน role ผู้ใช้", description: "เปลี่ยน role ของผู้ใช้ (รวมการดูรายชื่อ)", requires: null },
+          { key: P.roles, label: "Role และสิทธิ์", description: "เพิ่ม แก้ ลบ role และติ๊กสิทธิ์", requires: null },
+          { key: P.audit, label: "ประวัติการเปลี่ยนแปลง", description: "ดูว่าใครเปลี่ยนอะไรในตั้งค่าระบบ", requires: null },
         ],
       },
     ],
@@ -164,24 +199,51 @@ export const mockPermissionSystems: PermissionSystem[] = [
 ];
 
 const CATALOG = mockPermissionSystems.flatMap((s) => s.groups.flatMap((g) => g.permissions.map((p) => ({ ...p, isFixed: g.isFixed }))));
+const CATALOG_KEYS = CATALOG.map((p) => p.key);
 const isFixedKey = (k: string) => CATALOG.some((p) => p.key === k && p.isFixed);
-const FIXED_BY_ROLE: Record<string, string[]> = { admin: [P.locations, P.assets, P.categories] };
 
-/** Seeded matrix = `01-users.md` defaults (stored, editable keys only); the custom role matches its mock `Me`. */
+const SERVICES = [P.report, P.car, P.room];
+const SETTINGS = [P.locations, P.assets, P.categories, P.contractorTypes, P.usersView, P.users, P.roles, P.audit];
+
+/** Seeded matrix = `01-users.md` defaults + the CR-006 migration; the custom role matches its mock `Me`. */
 const SEEDED_STORED: Record<string, string[]> = {
-  employee: [],
-  housekeeper_lead: [P.teamHandle],
-  security_lead: [P.teamHandle],
+  employee: [...SERVICES],
+  housekeeper_lead: [...SERVICES, P.teamHandle],
+  security_lead: [...SERVICES, P.teamHandle],
   technician: [P.viewAll, P.work, P.contractor],
-  admin: [P.viewAll, P.closeAny, P.handoverAny, P.overview],
-  [MOCK_CUSTOM_ROLE]: [P.viewAll, P.work, P.closeAny],
+  admin: [...SERVICES, P.viewAll, P.closeAny, P.handoverAny, P.overview, P.building3d, ...SETTINGS],
+  [MOCK_CUSTOM_ROLE]: [...SERVICES, P.viewAll, P.work, P.closeAny],
 };
 
-/** Effective keys in catalog order: super_admin all; others their stored keys + the fixed keys of their role key. */
+/** Effective keys in catalog order: super_admin all; others their stored keys (no group is fixed since CR-006). */
 function effective(roleKey: string, stored: string[]): string[] {
-  return CATALOG.filter((p) =>
-    roleKey === "super_admin" || (p.isFixed ? (FIXED_BY_ROLE[roleKey] ?? []).includes(p.key) : stored.includes(p.key)),
-  ).map((p) => p.key);
+  return CATALOG.filter((p) => roleKey === "super_admin" || (!p.isFixed && stored.includes(p.key))).map((p) => p.key);
+}
+
+// ---- CR-006 guard rules G1–G3, same as the API (backend settings/guards.go) ----
+
+/** Who calls (the mock `Me` of the role switcher). */
+export type MockViewer = Pick<Me, "id" | "role" | "permissions">;
+
+const isSuper = (v: MockViewer) => v.role === "super_admin";
+
+/** G1 / G2: the rule that stops the viewer from touching the role with this key. */
+function roleGuard(v: MockViewer, roleKey: string): RoleGuard | null {
+  if (isSuper(v)) return null;
+  if (roleKey === "super_admin") return "SUPER_ADMIN";
+  if (roleKey === v.role) return "OWN_ROLE";
+  return null;
+}
+
+/** G3: the viewer holds every key. */
+const holdsAll = (v: MockViewer, keys: string[]) => isSuper(v) || keys.every((k) => v.permissions.includes(k));
+
+const guardError = (rule: GuardRule) => mockErrors.code(403, "PERMISSION_GUARD", undefined, { rule });
+
+function assignGuard(v: MockViewer, roleKey: string, perms: string[]): GuardRule | null {
+  if (isSuper(v)) return null;
+  if (roleKey === "super_admin") return "SUPER_ADMIN";
+  return holdsAll(v, perms) ? null : "ESCALATION";
 }
 
 // ---- in-memory store for #2–#7 (reset on reload) ----
@@ -201,22 +263,28 @@ const randomHex = () =>
     .toString(16)
     .padStart(8, "0");
 
-/** #2 */
-export function mockRoleList(): Role[] {
-  return store.roles.map((r) => ({ ...r }));
+const permsOf = (r: Role) => effective(r.key, store.stored.get(r.id) ?? []);
+
+/** #2 — with this viewer's guard / assignable (CR-006). */
+export function mockRoleList(viewer: MockViewer): RoleListItem[] {
+  return store.roles.map((r) => ({ ...r, guard: roleGuard(viewer, r.key), assignable: assignGuard(viewer, r.key, permsOf(r)) === null }));
 }
 
-/** #6 */
-export function mockMatrix(): PermissionMatrix {
+/** #6 — with this viewer's row guards and grantable keys (CR-006). */
+export function mockMatrix(viewer: MockViewer): PermissionMatrix {
   const roles: MatrixRole[] = store.roles.map((r) => ({
     id: r.id,
     key: r.key,
     name: r.name,
     userCount: r.userCount,
     isLocked: r.isLocked,
-    permissions: effective(r.key, store.stored.get(r.id) ?? []),
+    guard: roleGuard(viewer, r.key),
+    permissions: permsOf(r),
   }));
-  return { version: store.version, updatedAt: store.updatedAt, updatedBy: store.updatedBy, systems: mockPermissionSystems, roles };
+  return {
+    version: store.version, updatedAt: store.updatedAt, updatedBy: store.updatedBy, systems: mockPermissionSystems, roles,
+    grantable: CATALOG_KEYS.filter((k) => holdsAll(viewer, [k])),
+  };
 }
 
 function validateRole(name: string | undefined, description: string | undefined, selfId?: string) {
@@ -237,14 +305,17 @@ function findRole(id: string): Role {
   return r;
 }
 
-/** #3 — copy-from takes the editable keys only (BR-F29-8). */
-export function mockCreateRole(input: CreateRoleInput, actor: PersonRef): Role {
-  validateRole(input.name, input.description ?? "");
+/** #3 — copy-from takes the source's keys; a non-Superadmin may only copy a role within their own keys (G3). */
+export function mockCreateRole(input: CreateRoleInput, actor: PersonRef, viewer: MockViewer): Role {
   let copied: string[] = [];
   if (input.copyFromRoleId) {
     const src = store.roles.find((r) => r.id === input.copyFromRoleId);
+    if (src && !holdsAll(viewer, permsOf(src))) throw guardError("ESCALATION");
+    validateRole(input.name, input.description ?? "");
     if (!src) throw mockErrors.code(400, "VALIDATION_FAILED", { copyFromRoleId: "INVALID" });
-    copied = effective(src.key, store.stored.get(src.id) ?? []).filter((k) => !isFixedKey(k));
+    copied = permsOf(src).filter((k) => !isFixedKey(k));
+  } else {
+    validateRole(input.name, input.description ?? "");
   }
   const role: Role = {
     id: crypto.randomUUID(),
@@ -262,9 +333,11 @@ export function mockCreateRole(input: CreateRoleInput, actor: PersonRef): Role {
   return { ...role };
 }
 
-/** #4 */
-export function mockUpdateRole(id: string, input: UpdateRoleInput, actor: PersonRef): Role {
+/** #4 — G1 / G2 first. */
+export function mockUpdateRole(id: string, input: UpdateRoleInput, actor: PersonRef, viewer: MockViewer): Role {
   const r = findRole(id);
+  const rule = roleGuard(viewer, r.key);
+  if (rule) throw guardError(rule);
   if (r.isLocked) throw mockErrors.code(422, "SYSTEM_ROLE");
   validateRole(input.name, input.description, id);
   if (r.updatedAt !== input.updatedAt) throw mockErrors.code(409, "VERSION_CONFLICT");
@@ -274,20 +347,31 @@ export function mockUpdateRole(id: string, input: UpdateRoleInput, actor: Person
   return { ...r };
 }
 
-/** #5 — demo users never count, so Admin (2 users) gives ROLE_IN_USE and หัวหน้าช่าง (0) can go. */
-export function mockDeleteRole(id: string): void {
+/** #5 — G1 / G2 first; demo users never count, so Admin (2 users) gives ROLE_IN_USE and หัวหน้าช่าง (0) can go. */
+export function mockDeleteRole(id: string, viewer: MockViewer): void {
   const r = findRole(id);
+  const rule = roleGuard(viewer, r.key);
+  if (rule) throw guardError(rule);
   if (r.isSystem || r.isLocked) throw mockErrors.code(422, "SYSTEM_ROLE");
   if (r.userCount > 0) throw mockErrors.code(409, "ROLE_IN_USE");
   store.roles = store.roles.filter((x) => x.id !== id);
   store.stored.delete(id);
 }
 
-/** #7 — scenario `conflict`: the first save is refused as if ปวีณา saved first; the reload then shows her change. */
-export function mockSavePermissions(input: SavePermissionsInput, actor: PersonRef, scenario: MockScenario): PermissionMatrix {
+/**
+ * #7 — G1–G3 on every cell first. Scenario `conflict`: the first save is refused as if ปวีณา saved first; the reload
+ * then shows her change.
+ */
+export function mockSavePermissions(input: SavePermissionsInput, actor: PersonRef, scenario: MockScenario, viewer: MockViewer): PermissionMatrix {
   if (input.changes.length === 0) throw mockErrors.code(400, "VALIDATION_FAILED", { changes: "REQUIRED" });
   for (const c of input.changes) {
-    if (!CATALOG.some((p) => p.key === c.permission)) throw mockErrors.code(400, "UNKNOWN_PERMISSION");
+    const r = store.roles.find((x) => x.id === c.roleId);
+    if (!r || !CATALOG_KEYS.includes(c.permission)) continue;
+    const rule = roleGuard(viewer, r.key) ?? (holdsAll(viewer, [c.permission]) ? null : "ESCALATION");
+    if (rule) throw guardError(rule);
+  }
+  for (const c of input.changes) {
+    if (!CATALOG_KEYS.includes(c.permission)) throw mockErrors.code(400, "UNKNOWN_PERMISSION");
     if (isFixedKey(c.permission)) throw mockErrors.code(422, "FIXED_PERMISSION");
   }
   if (scenario === "conflict" && store.conflictPending) {
@@ -305,7 +389,7 @@ export function mockSavePermissions(input: SavePermissionsInput, actor: PersonRe
   store.version += 1;
   store.updatedAt = now();
   store.updatedBy = actor;
-  return mockMatrix();
+  return mockMatrix(viewer);
 }
 
 // ---- Stage 3: users (#8–#10) and audit (#11, #12) ----
@@ -360,18 +444,28 @@ export function mockUsers(query: UserQuery): Page<UserSummary> {
   return { items: all.slice((page - 1) * size, page * size).map(toSummary), meta: { page, pageSize: size, total: all.length } };
 }
 
-/** #9 */
-export function mockUser(id: string, viewerId: string): UserDetail {
+/** #9 — CR-006 adds READ_ONLY (viewer has users.view only) and SUPER_ADMIN (G2). */
+export function mockUser(id: string, viewer: MockViewer): UserDetail {
   const p = userStore.people.find((x) => x.id === id);
   if (!p) throw mockErrors.code(404, "USER_NOT_FOUND");
-  const reason = p.id === viewerId ? "SELF" : p.envLocked ? "LOCKED_BY_ENV" : null;
+  const reason: CannotChangeReason | null = p.id === viewer.id ? "SELF"
+    : p.envLocked ? "LOCKED_BY_ENV"
+    : !viewer.permissions.includes(P.users) ? "READ_ONLY"
+    : roleGuard(viewer, p.roleKey) === "SUPER_ADMIN" ? "SUPER_ADMIN"
+    : null;
   return { ...toSummary(p), division: p.division, firstLoginAt: p.firstLoginAt, canChangeRole: reason === null, cannotChangeReason: reason, roleHistory: [...(userStore.history.get(id) ?? [])] };
 }
 
-/** #10 — same rules as the API. */
-export function mockChangeUserRole(id: string, roleId: string, actor: PersonRef): UserSummary {
+/** #10 — same rules as the API: G2 / G3 (CR-006), then self / env lock / role. */
+export function mockChangeUserRole(id: string, roleId: string, actor: PersonRef, viewer: MockViewer): UserSummary {
   const p = userStore.people.find((x) => x.id === id);
   if (!p) throw mockErrors.code(404, "USER_NOT_FOUND");
+  if (p.id !== viewer.id && !isSuper(viewer)) {
+    if (p.roleKey === "super_admin") throw guardError("SUPER_ADMIN");
+    const target = store.roles.find((r) => r.id === roleId);
+    const rule = target && assignGuard(viewer, target.key, permsOf(target));
+    if (rule) throw guardError(rule);
+  }
   if (p.id === actor.id) throw mockErrors.code(422, "CANNOT_CHANGE_SELF");
   if (p.envLocked) throw mockErrors.code(422, "ROLE_LOCKED");
   const role = store.roles.find((r) => r.id === roleId);

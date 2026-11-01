@@ -119,6 +119,8 @@ flowchart TD
 
 ## F02 — แจ้งซ่อม
 
+> **settings CR-006 (2026-10-29):** needs `repair.ticket.report` (default: every role except `technician`). Without it the report entry is hidden and the API answers 403. (settings CR-006)
+
 - **Actor:** ทุก role · **Trigger:** กด "แจ้งซ่อม" (หน้าแรก/เมนู) หรือสแกน QR (F13-B) · **Outcome:** ได้เลข Ticket, งานถึงช่างทันที สถานะ "กำลังดำเนินการ · รอช่างประเมิน" (CR-005)
 
 ```mermaid
@@ -168,6 +170,8 @@ flowchart TD
 - ~~ตัด "ระบบตั้ง Priority เมื่อเข้าเงื่อนไขฉุกเฉิน" ของเดิม~~ — CR-008: ระบบกำหนดให้ตามอาการ (BR-F02-2)
 
 ## F03 — ตรวจงานซ้ำ → ติดตามเคสเดิม
+
+> **settings CR-006 (2026-10-29):** needs `repair.ticket.report` (default: every role except `technician`). Without it the report entry is hidden and the API answers 403. (settings CR-006)
 
 - **Actor:** ผู้แจ้ง · **Trigger:** กดส่งใน F02 · **Outcome:** เป็นผู้ติดตามเคสเดิม หรือสร้าง Ticket ใหม่
 
@@ -298,6 +302,8 @@ flowchart TD
 
 ## F13-B — สแกน QR ที่อุปกรณ์ → เติมฟอร์ม
 
+> **settings CR-006 (2026-10-29):** needs `repair.ticket.report` (default: every role except `technician`). Without it the report entry is hidden and the API answers 403. (settings CR-006)
+
 - **Actor:** ทุก role · **Outcome:** ฟอร์ม F02 ที่กรอกอุปกรณ์ หมวด อาคาร ชั้น ไว้ให้แล้ว
 
 ```mermaid
@@ -423,6 +429,8 @@ flowchart TD
 - ค่าใช้จ่ายการจ้างมาพร้อม F10 (later)
 
 ## F23 — Dashboard หน้าแรกของ Admin ~~/ ผู้บริหาร~~ (CR-024) + ภาพรวมอาคาร 3D (CR-016; เดิม S27 ภาพรวมองค์กร, CR-008)
+
+> **settings CR-006 (2026-10-29):** the 3D building model and site view need `repair.building3d.view` in addition to `repair.overview.view` (default Admin); without it S29 shows the floor list only. (settings CR-006)
 
 > **CR-016 (approved 2026-10-19):** แทน S12 / S27 — dashboard อยู่ที่ **หน้าแรก** ของ Admin ~~และผู้บริหาร~~ (CR-024) (S29) โมเดล 3D ของอาคาร 1 อยู่กลางหน้า ตัวเลขสำคัญอยู่รอบ ๆ บริการอื่น (จองรถ / ห้องประชุม) เป็นบล็อกข้อมูลตัวอย่างจนกว่าระบบจะมี
 

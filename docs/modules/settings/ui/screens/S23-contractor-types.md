@@ -12,6 +12,8 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 
 > **CR-001 (2026-10-26):** Superadmin only (`settings.contractor_types.manage`), reached from the sidebar group ข้อมูลกลาง (owner 2026-10-26). Visual: the administration shell and page heading (`_common.md` §1–§2) with one white panel holding the `MasterList` rows, as the CR-001 panels (`../mockups/CR-001-admin-settings.html`). Business rules, columns and copy below are unchanged.
 
+> **CR-006 (2026-10-29):** restyle to the CR-006 page frame and list panel; sub-menu of การให้บริการ; `settings.contractor_types.manage` is tickable (default Admin + Superadmin). (CR-006)
+
 ## Layout — mobile first
 
 ```

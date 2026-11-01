@@ -16,7 +16,9 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 | 4 | (CR-001 / CR-002) อาคารและอุปกรณ์: เลือกห้องจากผัง แก้ชื่ออาคาร/ห้อง จัดการอุปกรณ์ในห้อง และประเภทอุปกรณ์ (Admin + Superadmin) | F26 | S20 (redesigned), ~~S21~~ | done — accepted 2026-10-27 (Claude UI, D-115) |
 | 5 | ตั้งค่าหมวดงาน อาการ (Admin + Superadmin, CR-001) และประเภทผู้รับเหมา (Superadmin) ได้ | F27, F28 | S22, S23 | done — accepted 2026-10-27 (Claude UI, D-115) |
 | 6 | edge cases, สิทธิ์ทุก role, มือถือ, a11y และความพร้อม UAT | all | all | done — accepted 2026-10-27 (Claude, D-115) |
-| 4P | **CR-005 (repair CR-025):** ประเภทอาคาร — แท็บ "ประเภทอาคาร" ใน S20, อาคารต้องมีประเภท, หมวดงานต้องระบุ "ใช้กับประเภทอาคาร" ใน S22 (Admin + Superadmin) — after repair 4P backend | F26, F27 | S20, S22 | pending |
+| 4P | **CR-005 (repair CR-025):** ประเภทอาคาร — แท็บ "ประเภทอาคาร" ใน S20, อาคารต้องมีประเภท, หมวดงานต้องระบุ "ใช้กับประเภทอาคาร" ใน S22 (Admin + Superadmin) — after repair 4P backend | F26, F27 | S20, S22 | done — accepted 2026-10-29, tag `settings-stage-4P` |
+| R1 | **CR-006:** platform-wide permissions — service access (`repair.ticket.report`, `car_booking.use`, `room_booking.use`), `repair.building3d.view`, `settings.users.view`; settings group tickable; guard rules G1–G3; technician no longer reports / sees bookings — after repair 3D-2 is accepted | F25, F29, F15; repair F02, F03, F13-B, F23 | S24, S25, navbar, Home, S29 | done — accepted 2026-11-01 (Claude UI, D-133; navbar + one repair table pulled in, D-134), tag `settings-stage-R1` |
+| R2 | **CR-006:** settings UI to the owner's layout (`ui/mockups/CR-006-design/`) — navbar dropdown (no `>` on sub-menus), group page shows only its sub-menus, S20 / S22–S26 restyled; S26 pagination 20 per page on every width | F25, F26–F30 | `_common.md` §2, S20, S22–S26 | pending |
 
 (CR-001) Order unchanged. The administration shell (sidebar, drawer, page heading with mascot) is built in Stage 1 so every later stage only adds a page into it. Admin's own pages (4, 5) still follow the identity pages; Admin sees an empty-but-working shell until then.
 
@@ -292,6 +294,37 @@ Status: done (accepted 2026-10-29, tag `settings-stage-4P`) — runs after repai
 - [ ] AC3: Changing `โกดังเก็บของ 1 (ตัวอย่าง)` to อาคารสำนักงาน → the repair form shows ระบบปรับอากาศ for that building; changing back hides it
 - [ ] AC4: S22 new category without a building type → `เลือกประเภทอาคารอย่างน้อย 1 ประเภท`; `อื่น ๆ` shows `ใช้ได้กับทุกประเภทอาคาร` (no check boxes)
 - [ ] AC5: every change appears in S26; `go test ./...`, `tsc`, `eslint`, `next build`, settings e2e pass
+
+
+## Stage R1 — สิทธิ์ทั้งแพลตฟอร์ม (CR-006)
+
+**Scope**
+- Backend: register the new keys (repair, platform "การเข้าใช้บริการ", settings); settings group stored (not fixed) — data migration seeds the defaults in `changes/CR-006.md`; guards G1–G3 + `403 PERMISSION_GUARD` on #7, role create / copy / delete, user role change; repair create ticket / follow / QR prefill need `repair.ticket.report`; S29 3D / site-view data need `repair.building3d.view` + `overview.view`; users list read with `settings.users.view`
+- Frontend: `lib/platform/permissions.ts` keys; navbar / Home / profile show services by permission; report CTA hidden without `report`; `/car-booking`, `/room-booking` Forbidden without `use`; S24 matrix changes + locked-cell reasons; S25 read-only mode + filtered role picker; S29 floor list without 3D
+- Tests: Go unit (guards, registry), repository integration (migration defaults), e2e: technician sees only แจ้งซ่อม → work list, no report; Admin cannot edit own role / super_admin / grant a key they lack; S29 without 3D
+
+**Acceptance criteria**
+- [ ] AC1: technician (seed defaults) sees only แจ้งซ่อม in navbar / Home, no report CTA; the create-ticket API answers 403
+- [ ] AC2: unticking `repair.ticket.report` for พนักงาน hides the CTA on the next request; ticking it back restores it
+- [ ] AC3: Admin can edit another role's settings keys; editing role `admin` (own), `super_admin`, or ticking a key Admin lacks → locked in the UI, 403 `PERMISSION_GUARD` from the API
+- [ ] AC4: Admin cannot change their own role or assign `super_admin`
+- [ ] AC5: Admin without `repair.building3d.view` sees S29 with the floor list and no 3D
+- [ ] AC6: other roles' defaults unchanged (repair regression e2e pass); `go test ./...`, `tsc`, `eslint`, `next build`, e2e pass
+
+## Stage R2 — หน้าตาตั้งค่าระบบใหม่ (CR-006)
+
+**Scope**
+- Remove the administration sidebar / drawer; settings use the app navbar with the "ตั้งค่าระบบ" dropdown and the CR-006 page frame (`ui/screens/_common.md` §2 CR-006 block)
+- Restyle S20 (location + equipment panels), S22, S23, S24, S25, S26; ประเภทอาคาร / ประเภทอุปกรณ์ as sub-menus
+- S26 pagination footer, 20 per page on every width (no "โหลดเพิ่ม")
+- Builder: owner picks at `prepare` (Codex per AGENTS.md §8, or Claude as in D-115)
+
+**Acceptance criteria**
+- [ ] AC1: the dropdown shows groups (with `>`) and sub-menus without `>`; the current page has a check
+- [ ] AC2: opening a group shows only its sub-menus, never the other groups
+- [ ] AC3: every settings page keeps its loading / empty / error / forbidden states and behaviour (settings e2e F15 / F26–F30 pass after selector updates)
+- [ ] AC4: S26 always shows the pagination footer; 20 rows per page on desktop and phone
+- [ ] AC5: phone layout works at 390px (navbar sheet → group → sub-menus); `tsc`, `eslint`, `next build`, e2e pass
 
 ---
 

@@ -1,10 +1,12 @@
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { psql } from "./people";
+import { viewerWith } from "./sessions";
 
 // F28 (settings Stage 5, S23, CR-001): Superadmin adds / renames / deactivates contractor types; a deactivated type
 // leaves the technician's picker and typing its name there re-activates it (audit row by the technician).
-// Admin has no ประเภทผู้รับเหมา. Real API; rows this spec creates are removed afterwards.
+// A Role without `settings.contractor_types.manage` has no ประเภทผู้รับเหมา (CR-006: seeded Admin has it). Real API;
+// rows this spec creates are removed afterwards.
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 const API = "/api/v1/settings";
 
@@ -66,14 +68,23 @@ test.describe("super_admin", () => {
   });
 });
 
-test("AC5: Admin has no ประเภทผู้รับเหมา item and gets Forbidden; the API refuses", async ({ browser, baseURL, isMobile }) => {
-  const ctx = await browser.newContext({ storageState: auth("admin"), baseURL });
-  const page = await ctx.newPage();
-  await page.goto("/settings/contractor-types");
-  await expect(page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
-  if (!isMobile) await expect(page.getByRole("complementary", { name: "เมนูหลัก" }).getByRole("link", { name: "ประเภทผู้รับเหมา" })).toHaveCount(0);
-  expect((await page.request.get(`${API}/contractor-types`)).status()).toBe(403);
-  // Admin still manages categories (AC5 part 1)
-  expect((await page.request.get(`${API}/categories`)).status()).toBe(200);
-  await ctx.close();
+test("AC5: without the contractor-types key: no ประเภทผู้รับเหมา item, Forbidden, the API refuses", async ({ browser, baseURL, isMobile }) => {
+  test.skip(isMobile, "runs once (desktop)");
+  const v = await viewerWith(browser, baseURL, ["settings.categories.manage"]);
+  try {
+    const page = v.page;
+    await page.goto("/settings/contractor-types");
+    await expect(page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
+    await page.getByRole("button", { name: "ตั้งค่าระบบ" }).filter({ visible: true }).click();
+    const menu = page.getByRole("dialog", { name: "การตั้งค่าระบบ" });
+    await menu.getByRole("button", { name: /^การให้บริการ/ }).click();
+    await expect(menu.getByRole("link", { name: "หมวดงานและอาการ" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "ประเภทผู้รับเหมา" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    expect((await page.request.get(`${API}/contractor-types`)).status()).toBe(403);
+    // still manages categories (AC5 part 1)
+    expect((await page.request.get(`${API}/categories`)).status()).toBe(200);
+  } finally {
+    await v.close();
+  }
 });

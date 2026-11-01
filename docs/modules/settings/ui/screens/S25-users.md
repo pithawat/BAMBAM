@@ -17,6 +17,8 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 > - Change-role dialog: title "เปลี่ยน Role", subtitle "กำหนดบทบาทให้เหมาะกับหน้าที่ของผู้ใช้", person line, radio list "Role ใหม่ *" (current marked "ปัจจุบัน"), Superadmin warning, live line "เปลี่ยน {ชื่อ} จาก {เดิม} → {ใหม่}", button **ยืนยันเปลี่ยน Role** (disabled until a different role), toast "เปลี่ยน Role ของ {ชื่อ} เป็น {role} แล้ว".
 > - No invitations, deletion, passwords or active / inactive state (SSO identity, BR-F15-4).
 
+> **CR-006 (2026-10-29):** `settings.users.view` shows the list read-only (no เปลี่ยน role); with `settings.users.manage` the role picker leaves out `super_admin` and roles beyond the editor's permissions, and the editor's own row has no change action. Restyle to the CR-006 frame. (CR-006)
+
 ## Layout — mobile first
 
 ```

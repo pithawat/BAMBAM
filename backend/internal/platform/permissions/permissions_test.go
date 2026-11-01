@@ -59,3 +59,15 @@ func TestDuplicateKeyRejected(t *testing.T) {
 		t.Fatal("want error for a duplicate key")
 	}
 }
+
+// settings CR-006: a key may require another (S24 greys it out); the required key must exist.
+func TestRequiresMustBeKnown(t *testing.T) {
+	bad := System{Key: "x", Groups: []Group{{Permissions: []Permission{{Key: "x.child", Requires: "x.parent"}}}}}
+	if _, err := NewRegistry(bad); err == nil {
+		t.Fatal("want error for an unknown required key")
+	}
+	ok := System{Key: "x", Groups: []Group{{Permissions: []Permission{{Key: "x.parent"}, {Key: "x.child", Requires: "x.parent"}}}}}
+	if r, err := NewRegistry(ok); err != nil || !slices.Equal(r.Keys(), []string{"x.parent", "x.child"}) {
+		t.Fatalf("registry %v, err %v", r, err)
+	}
+}

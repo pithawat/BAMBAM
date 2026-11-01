@@ -1,8 +1,9 @@
 // Package permissions is the catalog of action-level permission keys (settings F29, BR-F29-1).
 // Each module declares its own System with Thai labels; main.go builds one Registry from them.
 //
-// Base permissions every role always has (log in, profile, report / scan QR / follow, see own and
-// followed tickets) are not keys: they need no check (settings 01-users.md → Permission catalog).
+// Base permissions every role always has (log in, profile, see own and followed tickets) are not keys:
+// they need no check (settings 01-users.md → Permission catalog). Reporting is a key since settings
+// CR-006 (`repair.ticket.report`).
 package permissions
 
 import (
@@ -24,6 +25,9 @@ type Permission struct {
 	// FixedRoles: for a permission in a fixed group, the role keys it is granted to in code.
 	// Fixed permissions are never stored, edited or copied (settings CR-001, D-111).
 	FixedRoles []string
+	// Requires is the key that must be ticked first for this one to do anything (S24 greys the cell
+	// out until then; settings CR-006: `repair.building3d.view` needs `repair.overview.view`).
+	Requires string
 }
 
 type Group struct {
@@ -65,6 +69,11 @@ func NewRegistry(systems ...System) (*Registry, error) {
 			}
 		}
 	}
+	for _, k := range r.order {
+		if req := r.byKey[k].Requires; req != "" && !r.Known(req) {
+			return nil, fmt.Errorf("permission %q requires unknown key %q", k, req)
+		}
+	}
 	return r, nil
 }
 
@@ -94,6 +103,9 @@ func (r *Registry) IsFixed(key string) bool {
 func (r *Registry) Label(key string) string {
 	return r.byKey[key].Label
 }
+
+// Keys is every key in catalog order.
+func (r *Registry) Keys() []string { return slices.Clone(r.order) }
 
 // Ordered returns keys in catalog order, dropping unknown ones and duplicates.
 func (r *Registry) Ordered(keys []string) []string {

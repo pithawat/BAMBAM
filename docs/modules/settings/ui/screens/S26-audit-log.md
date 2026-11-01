@@ -12,6 +12,8 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 
 > **CR-001 (2026-10-26):** Superadmin only (`settings.audit.view`), sidebar group ผู้ใช้และสิทธิ์ (owner 2026-10-26). Visual: administration shell + page heading (`_common.md` §1–§2) and the people-panel table pattern of S25 in the CR-001 design. New entity types `asset` อุปกรณ์ · `asset_type` ประเภทอุปกรณ์ appear under the Master filter; floor-plan actions no longer occur (CR-002). Other content unchanged.
 
+> **CR-006 (2026-10-29):** pagination footer always shown ("แสดง {a}–{b} จาก {n} รายการ", page numbers, prev / next; one page = page 1 only, arrows disabled), **20 per page on every width**; phones drop "โหลดเพิ่ม" and keep the day groups within a page. Restyle to the CR-006 frame. (CR-006)
+
 ## Layout — mobile first
 
 ```

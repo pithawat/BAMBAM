@@ -37,6 +37,8 @@ Status: APPROVED (2026-10-16) — user: "ทำเลย" with Claude's proposal
 
 ## F25 — เข้าเมนูตั้งค่าระบบ และ Superadmin คนแรก
 
+> **CR-006 (2026-10-29):** entry is the app navbar "ตั้งค่าระบบ" dropdown (groups → sub-menus, no `>` on sub-menus); a group page shows only its own sub-menus; no administration sidebar. Settings keys are tickable, so any role with a `settings.*` key gets the entry. (CR-006)
+
 - **Actor:** Superadmin; ผู้ดูแล server (ตั้ง env)
 - **Trigger:** Superadmin กดเมนู "ตั้งค่าระบบ"
 - **Preconditions:** login ผ่าน SSO แล้ว และมี role `super_admin`
@@ -271,6 +273,8 @@ flowchart TD
 
 ## F29 — Role และ Matrix สิทธิ์
 
+> **CR-006 (2026-10-29):** new keys (service access, 3D, users.view); the "ตั้งค่าระบบ" group is tickable; `settings.roles.manage` defaults to Admin. Guard rules G1–G3 (`changes/CR-006.md`): no edit / copy-over / delete of the editor's own role, never the `super_admin` role, tick only keys the editor holds; a refused change returns 403 and the cell shows locked with its reason. `building3d.view` is disabled until `overview.view` is ticked. (CR-006)
+
 - **Actor:** Superadmin
 - **Trigger:** ต้องการ role ใหม่ (เช่น "หัวหน้าช่าง") หรือปรับว่า role ไหนทำอะไรได้
 - **Preconditions:** F25
@@ -325,6 +329,8 @@ flowchart TD
 
 ## F15 — จัดการผู้ใช้ (เปลี่ยน role)
 
+> **CR-006 (2026-10-29):** `settings.users.view` (read-only list) and `settings.users.manage` (change role). Guards: no change of the editor's own role, never give / remove `super_admin`, only assign a role whose permissions are within the editor's. (CR-006)
+
 - **Actor:** Superadmin
 - **Trigger:** พนักงานเปลี่ยนตำแหน่ง มีช่าง/หัวหน้าทีมคนใหม่ หรือย้ายคนออกจาก role ที่จะลบ
 - **Preconditions:** F25; ผู้ใช้คนนั้นเคย login BAMBAM ผ่าน SSO อย่างน้อย 1 ครั้ง
@@ -376,6 +382,8 @@ flowchart TD
 ---
 
 ## F30 — ประวัติการเปลี่ยนแปลง
+
+> **CR-006 (2026-10-29):** always-visible pagination footer ("แสดง {a}–{b} จาก {n} รายการ", page numbers, prev / next), 20 per page on every width; phones no longer use "โหลดเพิ่ม". (CR-006)
 
 - **Actor:** Superadmin
 - **Trigger:** ต้องการตรวจว่าใครเปลี่ยน role / สิทธิ์ / master อะไร เมื่อไหร่

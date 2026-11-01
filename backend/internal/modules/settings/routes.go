@@ -17,14 +17,14 @@ type route struct {
 }
 
 var routes = []route{
-	{"2", "GET", "/roles", []string{PermRoles, PermUsers}, func(c *Controller) gin.HandlerFunc { return c.Roles }},
+	{"2", "GET", "/roles", []string{PermRoles, PermUsers, PermUsersView}, func(c *Controller) gin.HandlerFunc { return c.Roles }},
 	{"3", "POST", "/roles", []string{PermRoles}, func(c *Controller) gin.HandlerFunc { return c.CreateRole }},
 	{"4", "PATCH", "/roles/:id", []string{PermRoles}, func(c *Controller) gin.HandlerFunc { return c.UpdateRole }},
 	{"5", "DELETE", "/roles/:id", []string{PermRoles}, func(c *Controller) gin.HandlerFunc { return c.DeleteRole }},
 	{"6", "GET", "/permissions", []string{PermRoles}, func(c *Controller) gin.HandlerFunc { return c.Matrix }},
 	{"7", "PUT", "/permissions", []string{PermRoles}, func(c *Controller) gin.HandlerFunc { return c.SaveMatrix }},
-	{"8", "GET", "/users", []string{PermUsers}, func(c *Controller) gin.HandlerFunc { return c.Users }},
-	{"9", "GET", "/users/:id", []string{PermUsers}, func(c *Controller) gin.HandlerFunc { return c.User }},
+	{"8", "GET", "/users", []string{PermUsers, PermUsersView}, func(c *Controller) gin.HandlerFunc { return c.Users }},
+	{"9", "GET", "/users/:id", []string{PermUsers, PermUsersView}, func(c *Controller) gin.HandlerFunc { return c.User }},
 	{"10", "PUT", "/users/:id/role", []string{PermUsers}, func(c *Controller) gin.HandlerFunc { return c.ChangeUserRole }},
 	{"11", "GET", "/audit", []string{PermAudit}, func(c *Controller) gin.HandlerFunc { return c.Audit }},
 	{"12", "GET", "/audit/actors", []string{PermAudit}, func(c *Controller) gin.HandlerFunc { return c.AuditActors }},

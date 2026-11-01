@@ -1,5 +1,5 @@
 import { env } from "@/lib/env";
-import { http } from "@/lib/http";
+import { ApiError, http } from "@/lib/http";
 import { mockRole } from "@/lib/platform/api";
 import { mockMeByRole } from "@/lib/platform/mocks";
 import { canAny, PERM, type PermissionKey } from "@/lib/platform/permissions";
@@ -72,10 +72,12 @@ import type {
   AuditEntry,
   AuditQuery,
   CreateRoleInput,
+  GuardRule,
   Page,
   PermissionMatrix,
   PersonRef,
   Role,
+  RoleListItem,
   SavePermissionsInput,
   UpdateRoleInput,
   UserDetail,
@@ -89,43 +91,63 @@ import type {
 
 const BASE = "/settings";
 
-/** #2 GET /settings/roles — roles with user counts (S24 list, S25 role filter). Needs roles or users. */
-export async function getRoles(): Promise<Role[]> {
-  if (env.useMocks) return mockRead(mockRoleList, PERM.settingsRoles, PERM.settingsUsers);
-  return http.get<Role[]>(`${BASE}/roles`);
+/**
+ * #2 GET /settings/roles — roles with user counts and (CR-006) this viewer's `guard` / `assignable` (S24 list, S25 role
+ * filter and picker). Needs roles, users.manage or users.view.
+ */
+export async function getRoles(): Promise<RoleListItem[]> {
+  if (env.useMocks) return mockRead(() => mockRoleList(mockViewer()), PERM.settingsRoles, PERM.settingsUsers, PERM.settingsUsersView);
+  return http.get<RoleListItem[]>(`${BASE}/roles`);
 }
 
-/** #3 POST /settings/roles → the new role. Errors: VALIDATION_FAILED (name / description / copyFromRoleId), NAME_TAKEN. */
+/**
+ * #3 POST /settings/roles → the new role. Errors: VALIDATION_FAILED (name / description / copyFromRoleId), NAME_TAKEN,
+ * (CR-006) PERMISSION_GUARD `ESCALATION` (copying a role with keys the viewer lacks).
+ */
 export async function createRole(input: CreateRoleInput): Promise<Role> {
-  if (env.useMocks) return mockWrite(() => mockCreateRole(input, mockActor()));
+  if (env.useMocks) return mockWrite(() => mockCreateRole(input, mockActor(), mockViewer()));
   return http.post<Role>(`${BASE}/roles`, input);
 }
 
-/** #4 PATCH /settings/roles/{id}. Errors: ROLE_NOT_FOUND, NAME_TAKEN, VERSION_CONFLICT (refetch the list), SYSTEM_ROLE. */
+/**
+ * #4 PATCH /settings/roles/{id}. Errors: ROLE_NOT_FOUND, NAME_TAKEN, VERSION_CONFLICT (refetch the list), SYSTEM_ROLE,
+ * (CR-006) PERMISSION_GUARD `OWN_ROLE` / `SUPER_ADMIN`.
+ */
 export async function updateRole(id: string, input: UpdateRoleInput): Promise<Role> {
-  if (env.useMocks) return mockWrite(() => mockUpdateRole(id, input, mockActor()));
+  if (env.useMocks) return mockWrite(() => mockUpdateRole(id, input, mockActor(), mockViewer()));
   return http.patch<Role>(`${BASE}/roles/${id}`, input);
 }
 
-/** #5 DELETE /settings/roles/{id}. Errors: ROLE_IN_USE (the "ลบ role นี้ไม่ได้" dialog), ROLE_NOT_FOUND, SYSTEM_ROLE. */
+/**
+ * #5 DELETE /settings/roles/{id}. Errors: ROLE_IN_USE (the "ลบ role นี้ไม่ได้" dialog), ROLE_NOT_FOUND, SYSTEM_ROLE,
+ * (CR-006) PERMISSION_GUARD `OWN_ROLE` / `SUPER_ADMIN`.
+ */
 export async function deleteRole(id: string): Promise<void> {
-  if (env.useMocks) return mockWrite(() => mockDeleteRole(id));
+  if (env.useMocks) return mockWrite(() => mockDeleteRole(id, mockViewer()));
   await http.delete<void>(`${BASE}/roles/${id}`);
 }
 
-/** #6 GET /settings/permissions — the matrix. */
+/** #6 GET /settings/permissions — the matrix, with this viewer's `grantable` keys and row `guard`s (CR-006). */
 export async function getPermissionMatrix(): Promise<PermissionMatrix> {
-  if (env.useMocks) return mockRead(mockMatrix, PERM.settingsRoles);
+  if (env.useMocks) return mockRead(() => mockMatrix(mockViewer()), PERM.settingsRoles);
   return http.get<PermissionMatrix>(`${BASE}/permissions`);
 }
 
 /**
  * #7 PUT /settings/permissions → the new matrix. Errors: VERSION_CONFLICT (someone saved first: reload with
- * `getPermissionMatrix`, show its `updatedBy` / `updatedAt`, re-apply the pending changes), ROLE_NOT_FOUND, others generic.
+ * `getPermissionMatrix`, show its `updatedBy` / `updatedAt`, re-apply the pending changes), ROLE_NOT_FOUND,
+ * (CR-006) PERMISSION_GUARD `OWN_ROLE` / `SUPER_ADMIN` / `ESCALATION` (nothing is saved), others generic.
  */
 export async function savePermissionMatrix(input: SavePermissionsInput): Promise<PermissionMatrix> {
-  if (env.useMocks) return mockWrite(() => mockSavePermissions(input, mockActor(), mockScenario()));
+  if (env.useMocks) return mockWrite(() => mockSavePermissions(input, mockActor(), mockScenario(), mockViewer()));
   return http.put<PermissionMatrix>(`${BASE}/permissions`, input);
+}
+
+/** `details.rule` of a `403 PERMISSION_GUARD` (CR-006), else null. */
+export function guardRule(err: unknown): GuardRule | null {
+  if (!(err instanceof ApiError) || err.code !== "PERMISSION_GUARD") return null;
+  const rule = (err.details as { rule?: string } | undefined)?.rule;
+  return rule === "OWN_ROLE" || rule === "SUPER_ADMIN" || rule === "ESCALATION" ? rule : null;
 }
 
 // ---- Stage 3: users and audit (#8–#12) ----
@@ -137,22 +159,28 @@ function query(params: Record<string, string | number | undefined>): string {
   return s ? `?${s}` : "";
 }
 
-/** #8 GET /settings/users — search (q ≥ 2 characters), role filter, 20 per page by default. */
+/** #8 GET /settings/users — search (q ≥ 2 characters), role filter, 20 per page by default. users.view or users.manage. */
 export async function getUsers(params: UserQuery): Promise<Page<UserSummary>> {
-  if (env.useMocks) return mockRead(() => mockUsers(params), PERM.settingsUsers);
+  if (env.useMocks) return mockRead(() => mockUsers(params), PERM.settingsUsers, PERM.settingsUsersView);
   const res = await http.list<UserSummary>(`${BASE}/users${query({ ...params, q: params.q && params.q.trim().length >= 2 ? params.q.trim() : undefined })}`);
   return { items: res.data, meta: res.meta! };
 }
 
-/** #9 GET /settings/users/{id} — detail, lock reason, role history (newest first). Errors: USER_NOT_FOUND. */
+/**
+ * #9 GET /settings/users/{id} — detail, lock reason (CR-006 adds READ_ONLY, SUPER_ADMIN), role history (newest first).
+ * Errors: USER_NOT_FOUND.
+ */
 export async function getUser(id: string): Promise<UserDetail> {
-  if (env.useMocks) return mockRead(() => mockUser(id, mockActor().id), PERM.settingsUsers);
+  if (env.useMocks) return mockRead(() => mockUser(id, mockViewer()), PERM.settingsUsers, PERM.settingsUsersView);
   return http.get<UserDetail>(`${BASE}/users/${id}`);
 }
 
-/** #10 PUT /settings/users/{id}/role. Errors: USER_NOT_FOUND, ROLE_NOT_FOUND, CANNOT_CHANGE_SELF, ROLE_LOCKED. */
+/**
+ * #10 PUT /settings/users/{id}/role. Errors: USER_NOT_FOUND, ROLE_NOT_FOUND, CANNOT_CHANGE_SELF, ROLE_LOCKED,
+ * (CR-006) PERMISSION_GUARD `SUPER_ADMIN` / `ESCALATION` (offer only `assignable` roles to avoid it).
+ */
 export async function changeUserRole(id: string, roleId: string): Promise<UserSummary> {
-  if (env.useMocks) return mockWrite(() => mockChangeUserRole(id, roleId, mockActor()), PERM.settingsUsers);
+  if (env.useMocks) return mockWrite(() => mockChangeUserRole(id, roleId, mockActor(), mockViewer()), PERM.settingsUsers);
   return http.put<UserSummary>(`${BASE}/users/${id}/role`, { roleId });
 }
 
@@ -343,6 +371,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function mockActor(): PersonRef {
   const me = mockMeByRole[mockRole()];
   return { id: me.id, name: me.name, department: me.department };
+}
+
+/** The role switcher's mock user, for the CR-006 guard rules. */
+function mockViewer() {
+  return mockMeByRole[mockRole()];
 }
 
 async function mockRead<T>(fn: () => T, ...perms: PermissionKey[]): Promise<T> {

@@ -11,8 +11,8 @@ import { ErrorState } from "./states";
 /**
  * App shell for every (app) route (_common.md §1, CR-010): role switcher strip (dev/UAT only) · top navbar ·
  * content (phone / tablet max 560px, desktop max 1280px). No sidebar and no bottom nav.
- * `/settings/**` (settings CR-001): no strip, navbar or width frame — `app/(app)/settings/layout.tsx` renders the
- * administration shell (sidebar / drawer, role switcher in the sidebar) around the page.
+ * `/settings/**` (settings CR-006): same strip and navbar, no width frame — `app/(app)/settings/layout.tsx` renders
+ * the settings page frame.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -36,15 +36,17 @@ function ShellFrame({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isSettingsPath(pathname)) return <div className="min-h-svh bg-background">{children}</div>;
-
   return (
     <div className="min-h-svh bg-background">
       <RoleSwitcher />
       <AppNavbar me={state.me} />
-      <main className="min-w-0 pb-6 lg:px-8 lg:pt-2 lg:pb-8 print:p-0">
-        <div className="mx-auto w-full max-w-140 lg:max-w-7xl print:max-w-none">{children}</div>
-      </main>
+      {isSettingsPath(pathname) ? (
+        children
+      ) : (
+        <main className="min-w-0 pb-6 lg:px-8 lg:pt-5 lg:pb-8 print:p-0">
+          <div className="mx-auto w-full max-w-140 lg:max-w-7xl print:max-w-none">{children}</div>
+        </main>
+      )}
     </div>
   );
 }
@@ -54,9 +56,9 @@ const isSettingsPath = (p: string) => p === "/settings" || p.startsWith("/settin
 function ShellSkeleton() {
   return (
     <div className="min-h-svh" aria-busy="true" aria-label="กำลังโหลด">
-      <div className="lg:mt-3 lg:px-8">
-        <div className="mx-auto border-b bg-card lg:max-w-7xl lg:rounded-2xl lg:border">
-          <div className="flex h-15 items-center gap-3 px-4 lg:h-19 lg:px-5">
+      <div>
+        <div className="border-b bg-card">
+          <div className="flex h-15 items-center gap-3 px-4 lg:h-20 lg:px-10 xl:px-12">
             <Skeleton className="h-7 w-24" />
             <div className="hidden flex-1 gap-2 lg:flex">
               {Array.from({ length: 4 }).map((_, i) => (

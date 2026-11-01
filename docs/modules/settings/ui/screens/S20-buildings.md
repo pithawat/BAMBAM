@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-16) — user approved screens + plan · rewritten by CR-001 / CR-002 2026-10-26 (owner approved the design `../mockups/CR-001-admin-settings.html`); the original "อาคารและชั้น" spec is kept at the end for history · CR-005 building types (approved 2026-10-27)
 
+> **CR-006 (2026-10-29):** layout per `../mockups/CR-006-design/App.tsx` (location panel: building select · floor grid · room list; equipment panel: room header + add, three stat tiles, search + type filter, table, footer pagination, "แสดงอุปกรณ์ที่ไม่ใช้งาน"). ประเภทอาคาร and ประเภทอุปกรณ์ become sub-menus of สถานที่และอุปกรณ์ (same content as today's tabs; `?tab=` kept as their routes). Behaviour, data and permissions otherwise unchanged. (CR-006)
+
 - **Flows:** F26 (see ../../02-flows.md)
 - **Persona:** Admin and Superadmin on desktop (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** pick a room from the building plan and keep its equipment, the equipment types and the building / room names right.

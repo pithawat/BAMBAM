@@ -8,17 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
-import { changeUserRole } from "../../api";
-import type { Role, UserSummary } from "../../types";
+import { changeUserRole, guardRule } from "../../api";
+import type { RoleListItem, UserSummary } from "../../types";
 import { errorCode, GENERIC_ERROR, sheetOnMobile } from "../settings-ui";
 import { Initials, LOCK_COPY } from "./user-bits";
 
 // S25 change-role dialog (CR-001 block, design user-role-confirmation-desktop.png): radio grid of roles with the
-// current one marked, Superadmin warning, live summary, confirm only for a different role.
+// current one marked, Superadmin warning, live summary, confirm only for a different role. CR-006: only `assignable`
+// roles (+ the current one) are offered.
 
 type Props = {
   user: UserSummary | null;
-  roles: Role[];
+  roles: RoleListItem[];
   onOpenChange: (open: boolean) => void;
   onChanged: (user: UserSummary) => void;
   /** ROLE_NOT_FOUND: the role list is stale; the caller refetches it. */
@@ -40,7 +41,8 @@ export function ChangeRoleDialog({ user, roles, onOpenChange, onChanged, onRoles
     }
   }
 
-  const picked = roles.find((r) => r.id === roleId);
+  const offered = roles.filter((r) => r.assignable || r.id === user?.role.id);
+  const picked = offered.find((r) => r.id === roleId);
   const changed = !!user && !!picked && picked.id !== user.role.id;
 
   async function confirm() {
@@ -53,7 +55,14 @@ export function ChangeRoleDialog({ user, roles, onOpenChange, onChanged, onRoles
       onChanged(next);
     } catch (err) {
       const code = errorCode(err);
-      if (code === "CANNOT_CHANGE_SELF") setError(LOCK_COPY.SELF);
+      const rule = guardRule(err);
+      if (rule === "SUPER_ADMIN") setError(LOCK_COPY.SUPER_ADMIN);
+      else if (rule === "OWN_ROLE") setError(LOCK_COPY.SELF);
+      else if (rule === "ESCALATION") {
+        setError("เลือกได้เฉพาะ Role ที่มีสิทธิ์ไม่เกินของคุณ");
+        setRoleId(user.role.id);
+        onRolesStale();
+      } else if (code === "CANNOT_CHANGE_SELF") setError(LOCK_COPY.SELF);
       else if (code === "ROLE_LOCKED") setError(LOCK_COPY.LOCKED_BY_ENV);
       else if (code === "ROLE_NOT_FOUND") {
         setError("Role นี้ถูกลบไปแล้ว เลือกใหม่");
@@ -100,7 +109,7 @@ export function ChangeRoleDialog({ user, roles, onOpenChange, onChanged, onRoles
                 Role ใหม่ <span className="text-destructive">*</span>
               </legend>
               <RadioGroup value={roleId} onValueChange={setRoleId} className="grid gap-2 sm:grid-cols-2">
-                {roles.map((r) => {
+                {offered.map((r) => {
                   const id = `new-role-${r.id}`;
                   return (
                     <label

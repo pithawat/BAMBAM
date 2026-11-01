@@ -3,7 +3,7 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Info, Lock, Search } from "lucide-react";
-import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
+import { EmptyState, ErrorState } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,16 +11,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getRoles, getUsers } from "../../api";
 import { settingsHeading } from "../../nav";
-import type { Page, Role, UserSummary } from "../../types";
+import type { Page, RoleListItem, UserSummary } from "../../types";
+import { SettingsForbidden } from "../settings-forbidden";
 import { SettingsHeading } from "../settings-heading";
 import { errorCode, panelClass } from "../settings-ui";
 import { ChangeRoleDialog } from "./change-role-dialog";
 import { dateAndTime, FixedRoleNote, Initials, LOCK_COPY } from "./user-bits";
 import { UserDetailDialog } from "./user-detail-dialog";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM } from "@/lib/platform/permissions";
 
 // S25 ผู้ใช้ (F15; spec screens/S25-users.md + CR-001 block; design CR-001-admin-settings.html#users).
-// `?q=&role=&page=&user=` live in the URL; search / filter reset the page.
+// `?q=&role=&page=&user=` live in the URL; search / filter reset the page. CR-006: `users.view` only → read-only;
+// a non-Superadmin cannot change a Superadmin.
 
 const PAGE_SIZE = 20;
 const ALL = "all";
@@ -35,7 +38,7 @@ export function UsersScreen() {
   const openUser = search.get("user");
 
   const [text, setText] = useState(q);
-  const [roles, setRoles] = useState<Role[]>();
+  const [roles, setRoles] = useState<RoleListItem[]>();
   const [list, setList] = useState<Page<UserSummary>>();
   const [error, setError] = useState<unknown>();
   const [revision, setRevision] = useState(0);
@@ -81,6 +84,12 @@ export function UsersScreen() {
   }, [q, roleId, page, revision]);
 
   const heading = settingsHeading("users");
+  const lock = (u: UserSummary): RoleLock =>
+    u.roleLockedByEnv ? "env"
+      : u.id === me.id ? "self"
+      : !can(me, PERM.settingsUsers) ? "readOnly"
+      : me.role !== "super_admin" && u.role.key === "super_admin" ? "superAdmin"
+      : null;
   const filterRole = roles?.find((r) => r.id === roleId);
 
   if (error !== undefined) {
@@ -89,7 +98,7 @@ export function UsersScreen() {
         <SettingsHeading {...heading} />
         <section className={panelClass}>
           {errorCode(error) === "FORBIDDEN" ? (
-            <ForbiddenState title="คุณไม่มีสิทธิ์เข้าถึงหน้านี้" reason="การจัดการผู้ใช้ Role และสิทธิ์ สำหรับ Superadmin เท่านั้น" />
+            <SettingsForbidden />
           ) : (
             <ErrorState hint="ตรวจสอบการเชื่อมต่อ แล้วลองอีกครั้ง ข้อมูลที่ยังไม่บันทึกจะยังอยู่" onRetry={() => { setError(undefined); setRevision((r) => r + 1); setRolesRevision((r) => r + 1); }} />
           )}
@@ -195,7 +204,7 @@ export function UsersScreen() {
                       <span className="block">{u.department ?? "—"}</span>
                       <span className="block text-xs text-muted-foreground">{u.position ?? ""}</span>
                     </td>
-                    <td className="px-3 py-3"><RoleControl u={u} self={u.id === me.id} onChange={() => setChanging(u)} /></td>
+                    <td className="px-3 py-3"><RoleControl u={u} lock={lock(u)} onChange={() => setChanging(u)} /></td>
                     <td className="px-3 py-3 tabular-nums"><LastLogin iso={u.lastLoginAt} /></td>
                     <td className="px-3 py-3 text-right"><OpenButton u={u} onOpen={() => setParams({ user: u.id }, true)} /></td>
                   </tr>
@@ -208,7 +217,7 @@ export function UsersScreen() {
                 <li key={u.id} className="flex items-start gap-2 py-3.5 pr-2 pl-4">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Person u={u} self={u.id === me.id} />
-                    <div className="pl-13"><RoleControl u={u} self={u.id === me.id} onChange={() => setChanging(u)} /></div>
+                    <div className="pl-13"><RoleControl u={u} lock={lock(u)} onChange={() => setChanging(u)} /></div>
                     <p className="pl-13 text-xs text-muted-foreground">
                       เข้าใช้ล่าสุด {dateAndTime(u.lastLoginAt)?.join(" ") ?? "—"}
                     </p>
@@ -274,9 +283,11 @@ function Person({ u, self }: { u: UserSummary; self: boolean }) {
   );
 }
 
-/** Contextual role control: opens the change dialog; env-locked and self are disabled with the reason. */
-function RoleControl({ u, self, onChange }: { u: UserSummary; self: boolean; onChange: () => void }) {
-  if (u.roleLockedByEnv) {
+type RoleLock = "env" | "self" | "readOnly" | "superAdmin" | null;
+
+/** Contextual role control: opens the change dialog; locked cases show plain text (with the reason as title). */
+function RoleControl({ u, lock, onChange }: { u: UserSummary; lock: RoleLock; onChange: () => void }) {
+  if (lock === "env") {
     return (
       <span className="inline-flex flex-col">
         <span className="inline-flex items-center gap-1.5 font-medium">{u.role.name}<Lock className="size-3.5 text-muted-foreground" aria-hidden /></span>
@@ -284,8 +295,17 @@ function RoleControl({ u, self, onChange }: { u: UserSummary; self: boolean; onC
       </span>
     );
   }
-  if (self) {
+  if (lock === "self") {
     return <span className="font-medium text-muted-foreground" title={LOCK_COPY.SELF}>{u.role.name}</span>;
+  }
+  if (lock === "readOnly") return <span className="font-medium">{u.role.name}</span>;
+  if (lock === "superAdmin") {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-medium" title={LOCK_COPY.SUPER_ADMIN}>
+        {u.role.name}
+        <Lock className="size-3.5 text-muted-foreground" aria-label={LOCK_COPY.SUPER_ADMIN} />
+      </span>
+    );
   }
   return (
     <button

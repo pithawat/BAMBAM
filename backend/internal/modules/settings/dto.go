@@ -30,6 +30,27 @@ func newRoleResponse(r roles.Role) RoleResponse {
 	}
 }
 
+// RoleListItemResponse = a #2 item: `Role` + what the viewer may do with it (CR-006).
+type RoleListItemResponse struct {
+	RoleResponse
+	// Guard: the G1 / G2 rule that locks edit / delete for this viewer (OWN_ROLE, SUPER_ADMIN), null = none.
+	Guard *string `json:"guard"`
+	// Assignable: the viewer may give this role to someone (#10 passes G2 / G3).
+	Assignable bool `json:"assignable"`
+}
+
+func newRoleListItemResponse(r RoleItem) RoleListItemResponse {
+	return RoleListItemResponse{RoleResponse: newRoleResponse(r.Role), Guard: orNull(r.Guard), Assignable: r.Assignable}
+}
+
+// orNull writes "" as null.
+func orNull(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 // CreateRoleRequest is #3.
 type CreateRoleRequest struct {
 	Name           string  `json:"name"`
@@ -61,6 +82,8 @@ type MatrixResponse struct {
 	UpdatedBy *people.Ref          `json:"updatedBy"`
 	Systems   []SystemResponse     `json:"systems"`
 	Roles     []MatrixRoleResponse `json:"roles"`
+	// Grantable: the keys this viewer may tick or untick (G3, CR-006); Superadmin = every key.
+	Grantable []string `json:"grantable"`
 }
 
 type SystemResponse struct {
@@ -80,26 +103,35 @@ type PermissionResponse struct {
 	Key         string `json:"key"`
 	Label       string `json:"label"`
 	Description string `json:"description"`
+	// Requires: the key that must be ticked first (CR-006), null = none.
+	Requires *string `json:"requires"`
 }
 
 type MatrixRoleResponse struct {
-	ID          string   `json:"id"`
-	Key         string   `json:"key"`
-	Name        string   `json:"name"`
-	UserCount   int64    `json:"userCount"`
-	IsLocked    bool     `json:"isLocked"`
+	ID        string `json:"id"`
+	Key       string `json:"key"`
+	Name      string `json:"name"`
+	UserCount int64  `json:"userCount"`
+	IsLocked  bool   `json:"isLocked"`
+	// Guard: the G1 / G2 rule that locks the whole row for this viewer (CR-006), null = none.
+	Guard       *string  `json:"guard"`
 	Permissions []string `json:"permissions"`
 }
 
-func newMatrixResponse(m roles.Matrix) MatrixResponse {
-	out := MatrixResponse{Version: m.Version, UpdatedAt: m.UpdatedAt.UTC(), UpdatedBy: m.UpdatedBy,
+func newMatrixResponse(mv MatrixView) MatrixResponse {
+	m := mv.Matrix
+	grantable := mv.Grantable
+	if grantable == nil {
+		grantable = []string{}
+	}
+	out := MatrixResponse{Version: m.Version, UpdatedAt: m.UpdatedAt.UTC(), UpdatedBy: m.UpdatedBy, Grantable: grantable,
 		Systems: make([]SystemResponse, 0, len(m.Systems)), Roles: make([]MatrixRoleResponse, 0, len(m.Roles))}
 	for _, s := range m.Systems {
 		sr := SystemResponse{Key: s.Key, Name: s.Name, Groups: make([]GroupResponse, 0, len(s.Groups))}
 		for _, g := range s.Groups {
 			gr := GroupResponse{Key: g.Key, Name: g.Name, IsFixed: g.Fixed, Permissions: make([]PermissionResponse, 0, len(g.Permissions))}
 			for _, p := range g.Permissions {
-				gr.Permissions = append(gr.Permissions, PermissionResponse{Key: p.Key, Label: p.Label, Description: p.Description})
+				gr.Permissions = append(gr.Permissions, PermissionResponse{Key: p.Key, Label: p.Label, Description: p.Description, Requires: orNull(p.Requires)})
 			}
 			sr.Groups = append(sr.Groups, gr)
 		}
@@ -111,7 +143,7 @@ func newMatrixResponse(m roles.Matrix) MatrixResponse {
 			perms = []string{}
 		}
 		out.Roles = append(out.Roles, MatrixRoleResponse{ID: r.ID.String(), Key: r.Key, Name: r.Name,
-			UserCount: r.UserCount, IsLocked: r.IsLocked, Permissions: perms})
+			UserCount: r.UserCount, IsLocked: r.IsLocked, Guard: orNull(mv.Guards[r.ID]), Permissions: perms})
 	}
 	return out
 }

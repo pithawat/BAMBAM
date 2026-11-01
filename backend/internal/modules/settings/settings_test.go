@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -24,11 +23,13 @@ import (
 
 var registry = permissions.MustRegistry(Permissions)
 
-// fakeRoles answers every write with err (nil = success) and records the last call.
+// fakeRoles answers every write with err (nil = success) and records the last call. perms are the
+// matrix rows' effective keys.
 type fakeRoles struct {
-	list []roles.Role
-	err  error
-	last *recorded
+	list  []roles.Role
+	perms map[uuid.UUID][]string
+	err   error
+	last  *recorded
 }
 
 type recorded struct {
@@ -57,18 +58,29 @@ func (f fakeRoles) Delete(_ context.Context, actor, _ uuid.UUID) error {
 	f.record(recorded{actor: actor})
 	return f.err
 }
+func (f fakeRoles) matrix() roles.Matrix {
+	m := roles.Matrix{Systems: registry.Systems()}
+	for _, r := range f.list {
+		m.Roles = append(m.Roles, roles.MatrixRole{Role: r, Permissions: f.perms[r.ID]})
+	}
+	return m
+}
 func (f fakeRoles) Matrix(context.Context) (roles.Matrix, error) {
-	return roles.Matrix{Systems: registry.Systems(), Roles: []roles.MatrixRole{{Role: f.list[0]}}}, f.err
+	return f.matrix(), nil
 }
 func (f fakeRoles) SaveMatrix(_ context.Context, actor uuid.UUID, version int32, changes []roles.Change) (roles.Matrix, error) {
 	f.record(recorded{actor: actor, version: version, changes: changes})
-	return roles.Matrix{MatrixMeta: roles.MatrixMeta{Version: version + 1}}, f.err
+	m := f.matrix()
+	m.Version = version + 1
+	return m, f.err
 }
 
 // fakeUsers / fakeAudit stand in for the platform users admin and audit reader (Stage 3).
 type fakeUsers struct {
-	err   error
-	calls *[]string
+	err    error
+	calls  *[]string
+	reason string        // #9 lock reason the users admin answers
+	role   users.RoleRef // the user's current role
 }
 
 func (f fakeUsers) Search(_ context.Context, in users.SearchInput) ([]users.Summary, int64, error) {
@@ -78,7 +90,7 @@ func (f fakeUsers) Search(_ context.Context, in users.SearchInput) ([]users.Summ
 	return []users.Summary{{User: users.User{ID: uuid.New(), EmployeeCode: "EMP0231"}, RoleRef: users.RoleRef{Key: users.RoleTechnician, Name: "ช่างเทคนิค"}}}, 1, f.err
 }
 func (f fakeUsers) Get(_ context.Context, _, id uuid.UUID) (users.Summary, string, error) {
-	return users.Summary{User: users.User{ID: id, EmployeeCode: "EMP0412"}}, users.ReasonSelf, f.err
+	return users.Summary{User: users.User{ID: id, EmployeeCode: "EMP0412"}, RoleRef: f.role}, f.reason, f.err
 }
 func (f fakeUsers) ChangeRole(_ context.Context, _, id, _ uuid.UUID) (users.Summary, error) {
 	return users.Summary{User: users.User{ID: id}}, f.err
@@ -116,7 +128,7 @@ func router(role string) *gin.Engine {
 func routerWith(role string, f fakeRoles) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	p := middleware.Principal{UserID: viewerID, Role: role, Permissions: registry.Effective(role, nil)}
+	p := middleware.Principal{UserID: viewerID, Role: role, Permissions: registry.Defaults(role)}
 	RegisterRoutes(r.Group("/api/v1/settings", middleware.RequireAuth(fixedSession{p})), NewController(NewService(Deps{Roles: f, Users: fakeUsers{}, Audit: fakeAudit{}, Locations: fakeLocations{}, Assets: fakeAssets{}, Repair: fakeRepair{}, Master: fakeMaster{}})))
 	return r
 }
@@ -137,21 +149,27 @@ func callBody(r http.Handler, method, path, body string) *httptest.ResponseRecor
 	return w
 }
 
-// BR-ALL-1 (CR-001): admin reaches only ข้อมูลกลาง (locations, assets, categories); super_admin
-// reaches every route; every other role gets 403 everywhere.
+// BR-ALL-1 (CR-001, CR-006): with the seeded matrix admin and super_admin reach every route; every
+// other role gets 403 everywhere. A role with only `settings.users.view` reads #2, #8, #9.
 func TestRoutePermissions(t *testing.T) {
-	adminRoutes := map[string]bool{"13": true, "15": true, "27": true, "46": true, "47": true, "48": true, "49": true, "50": true, "51": true, "52": true, "53": true, "54": true, "55": true}
-	for n := 32; n <= 41; n++ {
-		adminRoutes[strconv.Itoa(n)] = true
-	}
 	for _, role := range []string{users.RoleEmployee, users.RoleTechnician, users.RoleHousekeeperLead, users.RoleSecurityLead, "r_0a1b2c3d", users.RoleAdmin, users.RoleSuperAdmin} {
 		r := router(role)
 		for _, rt := range routes {
 			w := call(r, rt.method, rt.path)
-			want := role == users.RoleSuperAdmin || (role == users.RoleAdmin && adminRoutes[rt.no])
+			want := role == users.RoleSuperAdmin || role == users.RoleAdmin
 			if got := w.Code != http.StatusForbidden; got != want {
 				t.Errorf("%s #%s %s %s = %d, allowed want %v", role, rt.no, rt.method, rt.path, w.Code, want)
 			}
+		}
+	}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	p := middleware.Principal{UserID: viewerID, Role: "r_0a1b2c3d", Permissions: []string{PermUsersView}}
+	RegisterRoutes(r.Group("/api/v1/settings", middleware.RequireAuth(fixedSession{p})), NewController(NewService(Deps{Roles: fakeRoles{list: []roles.Role{superRole}}, Users: fakeUsers{}, Audit: fakeAudit{}})))
+	readOnly := map[string]bool{"2": true, "8": true, "9": true}
+	for _, rt := range routes {
+		if got := call(r, rt.method, rt.path).Code != http.StatusForbidden; got != readOnly[rt.no] {
+			t.Errorf("users.view #%s %s %s allowed = %v", rt.no, rt.method, rt.path, got)
 		}
 	}
 }
@@ -169,26 +187,39 @@ func TestRolesList(t *testing.T) {
 
 func TestServiceChecksPermissionToo(t *testing.T) {
 	svc := NewService(Deps{Roles: fakeRoles{}, Users: fakeUsers{}, Audit: fakeAudit{}})
-	if _, err := svc.Roles(context.Background(), Viewer{ID: uuid.New(), Permissions: registry.Effective(users.RoleAdmin, nil)}); err == nil {
-		t.Fatal("admin read roles, want FORBIDDEN")
+	if _, err := svc.Roles(context.Background(), Viewer{ID: uuid.New(), Permissions: registry.Defaults(users.RoleEmployee)}); err == nil {
+		t.Fatal("employee read roles, want FORBIDDEN")
 	}
-	for _, perms := range [][]string{{PermRoles}, {PermUsers}} {
+	for _, perms := range [][]string{{PermRoles}, {PermUsers}, {PermUsersView}} {
 		if _, err := svc.Roles(context.Background(), Viewer{Permissions: perms}); err != nil {
 			t.Fatalf("%v: %v", perms, err)
 		}
 	}
 }
 
-func TestFixedGrants(t *testing.T) {
-	admin := registry.Effective(users.RoleAdmin, []string{PermUsers}) // a stored settings key is ignored
-	if !slices.Equal(admin, []string{PermLocations, PermAssets, PermCategories}) {
-		t.Fatalf("admin = %v", admin)
+// CR-006: the settings keys are stored and tickable — admin has all 8 by default, a custom role none,
+// super_admin always all.
+func TestSettingsKeysStored(t *testing.T) {
+	all := []string{PermLocations, PermAssets, PermCategories, PermContractorTypes, PermUsersView, PermUsers, PermRoles, PermAudit}
+	if got := registry.Defaults(users.RoleAdmin); !slices.Equal(got, all) {
+		t.Fatalf("admin = %v", got)
 	}
-	if got := registry.Effective("r_0a1b2c3d", nil); len(got) != 0 {
-		t.Fatalf("custom role = %v, want none (BR-F29-8)", got)
+	if got := registry.StoredDefaults(users.RoleAdmin); !slices.Equal(got, all) {
+		t.Fatalf("admin stored = %v, want the 8 keys seeded as rows", got)
 	}
-	if got := registry.Effective(users.RoleSuperAdmin, nil); len(got) != 7 {
-		t.Fatalf("super_admin = %v, want all 7", got)
+	if got := registry.Effective(users.RoleAdmin, []string{PermUsers}); !slices.Equal(got, []string{PermUsers}) {
+		t.Fatalf("admin with one stored key = %v (rows decide now)", got)
+	}
+	if got := registry.Defaults("r_0a1b2c3d"); len(got) != 0 {
+		t.Fatalf("custom role = %v, want none", got)
+	}
+	if got := registry.Effective(users.RoleSuperAdmin, nil); !slices.Equal(got, all) {
+		t.Fatalf("super_admin = %v, want all 8", got)
+	}
+	for _, k := range all {
+		if registry.IsFixed(k) {
+			t.Errorf("%s still fixed", k)
+		}
 	}
 }
 
@@ -234,7 +265,8 @@ func TestRoleAndMatrixWrites(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &m); err != nil || w.Code != http.StatusOK {
 		t.Fatalf("GET matrix = %d %s", w.Code, w.Body.String())
 	}
-	if len(m.Data.Systems) != 1 || !m.Data.Systems[0].Groups[0].IsFixed || len(m.Data.Systems[0].Groups[0].Permissions) != 7 || m.Data.Roles[0].Permissions == nil {
+	if len(m.Data.Systems) != 1 || m.Data.Systems[0].Groups[0].IsFixed || len(m.Data.Systems[0].Groups[0].Permissions) != 8 || m.Data.Roles[0].Permissions == nil ||
+		len(m.Data.Grantable) != 8 || m.Data.Roles[0].Guard != nil {
 		t.Fatalf("matrix = %+v", m.Data)
 	}
 
@@ -317,7 +349,7 @@ func TestRoleWritesNeedRolesPermission(t *testing.T) {
 func stage3Router(u fakeUsers, a fakeAudit) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	p := middleware.Principal{UserID: viewerID, Role: users.RoleSuperAdmin, Permissions: registry.Effective(users.RoleSuperAdmin, nil)}
+	p := middleware.Principal{UserID: viewerID, Role: users.RoleSuperAdmin, Permissions: registry.Defaults(users.RoleSuperAdmin)}
 	RegisterRoutes(r.Group("/api/v1/settings", middleware.RequireAuth(fixedSession{p})), NewController(NewService(Deps{Roles: fakeRoles{list: []roles.Role{superRole}}, Users: u, Audit: a})))
 	return r
 }
@@ -348,7 +380,7 @@ func TestChangeUserRoleErrors(t *testing.T) {
 }
 
 func TestUserDetailShape(t *testing.T) {
-	w := call(stage3Router(fakeUsers{}, fakeAudit{}), "GET", "/users/:id")
+	w := call(stage3Router(fakeUsers{reason: users.ReasonSelf}, fakeAudit{}), "GET", "/users/:id")
 	var body struct {
 		Data struct {
 			CanChangeRole      bool    `json:"canChangeRole"`

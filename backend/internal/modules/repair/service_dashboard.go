@@ -11,7 +11,7 @@ import (
 // CR-016: S29 dashboard (#27), floor plans (#30) and equipment placed in rooms (#29, #31–#34).
 
 // Overview implements #27: key numbers, buildings → floors with open tickets, and the attention list.
-// Every number uses the same step rules as S11 (BR-F23-1).
+// Every number uses the same step rules as S11 (BR-F23-1). The 3D data needs `building3d.view` too.
 func (s *Service) Overview(ctx context.Context, v Viewer) (Overview, error) {
 	if !seesDashboard(v) {
 		return Overview{}, apperr.ErrForbidden
@@ -45,7 +45,11 @@ func (s *Service) Overview(ctx context.Context, v Viewer) (Overview, error) {
 		decorate(v, &t)
 		attention = append(attention, t)
 	}
-	return Overview{Counts: counts, Buildings: buildings, Site: site, Attention: attention}, nil
+	o := Overview{Counts: counts, Buildings: buildings, Site: site, Attention: attention}
+	if !sees3D(v) {
+		o = without3D(o)
+	}
+	return o, nil
 }
 
 // AssetTypes implements #29 (the palette).

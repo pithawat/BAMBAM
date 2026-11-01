@@ -4,32 +4,38 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
+import { Check, ChevronDown, Home, LogOut, Settings, UserRound } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { canAnySettings, repairHome } from "@/lib/platform/permissions";
+import { canAnySettings, repairHome, usesService, type ServiceKey } from "@/lib/platform/permissions";
 import { initials } from "@/lib/platform/roles";
 import type { Me } from "@/lib/platform/types";
 import { applyTheme, currentTheme, THEMES, type ThemeId } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { SettingsMenuDesktop, SettingsMenuMobile } from "@/modules/settings/components/settings-menu";
 import { LogoutDialog } from "./logout-dialog";
 import { SERVICES, type Service } from "./service-icon";
 
-// Top navigation (_common.md §1, CR-010): BAMBAM · หน้าแรก · three equal services · ตั้งค่าระบบ (settings CR-001,
-// any `settings.*` permission) · account menu (no bell, repair CR-024). Settings pages use their own administration shell instead.
-// No sidebar, no bottom nav and no repair-only shortcut here; repair tracking and staff tools live in the repair
-// section nav (modules/repair/components/repair-nav.tsx). Desktop: floating sticky bar. Phone / tablet: brand row
-// + a row of the three services; it scrolls away so route-local sticky bars keep the top edge.
+// Top navigation on every page, settings included (_common.md §1, CR-010; settings CR-006 layout from
+// mockups/CR-006-design/App.tsx, flush with the top and side edges — owner 2026-11-01): BAMBAM | WORKPLACE · หน้าแรก ·
+// the services the user may use (`usesService`; a technician sees only แจ้งซ่อม) · the "ตั้งค่าระบบ" dropdown (any
+// `settings.*` permission) · account menu (no bell, repair CR-024). Repair tracking and staff tools live in the repair
+// section nav (modules/repair/components/repair-nav.tsx). Desktop: sticky full-width bar. Phone / tablet: brand row
+// (+ settings sheet) and a row of the services; it scrolls away so route-local sticky bars keep the top edge.
 
-type ServiceLink = { service: Service; href: string; match: string };
+type ServiceLink = { service: Service & ServiceKey; href: string; match: string };
 
 function serviceLinks(me: Me): ServiceLink[] {
-  return [
+  const links: ServiceLink[] = [
     // Whoever works tickets starts at the work list (CR-005, `repair.ticket.work`); everyone else tracks their own.
     { service: "repair", href: repairHome(me), match: "/repair" },
     { service: "car", href: "/car-booking", match: "/car-booking" },
     { service: "room", href: "/room-booking", match: "/room-booking" },
   ];
+  return links.filter((l) => usesService(me, l.service));
 }
+
+// phone service row: one column per visible service (static classes for Tailwind)
+const SERVICE_COLS = ["hidden", "grid-cols-1", "grid-cols-2", "grid-cols-3"];
 
 const within = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
@@ -37,71 +43,74 @@ export function AppNavbar({ me }: { me: Me }) {
   const pathname = usePathname();
   const links = serviceLinks(me);
   const home = pathname === "/";
+  const settings = canAnySettings(me);
 
-  // Desktop: the wrapper sticks at the very top and paints the page background above and below the bar, so content
-  // scrolling underneath never shows in the gap (owner, 2026-10-24).
   return (
-    <div className="print:hidden lg:sticky lg:top-0 lg:z-30 lg:bg-background lg:px-8 lg:pt-3 lg:pb-3">
-      <header className="mx-auto w-full border-b bg-card lg:max-w-7xl lg:rounded-2xl lg:border lg:shadow-card">
-        <div className="flex h-15 items-center gap-2 px-4 lg:h-19 lg:gap-6 lg:px-5">
-          <Link href="/" aria-label="BAMBAM หน้าแรก" className="shrink-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
-            <Image src="/brand/bam-logo.webp" alt="BAMBAM" width={96} height={31} className="h-7 w-auto lg:h-8" priority />
+    <header className="border-b bg-card print:hidden lg:sticky lg:top-0 lg:z-30">
+      <div className="flex h-15 items-center gap-2 px-4 lg:h-20 lg:gap-8 lg:px-10 xl:px-12">
+        <Link href="/" aria-label="BAMBAM หน้าแรก" className="flex shrink-0 items-center gap-4 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+          <Image src="/brand/bam-logo.webp" alt="BAMBAM" width={96} height={31} className="h-7 w-auto lg:h-8.5" priority />
+          <span aria-hidden className="hidden h-6 w-px bg-border sm:block" />
+          <span className="hidden text-[10px] font-semibold tracking-[0.17em] text-muted-foreground sm:block">WORKPLACE</span>
+        </Link>
+
+        <nav aria-label="บริการหลัก" className="hidden h-full min-w-0 flex-1 items-center gap-1 lg:flex">
+          <Link href="/" aria-current={home ? "page" : undefined} className={desktopItem(home)}>
+            <Home className="size-4.5" aria-hidden />
+            หน้าแรก
           </Link>
-
-          <nav aria-label="บริการหลัก" className="hidden min-w-0 flex-1 items-center gap-1 lg:flex">
-            <Link href="/" aria-current={home ? "page" : undefined} className={desktopItem(home)}>หน้าแรก</Link>
-            {links.map(({ service, href, match }) => {
-              const s = SERVICES[service];
-              const active = within(pathname, match);
-              return (
-                <Link key={service} href={href} aria-current={active ? "page" : undefined} className={desktopItem(active)}>
-                  <s.icon className="size-4.5" aria-hidden />
-                  {s.label}
-                </Link>
-              );
-            })}
-            {canAnySettings(me) && (
-              <Link href="/settings" className={desktopItem(within(pathname, "/settings"))}>
-                <Settings className="size-4.5" aria-hidden />
-                ตั้งค่าระบบ
-              </Link>
-            )}
-          </nav>
-
-          <div className="ml-auto flex items-center gap-1 lg:gap-2">
-            <AccountMenu me={me} />
-          </div>
-        </div>
-
-        <nav aria-label="บริการหลัก" className="grid grid-cols-3 border-t lg:hidden">
           {links.map(({ service, href, match }) => {
             const s = SERVICES[service];
             const active = within(pathname, match);
             return (
-              <Link
-                key={service}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-12 items-center justify-center gap-1.5 border-b-2 px-1 text-center text-[13.5px] leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset",
-                  active ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground",
-                )}
-              >
-                <s.icon className="size-4 shrink-0" aria-hidden />
+              <Link key={service} href={href} aria-current={active ? "page" : undefined} className={desktopItem(active)}>
+                <s.icon className="size-4.5" aria-hidden />
                 {s.label}
               </Link>
             );
           })}
+          {settings && <SettingsMenuDesktop me={me} />}
         </nav>
-      </header>
-    </div>
+
+        <div className="ml-auto flex items-center gap-1 lg:gap-5">
+          {settings && (
+            <div className="lg:hidden">
+              <SettingsMenuMobile me={me} />
+            </div>
+          )}
+          <span aria-hidden className="hidden h-7 w-px bg-border lg:block" />
+          <AccountMenu me={me} />
+        </div>
+      </div>
+
+      <nav aria-label="บริการหลัก" className={cn("grid border-t lg:hidden", SERVICE_COLS[links.length])}>
+        {links.map(({ service, href, match }) => {
+          const s = SERVICES[service];
+          const active = within(pathname, match);
+          return (
+            <Link
+              key={service}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-h-12 items-center justify-center gap-1.5 border-b-2 px-1 text-center text-[13.5px] leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset",
+                active ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground",
+              )}
+            >
+              <s.icon className="size-4 shrink-0" aria-hidden />
+              {s.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </header>
   );
 }
 
 function desktopItem(active: boolean) {
   return cn(
     "flex min-h-11 items-center gap-2 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30",
-    active ? "bg-secondary font-semibold text-secondary-foreground" : "text-foreground hover:bg-muted",
+    active ? "bg-secondary font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-primary",
   );
 }
 
@@ -134,7 +143,7 @@ function AccountMenu({ me }: { me: Me }) {
             aria-haspopup="menu"
             className="flex min-h-11 items-center gap-2.5 rounded-full outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 lg:rounded-xl lg:py-1 lg:pr-2 lg:pl-1"
           >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-[13px] font-semibold text-secondary-foreground">{initials(me.name)}</span>
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-[13px] font-semibold text-primary ring-4 ring-secondary/50">{initials(me.name)}</span>
             <span className="hidden max-w-40 min-w-0 text-left leading-tight lg:block">
               <b className="block truncate text-sm font-semibold">{me.name}</b>
               <span className="block truncate text-xs text-muted-foreground">{me.roleName}</span>

@@ -35,6 +35,9 @@ Keys and defaults: `../../01-users.md` → Permission catalog. The API returns g
 > - Mobile: role `Select` "เลือก Role ที่ต้องการตั้งค่า" + switches per permission (fixed ones disabled with "· กำหนดโดยระบบ").
 > - Spelling in the CR-001 design is "Role" (capital R) in labels; keep it consistently.
 
+> **CR-006 (2026-10-29):** new rows (service access, `repair.building3d.view`, `settings.users.view`); the "ตั้งค่าระบบ" group is tickable (no longer locked) except for `super_admin`. Locked cells with a reason tooltip: the editor's own role ("แก้สิทธิ์ของ role ตัวเองไม่ได้"), keys the editor does not hold ("ให้ได้เฉพาะสิทธิ์ที่คุณมี"); the `super_admin` column is always locked; ดูโมเดล 3D อาคาร is disabled until ดูภาพรวมอาคาร is ticked. Restyle to the CR-006 frame. (CR-006)
+> **D-134 (2026-11-01, owner):** one card / table per system — ระบบแจ้งซ่อม has a two-level column header (การใช้บริการแจ้งซ่อม · งานแจ้งซ่อม · **งานทีม ช่างภายนอก และภาพรวมอาคาร**, renamed from "งานทีมและช่างภายนอก"); phones: one card per system with group sub-headings. (CR-006)
+
 ## Layout — mobile first
 
 Mobile — tab "สิทธิ์":

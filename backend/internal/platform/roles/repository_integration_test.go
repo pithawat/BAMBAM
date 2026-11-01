@@ -28,13 +28,19 @@ func TestMigrationSeed(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	// The catalog as the modules register it; repeated here because platform cannot import modules.
+	// settings CR-006 (migration 20261030000002): service access for every role but technician,
+	// building3d for admin, the 8 settings keys stored for admin.
+	settingsKeys := []string{"settings.assets.manage", "settings.audit.view", "settings.categories.manage", "settings.contractor_types.manage",
+		"settings.locations.manage", "settings.roles.manage", "settings.users.manage", "settings.users.view"}
 	stored := map[string][]string{
-		"super_admin":      {"repair.contractor.manage", "repair.overview.view", "repair.ticket.close_any", "repair.ticket.handover_any", "repair.ticket.team_handle", "repair.ticket.view_all", "repair.ticket.work"},
-		"employee":         {},
-		"housekeeper_lead": {"repair.ticket.team_handle"},
-		"security_lead":    {"repair.ticket.team_handle"},
+		"super_admin": append([]string{"car_booking.use", "repair.building3d.view", "repair.contractor.manage", "repair.overview.view", "repair.ticket.close_any",
+			"repair.ticket.handover_any", "repair.ticket.report", "repair.ticket.team_handle", "repair.ticket.view_all", "repair.ticket.work", "room_booking.use"}, settingsKeys...),
+		"employee":         {"car_booking.use", "repair.ticket.report", "room_booking.use"},
+		"housekeeper_lead": {"car_booking.use", "repair.ticket.report", "repair.ticket.team_handle", "room_booking.use"},
+		"security_lead":    {"car_booking.use", "repair.ticket.report", "repair.ticket.team_handle", "room_booking.use"},
 		"technician":       {"repair.contractor.manage", "repair.ticket.view_all", "repair.ticket.work"},
-		"admin":            {"repair.overview.view", "repair.ticket.close_any", "repair.ticket.handover_any", "repair.ticket.view_all"},
+		"admin": append([]string{"car_booking.use", "repair.building3d.view", "repair.overview.view", "repair.ticket.close_any", "repair.ticket.handover_any",
+			"repair.ticket.report", "repair.ticket.view_all", "room_booking.use"}, settingsKeys...),
 	}
 	repo := NewRepository(pool)
 	list, err := NewService(repo, permissions.MustRegistry()).List(ctx)

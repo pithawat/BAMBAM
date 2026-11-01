@@ -5,13 +5,14 @@ import { Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { Role } from "../../types";
+import type { RoleListItem } from "../../types";
 import { panelClass } from "../settings-ui";
 import { usersOfRoleHref } from "./role-dialogs";
 
-// S24 tab รายการ Role (CR-001 block): table on desktop, cards on phones. `isSystem` → no ลบ; `isLocked` → no menu.
+// S24 tab รายการ Role (CR-001 block): table on desktop, cards on phones. `isSystem` → no ลบ; `isLocked` → no menu;
+// CR-006 `guard` (own role) → no menu, `Lock` + "Role ของคุณ" instead.
 
-type Props = { roles: Role[]; onEdit: (role: Role) => void; onDelete: (role: Role) => void };
+type Props = { roles: RoleListItem[]; onEdit: (role: RoleListItem) => void; onDelete: (role: RoleListItem) => void };
 
 function SystemBadge() {
   return (
@@ -22,7 +23,7 @@ function SystemBadge() {
   );
 }
 
-function UsersLink({ role }: { role: Role }) {
+function UsersLink({ role }: { role: RoleListItem }) {
   return (
     <Link href={usersOfRoleHref(role)} className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30">
       {role.userCount.toLocaleString("th-TH")} คน
@@ -30,8 +31,16 @@ function UsersLink({ role }: { role: Role }) {
   );
 }
 
-function RowMenu({ role, onEdit, onDelete }: { role: Role } & Omit<Props, "roles">) {
-  if (role.isLocked) return <span className="block size-11" aria-hidden />;
+function RowMenu({ role, onEdit, onDelete }: { role: RoleListItem } & Omit<Props, "roles">) {
+  if (role.guard === "OWN_ROLE" && !role.isLocked) {
+    return (
+      <span className="inline-flex min-h-11 shrink-0 items-center gap-1 px-2 text-xs whitespace-nowrap text-muted-foreground">
+        <Lock className="size-3" aria-hidden />
+        Role ของคุณ
+      </span>
+    );
+  }
+  if (role.isLocked || role.guard) return <span className="block size-11" aria-hidden />;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

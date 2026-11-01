@@ -1,6 +1,6 @@
 # UI handoff — ตั้งค่าระบบ (Admin / Superadmin)
 
-Status: UI DONE + WIRED — Stage 4P (2026-10-29, built by Claude per D-115 / owner; waiting for owner acceptance). Before: ACCEPTED — Stages 1–6 (2026-10-27, tags `settings-stage-1`…`6`)
+Status: ACCEPTED — Stage R1 (2026-11-01, built and wired by Claude, D-133 / D-134, tag `settings-stage-R1`). Before: ACCEPTED — Stages 1–6 (2026-10-27) and 4P (2026-10-29, tags `settings-stage-1`…`6`, `settings-stage-4P`)
 
 <!-- Written by Claude (/ui-spec settings 2026-10-16, updated by /build-stage prepare). Codex starts here.
      Only build the screens of the current stage. -->
@@ -29,10 +29,54 @@ Status: UI DONE + WIRED — Stage 4P (2026-10-29, built by Claude per D-115 / ow
 | S22 หมวดงานและอาการ | `screens/S22-categories.md` (+ CR-001 block) | `mockups/CR-001-admin-settings.html#categories` | `/settings/categories[/[categoryId]]` | 5 |
 | S23 ประเภทผู้รับเหมา | `screens/S23-contractor-types.md` (+ CR-001 block) | — (`MasterList` in a CR-001 panel) | `/settings/contractor-types` | 5 |
 | S20 tab ประเภทอาคาร + แก้ไขอาคาร · S22 ใช้กับประเภทอาคาร · S26 labels (CR-005) | `screens/S20-buildings.md`, `screens/S22-categories.md` (CR-005 blocks) | — (S20 `ประเภทอุปกรณ์` tab pattern; S22 dialog) | `/settings/buildings?tab=building-types`, `/settings/categories` | 4P |
+| S24 / S25 permission changes, navbar + Home service visibility (CR-006) | `../changes/CR-006.md`, S24 / S25 CR-006 blocks | — | `/settings/roles`, `/settings/users`, `/` | R1 |
+| Settings redesign + S26 pagination (CR-006) | `screens/_common.md` §2 CR-006 block, S20 / S22–S26 CR-006 blocks | `mockups/CR-006-design/App.tsx` + `index.css` (layout only; tokens from `design-system.md`) | all `/settings/**` | R2 |
 
 Known differences from the design that are intentional (CR-001 apply, 2026-10-26): asset type form adds รหัสนำหน้า + ตำแหน่งติดตั้ง (owner); asset type cannot change on edit and inactive assets only offer เปิดใช้งาน (approved repair rules); S22 row menus add เลื่อนขึ้น / เลื่อนลง / ลบ (approved rules); sidebar adds ประเภทผู้รับเหมา and ประวัติการเปลี่ยนแปลง for Superadmin (owner); dev/UAT keep the existing role switcher instead of the prototype's review controls.
 
-## Stage 4P — ประเภทอาคาร (CR-005, repair CR-025) (build this now)
+## Stage R1 — สิทธิ์ทั้งแพลตฟอร์ม (CR-006) (built by Claude 2026-11-01, D-133)
+
+Changes to the built S24, S25 and Home (`/`) only. Keep today's layout and look — the CR-006 restyle is Stage R2. Everything else stays as accepted.
+
+**Spec:** `../changes/CR-006.md` (catalog, defaults, guard rules G1–G3), the **CR-006 blocks** at the top of `screens/S24-roles-permissions.md` and `screens/S25-users.md`, and the copy below (use it word for word). Contract: `../04-api-contract.md` → "Stage R1 shapes and rules (CR-006)".
+
+**Already done by Claude (read-only for you):** API + mocks (G1–G3 in mock mode too), `lib/platform/permissions.ts` (`canReport`, `sees3D`, `seesUsers`, `usesService`), navbar services by permission, `/car-booking` · `/room-booking` Forbidden without `*.use`, `/repair/new` Forbidden without `report` (team mode keeps `team_handle`), report CTAs in repair S06 / S05, S29 floor list without 3D, `nav.ts` (ผู้ใช้ opens with `users.view` or `users.manage`; services filtered), `/settings` → first allowed page. Placeholder copy `LOCK_COPY.READ_ONLY` / `SUPER_ADMIN` in `users/user-bits.tsx` keeps the build green — keep the strings.
+
+**Use these:**
+
+| Need | Use |
+|---|---|
+| Matrix cards | `getPermissionMatrix()` — now **3 systems** (ระบบแจ้งซ่อม: การใช้บริการแจ้งซ่อม · งานแจ้งซ่อม · งานทีมและช่างภายนอก; การเข้าใช้บริการ: ระบบจองรถและห้องประชุม; ตั้งค่าระบบ). Render from data as today. The ตั้งค่าระบบ card is **no longer fixed** (`isFixed: false`) — its cells are tickable like the others (keep the `isFixed` branch for safety) |
+| Cell disabled — row | `role.isLocked` (Superadmin, as today) **or** `role.guard` set. Row header: `Lock` + reason `OWN_ROLE` → `แก้สิทธิ์ของ role ตัวเองไม่ได้` · `SUPER_ADMIN` → as today's Superadmin row |
+| Cell disabled — column | `!matrix.grantable.includes(permission.key)` → every row's cell of that key disabled; tooltip / mobile hint `ให้ได้เฉพาะสิทธิ์ที่คุณมี`. Superadmin gets every key in `grantable` |
+| Cell disabled — requires | `permission.requires` set and the role (loaded value **with pending changes**) lacks that key → disabled, hint `ต้องติ๊ก "{label of the required key}" ก่อน` (today: ดูโมเดล 3D อาคาร needs ดูภาพรวมอาคาร). Unticking the required key in a row also unticks the dependent one in the same row (two pending changes) |
+| Order of reasons (one shown) | row (`isLocked` / `guard`) → column (`grantable`) → requires |
+| Save refused | `guardRule(err)` from `api.ts` (`403 PERMISSION_GUARD`): `OWN_ROLE` → toast `แก้สิทธิ์ของ role ตัวเองไม่ได้` · `SUPER_ADMIN` → `แก้สิทธิ์ของ Superadmin ไม่ได้` · `ESCALATION` → `ให้ได้เฉพาะสิทธิ์ที่คุณมี`; then refetch the matrix and drop pending changes that are now disabled (keep the rest); dialog closes. Nothing was saved |
+| Role list tab | `getRoles()` → `RoleListItem[]` (`Role` + `guard` + `assignable`). `guard` set → no row menu; instead `Lock` + `Role ของคุณ` (`OWN_ROLE`) — `SUPER_ADMIN` rows already have no menu (`isLocked`) |
+| Add Role "คัดลอกจาก" | offer every role, but a role whose matrix `permissions` are not all in `matrix.grantable` is a disabled option with the hint `มีสิทธิ์ที่คุณไม่มี`. Server `ESCALATION` → under the picker `คัดลอกได้เฉพาะ Role ที่มีสิทธิ์ไม่เกินของคุณ` |
+| Edit / delete refused | `guardRule(err)` on `updateRole` / `deleteRole`: toast as "Save refused", refetch roles + matrix |
+| S25 read-only | `can(me, PERM.settingsUsers)` false (only `settings.users.view`): role cell = plain text (no change button, no chevron), detail dialog button `เปลี่ยน Role` disabled with `LOCK_COPY.READ_ONLY` (the API returns `cannotChangeReason: "READ_ONLY"`) |
+| S25 Superadmin rows | viewer is not Superadmin (`me.role !== "super_admin"`) and `u.role.key === "super_admin"` → plain text + `Lock`, title `LOCK_COPY.SUPER_ADMIN`; #9 returns `SUPER_ADMIN` → same copy under the disabled button |
+| S25 change dialog | radio list = `roles.filter(r => r.assignable)` + the user's current role (marked `ปัจจุบัน`, even when not assignable). The Superadmin warning only appears when `super_admin` is offered (Superadmin viewers). `guardRule(err)` on `changeUserRole`: `SUPER_ADMIN` → `LOCK_COPY.SUPER_ADMIN` · `ESCALATION` → `เลือกได้เฉพาะ Role ที่มีสิทธิ์ไม่เกินของคุณ` (in the dialog's error line) + refetch roles. The role filter keeps every role |
+| Forbidden copy | `roles-screen.tsx` still shows `การจัดการผู้ใช้ Role และสิทธิ์ สำหรับ Superadmin เท่านั้น` — use `settingsAccess(me, pathname)`'s copy instead (every key is tickable now) |
+| Home services (`/`) | `usesService(me, "repair" \| "car" \| "room")` — only those cards (mobile grid and desktop row; columns = count). แจ้งซ่อม card: `canReport(me)` → `/repair/new`, hint `แจ้งปัญหาในอาคาร`; else → `repairHome(me)`, hint `ดูงานซ่อม`. No service at all → the บริการ section shows `EmptyState` `ยังไม่มีบริการที่ใช้ได้` hint `ติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์` |
+| Home CTA (`/`) | `canReport(me)` → as today (mobile card แจ้งซ่อม + สแกน QR; desktop hero แจ้งซ่อม + ติดตามงานซ่อม). Else, with any repair key: mobile card title `งานซ่อมของคุณ`, text `ดูงานที่ได้รับมอบหมายและงานที่คุณติดตาม`, one brand button `ไปที่งานซ่อม` (`Wrench`) → `repairHome(me)`, no สแกน QR; desktop hero: white button `ไปที่งานซ่อม` → `repairHome(me)` + glass `ติดตามงานซ่อม` → `/repair/my`. No repair key: card / hero without buttons (greeting only) |
+
+**Mock mode:** role switcher users follow the seeded CR-006 matrix. **Admin** (ปวีณา) lacks ดำเนินการและบันทึกผลซ่อม · บันทึกงานทีมทำเอง · จัดการช่างภายนอก → those three columns are locked for her; her own row (Admin) and Superadmin are locked; in S25 she can only assign พนักงานทั่วไป and Admin (every other role has a key she lacks); ณัฐพล is Superadmin. **ช่างเทคนิค** has no report (Home: only แจ้งซ่อม → งานที่ต้องทำ, no CTA; `/repair/new` Forbidden; จองรถ / จองห้องประชุม gone from the navbar). Superadmin: nothing locked except the Superadmin row. Scenarios as before (`?mock=normal|error|forbidden|slow|conflict`). The mock `Me` is fixed per role, so a matrix change does not change the viewer's own menus until reload of the real API (wire checks AC2).
+
+**Build:**
+
+- [x] S24 matrix: new cards from data; disabled cells with the three reasons (desktop tooltip on the disabled checkbox's cell, mobile hint line under the switch label); requires-chain untick; settings card tickable
+- [x] S24 save refused path (`PERMISSION_GUARD`), role list `guard`, Add Role copy-from limits, edit / delete refused
+- [x] S25 read-only mode, Superadmin rows locked for non-Superadmin, change dialog shows only assignable roles, guard errors
+- [x] Home `/`: services by permission, CTA variants (report / no report / no repair key), empty services state
+- [x] Forbidden copy in S24 from `settingsAccess` (S25 too, shared `settings-forbidden.tsx`)
+- [x] Accessible names unchanged (`{permission label} — {role name}`); disabled reasons reachable (`aria-describedby` on every disabled cell / switch)
+- [ ] Check at 1280px and 375px in mock mode as Superadmin, Admin, ช่างเทคนิค, พนักงานทั่วไป — checked against the real API by e2e (desktop + mobile projects); a by-hand mock-mode pass is not done
+
+**Acceptance (from `03-plan.md` Stage R1, UI part, mock mode):** AC1 UI (ช่างเทคนิค: Home and navbar show only แจ้งซ่อม, no report CTA), AC3 UI (as Admin in S24: Admin row and Superadmin row locked with the reason; ดำเนินการและบันทึกผลซ่อม column locked `ให้ได้เฉพาะสิทธิ์ที่คุณมี`; ticking ประวัติการเปลี่ยนแปลง for พนักงานทั่วไป saves), AC4 UI (as Admin in S25: own row has no change; ณัฐพล locked; change dialog for วรรณา lists พนักงานทั่วไป and Admin only), plus: ดูโมเดล 3D อาคาร disabled for พนักงานทั่วไป until ดูภาพรวมอาคาร is ticked. AC2, AC5 and the API 403s are Claude's in wire.
+
+## Stage 4P — ประเภทอาคาร (CR-005, repair CR-025) (done, accepted 2026-10-29)
 
 Changes to the built S20 / S22 / S26 only. Everything else stays as accepted.
 
@@ -177,6 +221,7 @@ The app shell (`components/shared/app-shell.tsx`) already drops the role-switche
 
 - `frontend/src/app/(app)/settings/**` (incl. `layout.tsx` = administration shell, CR-001)
 - `frontend/src/modules/settings/components/**`
+- Stage R1 only: `frontend/src/app/(app)/page.tsx` (Home services + CTA; the S29 dashboard it renders stays Claude's)
 - `frontend/src/components/ui/**` only via `npx shadcn@latest add` (`checkbox`, `switch`, `dropdown-menu` are already added for Stage 2)
 - This file: checklist and "Open questions" only
 
@@ -205,6 +250,7 @@ npm run lint && npm run typecheck
 
 | Screen | All checklist items pass? | Notes |
 |---|---|---|
+| S24 · S25 · Home `/` permission changes (Stage R1, Claude, D-133) | ✅ (real API) | e2e `F29-permission-guards`, `F29-s29-without-3d`, `F15-role-guards` + updated F15 / F25 / F28 / F29 / F30. Components: `roles/{permission-matrix,roles-screen,role-list,role-dialogs}.tsx`, `users/{users-screen,change-role-dialog}.tsx`, `settings-forbidden.tsx`, `app/(app)/page.tsx` |
 | S24 Role และสิทธิ์ (Stage 2, Claude) | ✅ (mock + real API) | 1280px / 375px checked in mock mode (normal, conflict path, blocked delete, NAME_TAKEN); real API via `e2e/settings/F29-roles-matrix.spec.ts`. Components: `modules/settings/components/roles/{roles-screen,permission-matrix,role-list,role-dialogs}.tsx`, helpers `settings-ui.ts` |
 | S25 ผู้ใช้ · S26 ประวัติการเปลี่ยนแปลง (Stage 3, Claude) | ✅ (mock + real API) | 1280 / 375 in mock mode; real API via `e2e/settings/F15-change-role.spec.ts`, `F30-audit.spec.ts`. Components: `modules/settings/components/users/*`, `audit/audit-screen.tsx` |
 | S20 อาคารและอุปกรณ์ (Stage 4, Claude) | ✅ (mock + real API) | 1280 / 375 in mock mode (navigator, asset panel, asset dialog with inline type, types tab); real API via `e2e/settings/F26-places-assets.spec.ts`. Components: `modules/settings/components/places/*`; shared `components/shared/asset-icon.ts` |
@@ -212,6 +258,16 @@ npm run lint && npm run typecheck
 | Administration shell (Stage 1, Claude) | ✅ (mock mode) | 1280px: Superadmin all items + guardian mascot; Admin บริการ + ข้อมูลกลาง (2 items), planner mascot, `/settings/users` Forbidden + "ไปที่อาคารและอุปกรณ์"; พนักงาน full-page Forbidden. 375px: drawer opens from "เปิดเมนูหลัก", Escape closes, focus back on the menu button. `/settings` → `/settings/buildings`. lint, typecheck, build pass. Components: `modules/settings/components/settings-{shell,heading,placeholder}.tsx` | | |
 
 ## Differences from mockup (Codex fills)
+
+Stage R1 (Claude):
+
+- D-134 (owner, 2026-11-01): the CR-006 navbar + "ตั้งค่าระบบ" dropdown / phone sheet are built in R1 on every page (sidebar / drawer removed; `components/shared/app-navbar.tsx`, `modules/settings/components/settings-menu.tsx`, `settings-shell.tsx` is now only the page frame); S24 matrix = one table per system with a two-level header; group renamed "งานทีม ช่างภายนอก และภาพรวมอาคาร". R2 keeps the page frame and restyle.
+
+- S24 info strip: the approved "ทุก Role แจ้งซ่อมและติดตามงานตัวเองได้เสมอ / สิทธิ์ตั้งค่าระบบล็อกตามขอบเขตของผู้ดูแล" is no longer true under CR-006; replaced with R1 strings "Superadmin มีทุกสิทธิ์เสมอ" / "ให้ได้เฉพาะสิทธิ์ที่คุณมี · แก้สิทธิ์ของ role ตัวเองไม่ได้" (D-133, owner to confirm).
+- Add Role picker hint: "คัดลอกเฉพาะสิทธิ์งานซ่อม…" (settings keys were never copied) → "คัดลอกได้เฉพาะ Role ที่มีสิทธิ์ไม่เกินของคุณ" — settings keys are copied since CR-006 (D-133).
+- Locked cells: a whole locked row (Superadmin / own role) shows its reason once on the row header (`Lock` tooltip); its cells carry it only as `aria-describedby`. Column (`grantable`) and requires reasons get a tooltip per cell.
+- Home without any repair key: mobile card shows the greeting as its title (no buttons); desktop hero has no buttons.
+- Car / room service cards keep the "เร็ว ๆ นี้" chip (no link) as before — only their visibility follows `*.use`.
 
 Stage 2 (S24):
 
@@ -250,5 +306,6 @@ Stage 1 (shell):
 
 ## Open questions (Codex fills — never guess)
 
+- Stage R1: none new from the build; copy written by Claude is listed in PROGRESS → Open issues (owner to confirm).
 - Stage 2: none.
 - Stage 1: none.

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { person, seedPeople, upsertPerson } from "./people";
+import { viewerWith } from "./sessions";
 
 // F15 (settings Stage 3, S25): Superadmin finds a person and changes their role; env-defined Superadmins are locked;
 // the detail shows the role history. Real API, sample people from ./people.ts in bambam_e2e.
@@ -148,11 +149,14 @@ test.describe("mobile", () => {
   });
 });
 
-test("Admin gets Forbidden on S25 and 403 from #8", async ({ browser, baseURL }) => {
-  const ctx = await browser.newContext({ storageState: auth("admin"), baseURL });
-  const page = await ctx.newPage();
-  await page.goto("/settings/users");
-  await expect(page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
-  expect((await page.request.get(`${API}/users`)).status()).toBe(403);
-  await ctx.close();
+test("without a users key: Forbidden on S25 and 403 from #8 (CR-006: seeded Admin has both)", async ({ browser, baseURL, isMobile }) => {
+  test.skip(isMobile, "runs once (desktop)");
+  const v = await viewerWith(browser, baseURL, ["settings.locations.manage"]);
+  try {
+    await v.page.goto("/settings/users");
+    await expect(v.page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
+    expect((await v.page.request.get(`${API}/users`)).status()).toBe(403);
+  } finally {
+    await v.close();
+  }
 });

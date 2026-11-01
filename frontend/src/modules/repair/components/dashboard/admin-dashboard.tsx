@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Building2, Check, ChevronRight, Clock, FileText, Move, Wrench, type LucideIcon } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
-import { can, PERM } from "@/lib/platform/permissions";
+import { can, PERM, sees3D, usesService } from "@/lib/platform/permissions";
 import { Picker } from "@/components/shared/picker";
 import { PriorityIndicator } from "@/components/shared/priority-indicator";
 import { SERVICES, type Service } from "@/components/shared/service-icon";
@@ -61,11 +61,14 @@ export function AdminDashboard() {
   const load = () => { setState("loading"); setRev((n) => n + 1); };
 
   const isAdmin = can(me, PERM.settingsAssets);
+  // settings CR-006: the 3D models and the site view need `repair.building3d.view` (the API leaves them out too)
+  const with3D = sees3D(me);
   const buildings = useMemo(() => overview?.buildings.filter((b) => b.floors.length > 0) ?? [], [overview]);
   // CR-027: buildings drawn in 3D (a registered shape + floor plans); the site view needs desktop + WebGL
   // stable between renders: the 3D card rebuilds the site mesh when this list changes
-  const modelBuildings = useMemo(() => buildings.filter((b) => b.hasModel && hasShape(b.modelKey) && b.widthM !== null && b.depthM !== null), [buildings]);
-  const siteView = desktop && webgl && !!overview?.site.length;
+  const modelBuildings = useMemo(() => with3D ? buildings.filter((b) => b.hasModel && hasShape(b.modelKey) && b.widthM !== null && b.depthM !== null) : [],
+    [buildings, with3D]);
+  const siteView = with3D && desktop && webgl && !!overview?.site.length;
   const side: SiteSide = sideOf(buildingId) ?? 1;
   const onSite = siteView && (!!sideOf(buildingId) || !buildingId);
   const building = onSite ? null : buildings.find((b) => b.id === buildingId) ?? modelBuildings[0] ?? buildings[0];
@@ -90,7 +93,7 @@ export function AdminDashboard() {
         <Picker title="อาคาร" placeholder="เลือกอาคาร" icon={Building2} value={building?.id ?? SITE[side]} onValueChange={pick}
           options={[
             ...(siteView ? ([1, 2] as const).map((s) => ({ value: SITE[s], label: `ภาพรวม${SITE_SIDES[s]}`, description: "อาคารบนแผนที่" })) : []),
-            ...buildings.map((b) => ({ value: b.id, label: b.name, description: modelBuildings.includes(b) ? undefined : "ยังไม่มีโมเดล" })),
+            ...buildings.map((b) => ({ value: b.id, label: b.name, description: !with3D || modelBuildings.includes(b) ? undefined : "ยังไม่มีโมเดล" })),
           ]} />
       </div>}
       {isAdmin && show3D && <Button aria-pressed={editing} onClick={() => setEditing((e) => !e)} variant={editing ? "secondary" : "default"} className="h-13">
@@ -119,7 +122,7 @@ export function AdminDashboard() {
           : show3D ? <BuildingCard buildings={modelBuildings} site={overview.site} buildingId={building?.id ?? null}
               side={side} onOpenBuilding={setBuildingId} onShowSite={(s) => setBuildingId(SITE[s])} canEdit={isAdmin} editing={editing} />
           : !building ? null
-          : <FloorList building={building} note={desktop
+          : <FloorList building={building} note={!with3D ? undefined : desktop
               ? (webgl ? "อาคารนี้ยังไม่มีโมเดล 3 มิติ" : "เบราว์เซอร์นี้แสดงภาพ 3 มิติไม่ได้")
               : isAdmin ? "จัดวางอุปกรณ์ได้บนคอมพิวเตอร์" : "ภาพ 3 มิติใช้ได้บนคอมพิวเตอร์"} />}
       </div>
@@ -212,9 +215,12 @@ function AttentionPanel({ overview }: { overview: Overview | null }) {
 }
 
 /** CR-017: no numbers until the car / room modules exist (every number on S29 comes from the API). */
+/** Car / room blocks, each only with its `*.use` permission (settings CR-006). */
 function ServicesPanel({ className }: { className?: string }) {
+  const me = useCurrentUser();
+  const shown = (["car", "room"] as const).filter((s) => usesService(me, s));
   const block = (service: Service, title: string, note: string) =>
-    <div className="flex items-center gap-3 p-5 sm:px-6">
+    <div key={service} className="flex items-center gap-3 p-5 sm:px-6">
       <ServiceBadge service={service} />
       <span className="min-w-0 flex-1">
         <b className="block text-[15px] font-semibold">{title}</b>
@@ -222,8 +228,9 @@ function ServicesPanel({ className }: { className?: string }) {
       </span>
       <span className="inline-flex h-6 items-center rounded-full bg-muted px-2.5 text-xs font-medium whitespace-nowrap text-muted-foreground">ยังไม่เปิดใช้งาน</span>
     </div>;
-  return <section aria-label="บริการอื่น" className={cn("grid divide-y overflow-hidden rounded-xl border bg-card shadow-card sm:grid-cols-2 sm:divide-x sm:divide-y-0", className)}>
-    {block("car", "จองรถ", "ระบบจองรถยังไม่เปิดใช้งาน")}
-    {block("room", "จองห้องประชุม", "ระบบจองห้องประชุมยังไม่เปิดใช้งาน")}
+  if (shown.length === 0) return null;
+  return <section aria-label="บริการอื่น" className={cn("grid divide-y overflow-hidden rounded-xl border bg-card shadow-card sm:divide-x sm:divide-y-0", shown.length > 1 && "sm:grid-cols-2", className)}>
+    {shown.includes("car") && block("car", "จองรถ", "ระบบจองรถยังไม่เปิดใช้งาน")}
+    {shown.includes("room") && block("room", "จองห้องประชุม", "ระบบจองห้องประชุมยังไม่เปิดใช้งาน")}
   </section>;
 }

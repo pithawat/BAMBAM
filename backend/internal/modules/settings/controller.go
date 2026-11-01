@@ -31,7 +31,7 @@ func viewer(c *gin.Context) (Viewer, bool) {
 		httpx.Error(c, apperr.ErrUnauthenticated)
 		return Viewer{}, false
 	}
-	return Viewer{ID: p.UserID, Permissions: p.Permissions}, true
+	return Viewer{ID: p.UserID, RoleKey: p.Role, Permissions: p.Permissions}, true
 }
 
 // roleID reads the :id path param; a malformed id is an unknown role.
@@ -55,9 +55,9 @@ func (ctl *Controller) Roles(c *gin.Context) {
 		httpx.Error(c, err)
 		return
 	}
-	out := make([]RoleResponse, 0, len(list))
+	out := make([]RoleListItemResponse, 0, len(list))
 	for _, r := range list {
-		out = append(out, newRoleResponse(r))
+		out = append(out, newRoleListItemResponse(r))
 	}
 	httpx.OK(c, out)
 }

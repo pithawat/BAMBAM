@@ -21,6 +21,8 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 > - Empty symptoms: ยังไม่มีอาการที่เปิดใช้งาน / หมวดนี้จะไม่แสดงในแบบฟอร์มแจ้งซ่อม จนกว่าจะมีอาการที่เปิดใช้งาน · button เพิ่มอาการ. Last-active-symptom deactivate extra line: นี่คืออาการสุดท้ายที่เปิดใช้งาน หมวดนี้จะไม่แสดงในฟอร์มแจ้งซ่อม.
 > - ~~Area types of a category (repair CR-014) are not in the design: keep them in the category dialog as an optional multi-select under ความเร่งด่วนตั้งต้น.~~ (CR-005)
 
+> **CR-006 (2026-10-29):** restyle to the CR-006 page frame and list panel (`generic-panel` pattern); sub-menu of การให้บริการ. Behaviour unchanged. (CR-006)
+
 > **CR-005 (approved 2026-10-27, repair CR-025):** the category dialog replaces the area-type multi-select with `ใช้กับประเภทอาคาร *` (check boxes of active building types, ≥ 1; new category: none ticked; error `เลือกประเภทอาคารอย่างน้อย 1 ประเภท`; hint `ฟอร์มแจ้งซ่อมแสดงหมวดนี้เฉพาะอาคารประเภทที่เลือก`). The `อื่น ๆ` category shows `ใช้ได้กับทุกประเภทอาคาร` instead (read-only). Category header meta line adds `ใช้กับ: {type tags}`. Data: #32–#34 `buildingTypeIds`, #53 for the options.
 
 ## Layout — mobile first

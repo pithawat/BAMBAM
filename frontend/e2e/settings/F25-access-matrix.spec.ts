@@ -1,21 +1,22 @@
 import path from "node:path";
 import { expect, request as playwrightRequest, test } from "@playwright/test";
 
-// Settings Stage 6 (BR-ALL-1, CR-001): every role × every settings page and a read of each page's API. Admin and
-// Superadmin reach ข้อมูลกลาง (buildings, categories); only Superadmin reaches contractor types, users, roles and
-// audit; every other role is refused everywhere — the page shows Forbidden and never any data. Real API.
+// Settings Stage 6 (BR-ALL-1, CR-001, CR-006): every role × every settings page and a read of each page's API with
+// the seed defaults. Admin and Superadmin reach every page (CR-006: Admin holds every settings key); every other role
+// is refused everywhere — the page shows Forbidden and never any data. A Role with only some keys: F25-settings-entry.
+// Real API.
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 
 const PAGES = [
-  { path: "/settings/buildings", api: "/api/v1/settings/buildings", admin: true },
-  { path: "/settings/categories", api: "/api/v1/settings/categories", admin: true },
-  { path: "/settings/contractor-types", api: "/api/v1/settings/contractor-types", admin: false },
-  { path: "/settings/users", api: "/api/v1/settings/users", admin: false },
-  { path: "/settings/roles", api: "/api/v1/settings/permissions", admin: false },
-  { path: "/settings/audit", api: "/api/v1/settings/audit", admin: false },
+  { path: "/settings/buildings", api: "/api/v1/settings/buildings" },
+  { path: "/settings/categories", api: "/api/v1/settings/categories" },
+  { path: "/settings/contractor-types", api: "/api/v1/settings/contractor-types" },
+  { path: "/settings/users", api: "/api/v1/settings/users" },
+  { path: "/settings/roles", api: "/api/v1/settings/permissions" },
+  { path: "/settings/audit", api: "/api/v1/settings/audit" },
 ];
 const ROLES = ["employee", "housekeeper_lead", "security_lead", "technician", "admin", "super_admin"] as const;
-const allowed = (role: string, admin: boolean) => role === "super_admin" || (role === "admin" && admin);
+const allowed = (role: string) => role === "super_admin" || role === "admin";
 
 test.describe("API", () => {
   test.skip(({ isMobile }) => isMobile, "API checks run once");
@@ -24,7 +25,7 @@ test.describe("API", () => {
       const api = await playwrightRequest.newContext({ baseURL, storageState: auth(role) });
       for (const p of PAGES) {
         const status = (await api.get(p.api)).status();
-        expect(status, `${role} ${p.api}`).toBe(allowed(role, p.admin) ? 200 : 403);
+        expect(status, `${role} ${p.api}`).toBe(allowed(role) ? 200 : 403);
       }
       await api.dispose();
     });
@@ -41,7 +42,7 @@ test.describe("pages", () => {
       for (const p of PAGES) {
         await page.goto(p.path);
         const forbidden = page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
-        if (allowed(role, p.admin)) {
+        if (allowed(role)) {
           await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
           await expect(forbidden).toHaveCount(0);
         } else {

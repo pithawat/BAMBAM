@@ -57,7 +57,7 @@ Status: APPROVED (2026-10-16) · CR-001 applied 2026-10-26 (Admin persona, fixed
 
 รายการสิทธิ์กำหนดในโค้ด (เพิ่มได้ตอนพัฒนาเท่านั้น) ค่าตั้งต้นต้องให้ผลเหมือนพฤติกรรมของ repair วันนี้ทุก role (หลัง CR-005/CR-006) เพื่อให้วันที่เปิดโมดูลนี้ไม่มีใครเห็นอะไรเปลี่ยน
 
-**สิทธิ์พื้นฐาน (ทุก role มีเสมอ ติ๊กออกไม่ได้):** เข้าสู่ระบบและโปรไฟล์, แจ้งซ่อม / สแกน QR / ติดตามเคสเดิม (repair F02, F03, F13-B), ดูงานที่ตัวเองแจ้งหรือติดตาม (F06) ~~, แจ้งเตือนของตัวเอง (F19-B)~~ (repair CR-024) — ตรงกับ D-004 "ทุก role ทำสิ่งที่ `employee` ทำได้"
+**สิทธิ์พื้นฐาน (ทุก role มีเสมอ ติ๊กออกไม่ได้):** เข้าสู่ระบบและโปรไฟล์, ~~แจ้งซ่อม / สแกน QR / ติดตามเคสเดิม (repair F02, F03, F13-B)~~ (CR-006: now `repair.ticket.report`), ดูงานที่ตัวเองแจ้งหรือติดตาม (F06) ~~, แจ้งเตือนของตัวเอง (F19-B)~~ (repair CR-024) — ตรงกับ D-004 "ทุก role ทำสิ่งที่ `employee` ทำได้"
 
 **กฎที่ไม่ใช่สิทธิ์ (อยู่ในโค้ด ไม่อยู่ใน matrix):** ตรวจรับ / ให้คะแนน / ส่งกลับให้แก้ได้เฉพาะผู้แจ้งของงานนั้น (repair F07)
 
@@ -87,6 +87,13 @@ Status: APPROVED (2026-10-16) · CR-001 applied 2026-10-26 (Admin persona, fixed
 | `settings.users.manage` | ผู้ใช้ | ❌ | ❌ | ❌ | ❌ | ❌ 🔒 | ✅ 🔒 | ❌ 🔒 |
 | `settings.roles.manage` | Role และสิทธิ์ | ❌ | ❌ | ❌ | ❌ | ❌ 🔒 | ✅ 🔒 | ❌ 🔒 |
 | `settings.audit.view` | ประวัติการเปลี่ยนแปลง | ❌ | ❌ | ❌ | ❌ | ❌ 🔒 | ✅ 🔒 | ❌ 🔒 |
+
+**CR-006 (2026-10-29) — platform-wide catalog.** Full tables, defaults and guard rules: `changes/CR-006.md`. (CR-006)
+
+- New keys: `repair.ticket.report` แจ้งซ่อม (F02, F03, F13-B) · `car_booking.use` ใช้ระบบจองรถ · `room_booking.use` ใช้ระบบจองห้องประชุม — default ✅ every role except `technician` · `repair.building3d.view` ดูโมเดล 3D อาคาร (sub-permission of `repair.overview.view`) — default `admin` · `settings.users.view` ดูรายชื่อผู้ใช้ — default `admin` (CR-006)
+- The settings group is **no longer fixed**: its 8 keys are stored and tickable; default `admin` has all 8, custom roles none; `super_admin` always all (🔒) (CR-006)
+- The "ตั้งค่าระบบ" table above (locked by role key) is superseded by CR-006 (CR-006)
+- Guard rules for anyone but Superadmin: G1 not their own role / own role change · G2 never Superadmin · G3 grant / assign only within their own permissions · G4 audited (CR-006)
 
 ## Open questions
 

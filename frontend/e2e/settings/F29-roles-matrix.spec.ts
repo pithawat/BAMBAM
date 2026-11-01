@@ -2,17 +2,17 @@ import path from "node:path";
 import { expect, request as playwrightRequest, test, type APIRequestContext, type Page } from "@playwright/test";
 import stack from "../test-stack.cjs";
 import { addPersonToRole, removePerson } from "./people";
+import { confirmSave, saveMatrix, viewerWith } from "./sessions";
 
 // F29 (settings Stage 2, S24): Superadmin ticks permissions in the matrix and the role's users gain / lose them on
-// their next request; add / edit / delete Role; the fixed "ตั้งค่าระบบ" card; VERSION_CONFLICT; unsaved guard. Real API.
+// their next request; add / edit / delete Role; the ตั้งค่าระบบ card (tickable since CR-006); VERSION_CONFLICT; unsaved
+// guard. Real API. CR-006 guards (Admin as editor, 3D requires overview): F29-permission-guards.spec.ts.
 //
 // Isolation: the matrix is shared by every spec, so the write tests run on a Role this file creates (its demo user is
 // reached through the dev role switch) and remove it afterwards. Seeded roles are only read here.
 const auth = (role: string) => path.join(__dirname, "..", ".auth", `${role}.json`);
 const API = "/api/v1/settings";
 const VIEW_ALL = "repair.ticket.view_all";
-/** A save under full-suite load (4 workers on `next dev`) can take longer than the default 5 s. */
-const SAVE = 20_000;
 
 type Role = { id: string; key: string; name: string; userCount: number; updatedAt: string };
 type Matrix = { version: number; roles: { id: string; permissions: string[] }[] };
@@ -53,27 +53,25 @@ async function sessionAs(baseURL: string | undefined, roleKey: string) {
 async function openMatrix(page: Page) {
   await page.goto("/settings/roles");
   await expect(page.getByRole("heading", { name: "Role และสิทธิ์", level: 1 })).toBeVisible();
-  await expect(page.getByRole("region", { name: "งานแจ้งซ่อม" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "ระบบแจ้งซ่อม" })).toBeVisible();
 }
 
-async function saveMatrix(page: Page) {
-  await page.getByRole("button", { name: "บันทึกสิทธิ์" }).click();
-  const dialog = page.getByRole("alertdialog", { name: "บันทึกการเปลี่ยนสิทธิ์?" });
-  await dialog.getByRole("button", { name: "บันทึกสิทธิ์" }).click();
-  await expect(page.getByText("บันทึกสิทธิ์แล้ว")).toBeVisible({ timeout: SAVE });
-  await expect(dialog).toBeHidden();
-}
 
 test.describe("desktop", () => {
   test.describe.configure({ mode: "serial" });
   test.use({ storageState: auth("super_admin") });
   test.skip(({ isMobile }) => isMobile, "matrix writes run once (desktop); the mobile layout is checked below");
 
-  test("AC1 / AC1b: default ticks, Superadmin row locked, the fixed ตั้งค่าระบบ card", async ({ page }) => {
+  test("AC1 / AC1b: default ticks, Superadmin row locked, the ตั้งค่าระบบ card is tickable (CR-006)", async ({ page }) => {
     test.slow(); // first visit compiles on `next dev`
     await openMatrix(page);
-    await expect(page.getByText("ทุก Role แจ้งซ่อมและติดตามงานตัวเองได้เสมอ")).toBeVisible();
-    for (const card of ["งานแจ้งซ่อม", "งานทีมและช่างภายนอก", "ตั้งค่าระบบ"]) await expect(page.getByRole("region", { name: card })).toBeVisible();
+    await expect(page.getByText("Superadmin มีทุกสิทธิ์เสมอ").first()).toBeVisible();
+    // ระบบแจ้งซ่อม is one table, its groups as column headers (owner 2026-11-01)
+    const cards = ["ระบบแจ้งซ่อม", "ระบบจองรถและห้องประชุม", "ตั้งค่าระบบ"];
+    for (const group of ["การใช้บริการแจ้งซ่อม", "งานแจ้งซ่อม", "งานทีม ช่างภายนอก และภาพรวมอาคาร"]) {
+      await expect(page.getByRole("region", { name: "ระบบแจ้งซ่อม" }).getByRole("columnheader", { name: group })).toBeVisible();
+    }
+    for (const card of cards) await expect(page.getByRole("region", { name: card })).toBeVisible();
 
     const cell = (perm: string, role: string) => page.getByRole("checkbox", { name: `${perm} — ${role}` });
     // 01-users.md defaults
@@ -85,19 +83,21 @@ test.describe("desktop", () => {
     // Superadmin: ticked and disabled
     await expect(cell("ปิดงานใดก็ได้", "Superadmin")).toBeChecked();
     await expect(cell("ปิดงานใดก็ได้", "Superadmin")).toBeDisabled();
-    // ตั้งค่าระบบ: Admin = อาคารและห้อง · อุปกรณ์และประเภทอุปกรณ์ · หมวดงานและอาการ only; every cell disabled
-    const fixed = page.getByRole("region", { name: "ตั้งค่าระบบ" });
-    await expect(fixed.getByText("กำหนดโดยระบบ")).toBeVisible();
-    for (const p of ["อาคารและห้อง", "อุปกรณ์และประเภทอุปกรณ์", "หมวดงานและอาการ"]) {
+    // CR-006 defaults: reporting is a key (every seeded role but technician)
+    await expect(cell("แจ้งซ่อม", "พนักงานทั่วไป")).toBeChecked();
+    await expect(cell("แจ้งซ่อม", "ช่างเทคนิค")).not.toBeChecked();
+    // ตั้งค่าระบบ: Admin has every key; no longer fixed — a Superadmin can tick it for any role but Superadmin
+    const settings = page.getByRole("region", { name: "ตั้งค่าระบบ" });
+    await expect(settings.getByText("กำหนดโดยระบบ")).toHaveCount(0);
+    const keys = ["อาคารและห้อง", "อุปกรณ์และประเภทอุปกรณ์", "หมวดงานและอาการ", "ประเภทผู้รับเหมา", "ดูรายชื่อผู้ใช้", "เปลี่ยน role ผู้ใช้", "Role และสิทธิ์", "ประวัติการเปลี่ยนแปลง"];
+    for (const p of keys) {
       await expect(cell(p, "Admin")).toBeChecked();
-      await expect(cell(p, "Admin")).toBeDisabled();
-    }
-    for (const p of ["ประเภทผู้รับเหมา", "ผู้ใช้", "Role และสิทธิ์", "ประวัติการเปลี่ยนแปลง"]) {
-      await expect(cell(p, "Admin")).not.toBeChecked();
+      await expect(cell(p, "Admin")).toBeEnabled();
       await expect(cell(p, "Superadmin")).toBeChecked();
+      await expect(cell(p, "Superadmin")).toBeDisabled();
     }
-    await expect(cell("ผู้ใช้", "ช่างเทคนิค")).not.toBeChecked();
-    await expect(cell("ผู้ใช้", "ช่างเทคนิค")).toBeDisabled();
+    await expect(cell("เปลี่ยน role ผู้ใช้", "ช่างเทคนิค")).not.toBeChecked();
+    await expect(cell("เปลี่ยน role ผู้ใช้", "ช่างเทคนิค")).toBeEnabled();
   });
 
   test("AC2: grant → the role's user gets it on the next request; revoke → refused again", async ({ page, baseURL }) => {
@@ -124,8 +124,7 @@ test.describe("desktop", () => {
       await expect(dialog.getByText("ผู้ใช้ 0 คน")).toBeVisible();
       await expect(dialog.getByText("เพิ่ม: ดูทุกงาน")).toBeVisible();
       await expect(dialog.getByText("มีผลในการใช้งานครั้งถัดไป โดยไม่ต้องออกจากระบบ")).toBeVisible();
-      await dialog.getByRole("button", { name: "บันทึกสิทธิ์" }).click();
-      await expect(page.getByText("บันทึกสิทธิ์แล้ว")).toBeVisible({ timeout: SAVE });
+      await confirmSave(page);
       await expect(cell).toBeChecked();
 
       // same session, next request
@@ -137,7 +136,7 @@ test.describe("desktop", () => {
       await expect(page.getByText("เปลี่ยนสิทธิ์ 1 รายการ")).toBeVisible();
       await page.getByRole("button", { name: "บันทึกสิทธิ์" }).click();
       await expect(page.getByRole("alertdialog").getByText("ถอด: ดูทุกงาน")).toBeVisible();
-      await page.getByRole("alertdialog").getByRole("button", { name: "บันทึกสิทธิ์" }).click();
+      await confirmSave(page);
       // the toast text repeats from the grant save, so wait for what only a finished save does: the pending bar goes
       await expect(page.getByText(/เปลี่ยนสิทธิ์ \d+ รายการ/)).toBeHidden();
       await expect(cell).not.toBeChecked();
@@ -171,18 +170,19 @@ test.describe("desktop", () => {
       await form.getByLabel("ชื่อ Role").fill(name);
       await form.getByRole("combobox").click();
       await page.getByRole("option", { name: "คัดลอกจาก ช่างเทคนิค" }).click();
-      await expect(form.getByText("คัดลอกเฉพาะสิทธิ์งานซ่อม สิทธิ์ตั้งค่าระบบสงวนตามบทบาทผู้ดูแล")).toBeVisible();
+      await expect(form.getByText("คัดลอกได้เฉพาะ Role ที่มีสิทธิ์ไม่เกินของคุณ")).toBeVisible();
       await form.getByRole("button", { name: "เพิ่ม Role" }).click();
       await expect(page.getByText(`เพิ่ม Role "${name}" แล้ว`)).toBeVisible();
 
-      const row = page.getByRole("region", { name: "งานแจ้งซ่อม" }).getByRole("row").filter({ hasText: name });
+      const row = page.getByRole("region", { name: "ระบบแจ้งซ่อม" }).getByRole("row").filter({ hasText: name });
       await expect(row).toHaveClass(/bg-secondary/);
       for (const p of ["ดูทุกงาน", "ดำเนินการและบันทึกผลซ่อม", "จัดการช่างภายนอก"]) {
         await expect(page.getByRole("checkbox", { name: `${p} — ${name}` })).toBeChecked();
       }
       await expect(page.getByRole("checkbox", { name: `ปิดงานใดก็ได้ — ${name}` })).not.toBeChecked();
-      // fixed settings keys are never copied
+      // the technician has no settings key and no report (CR-006), so neither has the copy
       await expect(page.getByRole("checkbox", { name: `อาคารและห้อง — ${name}` })).not.toBeChecked();
+      await expect(page.getByRole("checkbox", { name: `แจ้งซ่อม — ${name}` })).not.toBeChecked();
 
       // the role switcher (dev/UAT) lists it
       const demo: { roleName: string }[] = (await (await api.get("/api/v1/dev/demo-users")).json()).data;
@@ -275,7 +275,7 @@ test.describe("desktop", () => {
     await page.getByRole("tab", { name: "ตารางสิทธิ์" }).click();
     await expect(page.getByText("เปลี่ยนสิทธิ์ 1 รายการ")).toBeVisible();
 
-    await page.getByRole("complementary", { name: "เมนูหลัก" }).getByRole("link", { name: "อาคารและอุปกรณ์" }).click();
+    await page.getByRole("navigation", { name: "บริการหลัก" }).filter({ visible: true }).getByRole("link", { name: "หน้าแรก" }).click();
     const leave = page.getByRole("alertdialog", { name: "ออกโดยไม่บันทึก?" });
     await expect(leave.getByText("มีการเปลี่ยนแปลง 1 รายการที่ยังไม่บันทึก")).toBeVisible();
     await leave.getByRole("button", { name: "อยู่ต่อ" }).click();
@@ -283,8 +283,8 @@ test.describe("desktop", () => {
 
     await page.getByRole("button", { name: "ยกเลิกการเปลี่ยนแปลง" }).click();
     await expect(page.getByText(/เปลี่ยนสิทธิ์ \d+ รายการ/)).toBeHidden();
-    await page.getByRole("complementary", { name: "เมนูหลัก" }).getByRole("link", { name: "อาคารและอุปกรณ์" }).click();
-    await expect(page).toHaveURL(/\/settings\/buildings/);
+    await page.getByRole("navigation", { name: "บริการหลัก" }).filter({ visible: true }).getByRole("link", { name: "หน้าแรก" }).click();
+    await expect(page).toHaveURL(/:\d+\/$/);
   });
 });
 
@@ -301,23 +301,26 @@ test.describe("mobile", () => {
     await expect(sw).toBeChecked();
     await sw.click();
     await expect(page.getByText("เปลี่ยนสิทธิ์ 1 รายการ")).toBeVisible();
-    await expect(page.getByRole("switch", { name: "อาคารและห้อง — ช่างเทคนิค" })).toBeDisabled();
+    await expect(page.getByRole("switch", { name: "อาคารและห้อง — ช่างเทคนิค" })).toBeEnabled(); // tickable since CR-006
 
     await page.getByRole("combobox").click();
     await page.getByRole("dialog", { name: "เลือก Role ที่ต้องการตั้งค่า" }).getByRole("option", { name: /^Admin/ }).click();
-    await page.getByRole("switch", { name: "ดูภาพรวมอาคาร — Admin" }).click();
+    await page.getByRole("switch", { name: "ดูทุกงาน — Admin" }).click();
     await expect(page.getByText("เปลี่ยนสิทธิ์ 2 รายการ")).toBeVisible();
     await page.getByRole("button", { name: "ยกเลิกการเปลี่ยนแปลง" }).click();
     await expect(page.getByText(/เปลี่ยนสิทธิ์ \d+ รายการ/)).toBeHidden();
   });
 });
 
-test("Admin gets Forbidden on S24 and 403 from #6", async ({ browser, baseURL }) => {
-  const ctx = await browser.newContext({ storageState: auth("admin"), baseURL });
-  const page = await ctx.newPage();
-  await page.goto("/settings/roles");
-  await expect(page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
-  await expect(page.getByRole("checkbox")).toHaveCount(0);
-  expect((await page.request.get(`${API}/permissions`)).status()).toBe(403);
-  await ctx.close();
+test("without settings.roles.manage: Forbidden on S24 and 403 from #6 (CR-006: seeded Admin has it)", async ({ browser, baseURL, isMobile }) => {
+  test.skip(isMobile, "runs once (desktop)");
+  const v = await viewerWith(browser, baseURL, ["settings.locations.manage"]);
+  try {
+    await v.page.goto("/settings/roles");
+    await expect(v.page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
+    await expect(v.page.getByRole("checkbox")).toHaveCount(0);
+    expect((await v.page.request.get(`${API}/permissions`)).status()).toBe(403);
+  } finally {
+    await v.close();
+  }
 });

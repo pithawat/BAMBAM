@@ -481,4 +481,19 @@ func TestOverviewCarriesSiteBlocks(t *testing.T) {
 	if _, err := a.svc.Overview(context.Background(), viewerAs(users.RoleEmployee, uuid.New())); err == nil {
 		t.Error("an employee must not see the overview")
 	}
+	// settings CR-006: overview without building3d.view = the floor list only (no site, no models)
+	o, err = a.svc.Overview(context.Background(), a.reader)
+	if err != nil || len(o.Site) != 0 || o.Site == nil {
+		t.Errorf("without 3D: site = %v, err = %v", o.Site, err)
+	}
+}
+
+func TestWithout3DDropsModels(t *testing.T) {
+	key := "b1"
+	o := without3D(Overview{Buildings: []OverviewBuilding{{Name: "อาคาร 1", HasModel: true, ModelKey: &key, Floors: []OverviewFloor{{Name: "1"}}}},
+		Site: []SiteBlock{{MapNo: 1}}})
+	b := o.Buildings[0]
+	if b.HasModel || b.ModelKey != nil || len(b.Floors) != 1 || len(o.Site) != 0 {
+		t.Errorf("without3D = %+v", o)
+	}
 }

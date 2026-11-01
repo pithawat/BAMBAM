@@ -20,8 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { createRole, deleteRole, getRoles, updateRole } from "../../api";
-import type { Role } from "../../types";
+import { createRole, deleteRole, getRoles, guardRule, updateRole } from "../../api";
+import type { GuardRule, Role } from "../../types";
 import { errorCode, errorFields, GENERIC_ERROR, sheetOnMobile } from "../settings-ui";
 
 // S24 role dialogs (CR-001 block): add / edit Role, delete (two variants). Copy from the S24 spec + HANDOFF Stage 2.
@@ -29,6 +29,7 @@ import { errorCode, errorFields, GENERIC_ERROR, sheetOnMobile } from "../setting
 const NAME_MAX = 50;
 const DESCRIPTION_MAX = 200;
 const BASE = "base";
+const COPY_LIMIT = "คัดลอกได้เฉพาะ Role ที่มีสิทธิ์ไม่เกินของคุณ";
 
 const len = (s: string) => [...s.trim()].length;
 
@@ -38,15 +39,19 @@ type FormProps = {
   /** undefined = add. */
   role?: Role;
   roles: Role[];
+  /** CR-006 G3: false → "คัดลอกจาก" this role is a disabled option ("มีสิทธิ์ที่คุณไม่มี"). */
+  copyable: (roleId: string) => boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** After a successful save (add → the new role). */
   onSaved: (role: Role, added: boolean) => void;
   /** VERSION_CONFLICT / ROLE_NOT_FOUND on edit: the caller refetches. */
   onStale: () => void;
+  /** `403 PERMISSION_GUARD` on edit: the caller closes, says why and refetches. */
+  onRefused: (rule: GuardRule) => void;
 };
 
-export function RoleFormDialog({ role, roles, open, onOpenChange, onSaved, onStale }: FormProps) {
+export function RoleFormDialog({ role, roles, copyable, open, onOpenChange, onSaved, onStale, onRefused }: FormProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [start, setStart] = useState(BASE);
@@ -93,7 +98,10 @@ export function RoleFormDialog({ role, roles, open, onOpenChange, onSaved, onSta
     } catch (err) {
       const code = errorCode(err);
       const f = errorFields(err);
-      if (code === "NAME_TAKEN") setErrors({ name: "ชื่อนี้มีอยู่แล้ว" });
+      const rule = guardRule(err);
+      if (rule && !role) setErrors({ start: COPY_LIMIT });
+      else if (rule) onRefused(rule);
+      else if (code === "NAME_TAKEN") setErrors({ name: "ชื่อนี้มีอยู่แล้ว" });
       else if (code === "VALIDATION_FAILED" && Object.keys(f).length) {
         setErrors({
           ...(f.name ? { name: f.name === "TOO_LONG" ? `ชื่อยาวได้ไม่เกิน ${NAME_MAX} ตัวอักษร` : "กรุณากรอกชื่อ Role" } : {}),
@@ -151,7 +159,7 @@ export function RoleFormDialog({ role, roles, open, onOpenChange, onSaved, onSta
             />
           </Field>
           {!role && (
-            <Field id="role-start" label="เริ่มต้นสิทธิ์" error={errors.start} hint="คัดลอกเฉพาะสิทธิ์งานซ่อม สิทธิ์ตั้งค่าระบบสงวนตามบทบาทผู้ดูแล">
+            <Field id="role-start" label="เริ่มต้นสิทธิ์" error={errors.start} hint={COPY_LIMIT}>
               <Picker
                 id="role-start"
                 aria-labelledby="role-start-label"
@@ -161,7 +169,14 @@ export function RoleFormDialog({ role, roles, open, onOpenChange, onSaved, onSta
                 value={start}
                 onValueChange={setStart}
                 invalid={!!errors.start}
-                options={[{ value: BASE, label: "สิทธิ์พื้นฐานเท่านั้น" }, ...roles.map((r) => ({ value: r.id, label: `คัดลอกจาก ${r.name}` }))]}
+                options={[
+                  { value: BASE, label: "สิทธิ์พื้นฐานเท่านั้น" },
+                  ...roles.map((r) =>
+                    copyable(r.id)
+                      ? { value: r.id, label: `คัดลอกจาก ${r.name}` }
+                      : { value: r.id, label: `คัดลอกจาก ${r.name}`, description: "มีสิทธิ์ที่คุณไม่มี", disabled: true },
+                  ),
+                ]}
               />
             </Field>
           )}
@@ -211,10 +226,12 @@ type DeleteProps = {
   onDeleted: (role: Role) => void;
   /** ROLE_IN_USE / ROLE_NOT_FOUND from the server: the caller refetches and shows the fresh state. */
   onStale: (role: Role, code: string | undefined) => void;
+  /** `403 PERMISSION_GUARD` (CR-006): the caller closes, says why and refetches. */
+  onRefused: (rule: GuardRule) => void;
 };
 
 /** Delete Role: blocked variant when it still has users (no call), confirm variant otherwise. */
-export function DeleteRoleDialog({ role, onOpenChange, onDeleted, onStale }: DeleteProps) {
+export function DeleteRoleDialog({ role, onOpenChange, onDeleted, onStale, onRefused }: DeleteProps) {
   const [busy, setBusy] = useState(false);
   const blocked = !!role && role.userCount > 0;
 
@@ -226,7 +243,9 @@ export function DeleteRoleDialog({ role, onOpenChange, onDeleted, onStale }: Del
       onDeleted(role);
     } catch (err) {
       const code = errorCode(err);
-      if (code === "ROLE_IN_USE" || code === "ROLE_NOT_FOUND") onStale(role, code);
+      const rule = guardRule(err);
+      if (rule) onRefused(rule);
+      else if (code === "ROLE_IN_USE" || code === "ROLE_NOT_FOUND") onStale(role, code);
       else toast.error(GENERIC_ERROR);
     } finally {
       setBusy(false);

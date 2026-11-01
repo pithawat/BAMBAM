@@ -7,7 +7,7 @@ import { Select as SelectPrimitive } from "radix-ui";
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Plus, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
-import { can, PERM } from "@/lib/platform/permissions";
+import { can, canReport, PERM } from "@/lib/platform/permissions";
 import { MenuContent, MenuItem, type PickerOption } from "@/components/shared/picker";
 import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,8 @@ export function MyTicketsScreen() {
   const params = useSearchParams();
   const me = useCurrentUser();
   const lead = can(me, PERM.ticketTeamHandle);
+  // settings CR-006: without `repair.ticket.report` there is no แจ้งซ่อมใหม่ (a lead keeps the team record)
+  const reports = canReport(me);
   const relations = lead ? [...RELATIONS, TEAM_RELATION] : RELATIONS;
   const q = (params.get("q") ?? "").slice(0, 50);
   const scope = pick(relations, params.get("scope"));
@@ -114,7 +116,7 @@ export function MyTicketsScreen() {
   </>;
 
   return <div className="space-y-4 px-4 pt-4 pb-8 lg:space-y-5 lg:px-0 lg:pt-2">
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-5">
+    <div className={cn("grid gap-4 lg:gap-5", (reports || lead) && "lg:grid-cols-[minmax(0,1fr)_23rem]")}>
       {/* Leads' CTA card holds two buttons, so their hero scales up to fill the taller row (owner, 2026-10-26). */}
       <header className={cn("flex items-center gap-4 rounded-xl border border-mascot-edge/35 bg-mascot-blue/15 px-4 py-4 shadow-card sm:px-8 sm:py-5", lead ? "sm:gap-7" : "sm:gap-6")}>
         <Mascot pose="tracking" size={lead ? 160 : 120} className="hidden shrink-0 sm:block" priority />
@@ -125,24 +127,24 @@ export function MyTicketsScreen() {
           <p className={cn("text-sm text-muted-foreground", lead && "lg:mt-1 lg:text-base")}>งานที่คุณแจ้งและติดตาม · ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ</p>
         </div>
       </header>
-      <section aria-labelledby="request-title" className="flex flex-col justify-center gap-4 rounded-xl bg-primary px-5 py-5 text-primary-foreground shadow-card sm:px-7">
+      {(reports || lead) && <section aria-labelledby="request-title" className="flex flex-col justify-center gap-4 rounded-xl bg-primary px-5 py-5 text-primary-foreground shadow-card sm:px-7">
         <div>
           <h2 id="request-title" className="text-lg leading-7 font-semibold">พบปัญหาในที่ทำงาน?</h2>
           <p className="text-sm text-primary-foreground/85">{lead ? "เรียกช่างช่วยดูแล หรือบันทึกงานที่ทีมแก้ไขแล้ว" : "แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล"}</p>
         </div>
         <div className="grid gap-2.5">
-          <Link href="/repair/new" className={cn("group flex items-center gap-3 rounded-lg bg-card px-3 text-base font-semibold text-primary outline-none transition-shadow hover:shadow-float focus-visible:ring-3 focus-visible:ring-white/60", lead ? "h-12" : "h-14")}>
+          {reports && <Link href="/repair/new" className={cn("group flex items-center gap-3 rounded-lg bg-card px-3 text-base font-semibold text-primary outline-none transition-shadow hover:shadow-float focus-visible:ring-3 focus-visible:ring-white/60", lead ? "h-12" : "h-14")}>
             <span aria-hidden className="grid size-8 place-items-center rounded-md bg-secondary"><Plus className="size-4.5" /></span>
             <span className="flex-1">แจ้งซ่อมใหม่</span>
             <ChevronRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-          </Link>
+          </Link>}
           {lead && <Link href="/repair/new?mode=team" className="group flex h-12 items-center gap-3 rounded-lg border border-primary-foreground/35 bg-primary-foreground/8 px-3 text-base font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-foreground/15 focus-visible:ring-3 focus-visible:ring-white/60">
             <span aria-hidden className="grid size-8 place-items-center rounded-md bg-primary-foreground/15"><ClipboardCheck className="size-4.5" /></span>
             <span className="flex-1">บันทึกงานที่ทีมแก้แล้ว</span>
             <ChevronRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </Link>}
         </div>
-      </section>
+      </section>}
     </div>
     <Board key={`${q}|${scope}|${status}|${sort}|${page}`} filters={filters} relation={relations.find((r) => r.value === scope)!} filtered={filtered} onReset={reset} toolbar={toolbar} onPage={(p) => change({ page: p > 1 ? String(p) : null })} />
   </div>;
@@ -201,6 +203,7 @@ function useTicketPage(filters: Filters, relation: Relation) {
 type BoardProps = { filters: Filters; relation: Relation; filtered: boolean; onReset: () => void; toolbar: ReactNode; onPage: (page: number) => void };
 
 function Board({ filters, relation, filtered, onReset, toolbar, onPage }: BoardProps) {
+  const me = useCurrentUser();
   const { data, loading, reload } = useTicketPage(filters, relation);
   const result = data?.page;
   const failure = !loading && data?.error !== undefined
@@ -209,8 +212,10 @@ function Board({ filters, relation, filtered, onReset, toolbar, onPage }: BoardP
   const total = result?.meta.total ?? 0;
 
   if (ready && total === 0 && !filtered && filters.page === 1) {
-    return <EmptyState title="ยังไม่มีงานที่คุณแจ้ง" hint="เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย หรือสแกน QR ที่ติดบนอุปกรณ์"
-      action={<Button asChild><Link href="/repair/new">แจ้งซ่อม</Link></Button>} />;
+    return canReport(me)
+      ? <EmptyState title="ยังไม่มีงานที่คุณแจ้ง" hint="เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย หรือสแกน QR ที่ติดบนอุปกรณ์"
+        action={<Button asChild><Link href="/repair/new">แจ้งซ่อม</Link></Button>} />
+      : <EmptyState title="ยังไม่มีงานที่คุณติดตาม" />;
   }
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));

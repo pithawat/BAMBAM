@@ -65,6 +65,10 @@ func canView(v Viewer, t ticketAccess) bool {
 
 func seesAllTickets(v Viewer) bool { return v.Can(PermViewAll) }
 
+// reports: may report a new ticket, scan a QR to report and follow an existing one (F02, F03,
+// F13-B) — `repair.ticket.report`, every seeded role but technician (settings CR-006).
+func reports(v Viewer) bool { return v.Can(PermReport) }
+
 // isLead: may record a team-handled job (BR-F04-1) and hand their own over (BR-F05-2) —
 // `repair.ticket.team_handle`, the team leads by default (CR-007).
 func isLead(v Viewer) bool { return v.Can(PermTeamHandle) }
@@ -352,6 +356,19 @@ func optional(s string) *string {
 // seesDashboard: the S29 dashboard and floor plans (#27, #29, #30) need `repair.overview.view`
 // (admin and super_admin by default, BR-F23-2, D-079).
 func seesDashboard(v Viewer) bool { return v.Can(PermOverviewView) }
+
+// sees3D: the S29 3D building models and the site view also need `repair.building3d.view` (admin by
+// default, settings CR-006); without it S29 shows the floor list only.
+func sees3D(v Viewer) bool { return seesDashboard(v) && v.Can(PermBuilding3D) }
+
+// without3D drops what only the 3D card uses: the site blocks and each building's model.
+func without3D(o Overview) Overview {
+	o.Site = []SiteBlock{}
+	for i := range o.Buildings {
+		o.Buildings[i].HasModel, o.Buildings[i].ModelKey = false, nil
+	}
+	return o
+}
 
 // managesAssets: add / move / edit / deactivate equipment (#31–#34) needs `settings.assets.manage`
 // (fixed: admin and super_admin, settings CR-001).

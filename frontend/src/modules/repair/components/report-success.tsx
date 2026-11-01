@@ -7,9 +7,11 @@ import { ArrowUpRight } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Mascot } from "@/components/shared/mascot";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
+import { useCurrentUser } from "@/components/shared/me-provider";
 import { ForbiddenState } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { canReport } from "@/lib/platform/permissions";
 import { cn } from "@/lib/utils";
 import { CopyTicketNumber, TicketFailure, TicketSkeleton } from "./ticket-ui";
 import { categoryName, ticketHref, ticketLocation, ticketTitle } from "./ticket-presentation";
@@ -21,6 +23,7 @@ import { useTicket } from "./use-ticket";
 const MINI_STEPS = ["แจ้งงาน", "รับเรื่อง", "กำลังดำเนินการ", "เสร็จ", "ประเมินตรวจงาน"];
 
 export function ReportSuccessScreen() {
+  const me = useCurrentUser();
   const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
   const id = useSearchParams().get("id") ?? "";
@@ -60,7 +63,7 @@ export function ReportSuccessScreen() {
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
           <Button asChild className="h-12"><Link href={ticketHref(ticket.id)} replace>ดูงานนี้<ArrowUpRight aria-hidden /></Link></Button>
-          <Button asChild variant="outline" className="h-12"><Link href={team ? "/repair/new?mode=team" : "/repair/new"} replace>แจ้งเรื่องอื่น</Link></Button>
+          {(team || canReport(me)) && <Button asChild variant="outline" className="h-12"><Link href={team ? "/repair/new?mode=team" : "/repair/new"} replace>แจ้งเรื่องอื่น</Link></Button>}
         </div>
       </section>)}
   </>;

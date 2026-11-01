@@ -1,13 +1,21 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { usesService } from "@/lib/platform/permissions";
+import { useCurrentUser } from "./me-provider";
 import { SERVICES, ServiceIcon, SoonChip, type Service } from "./service-icon";
+import { ForbiddenState } from "./states";
 
 /**
  * Car / room booking before their modules exist (CR-010): the navbar keeps the three services equal, and this page
- * says plainly that the service is not open yet. No booking form, no sample workflow.
+ * says plainly that the service is not open yet. No booking form, no sample workflow. Without `car_booking.use` /
+ * `room_booking.use` the route is Forbidden (settings CR-006).
  */
 export function ServiceUnavailable({ service }: { service: Exclude<Service, "repair"> }) {
+  const me = useCurrentUser();
   const { label } = SERVICES[service];
+  if (!usesService(me, service)) return <ForbiddenState reason={`บัญชีนี้ไม่มีสิทธิ์ใช้ระบบ${label} กรุณาติดต่อผู้ดูแลระบบ`} />;
   return (
     <section aria-labelledby="service-title" className="mx-4 mt-5 rounded-xl border bg-card px-6 py-10 text-center shadow-card lg:mx-auto lg:mt-8 lg:max-w-140 lg:py-14">
       <ServiceIcon service={service} className="mx-auto" />

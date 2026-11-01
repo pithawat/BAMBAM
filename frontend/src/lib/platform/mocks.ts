@@ -2,10 +2,13 @@ import { PERM } from "./permissions";
 import type { DemoUser, Me, Role } from "./types";
 
 // Sample people from docs/modules/repair/ui/screens/_common.md §8 and settings _common.md §7 (fictional).
-// Permissions = the seeded matrix (settings 01-users.md → Permission catalog), in catalog order.
+// Permissions = the seeded matrix (settings 01-users.md → Permission catalog; CR-006 migration), in catalog order.
+// The custom role got report + services like every role but technician (migration 20261030000002).
 
 const ALL_PERMISSIONS: string[] = Object.values(PERM);
-const ADMIN_SETTINGS = [PERM.settingsLocations, PERM.settingsAssets, PERM.settingsCategories];
+const SERVICES = [PERM.carBookingUse, PERM.roomBookingUse];
+const ADMIN_SETTINGS = [PERM.settingsLocations, PERM.settingsAssets, PERM.settingsCategories, PERM.settingsContractorTypes,
+  PERM.settingsUsersView, PERM.settingsUsers, PERM.settingsRoles, PERM.settingsAudit];
 
 /** A custom role made in S24 (settings P2 example), to exercise "roles are data" in mock mode. */
 export const MOCK_CUSTOM_ROLE = "r_7c21a9f0";
@@ -40,7 +43,7 @@ export const mockMeByRole: Record<Role, Me> = {
     email: "wanna.s@example.co.th",
     role: "employee",
     roleName: "พนักงานทั่วไป",
-    permissions: [],
+    permissions: [PERM.ticketReport, ...SERVICES],
   },
   housekeeper_lead: {
     ...base,
@@ -53,7 +56,7 @@ export const mockMeByRole: Record<Role, Me> = {
     email: null,
     role: "housekeeper_lead",
     roleName: "หัวหน้าแม่บ้าน",
-    permissions: [PERM.ticketTeamHandle],
+    permissions: [PERM.ticketReport, PERM.ticketTeamHandle, ...SERVICES],
   },
   security_lead: {
     ...base,
@@ -66,7 +69,7 @@ export const mockMeByRole: Record<Role, Me> = {
     email: null,
     role: "security_lead",
     roleName: "หัวหน้ารปภ.",
-    permissions: [PERM.ticketTeamHandle],
+    permissions: [PERM.ticketReport, PERM.ticketTeamHandle, ...SERVICES],
   },
   technician: {
     ...base,
@@ -96,7 +99,7 @@ export const mockMeByRole: Record<Role, Me> = {
     email: null,
     role: "admin",
     roleName: "Admin",
-    permissions: [PERM.ticketViewAll, PERM.ticketCloseAny, PERM.ticketHandoverAny, PERM.overviewView, ...ADMIN_SETTINGS],
+    permissions: [PERM.ticketReport, PERM.ticketViewAll, PERM.ticketCloseAny, PERM.ticketHandoverAny, PERM.overviewView, PERM.building3dView, ...SERVICES, ...ADMIN_SETTINGS],
   },
   [MOCK_CUSTOM_ROLE]: {
     ...base,
@@ -109,7 +112,7 @@ export const mockMeByRole: Record<Role, Me> = {
     email: null,
     role: MOCK_CUSTOM_ROLE,
     roleName: "หัวหน้าช่าง",
-    permissions: [PERM.ticketViewAll, PERM.ticketWork, PERM.ticketCloseAny],
+    permissions: [PERM.ticketReport, PERM.ticketViewAll, PERM.ticketWork, PERM.ticketCloseAny, ...SERVICES],
   },
 };
 

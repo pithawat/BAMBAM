@@ -54,7 +54,7 @@ func run() error {
 	defer pool.Close()
 
 	// platform: one permission catalog from every module (settings F29, D-049)
-	catalog := permissions.MustRegistry(repair.Permissions, settings.Permissions)
+	catalog := permissions.MustRegistry(repair.Permissions, permissions.Services, settings.Permissions)
 	roleSvc := roles.NewService(roles.NewRepository(pool), catalog)
 	userSvc := users.NewService(users.NewRepository(pool), roleSvc, catalog, cfg.SuperAdminEmployeeCodes)
 	if err := userSvc.EnsureEnvSuperAdmins(ctx); err != nil {

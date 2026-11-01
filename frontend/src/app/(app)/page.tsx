@@ -8,21 +8,38 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SERVICES, ServiceIcon, SoonChip, type Service } from "@/components/shared/service-icon";
 import { Button } from "@/components/ui/button";
 import { formatLongDate } from "@/lib/format";
-import { can, PERM } from "@/lib/platform/permissions";
+import { EmptyState } from "@/components/shared/states";
+import { can, canReport, PERM, repairHome, usesService, type ServiceKey } from "@/lib/platform/permissions";
 import { initials } from "@/lib/platform/roles";
+import type { Me } from "@/lib/platform/types";
+import { cn } from "@/lib/utils";
 import { AdminDashboard } from "@/modules/repair/components/dashboard/admin-dashboard";
 
 // Home: whoever has `repair.overview.view` (Admin, Superadmin; settings CR-001) gets the S29 dashboard (repair
 // Stage 3D, CR-016); every other role keeps the
-// S02 Home — Stage 0 placeholder (D-023): greeting, the option-a CTA card and the services only.
+// S02 Home — Stage 0 placeholder (D-023): greeting, the option-a CTA card and the services only. Settings CR-006:
+// services and the CTA follow permissions (no report → "ไปที่งานซ่อม"; no repair key → greeting only).
 // Role widgets and "ติดตามงานซ่อม" come in repair Stage 6 (no bell, repair CR-024). Account and role
 // switcher are in the navbar (CR-010).
 
-const SERVICE_LIST: { service: Service; href?: string; hint: string }[] = [
-  { service: "repair", href: "/repair/new", hint: "แจ้งปัญหาในอาคาร" },
-  { service: "car", hint: "รถส่วนกลาง" },
-  { service: "room", hint: "ห้องประชุมทุกชั้น" },
-];
+type ServiceCard = { service: Service & ServiceKey; href?: string; hint: string };
+
+function serviceCards(me: Me): ServiceCard[] {
+  const all: ServiceCard[] = [
+    canReport(me)
+      ? { service: "repair", href: "/repair/new", hint: "แจ้งปัญหาในอาคาร" }
+      : { service: "repair", href: repairHome(me), hint: "ดูงานซ่อม" },
+    { service: "car", hint: "รถส่วนกลาง" },
+    { service: "room", hint: "ห้องประชุมทุกชั้น" },
+  ];
+  return all.filter((c) => usesService(me, c.service));
+}
+
+const GRID_COLS = ["", "grid-cols-1", "grid-cols-2", "grid-cols-3"];
+
+function NoServices({ className }: { className?: string }) {
+  return <EmptyState title="ยังไม่มีบริการที่ใช้ได้" hint="ติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์" className={className} />;
+}
 
 export default function HomePage() {
   const me = useCurrentUser();
@@ -33,6 +50,9 @@ function EmployeeHome() {
   const me = useCurrentUser();
   const firstName = me.name.split(/\s+/)[0];
   const today = formatLongDate(new Date());
+  const services = serviceCards(me);
+  const report = canReport(me);
+  const repair = usesService(me, "repair");
 
   return (
     <>
@@ -57,28 +77,46 @@ function EmployeeHome() {
 
         <section className="relative mx-4 -mt-13.5 rounded-[26px] bg-card p-4.5 shadow-float">
           <Mascot pose="welcome" size={104} surface="none" className="absolute -top-25 right-3" />
-          <h2 className="font-heading text-lg font-semibold">เจออะไรเสีย บอก BAMBAM</h2>
-          <p className="mt-0.5 mb-3.5 text-[13.5px] text-muted-foreground">ถ่ายรูป เลือกอาการ ส่งถึงช่างในหมวดนั้นทันที</p>
-          <div className="flex gap-2.5">
-            <Button asChild variant="brand" className="flex-1">
-              <Link href="/repair/new">
-                <Wrench aria-hidden />
-                แจ้งซ่อม
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/repair/scan">
-                <QrCode aria-hidden />
-                สแกน QR
-              </Link>
-            </Button>
-          </div>
+          {report ? (
+            <>
+              <h2 className="font-heading text-lg font-semibold">เจออะไรเสีย บอก BAMBAM</h2>
+              <p className="mt-0.5 mb-3.5 text-[13.5px] text-muted-foreground">ถ่ายรูป เลือกอาการ ส่งถึงช่างในหมวดนั้นทันที</p>
+              <div className="flex gap-2.5">
+                <Button asChild variant="brand" className="flex-1">
+                  <Link href="/repair/new">
+                    <Wrench aria-hidden />
+                    แจ้งซ่อม
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/repair/scan">
+                    <QrCode aria-hidden />
+                    สแกน QR
+                  </Link>
+                </Button>
+              </div>
+            </>
+          ) : repair ? (
+            <>
+              <h2 className="font-heading text-lg font-semibold">งานซ่อมของคุณ</h2>
+              <p className="mt-0.5 mb-3.5 text-[13.5px] text-muted-foreground">ดูงานที่ได้รับมอบหมายและงานที่คุณติดตาม</p>
+              <Button asChild variant="brand" className="w-full">
+                <Link href={repairHome(me)}>
+                  <Wrench aria-hidden />
+                  ไปที่งานซ่อม
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <h2 className="pr-28 font-heading text-lg font-semibold">สวัสดี คุณ{firstName}</h2>
+          )}
         </section>
 
         <section className="px-4 pt-5.5">
           <h2 className="mb-3 font-heading text-lg font-semibold">บริการ</h2>
-          <div className="grid grid-cols-3 gap-2.5">
-            {SERVICE_LIST.map(({ service, href }) => {
+          {services.length === 0 && <NoServices />}
+          <div className={cn("grid gap-2.5", GRID_COLS[services.length])}>
+            {services.map(({ service, href }) => {
               const body = (
                 <>
                   <ServiceIcon service={service} disabled={!href} />
@@ -109,22 +147,32 @@ function EmployeeHome() {
           <span aria-hidden className="pointer-events-none absolute -right-15 -bottom-35 size-60 rounded-full bg-white/10" />
           <h2 className="relative font-heading text-[28px] leading-[38px] font-bold">สวัสดี คุณ{firstName}</h2>
           <p className="relative mt-1 mb-4.5 text-[15px] text-white/95">{today}</p>
-          <div className="relative flex gap-2.5">
-            <Button asChild variant="white">
-              <Link href="/repair/new">
-                <Wrench aria-hidden />
-                แจ้งซ่อม
-              </Link>
-            </Button>
-            <Button asChild variant="glass">
-              <Link href="/repair/my">ติดตามงานซ่อม</Link>
-            </Button>
-          </div>
+          {repair && (
+            <div className="relative flex gap-2.5">
+              <Button asChild variant="white">
+                {report ? (
+                  <Link href="/repair/new">
+                    <Wrench aria-hidden />
+                    แจ้งซ่อม
+                  </Link>
+                ) : (
+                  <Link href={repairHome(me)}>
+                    <Wrench aria-hidden />
+                    ไปที่งานซ่อม
+                  </Link>
+                )}
+              </Button>
+              <Button asChild variant="glass">
+                <Link href="/repair/my">ติดตามงานซ่อม</Link>
+              </Button>
+            </div>
+          )}
           <Mascot pose="welcome" size={184} surface="none" className="absolute right-17 bottom-2" />
         </section>
 
-        <div className="my-5 grid grid-cols-3 gap-4.5">
-          {SERVICE_LIST.map(({ service, href, hint }) => {
+        {services.length === 0 && <NoServices className="my-5" />}
+        <div className={cn("grid gap-4.5", services.length > 0 && "my-5", GRID_COLS[services.length])}>
+          {services.map(({ service, href, hint }) => {
             const body = (
               <>
                 <ServiceIcon service={service} disabled={!href} />

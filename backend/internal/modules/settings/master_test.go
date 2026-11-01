@@ -79,7 +79,7 @@ func (f fakeMaster) LinkBuildingType(_ context.Context, _ uuid.UUID, ids []uuid.
 func routerWithMaster(role string, m fakeMaster) http.Handler {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	p := middleware.Principal{UserID: viewerID, Role: role, Permissions: registry.Effective(role, nil)}
+	p := middleware.Principal{UserID: viewerID, Role: role, Permissions: registry.Defaults(role)}
 	svc := NewService(Deps{Roles: fakeRoles{list: []roles.Role{superRole}}, Users: fakeUsers{}, Audit: fakeAudit{},
 		Locations: fakeLocations{}, Assets: fakeAssets{}, Repair: fakeRepair{}, Master: m})
 	RegisterRoutes(r.Group("/api/v1/settings", middleware.RequireAuth(fixedSession{p})), NewController(svc))
@@ -102,7 +102,7 @@ func TestMasterMapping(t *testing.T) {
 		{"order bad id", users.RoleAdmin, "PUT", "/categories/order", `{"ids":["x"],"version":"2026-10-16T02:11:09Z"}`, fakeMaster{}, 400, "ids"},
 		{"order conflict", users.RoleAdmin, "PUT", "/categories/order", `{"ids":[],"version":"2026-10-16T02:11:09Z"}`, fakeMaster{err: repair.ErrMasterVersionChanged}, 409, "VERSION_CONFLICT"},
 		{"types badge", users.RoleSuperAdmin, "GET", "/contractor-types", "", fakeMaster{}, 200, `"createdByTechnician":true`},
-		{"admin has no contractor types", users.RoleAdmin, "GET", "/contractor-types", "", fakeMaster{}, 403, "FORBIDDEN"},
+		{"employee has no contractor types (CR-006: admin has them)", users.RoleEmployee, "GET", "/contractor-types", "", fakeMaster{}, 403, "FORBIDDEN"},
 		{"bad category id", users.RoleAdmin, "PATCH", "/categories/nope", `{}`, fakeMaster{}, 404, "CATEGORY_NOT_FOUND"},
 		{"category type ids", users.RoleAdmin, "GET", "/categories", "", fakeMaster{}, 200, `"buildingTypeIds":[]`},
 		{"bad building type id", users.RoleAdmin, "POST", "/categories", `{"name":"x","buildingTypeIds":["x"]}`, fakeMaster{}, 400, "buildingTypeIds"},

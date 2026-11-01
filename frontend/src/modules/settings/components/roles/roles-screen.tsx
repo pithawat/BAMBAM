@@ -6,7 +6,7 @@ import { AlertTriangle, Info, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useIsDesktop } from "@/components/shared/use-media-query";
 import { useDiscardGuard } from "@/components/shared/use-discard-guard";
-import { ErrorState, ForbiddenState } from "@/components/shared/states";
+import { ErrorState } from "@/components/shared/states";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -21,12 +21,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { getPermissionMatrix, getRoles, savePermissionMatrix } from "../../api";
+import { getPermissionMatrix, getRoles, guardRule, savePermissionMatrix } from "../../api";
 import { settingsHeading } from "../../nav";
-import type { MatrixRole, PermissionMatrix, Role } from "../../types";
+import type { GuardRule, MatrixRole, PermissionMatrix, Role, RoleListItem } from "../../types";
+import { SettingsForbidden } from "../settings-forbidden";
 import { SettingsHeading } from "../settings-heading";
 import { errorCode, GENERIC_ERROR, panelClass, sheetOnMobile } from "../settings-ui";
-import { cellKey, MatrixDesktop, MatrixMobile, type Pending } from "./permission-matrix";
+import { cellKey, cellValue, dependentsOf, GUARD_COPY, keepAllowed, MatrixDesktop, MatrixMobile, type Pending } from "./permission-matrix";
 import { DeleteRoleDialog, RoleFormDialog } from "./role-dialogs";
 import { RoleList } from "./role-list";
 
@@ -42,7 +43,7 @@ export function RolesScreen() {
   const desktop = useIsDesktop();
 
   const [matrix, setMatrix] = useState<PermissionMatrix>();
-  const [roles, setRoles] = useState<Role[]>();
+  const [roles, setRoles] = useState<RoleListItem[]>();
   const [error, setError] = useState<unknown>();
   const [revision, setRevision] = useState(0);
   const [pending, setPending] = useState<Pending>({});
@@ -89,16 +90,34 @@ export function RolesScreen() {
     router.replace(`${pathname}?${q}`, { scroll: false });
   }
 
+  /** Flips one cell; unticking a key also unticks the keys that require it in the same row (CR-006). */
   function toggle(role: MatrixRole, permission: string) {
-    const k = cellKey(role.id, permission);
-    const original = role.permissions.includes(permission);
+    if (!matrix) return;
     setPending((p) => {
       const next = { ...p };
-      const current = k in p ? p[k] : original;
-      if (!current === original) delete next[k];
-      else next[k] = !current;
+      const set = (key: string, value: boolean) => {
+        if (value === role.permissions.includes(key)) delete next[cellKey(role.id, key)];
+        else next[cellKey(role.id, key)] = value;
+      };
+      const untick = (key: string) => {
+        set(key, false);
+        for (const d of dependentsOf(matrix, key)) if (cellValue(next, role, d)) untick(d);
+      };
+      if (cellValue(p, role, permission)) untick(permission);
+      else set(permission, true);
       return next;
     });
+  }
+
+  /** `403 PERMISSION_GUARD`: nothing was saved — say why, refetch, keep only the changes still allowed. */
+  async function refused(rule: GuardRule) {
+    toast.error(GUARD_COPY[rule]);
+    try {
+      const { m } = await reloadAll();
+      setPending((p) => keepAllowed(m, p));
+    } catch {
+      toast.error(GENERIC_ERROR);
+    }
   }
 
   async function reloadAll() {
@@ -124,7 +143,11 @@ export function RolesScreen() {
       getRoles().then(setRoles, () => undefined);
     } catch (err) {
       const code = errorCode(err);
-      if (code === "VERSION_CONFLICT") {
+      const rule = guardRule(err);
+      if (rule) {
+        setSaveOpen(false);
+        await refused(rule);
+      } else if (code === "VERSION_CONFLICT") {
         try {
           setConflict(await getPermissionMatrix());
         } catch {
@@ -144,15 +167,7 @@ export function RolesScreen() {
   function loadLatest() {
     if (!conflict) return;
     const fresh = conflict;
-    setPending((p) => {
-      const next: Pending = {};
-      for (const [k, granted] of Object.entries(p)) {
-        const [roleId, permission] = k.split("|");
-        const role = fresh.roles.find((r) => r.id === roleId);
-        if (role && !role.isLocked && role.permissions.includes(permission) !== granted) next[k] = granted;
-      }
-      return next;
-    });
+    setPending((p) => keepAllowed(fresh, p));
     setMatrix(fresh);
     setConflict(null);
     setSaveOpen(false);
@@ -190,7 +205,7 @@ export function RolesScreen() {
         <SettingsHeading {...heading} />
         <section className={panelClass}>
           {errorCode(error) === "FORBIDDEN" ? (
-            <ForbiddenState title="คุณไม่มีสิทธิ์เข้าถึงหน้านี้" reason="การจัดการผู้ใช้ Role และสิทธิ์ สำหรับ Superadmin เท่านั้น" />
+            <SettingsForbidden />
           ) : (
             <ErrorState hint="ตรวจสอบการเชื่อมต่อ แล้วลองอีกครั้ง ข้อมูลที่ยังไม่บันทึกจะยังอยู่" onRetry={() => setRevision((r) => r + 1)} />
           )}
@@ -218,8 +233,8 @@ export function RolesScreen() {
           <div className="mb-4 flex gap-2.5 rounded-xl border border-primary/15 bg-secondary/60 px-4 py-3.5 text-sm">
             <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
             <div>
-              <p className="font-medium">ทุก Role แจ้งซ่อมและติดตามงานตัวเองได้เสมอ</p>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">Superadmin มีทุกสิทธิ์ · สิทธิ์ตั้งค่าระบบล็อกตามขอบเขตของผู้ดูแล</p>
+              <p className="font-medium">Superadmin มีทุกสิทธิ์เสมอ</p>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">ให้ได้เฉพาะสิทธิ์ที่คุณมี · แก้สิทธิ์ของ role ตัวเองไม่ได้</p>
             </div>
           </div>
         )}
@@ -277,14 +292,22 @@ export function RolesScreen() {
         />
       )}
 
-      {roles && (
+      {roles && matrix && (
         <RoleFormDialog
           role={form.role}
           roles={roles}
+          copyable={(roleId) => {
+            const m = matrix.roles.find((r) => r.id === roleId);
+            return !!m && m.permissions.every((k) => matrix.grantable.includes(k));
+          }}
           open={form.open}
           onOpenChange={(open) => setForm((f) => ({ ...f, open }))}
           onSaved={afterRoleSaved}
           onStale={() => reloadAll().catch(() => undefined)}
+          onRefused={(rule) => {
+            setForm({ open: false });
+            refused(rule);
+          }}
         />
       )}
 
@@ -297,6 +320,10 @@ export function RolesScreen() {
           // Its pending matrix changes go with it.
           setPending((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !k.startsWith(`${role.id}|`))));
           reloadAll().catch(() => undefined);
+        }}
+        onRefused={(rule) => {
+          setDeleting(null);
+          refused(rule);
         }}
         onStale={async (role, code) => {
           try {

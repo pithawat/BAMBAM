@@ -18,6 +18,14 @@ Status: APPROVED (2026-10-16) — user approved screens + plan; visual style fol
 
 ## 2. Navigation — administration shell (CR-001, CR-002, CR-004)
 
+> **CR-006 (2026-10-29) — supersedes the sidebar / drawer below.** Layout reference: `../mockups/CR-006-design/App.tsx` + `index.css` (owner design); colours and fonts stay the design system's (`#2741FA`, Anuphan). (CR-006)
+> - Settings pages keep the **app navbar** (D-064). Its "ตั้งค่าระบบ" button opens a dropdown: left column = groups (icon, name, one-line description, `>`), right column = the hovered group's sub-menus — **no `>` on sub-menus**, a check on the current page. Groups / items without permission are left out.
+> - Groups (only real pages): **สถานที่และอุปกรณ์** — อาคารและอุปกรณ์ · ประเภทอาคาร · ประเภทอุปกรณ์ · **การให้บริการ** — หมวดงานและอาการ · ประเภทผู้รับเหมา · จองรถ / จองห้องประชุม ("เร็ว ๆ นี้") · **ผู้ใช้งานและสิทธิ์** — ผู้ใช้งาน · บทบาทและสิทธิ์ · ประวัติการเปลี่ยนแปลง.
+> - Page frame: breadcrumb (หน้าแรก › ตั้งค่าระบบ › {group}) · page intro · a card with **only the open group's sub-menus** (the design's all-groups `category-tabs` row is dropped) · section heading (title, soft tag, description, primary action) · content.
+> - Phones (< 1024px): the navbar menu sheet lists the groups, tapping one shows its sub-menus; the sub-menu row scrolls horizontally.
+> - **D-134 (2026-11-01, built in R1):** the navbar is on every page, settings included, full-width and flush with the top and side edges (BAMBAM │ WORKPLACE · icon items · "ตั้งค่าระบบ" dropdown · separator · account); the sidebar / drawer below is removed. Phones: a settings icon in the brand row opens a sheet (groups → sub-menus, "กลุ่มทั้งหมด" back). Sub-menu labels: อาคารและอุปกรณ์ · ประเภทอาคาร · ประเภทอุปกรณ์ / หมวดงานและอาการ · ประเภทผู้รับเหมา · การจองรถ · การจองห้องประชุม (เร็ว ๆ นี้) / ผู้ใช้งาน · บทบาทและสิทธิ์ · ประวัติการเปลี่ยนแปลง. Page frame (breadcrumb, intro, sub-menu card) stays R2. (CR-006)
+> - Services in the navbar / Home show by permission: แจ้งซ่อม = any `repair.*` key · จองรถ = `car_booking.use` · จองห้องประชุม = `room_booking.use`.
+
 `app/(app)/settings/layout.tsx` replaces the app navbar on every `/settings/**` page. Visual reference: `../mockups/CR-001-admin-settings.html` (sidebar, drawer, headings).
 
 **Entry points** (shared shell, Claude):

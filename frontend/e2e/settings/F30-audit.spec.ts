@@ -1,6 +1,7 @@
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { person, seedPeople, upsertPerson } from "./people";
+import { viewerWith } from "./sessions";
 
 // F30 (settings Stage 3, S26): every settings write is listed with who, when and before → after; filters combine
 // and live in the URL; read-only. The rows are made here through the API (a Role with a permission change and a
@@ -69,12 +70,15 @@ test("phone: grouped by day, read-only", async ({ page, isMobile }) => {
   await expect(page.getByRole("region").filter({ has: page.getByRole("heading", { level: 3 }) }).first()).toBeVisible();
 });
 
-test("Admin gets Forbidden on S26 and 403 from #11 / #12", async ({ browser, baseURL }) => {
-  const ctx = await browser.newContext({ storageState: auth("admin"), baseURL });
-  const page = await ctx.newPage();
-  await page.goto("/settings/audit");
-  await expect(page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
-  expect((await page.request.get(`${API}/audit`)).status()).toBe(403);
-  expect((await page.request.get(`${API}/audit/actors`)).status()).toBe(403);
-  await ctx.close();
+test("without settings.audit.view: Forbidden on S26 and 403 from #11 / #12 (CR-006: seeded Admin has it)", async ({ browser, baseURL, isMobile }) => {
+  test.skip(isMobile, "runs once (desktop)");
+  const v = await viewerWith(browser, baseURL, ["settings.locations.manage"]);
+  try {
+    await v.page.goto("/settings/audit");
+    await expect(v.page.getByText("คุณไม่มีสิทธิ์เข้าถึงหน้านี้")).toBeVisible();
+    expect((await v.page.request.get(`${API}/audit`)).status()).toBe(403);
+    expect((await v.page.request.get(`${API}/audit/actors`)).status()).toBe(403);
+  } finally {
+    await v.close();
+  }
 });

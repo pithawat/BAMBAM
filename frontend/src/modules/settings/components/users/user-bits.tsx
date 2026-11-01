@@ -37,6 +37,9 @@ export function dateAndTime(iso: string | null): [string, string] | null {
 export const LOCK_COPY = {
   SELF: "เปลี่ยน Role ของตัวเองไม่ได้",
   LOCKED_BY_ENV: "Role นี้กำหนดโดยระบบ (ตั้งค่าใน server)",
+  // CR-006 (Claude placeholder so the build stays green; copy from HANDOFF Stage R1)
+  READ_ONLY: "บัญชีนี้ดูรายชื่อได้อย่างเดียว เปลี่ยน Role ไม่ได้",
+  SUPER_ADMIN: "เปลี่ยน Role ของ Superadmin ได้เฉพาะ Superadmin",
 } as const;
 
 export function FixedRoleNote({ className }: { className?: string }) {
