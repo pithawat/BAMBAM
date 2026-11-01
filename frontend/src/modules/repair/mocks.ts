@@ -1160,11 +1160,12 @@ export function mockOverview(v: Viewer): Overview {
   return { counts, buildings, site: mockSite, attention };
 }
 
-/** #27 `site[]` (CR-027): อาคาร 1 linked, two map blocks without a building (positions from the migration). */
+/** #27 `site[]` (CR-027): อาคาร 1 linked, map blocks without a building (positions from the CR-033 migration). */
 const mockSite: SiteBlock[] = [
   { id: "5b000000-0000-4000-8000-000000000001", mapNo: 1, name: "อาคาร 1", buildingId: B1_ID, x: 0, z: 0, rotDeg: 17.1, widthM: 32, depthM: 15, storeys: 6, side: 1 },
-  { id: "5b000000-0000-4000-8000-000000000003", mapNo: 3, name: "อาคาร 3", buildingId: null, x: 48.5, z: 61.1, rotDeg: 7.6, widthM: 72, depthM: 17, storeys: 1, side: 1 },
-  { id: "5b000000-0000-4000-8000-000000000016", mapNo: 16, name: "โรงอาหาร", buildingId: null, x: -40.6, z: -12.2, rotDeg: -76, widthM: 24.4, depthM: 11.4, storeys: 1, side: 1 },
+  { id: "5b000000-0000-4000-8000-000000000003", mapNo: 3, name: "อาคาร 3", buildingId: null, x: 74.8, z: 59.9, rotDeg: 7.6, widthM: 72, depthM: 17, storeys: 1, side: 1 },
+  { id: "5b000000-0000-4000-8000-000000000004", mapNo: 4, name: "อาคาร 4", buildingId: null, x: 101.2, z: 25.1, rotDeg: 96.1, widthM: 38, depthM: 10, storeys: 2, side: 1 },
+  { id: "5b000000-0000-4000-8000-000000000016", mapNo: 16, name: "โรงอาหาร", buildingId: null, x: -38.1, z: -11.3, rotDeg: -76, widthM: 16, depthM: 20, storeys: 1, side: 1 },
 ];
 
 /** #29. */

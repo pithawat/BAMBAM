@@ -48,7 +48,7 @@ const height = (b: SiteBlockSpec) => b.storeys * (b.modelKey === "b2" ? 3.6 : ST
 /** World point above a block's roof (its marker chip). */
 export const siteAnchor = (b: SiteBlockSpec): [number, number, number] => [b.x, height(b) + 2, b.z];
 
-export function buildSite(blocks: SiteBlockSpec[]): BuiltSite {
+export function buildSite(blocks: SiteBlockSpec[], side: 1 | 2): BuiltSite {
   const group = new THREE.Group();
   const geos: THREE.BufferGeometry[] = [];
   const col = new THREE.Color();
@@ -74,7 +74,7 @@ export function buildSite(blocks: SiteBlockSpec[]): BuiltSite {
   const bounds = new THREE.Box3();
   for (const p of placed) bounds.union(p.box.clone().applyMatrix4(p.m));
   if (bounds.isEmpty()) bounds.set(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 10, 50));
-  group.add(buildGround(bounds)); // CR-032: roads, walkways, car parks of this side (2 draw calls)
+  group.add(buildGround(side, blocks)); // CR-033: this side's ground from the site plan / OpenStreetMap (4 draw calls)
   const center = bounds.getCenter(new THREE.Vector3());
   group.add(new THREE.Mesh( // far past the view: the fog blends its edge into the background
     new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2).translate(center.x, -0.02, center.z),

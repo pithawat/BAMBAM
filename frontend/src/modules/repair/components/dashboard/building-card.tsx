@@ -17,6 +17,7 @@ import { AssetDialog, DeactivateAssetDialog, type AssetDraft } from "./asset-dia
 import { ASSET_SHORT, AssetIcon, SITE_SIDES, type SiteSide, assetLabel, floorStepCounts, floorTopStep, MODEL_STEP, MODEL_STEPS, modelStep, MOUNT_Y, spreadInRoom, type ModelStepKey } from "./dashboard-ui";
 import { BuildingEngine, type TicketPin } from "./scene/engine";
 import { siteAnchor, type SiteBlockSpec } from "./scene/site";
+import { SIDE_CROSSING, type SideCrossing } from "./scene/site-ground";
 
 // S29 3D card (F23 + F31, CR-016, CR-017, CR-027): campus site view (one block per map frame, a marker with
 // the open-ticket count on each building that has floors) → building model → floor plan with one pin per
@@ -134,8 +135,8 @@ export default function BuildingCard({ buildings, site, buildingId, side, onOpen
   }, []);
 
   useEffect(() => {
-    engine?.setSite(siteBlocks);
-  }, [engine, siteBlocks]);
+    engine?.setSite(siteBlocks, side);
+  }, [engine, siteBlocks, side]);
 
   useEffect(() => {
     if (ready) engine?.setFloorSteps((building?.floors ?? []).map((f) => ({ level: f.level, step: floorTopStep(f) })));
@@ -323,10 +324,14 @@ export default function BuildingCard({ buildings, site, buildingId, side, onOpen
   return <section aria-label={`${building?.name ?? "ภาพรวมพื้นที่"} แบบ 3 มิติ`} className="relative h-full min-h-140 overflow-hidden rounded-xl border bg-muted shadow-card">
     <div ref={hostRef} className="absolute inset-0" />
     <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-10">
-      {engine && !building && siteBlocks.filter((b) => b.building).map((b) =>
+      {/* taller buildings last: their marker stays on top where a low neighbour's marker overlaps it (CR-033) */}
+      {engine && !building && siteBlocks.filter((b) => b.building).sort((a, b) => a.storeys - b.storeys).map((b) =>
         <Anchor key={b.id} engine={engine} at={siteAnchor(b)} className="-translate-x-1/2 -translate-y-full">
           <SiteMarker building={b.building!} onOpen={() => onOpenBuilding(b.building!.id)} />
         </Anchor>)}
+      {engine && !building && <Anchor key={`cross-${side}`} engine={engine} at={[SIDE_CROSSING[side].at[0], 1, SIDE_CROSSING[side].at[1]]} className="-translate-x-1/2 -translate-y-1/2">
+        <CrossingButton crossing={SIDE_CROSSING[side]} onCross={() => onShowSite(SIDE_CROSSING[side].to)} />
+      </Anchor>}
       {engine && ready && !floorId && floors.filter((f) => f.openCount > 0).map((f) =>
         <Anchor key={f.id} engine={engine} at={engine.floorAnchor(f.level)} className="-translate-y-1/2">
           <FloorBadge floor={f} onOpen={() => setFloorId(f.id)} />
@@ -442,7 +447,8 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
 function Anchor({ engine, at: [x, y, z], className, children }: { engine: BuildingEngine; at: [number, number, number]; className?: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => (ref.current ? engine.track(ref.current, x, y, z) : undefined), [engine, x, y, z]);
-  return <div ref={ref} className="invisible absolute">
+  // the one under the pointer / focus comes to the front (neighbouring markers can overlap)
+  return <div ref={ref} className="invisible absolute hover:z-10 focus-within:z-10">
     <div className={cn("pointer-events-auto", className)}>{children}</div>
   </div>;
 }
@@ -492,6 +498,19 @@ function PlanOverlays({ engine, plan, edit, canEdit, mountOf, openAsset, setOpen
       </Anchor>;
     })}
   </>;
+}
+
+/** Site view (CR-033): the button on the main road at the side's edge → the other side. */
+function CrossingButton({ crossing, onCross }: { crossing: SideCrossing; onCross: () => void }) {
+  const to = `ไป${SITE_SIDES[crossing.to]}`;
+  return <button type="button" onClick={onCross} aria-label={to} title={`ข้าม${crossing.road}`}
+    className="flex items-center gap-1.5 rounded-full border-2 border-card bg-foreground py-1 pr-2 pl-3 text-xs font-semibold text-background shadow-raised outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-3 focus-visible:ring-ring/40 motion-reduce:transition-none">
+    <span className="flex flex-col items-start leading-tight">
+      <span className="whitespace-nowrap">{to}</span>
+      <small className="text-[10px] font-normal whitespace-nowrap opacity-75">ข้าม{crossing.road}</small>
+    </span>
+    <ArrowRight className="size-3.5" aria-hidden />
+  </button>;
 }
 
 /** Site view: one marker per building with floors — name + open tickets (the earliest open step's colour) → that building. */

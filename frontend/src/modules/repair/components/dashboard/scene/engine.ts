@@ -193,13 +193,13 @@ export class BuildingEngine {
    * Builds the site view of one side: the boxes as one merged mesh, then the real model of every block
    * with a shape (CR-028: without its surroundings, pick shells hidden). The camera frames every block.
    */
-  setSite(blocks: SiteBlockSpec[]) {
+  setSite(blocks: SiteBlockSpec[], side: 1 | 2) {
     const seq = ++this.siteSeq;
     if (this.site) {
       this.siteScene.remove(this.site.group);
       disposeTree(this.site.group);
     }
-    const site = buildSite(blocks);
+    const site = buildSite(blocks, side);
     this.site = site;
     this.siteScene.add(site.group);
     for (const b of blocks) {

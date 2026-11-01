@@ -149,6 +149,30 @@ test.describe("admin", () => {
     await expect(site.getByRole("button", { name: /^อาคาร 1 งานค้าง/ })).toHaveCount(0);
   });
 
+  test("CR-033 AC2 / AC3: อาคาร 4 turned 180°; the button on the main road switches side and back, the top buttons stay", async ({ page, isMobile }) => {
+    test.skip(isMobile, "3D is desktop only");
+    test.slow(); // WebGL + model build compete with the other workers
+    await page.goto("/");
+    const site = page.locator(SITE);
+    await expect(site.locator("canvas")).toBeVisible({ timeout: 60_000 });
+    const overview = (await (await page.request.get(`${API}/admin/overview`)).json()).data;
+    expect(overview.site.find((b: { name: string }) => b.name === "อาคาร 4").rotDeg).toBeCloseTo(96.1, 1); // migration 20261101000001
+    await expect(site.getByText(/^ฝั่งสำนักงานใหญ่ · \d+ อาคาร/)).toBeVisible();
+    await expect(site.getByRole("button", { name: "ไปฝั่งสำนักงานใหญ่" })).toHaveCount(0);
+    await site.getByRole("button", { name: "ไปฝั่ง Riverside" }).click();
+    await expect(site.getByText(/^ฝั่ง Riverside · \d+ อาคาร/)).toBeVisible();
+    await expect(site.getByRole("button", { name: /^อาคาร CCTC งานค้าง/ })).toBeVisible();
+    // keyboard reachable
+    await site.getByRole("button", { name: "ไปฝั่งสำนักงานใหญ่" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(site.getByText(/^ฝั่งสำนักงานใหญ่ · \d+ อาคาร/)).toBeVisible();
+    await expect(site.getByRole("button", { name: /^อาคาร 1 งานค้าง/ })).toBeVisible();
+    const top = site.getByRole("group", { name: "เลือกฝั่ง" });
+    await top.getByRole("button", { name: "ฝั่ง Riverside" }).click();
+    await expect(top.getByRole("button", { name: "ฝั่ง Riverside" })).toHaveAttribute("aria-pressed", "true");
+    await expect(site.getByRole("button", { name: "ไปฝั่งสำนักงานใหญ่" })).toBeVisible();
+  });
+
   test("CR-027 AC2: อาคาร 2 → 4 floors → floor 2 plan with its rooms → back to the building and the site", async ({ page, isMobile }) => {
     test.skip(isMobile, "3D is desktop only");
     test.slow(); // WebGL + model build compete with the other workers
@@ -218,7 +242,9 @@ test.describe("admin", () => {
 
     const counts: { geometries: number; textures: number }[] = [];
     for (let i = 0; i < 10; i++) {
-      await site.getByRole("button", { name: i % 2 ? /^อาคาร 1 งานค้าง/ : /^อาคาร 2 งานค้าง/ }).click();
+      // keyboard: the small blocks next to อาคาร 1 (โรงอาหาร, ห้องประชุม 60 ปี) can overlap its marker
+      await site.getByRole("button", { name: i % 2 ? /^อาคาร 1 งานค้าง/ : /^อาคาร 2 งานค้าง/ }).focus();
+      await page.keyboard.press("Enter");
       const card = page.locator(`section[aria-label='${i % 2 ? "อาคาร 1" : "อาคาร 2"} แบบ 3 มิติ']`);
       await expect(card.getByRole("group", { name: "เลือกชั้น" })).toBeVisible();
       await expect(card.getByLabel("กำลังโหลดอาคาร")).toHaveCount(0, { timeout: 20_000 });
@@ -237,8 +263,11 @@ test.describe("admin", () => {
     }
 
     // CR-031: the Riverside side with its nine light models keeps the same budget
+    const before = await stats(page);
     await site.getByRole("group", { name: "เลือกฝั่ง" }).getByRole("button", { name: "ฝั่ง Riverside" }).click();
     await expect(site.getByRole("button", { name: /^อาคาร CCTC งานค้าง/ })).toBeVisible();
+    // the other side is drawn (CR-033: its own ground), then its light models load
+    await expect.poll(async () => (await stats(page)).triangles, { timeout: 20_000 }).not.toBe(before.triangles);
     await expect.poll(async () => (await stats(page)).triangles, { timeout: 20_000 }).toBeGreaterThan(2_000);
     await page.waitForTimeout(1500);
     const s2 = await stats(page);

@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-19) — owner: "go" with `../mockups/S29-admin-dashboard-modern.html` as the layout and the owner's own 3D model (D-082) · CR-024 applied 2026-10-26 (block below)
 
+> **CR-033 (approved 2026-11-01, Stage 3D-5):** site view ground follows the site plans (ฝั่งสำนักงานใหญ่: plan p.4 of `5-อาคารTrialmix…pdf`; ฝั่ง Riverside: OpenStreetMap + `8-อาคาร Riverside 2.pdf` p.4) — roads, angled parking rows, trees, the main road at the edge; อาคาร 4 turned 180°; a button on the main road inside the map ("ไปฝั่ง Riverside" / "ไปฝั่งสำนักงานใหญ่") switches side, the "เลือกฝั่ง" buttons on top stay; budget unchanged (D-127 / D-130). (CR-033)
+
 > **CR-024 (approved 2026-10-26):** Admin Home only (no executive, no read-only variant or toggle); every Admin sees จัดวางอุปกรณ์.
 
 > **CR-019 (approved 2026-10-24) — light polish, same sections and data:** heading = `welcome` mascot · eyebrow `WORKPLACE OVERVIEW` · greeting · date line; tiles = label + icon tile on top, number + `งาน` below, white cards with shadow; panel headers with a sub-line (`งานตามขั้นตอน กดเพื่อดูรายการ` / `เลยกำหนด ส่งกลับ หรือเร่งด่วน`) and a count chip (open / attention); soft shadow on every card. Attention empty state uses the `review` mascot.

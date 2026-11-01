@@ -25,7 +25,9 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 4P | **CR-025 rework:** ฟอร์มแจ้งซ่อมเลือกสถานที่ก่อน แล้วแสดงเฉพาะหมวดงานของประเภทอาคาร (สำนักงาน · โกดัง · ภายนอกอาคาร) · การ์ดงานซ้ำย้ายไปขั้นปัญหาที่พบ · โกดังตัวอย่าง 1 หลัง + **CR-026:** รูป quality 0.25 และเก็บรูปไว้ในฟอร์มจนกดส่ง (ทุกฟอร์มที่แนบรูป) | F02, F03, F04, F07, F21 | S03, S04, S08, S10, PhotoPicker | done — accepted 2026-10-29, tag `repair-stage-4P` |
 | 4R | **CR-024 rework (Claude only):** ตัด role ผู้บริหาร (`executive`) ทั้งระบบ — ผู้ใช้เดิมย้ายเป็นพนักงานทั่วไป · ตัดระบบแจ้งเตือน (กระดิ่ง ข้อความ toast "…จะได้รับแจ้งเตือน") · เทส Go / e2e และ System Atlas ตาม | F06, F22, F23, F24, F03, F07, F21, F08-B | S07, S11, S18, S29, navbar (bell), toasts S05 / S07 / S09 / S10 / S17, role switcher | done — accepted 2026-10-29, tag `repair-stage-4R` |
 | 3D-2 | **CR-027:** โมเดล 3D อาคาร 2 + มุมมองทั้งพื้นที่ (site view) จาก `Cpac map.png` — เบาที่สุด (D-124) | F23, F31 | S29 | done — accepted 2026-10-29, tag `repair-stage-3D-2` (+ CR-028) |
-| 3D-3 | **CR-030:** โมเดลจริงฝั่งสำนักงานใหญ่ — อาคาร 3, 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี เป็นอาคารจริง (ชั้น ห้อง ผัง อุปกรณ์) | F23, F31 | S29 | pending — next |
+| 3D-3 | **CR-030:** โมเดลจริงฝั่งสำนักงานใหญ่ — อาคาร 3, 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี เป็นอาคารจริง (ชั้น ห้อง ผัง อุปกรณ์) | F23, F31 | S29 | done — accepted 2026-10-29, tag `repair-stage-3D-3` |
+| 3D-4 | **CR-031 / CR-032:** โมเดลจริงฝั่ง Riverside 9 อาคาร + ถนน ทางเดิน ที่จอดรถใน site view | F23, F31 | S29 | done — accepted 2026-10-30, tag `repair-stage-3D-4` |
+| 3D-5 | **CR-033 rework:** site view ตรงตามแปลนผังบริเวณ (ฝั่งสนญ. จากแปลน, ฝั่ง Riverside จาก OpenStreetMap + ครอปแปลน) · อาคาร 4 หมุน 180° · ปุ่มข้ามถนนไปอีกฝั่งในแผนที่ (ปุ่มด้านบนยังอยู่) · เบาเท่าเดิม | F23 | S29 | done — accepted 2026-11-01, tag `repair-stage-3D-5` |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
@@ -559,6 +561,32 @@ Status: done — accepted 2026-10-30 (tag `repair-stage-3D-4`, incl. CR-032). Bu
 - [x] AC2: Equipment drag and drop works in two Riverside buildings (F31 case)
 - [x] AC3: Budget: side 2 ≤ 20k triangles / ≤ 60 draw calls, 0 idle frames, GPU flat over 10 enter / leave cycles
 - [x] AC4: `go test`, `tsc`, `eslint`, `next build`, e2e F02 / F23 / F31 and Atlas `verify` pass
+
+---
+
+## Stage 3D-5 — site view ตรงตามแปลน (CR-033 rework)
+
+Status: done — accepted 2026-11-01 (tag `repair-stage-3D-5`). Built by Claude. Before Stage 5 (D-135). Built by Claude (no Codex hand-off). Branch `repair/stage-3D-5`
+
+**Scope**
+- Ground per side re-traced (roads, kerbs / islands, angled parking rows, trees, property line, the main road): ฝั่งสำนักงานใหญ่ from `attachments/building plan/5-อาคารTrialmix และ ห้องทดสอบหินทราย.pdf` p.4 (A3 1:750, fitted on Build.01 / 02 / 03); ฝั่ง Riverside from OpenStreetMap data (attribution in the code) aligned to `8-อาคาร Riverside 2.pdf` p.4
+- อาคาร 4 turned 180° on the site view (data migration on `platform.site_blocks`); a block off the plan by > ~3 m is moved too (listed in the stage report)
+- In-map crossing: each side shows Phiboonsongkram Road at its edge with a button ("ไปฝั่ง Riverside" / "ไปฝั่งสำนักงานใหญ่") that switches side; the "เลือกฝั่ง" buttons on top stay
+- Budget unchanged (D-127 / D-130): ≤ 60 draw calls, ≤ 20k triangles per side, no textures / shadows, render on demand; trees = one instanced low-poly mesh
+
+**Backend (Claude)**
+- [x] Migration: อาคาร 4 `rot_deg` + 180 (wrapped), any re-placed block; Pg test updated (`20261101000001`: อาคาร 2 / 3 / 4, โรงอาหาร, ห้องประชุม 60 ปี re-placed; Riverside checked against OSM in wire — not moved, D-136)
+
+**Frontend (Claude)**
+- [x] `scene/site-ground.ts` re-traced per side (+ trees), the road at the side's edge
+- [x] In-map side button (HTML chip placed by the engine, keyboard reachable, aria-label "ไปฝั่ง …")
+
+**Acceptance criteria**
+- [x] AC1: ฝั่งสำนักงานใหญ่ matches the site plan p.4 (roads, parking rows, Build.01–04, canteen, store, shops, main road); ฝั่ง Riverside matches the OSM layout and the Riverside 2 crop
+- [x] AC2: อาคาร 4 faces the other way (180°); its building view, floors and markers unchanged
+- [x] AC3: the in-map button on the road switches to the other side and back; the top buttons still work
+- [x] AC4: budget per side ≤ 60 draw calls / ≤ 20k triangles, 0 idle frames, GPU flat over 10 enter / leave cycles (F23 budget test)
+- [x] AC5: `go test`, `tsc`, `eslint`, `next build`, e2e F23 / F31 and Atlas `verify` pass
 
 ---
 

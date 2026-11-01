@@ -2,9 +2,11 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30; next: 5 · of 8   **Updated:** 2026-10-29 (Stage 3D-4 accepted)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; next: 5 · of 8   **Updated:** 2026-11-01 (Stage 3D-5 wire)
 
 ## Now
+
+- **Stage 3D-5 accepted 2026-11-01**, tag `repair-stage-3D-5` (CR-033, D-135 / D-136). Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
 
 - **2026-10-30 mascot proposal, revised by owner:** Keep the EXISTING theme/layout; only change mascot backdrops and related heading surfaces (darker tracking header like existing Home). Done: `output/mascot-theme-options/index.html`, 6 paint options + original across 12 contexts, embedded assets/fonts; 336 viewport checks + 288 geometry comparisons pass in both existing themes at 375/1440. Owner cleanup: only this standalone demo HTML retained; screenshots, supporting files and the superseded Home redesign removed. Next: owner selects per-page treatments; implementation/CR pending. Production/shared code untouched.
 
@@ -30,11 +32,13 @@
 
    - (2026-10-27) System Atlas already follows CR-024 / CR-025 / CR-026: no executive role, no F19-B / bell, 4R + 4P on the timeline (pending, no flows bound — owner's choice), F07 tour added (verify passes); 4R only re-checks with `/atlas sync repair` + `verify` after its FE changes
    - (D-113, 2026-10-26) the backend part is done in settings Stage 1 (migration executive → employee, no executive role, `Viewer.Can`, Go tests); 4R keeps FE copy / bell / toasts, e2e and the Atlas
-0. Then `/build-stage repair 5 prepare` (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
+0. `/build-stage repair 5 prepare` (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
 0. Shared dev DB: run migrations up to `20261026000001` once a writable user exists (dev DB still rejects DDL)
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 
 ## Open issues / questions
+
+- CR-033 / 3D-5 owner checks: Riverside blocks vs OSM (D-136) — OSM shows one 99 × 40 m building where CPAC Warehouse 2 / 3 are (our Warehouse 3 80 × 40 frame also runs over an OSM road), Riverside 1 / 2 as one ~36 × 34 m block south of our Riverside 1–3 / อเนกประสงค์ frames, no CCTC / โรงเรือน; office plan details by Claude: shop heights from their "n-SC-F" labels, the unnamed building by the steel tower drawn 2 storeys, the transmission line and the plan's "new building" complex (where TrialMix stands) not drawn; Pracha Rat Sai / Phibun Songkhram curves on the Riverside side come from OSM, not a plan
 
 - 3D-4 owner checks: Warehouse 3 placed 22 m past Warehouse 2 along its long side (real position unknown); Riverside 1 / 2 drawn with 2 floors (the plans' 3rd page is the toilet block — was 3 on the map); CCTC plan is 48 × 17.7 = 849.6 m² vs the sheet's 839.06 / 851.41; room names by Claude (ห้องประชุม Riverside 1 / 2, น.I&T 1–3, WP 1–5, น.WPS 1 / 2, โรงเรือนเพาะปลูก…); floors without a common-area outline have a shapeless common area (Riverside 1 / 3, Warehouses 1–3); site-view markers of Riverside 2 / 3 overlap (zoom in, or keyboard) — e2e opens markers by keyboard; long plans (Warehouse 1 / 3) open cut off at the sides until zoomed out
 - e2e: with the Playwright-started web server, `next dev` stops on every other first start (Next.js security notice) — start the stack by hand (`test-stack.md`) for long runs; F02 desktop needs 15 s for the place step while the 3D specs load the GPU
@@ -90,6 +94,10 @@
 - Mock photo restore: drafts drop photos with `blob:` URLs (mock uploads), so in mock mode a restored draft needs photos again
 
 ## Stage log
+
+- 2026-11-01: **Stage 3D-5 accepted**, tag `repair-stage-3D-5` (CR-033) — site ground from site plan p.4 / OSM, อาคาร 4 turned, in-map side button; budget 53 / 47 calls; e2e F23 / F31 + Atlas 13 / 13 pass
+
+- 2026-11-01: Stage 3D-5 wired (CR-033) — `site-ground.ts` re-traced (plan p.4 / OSM), in-map side button, marker order; Go lint 0 / tests pass; eslint / tsc / next build pass; e2e F23 + F31 34 passed (4 parallel-load fails passed alone); Atlas verify 13 / 13; D-136
 
 - 2026-10-30: **Stage 3D-4 accepted**, tag `repair-stage-3D-4` (CR-031, owner fixes Riverside 2 stairs / CCTC ห้อง 202, CR-032 site ground) — Riverside side: 9 real buildings + light models, side 2 = 44 calls / 5.9k tris; e2e F02 / F23 / F31 pass (load flakes passed alone), Atlas 13 / 13
 

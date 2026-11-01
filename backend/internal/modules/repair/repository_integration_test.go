@@ -587,6 +587,17 @@ func TestPgDashboardAndAssets(t *testing.T) {
 			t.Errorf("site block %d has no building", s.MapNo)
 		}
 	}
+	// CR-033: office side re-placed from the site plan, อาคาร 4 turned 180°.
+	for _, w := range []struct {
+		no        int16
+		x, z, rot float64
+	}{{1, 0, 0, 17.1}, {3, 74.8, 59.9, 7.6}, {4, 101.2, 25.1, 96.1}, {17, -22.4, -11.8, -75.7}} {
+		for _, s := range o.Site {
+			if s.MapNo == w.no && (math.Abs(s.X-w.x) > 1e-9 || math.Abs(s.Z-w.z) > 1e-9 || math.Abs(s.RotDeg-w.rot) > 1e-9) {
+				t.Errorf("site block %d at (%v, %v) %v°, want (%v, %v) %v°", w.no, s.X, s.Z, s.RotDeg, w.x, w.z, w.rot)
+			}
+		}
+	}
 	for n := 1; n <= 4; n++ {
 		fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c027f200-0000-4000-8000-00000000000%d", n)))
 		if err != nil {
