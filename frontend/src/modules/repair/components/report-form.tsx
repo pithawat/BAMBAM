@@ -181,6 +181,8 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [teamPhotos, setTeamPhotos] = useState<PhotoItem[]>([]);
   const [matches, setMatches] = useState<{ key: string; room: string; tickets: DuplicateTicket[] }>({ key: "", room: "", tickets: [] });
+  /** CR-034: the room + category for which a blocking duplicate was seen — the extra spot stays required (`*`) for it. */
+  const [blockedRoom, setBlockedRoom] = useState("");
   const [duplicateDialog, setDuplicateDialog] = useState<DuplicateTicket[] | null>(null);
   const [following, setFollowing] = useState<string | null>(null);
   const [step, setStep] = useState<StepKey>("location");
@@ -212,12 +214,19 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   // The card stays while the spot is being typed (no flicker); only the check for the current spot can block.
   const duplicates = matches.room === roomKey ? matches.tickets : [];
   const blocked = matches.key === duplicateKey && duplicates.some((t) => t.blocksReport);
+  const spotRequired = blockedRoom === roomKey;
+  // The duplicate check for the current room + category + spot has not answered yet (ถัดไป waits for it, CR-034).
+  const checkingDuplicates = !!(values.categoryId && values.floorId && values.roomId) && matches.key !== duplicateKey;
   useEffect(() => {
     if (!values.categoryId || !values.floorId || !values.roomId) return;
     let active = true;
     const timer = window.setTimeout(() => {
       getDuplicates({ categoryId: values.categoryId, floorId: values.floorId, roomId: values.roomId, locationDetail: values.locationDetail })
-        .then(tickets => { if (active) setMatches({ key: duplicateKey, room: roomKey, tickets }); }, () => { if (active) setMatches({ key: duplicateKey, room: roomKey, tickets: [] }); });
+        .then(tickets => {
+          if (!active) return;
+          setMatches({ key: duplicateKey, room: roomKey, tickets });
+          if (tickets.some((t) => t.blocksReport)) setBlockedRoom(roomKey);
+        }, () => { if (active) setMatches({ key: duplicateKey, room: roomKey, tickets: [] }); });
     }, 300);
     return () => { active = false; window.clearTimeout(timer); };
   }, [duplicateKey, roomKey, values.categoryId, values.floorId, values.roomId, values.locationDetail]);
@@ -292,6 +301,9 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   const checks = validate(values, photos, teamPhotos, team, blocked);
   const shown = { ...Object.fromEntries(Object.entries(checks).filter(([k]) => attempted.includes(FIELD_STEP[k]))), ...serverErrors };
   const stepDone = (key: StepKey) => !Object.keys(checks).some((k) => FIELD_STEP[k] === key);
+  // CR-034 (BR-F02-1a): ถัดไป / the final button cannot be pressed while this step has a missing field; the hint says what.
+  const missing = Object.entries(checks).find(([k]) => FIELD_STEP[k] === step)?.[1]
+    ?? (step === "problem" && checkingDuplicates ? "กำลังตรวจงานที่ตรงกัน…" : "");
   const index = STEPS.findIndex((s) => s.key === step);
   const last = step === "send";
   // BR-F02-2: explain the level as soon as it is known.
@@ -338,7 +350,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   /** ถัดไป checks only this step; the final button re-checks every step and opens the first invalid one. */
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting.current) return;
+    if (submitting.current || missing) return;
     const keys: StepKey[] = last ? STEPS.map((s) => s.key) : [step];
     setAttempted((old) => [...new Set([...old, ...keys])]);
     const firstBad = Object.keys(checks).find((k) => keys.includes(FIELD_STEP[k]));
@@ -457,7 +469,8 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
     onVisit: (ticket: DuplicateTicket) => guard.leave(`/repair/tickets/${encodeURIComponent(ticket.id)}`) };
   const duplicateCard = duplicates.length > 0 ? <DuplicateCard {...duplicateProps} tickets={duplicates} /> : null;
   // Step 2 (S04 CR-025): the card carries the extra spot, bound to the same value as step 1.
-  const blockingCard = duplicates.some((t) => t.blocksReport);
+  // CR-034: once a blocking match was seen for this room + category, the spot keeps `*` after it is typed.
+  const blockingCard = spotRequired || duplicates.some((t) => t.blocksReport);
   const problemCard = duplicates.length > 0 ? <DuplicateCard {...duplicateProps} tickets={duplicates}>
     <div data-field="duplicateSpot" className="border-t border-primary/15 pt-3.5">
       <Label htmlFor="duplicateSpot" required={blockingCard} help={blockingCard ? "จำเป็นเมื่อพบงานที่ตรงกัน" : undefined} optional={!blockingCard}>บอกจุดเพิ่มเติม</Label>
@@ -561,7 +574,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
           className="grid min-w-0 rounded-xl border bg-card p-4 shadow-card disabled:opacity-70 sm:p-6 lg:rounded-none lg:border-0 lg:px-6 lg:py-5 lg:shadow-none">
           {panel("location", <>
             {stepHeading("location", "ปัญหาเกิดขึ้นที่ไหน", "เลือกอาคาร ชั้น และห้อง", <RecentPlaces recent={recent} buildings={buildings} onPick={update} />)}
-            <LocationStep values={values} buildings={buildings} building={building} floor={floor} errors={shown} onChange={update} />
+            <LocationStep values={values} buildings={buildings} building={building} floor={floor} errors={shown} onChange={update} spotRequired={spotRequired} />
           </>)}
           {panel("problem", <>
             {stepHeading("problem", "ปัญหาที่พบ", "เลือก 1 หมวด แล้วเลือกอาการที่เห็น")}
@@ -583,15 +596,21 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
           </>)}
         </fieldset>
 
-        <div className="sticky bottom-0 z-20 -mx-3 mt-3 flex items-center gap-3 border-t bg-background px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-4 sm:px-4 lg:static lg:mx-0 lg:mt-0 lg:bg-muted/40 lg:px-6 lg:py-3">
+        <div className="sticky bottom-0 z-20 -mx-3 mt-3 border-t bg-background px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-4 sm:px-4 lg:static lg:mx-0 lg:mt-0 lg:bg-muted/40 lg:px-6 lg:py-3">
+          <div className="flex items-center gap-3">
           <Button type="button" variant="outline" className="h-11 min-w-24 bg-card" disabled={busy || following !== null} onClick={() => index > 0 ? go(STEPS[index - 1].key) : guard.leave()}>
             <ArrowLeft aria-hidden />{index > 0 ? "ย้อนกลับ" : "ยกเลิก"}</Button>
           <span className="flex-1 text-center text-xs text-muted-foreground lg:text-[13px]">ขั้นตอน {index + 1} จาก {STEPS.length}</span>
-          <Button type="submit" className="h-11 sm:min-w-45" disabled={busy || following !== null || masterReloading}>
+          {/* aria-disabled keeps the button focusable so the hint is read with it (CR-034). */}
+          <Button type="submit" className={cn("h-11 sm:min-w-45", missing && !busy && "cursor-not-allowed opacity-50 active:translate-y-0")}
+            disabled={busy || following !== null || masterReloading} aria-disabled={!!missing || undefined} aria-describedby={missing ? "step-missing" : undefined}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
             {sending || (last ? team ? "ยืนยันบันทึกงานทีม" : "ยืนยันส่งแจ้งซ่อม" : "ถัดไป")}
             {!busy && (last ? <Send aria-hidden /> : <ChevronRight aria-hidden />)}
           </Button>
+          </div>
+          {missing && !busy && <p id="step-missing" aria-live="polite" className="mt-2 flex items-center justify-end gap-1.5 text-right text-[13px] leading-5 text-muted-foreground">
+            <Info className="size-3.5 shrink-0" aria-hidden />{missing}</p>}
         </div>
       </div>
       {canTeam && <p className="mt-3 flex items-start justify-center gap-2 px-1 text-center text-[13px] leading-5 text-muted-foreground lg:mt-4">
@@ -736,9 +755,9 @@ function RecentPlaces({ recent, buildings, onPick }: { recent: RecentPlace[]; bu
   </Popover>;
 }
 
-function LocationStep({ values, buildings, building, floor, errors, onChange }: {
+function LocationStep({ values, buildings, building, floor, errors, onChange, spotRequired }: {
   values: Values; buildings: Building[]; building?: Building; floor?: Floor; errors: Record<string, string>;
-  onChange: (patch: Partial<Values>) => void;
+  onChange: (patch: Partial<Values>) => void; spotRequired: boolean;
 }) {
   return <div className="space-y-4">
     <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
@@ -785,7 +804,7 @@ function LocationStep({ values, buildings, building, floor, errors, onChange }: 
     </div>
 
     <div data-field="locationDetail">
-      <Label htmlFor="locationDetail" optional>บอกจุดเพิ่มเติม</Label>
+      <Label htmlFor="locationDetail" required={spotRequired} help={spotRequired ? "จำเป็นเมื่อพบงานที่ตรงกัน" : undefined} optional={!spotRequired}>บอกจุดเพิ่มเติม</Label>
       <Input id="locationDetail" value={values.locationDetail} maxLength={MAX_LOCATION} onChange={(e) => onChange({ locationDetail: e.target.value })} placeholder="เช่น ฝั่งหน้าต่าง เครื่องที่ 2" aria-invalid={!!errors.locationDetail} aria-describedby="locationDetail-error" className="h-11 rounded-sm bg-card px-3.5 text-base" />
       <FieldError id="locationDetail-error" message={errors.locationDetail} />
     </div>

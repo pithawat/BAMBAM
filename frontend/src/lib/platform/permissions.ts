@@ -87,7 +87,10 @@ export function seesRepairQueue(me: HasPermissions): boolean {
 
 /** Start route of the repair service: the work list for whoever works tickets (CR-005), else own tickets. */
 export function repairHome(me: HasPermissions): string {
-  return can(me, PERM.ticketWork) ? "/repair/work" : "/repair/my";
+  if (can(me, PERM.ticketWork)) return "/repair/work";
+  // repair CR-034: tracking needs `report`; a view-all role without it starts at งานทั้งหมด
+  if (!can(me, PERM.ticketReport) && seesRepairQueue(me)) return "/repair/admin/queue";
+  return "/repair/my";
 }
 
 export type ServiceKey = "repair" | "car" | "room";

@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, Settings, type LucideIcon } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Info, Settings, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Me } from "@/lib/platform/types";
 import { cn } from "@/lib/utils";
 import { settingsMenu, settingsMenuCurrent, type SettingsMenuGroup, type SettingsMenuItem } from "../nav";
 
 // The navbar "ตั้งค่าระบบ" menu (settings _common.md §2, CR-006; layout from mockups/CR-006-design/App.tsx, colours and
-// fonts from the design system). Desktop: a dropdown — groups on the left (icon, name, one line, `>`), the hovered
+// fonts from the design system). repair CR-034 (D-138): both triggers are a gear icon button on the right of the navbar,
+// the label in `aria-label` and (desktop) a tooltip. Desktop: a dropdown — groups on the left (icon, name, one line, `>`), the hovered
 // group's sub-menus on the right (no `>`, a check on the current page). Phones: a sheet — groups, then the tapped
 // group's sub-menus. Groups and items without permission are left out (`settingsMenu`).
 
@@ -60,7 +62,7 @@ function SubItem({ item, current, onNavigate }: { item: SettingsMenuItem; curren
   );
 }
 
-/** Desktop (≥ 1024px) trigger + dropdown. */
+/** Desktop (≥ 1024px) gear trigger + dropdown, opening below the gear towards the left. */
 export function SettingsMenuDesktop({ me }: { me: Me }) {
   const groups = settingsMenu(me);
   const readCurrent = useCurrent();
@@ -82,20 +84,25 @@ export function SettingsMenuDesktop({ me }: { me: Me }) {
         setOpen(o);
       }}
     >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex min-h-11 items-center gap-2 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap text-primary outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30",
-            open ? "bg-primary/15" : "bg-secondary hover:bg-primary/12",
-          )}
-        >
-          <Settings className="size-4.5" aria-hidden />
-          ตั้งค่าระบบ
-          <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={14} className="w-141 overflow-hidden rounded-2xl p-0 shadow-float" aria-label="การตั้งค่าระบบ">
+      <Tooltip open={open ? false : undefined}>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="ตั้งค่าระบบ"
+              aria-haspopup="dialog"
+              className={cn(
+                "grid size-11 place-items-center rounded-xl outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30",
+                open ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-muted hover:text-primary",
+              )}
+            >
+              <Settings className="size-4.5" aria-hidden />
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>ตั้งค่าระบบ</TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" sideOffset={14} className="w-141 overflow-hidden rounded-2xl p-0 shadow-float" aria-label="การตั้งค่าระบบ">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <span className="font-heading text-base font-semibold">การตั้งค่าระบบ</span>
           <span className="text-[10px] font-medium tracking-[0.17em] text-muted-foreground">SETTINGS</span>
@@ -163,7 +170,7 @@ export function SettingsMenuMobile({ me }: { me: Me }) {
           setPicked(null);
           setOpen(true);
         }}
-        className="grid size-11 place-items-center rounded-lg text-primary outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30"
+        className="grid size-11 place-items-center rounded-xl text-muted-foreground outline-none hover:bg-muted hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/30"
       >
         <Settings className="size-5" aria-hidden />
       </button>

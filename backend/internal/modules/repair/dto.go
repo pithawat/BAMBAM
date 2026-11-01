@@ -130,6 +130,7 @@ type TicketSummaryDTO struct {
 	WorkBy                 *string         `json:"workBy"`
 	Contractor             *RefDTO         `json:"contractor"`
 	ContractorTypes        []string        `json:"contractorTypes"`
+	Assignee               *StaffDTO       `json:"assignee"` // CR-034
 	AutoCloseAt            *time.Time      `json:"autoCloseAt"`
 	SendBackCount          int32           `json:"sendBackCount"`
 	Rating                 *int16          `json:"rating"`
@@ -193,7 +194,8 @@ type AssessRequest struct {
 	ExpectedDoneOn string `json:"expectedDoneOn"`
 	WorkBy         string `json:"workBy"`
 	ContractorID   string `json:"contractorId"`
-	Reason         string `json:"reason"` // CR-008, optional on a change
+	AssigneeID     string `json:"assigneeId"` // CR-034, required for in_house
+	Reason         string `json:"reason"`     // CR-008; required on a reschedule (CR-034)
 }
 
 // #10
@@ -353,7 +355,7 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 		Reporter:       *toPersonDTO(&s.Reporter),
 		Technician:     toPersonDTO(s.Technician),
 		ViewerRelation: s.ViewerRelation, AwaitingMyConfirmation: s.AwaitingMyConfirmation,
-		WorkBy: s.WorkBy, ContractorTypes: nonNil(s.ContractorTypes),
+		WorkBy: s.WorkBy, ContractorTypes: nonNil(s.ContractorTypes), Assignee: toStaffDTO(s.Assignee),
 		AutoCloseAt: utcPtr(s.AutoCloseAt), SendBackCount: s.SendBackCount, Rating: s.Rating,
 		CreatedAt: s.CreatedAt.UTC(), AssessedAt: utcPtr(s.AssessedAt), ResolvedAt: utcPtr(s.ResolvedAt), ClosedAt: utcPtr(s.ClosedAt),
 		UpdatedAt: s.UpdatedAt.UTC(),
@@ -434,10 +436,34 @@ type MyTicketDTO struct {
 	ViewerRelation         string          `json:"viewerRelation"`
 	AwaitingMyConfirmation bool            `json:"awaitingMyConfirmation"`
 	ExpectedDoneOn         *string         `json:"expectedDoneOn"`
+	Assignee               *StaffDTO       `json:"assignee"` // CR-034
 	AutoCloseAt            *time.Time      `json:"autoCloseAt"`
 	Rating                 *int16          `json:"rating"`
 	ResolvedAt             *time.Time      `json:"resolvedAt"`
 	UpdatedAt              time.Time       `json:"updatedAt"`
+}
+
+// StaffDTO is the ticket `assignee` and a #36 row (CR-034).
+type StaffDTO struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	RoleName string    `json:"roleName"`
+}
+
+func toStaffDTO(s *Staff) *StaffDTO {
+	if s == nil {
+		return nil
+	}
+	d := StaffDTO(*s)
+	return &d
+}
+
+func toStaffDTOs(list []Staff) []StaffDTO {
+	out := make([]StaffDTO, 0, len(list))
+	for _, s := range list {
+		out = append(out, StaffDTO(s))
+	}
+	return out
 }
 
 func toMyTicketDTOs(list []MyTicket) []MyTicketDTO {
@@ -449,6 +475,7 @@ func toMyTicketDTOs(list []MyTicket) []MyTicketDTO {
 			Building: RefDTO(t.Building), Floor: RefDTO(t.Floor), LocationDetail: t.LocationDetail,
 			ViewerRelation: RelationSubscriber, AwaitingMyConfirmation: t.IsReporter && t.Status == StatusResolved,
 			AutoCloseAt: utcPtr(t.AutoCloseAt), Rating: t.Rating, ResolvedAt: utcPtr(t.ResolvedAt), UpdatedAt: t.UpdatedAt.UTC(),
+			Assignee: toStaffDTO(t.Assignee),
 		}
 		if t.IsReporter {
 			d.ViewerRelation = RelationReporter

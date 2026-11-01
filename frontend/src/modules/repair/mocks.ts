@@ -28,6 +28,7 @@ import type {
   PrioritySource,
   RecentPlace,
   Ref,
+  StaffRef,
   Room,
   TicketCounts,
   TicketCountsQuery,
@@ -511,6 +512,7 @@ function build(s: Seed): TicketDetail {
     workBy: assessedAt ? workBy : null,
     contractor: s.contractor ? { id: s.contractor.id, name: s.contractor.name } : null,
     contractorTypes: s.contractor?.types ?? [],
+    assignee: assessedAt && !s.contractor && s.technician ? { id: s.technician.id, name: s.technician.name, roleName: "ช่างเทคนิค" } : null,
     autoCloseAt: s.status === "resolved" && s.resolvedAgo !== undefined ? later(3 * DAY - s.resolvedAgo) : null,
     sendBackCount: s.sendBackCount ?? 0,
     rating: s.rating ?? null,
@@ -835,7 +837,20 @@ export function mockListTickets(q: TicketListQuery, v: Viewer): TicketPage {
 }
 
 /** #35: #6 mine, then cut down to the S06 row (default 10 per page). */
+/** #36 (CR-034): everyone whose role has `repair.ticket.work`, by name. */
+export const mockTechnicians: StaffRef[] = [
+  { ...pick(mockPeople.thanakorn), roleName: "ช่างเทคนิค" },
+  { ...pick(mockPeople.weera), roleName: "ช่างเทคนิค" },
+  { ...pick(mockPeople.suriya), roleName: "ช่างเทคนิค" },
+  { ...pick(mockPeople.anucha), roleName: "ช่างเทคนิค" },
+].sort((a, b) => a.name.localeCompare(b.name, "th"));
+
+function pick(p: PersonRef) {
+  return { id: p.id, name: p.name };
+}
+
 export function mockListMyTickets(q: MyTicketsQuery, v: Viewer): MyTicketPage {
+  if (!can(v, PERM.ticketReport)) throw mockErrors.forbidden(); // CR-034
   const { items, meta } = mockListTickets({ ...q, scope: "mine", pageSize: q.pageSize ?? 10 }, v);
   return {
     meta,
@@ -845,7 +860,7 @@ export function mockListMyTickets(q: MyTicketsQuery, v: Viewer): MyTicketPage {
       title: [...t.symptoms.map((s) => s.name), ...(t.symptomOther ? [t.symptomOther] : [])].join(" · "),
       building: t.building, floor: t.floor, room: t.room, locationDetail: t.locationDetail,
       viewerRelation: t.viewerRelation === "reporter" ? "reporter" : "subscriber",
-      awaitingMyConfirmation: t.awaitingMyConfirmation, expectedDoneOn: t.expectedDoneOn, autoCloseAt: t.autoCloseAt,
+      awaitingMyConfirmation: t.awaitingMyConfirmation, expectedDoneOn: t.expectedDoneOn, assignee: t.assignee, autoCloseAt: t.autoCloseAt,
       rating: t.rating, resolvedAt: t.resolvedAt, updatedAt: t.updatedAt,
     })),
   };
@@ -1025,6 +1040,7 @@ export function mockCreateTicket(req: CreateTicketRequest, reporter: PersonRef, 
     workBy: null,
     contractor: null,
     contractorTypes: [],
+    assignee: null,
     autoCloseAt: null,
     sendBackCount: 0,
     rating: null,

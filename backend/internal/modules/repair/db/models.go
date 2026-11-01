@@ -263,6 +263,13 @@ type RepairSetting struct {
 	UpdatedAt        time.Time
 }
 
+type RepairStaff struct {
+	ID       uuid.UUID
+	Name     string
+	RoleKey  string
+	RoleName string
+}
+
 type RepairSymptom struct {
 	ID          uuid.UUID
 	CategoryID  uuid.UUID
@@ -310,6 +317,7 @@ type RepairTicket struct {
 	PrioritySource          string
 	RoomID                  *uuid.UUID
 	AssetID                 *uuid.UUID
+	AssigneeID              *uuid.UUID
 }
 
 type RepairTicketCounter struct {

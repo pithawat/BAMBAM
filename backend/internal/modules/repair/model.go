@@ -213,6 +213,7 @@ type TicketSummary struct {
 	WorkBy           *string
 	Contractor       *Ref
 	ContractorTypes  []string
+	Assignee         *Staff // CR-034: the responsible in-house technician; nil for contractor / old jobs
 	AutoCloseAt      *time.Time
 	CreatedAt        time.Time
 	ResolvedAt       *time.Time
@@ -260,9 +261,17 @@ type MyTicket struct {
 	Rating         *int16
 	SendBackCount  int32
 	ExpectedDoneOn *time.Time // date only
+	Assignee       *Staff     // CR-034
 	AutoCloseAt    *time.Time
 	ResolvedAt     *time.Time
 	UpdatedAt      time.Time
+}
+
+// Staff is a person with their role name: the ticket assignee and a #36 row (CR-034).
+type Staff struct {
+	ID       uuid.UUID
+	Name     string
+	RoleName string
 }
 
 func (t MyTicket) Step() string { return stepOf(t.Status, t.ExpectedDoneOn, t.SendBackCount) }
@@ -351,7 +360,8 @@ type AssessInput struct {
 	ExpectedDoneOn *time.Time // date only
 	WorkBy         string
 	ContractorID   *uuid.UUID
-	Reason         string // optional, kept on a change and shown to the reporter (CR-008)
+	AssigneeID     *uuid.UUID // CR-034: required for in-house, cleared for a contractor job
+	Reason         string     // kept on a change and shown to the reporter (CR-008); required on a reschedule (CR-034)
 }
 
 // ResolveInput is endpoint #10 after parsing. Who did the work was set by the assessment;
@@ -452,14 +462,16 @@ type ActiveCategory struct {
 
 // LockedTicket is the row state read under FOR UPDATE before a status change.
 type LockedTicket struct {
-	ID           uuid.UUID
-	Status       string
-	ClosedReason string // "" while open
-	ReporterID   uuid.UUID
-	Assessed     bool // expected date and work-by are both set (CR-006)
-	WorkBy       string
-	ContractorID *uuid.UUID
-	Rated        bool // the contractor already has a rating on this ticket
+	ID             uuid.UUID
+	Status         string
+	ClosedReason   string // "" while open
+	ReporterID     uuid.UUID
+	Assessed       bool // expected date and work-by are both set (CR-006)
+	ExpectedDoneOn *time.Time
+	SendBackCount  int32
+	WorkBy         string
+	ContractorID   *uuid.UUID
+	Rated          bool // the contractor already has a rating on this ticket
 }
 
 // NewEvent is a timeline row written together with a status change; photos are attached to it.

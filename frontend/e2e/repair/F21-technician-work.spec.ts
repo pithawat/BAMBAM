@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API, as, assess, auth, bangkokDay, bangkokToday, confirm, newContractor, report, resolve, sendBack, tag, uploadPhoto, attachVia } from "./helpers";
+import { API, as, assess, auth, bangkokDay, bangkokToday, confirm, myId, newContractor, report, resolve, sendBack, tag, uploadPhoto, attachVia } from "./helpers";
 
 // F21 (Stage 2, CR-005 / CR-006 / CR-008 / CR-009): the one in-house technician sees every open ticket oldest
 // first; เริ่มดำเนินการ sets the expected date and who does the work (ช่างของบริษัท, or a ช่างภายนอก picked or
@@ -59,10 +59,10 @@ test.describe("technician", () => {
     const sheet = page.getByRole("dialog", { name: "บันทึกผลซ่อม" });
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
     await expect(sheet.getByRole("alert").filter({ hasText: "ถ่ายหรือแนบรูปหลังซ่อมอย่างน้อย 1 รูป" })).toBeVisible();
-    await expect(sheet.getByRole("alert").filter({ hasText: "บอกสิ่งที่ทำ" })).toBeVisible();
+    await expect(sheet.getByRole("alert").filter({ hasText: "กรุณาใส่รายละเอียดการซ่อม" })).toBeVisible();
     await expect(sheet.getByText("คะแนนช่างภายนอก")).toHaveCount(0);
     await attachVia(page, sheet.locator("input[type=file]"));
-    await sheet.getByLabel("ทำอะไรไป").fill("ล้างแผงคอยล์เย็น เติมน้ำยา ทดสอบ 30 นาที");
+    await sheet.getByLabel("รายละเอียดการซ่อม").fill("ล้างแผงคอยล์เย็น เติมน้ำยา ทดสอบ 30 นาที");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
     await expect(page.getByText("ส่งผลแล้ว รอผู้แจ้งตรวจรับ")).toBeVisible();
 
@@ -119,7 +119,7 @@ test.describe("technician", () => {
     await nextAction(page).getByRole("button", { name: "บันทึกผลซ่อม" }).click();
     const sheet = page.getByRole("dialog", { name: "บันทึกผลซ่อม" });
     await attachVia(page, sheet.locator("input[type=file]"));
-    await sheet.getByLabel("ทำอะไรไป").fill("ช่างภายนอกเปลี่ยนคอมเพรสเซอร์");
+    await sheet.getByLabel("รายละเอียดการซ่อม").fill("ช่างภายนอกเปลี่ยนคอมเพรสเซอร์");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
     await expect(sheet.getByRole("alert").filter({ hasText: "ให้คะแนนช่างภายนอก" })).toBeVisible();
     await sheet.getByRole("radiogroup", { name: "คะแนน 1 ถึง 5 ดาว" }).getByRole("radio", { name: /^4 ดาว/ }).click();
@@ -177,12 +177,13 @@ test("API: technician only; date today or later; an active contractor; its stars
   const ticket = await report(employee, tag(info));
   const post = (api: typeof technician, action: string, data: object) => api.post(`${API}/tickets/${ticket.id}/${action}`, { data });
   const err = async (res: Awaited<ReturnType<typeof post>>) => [res.status(), (await res.json()).error] as const;
+  const assigneeId = await myId(technician); // CR-034: in-house needs the responsible technician
 
   for (const role of ["employee", "admin", "housekeeper_lead"]) {
     const [status, error] = await err(await post(await as(role, baseURL), "assess", { expectedDoneOn: bangkokToday(), workBy: "in_house" }));
     expect([status, error.code], role).toEqual([403, "NOT_TECHNICIAN"]);
   }
-  let [status, error] = await err(await post(technician, "assess", { expectedDoneOn: bangkokDay(-1), workBy: "in_house" }));
+  let [status, error] = await err(await post(technician, "assess", { expectedDoneOn: bangkokDay(-1), workBy: "in_house", assigneeId }));
   expect([status, error.fields]).toEqual([400, { expectedDoneOn: "PAST" }]);
   [status, error] = await err(await post(technician, "assess", { expectedDoneOn: bangkokToday(), workBy: "contractor" }));
   expect([status, error.fields]).toEqual([400, { contractorId: "REQUIRED" }]);
@@ -209,7 +210,7 @@ test("API: technician only; date today or later; an active contractor; its stars
   expect([status, error.fields]).toEqual([400, { contractorRating: "REQUIRED" }]);
   await resolve(technician, ticket.id, 5);
   await confirm(employee, ticket.id);
-  [status, error] = await err(await post(technician, "assess", { expectedDoneOn: bangkokToday(), workBy: "in_house" }));
+  [status, error] = await err(await post(technician, "assess", { expectedDoneOn: bangkokToday(), workBy: "in_house", assigneeId }));
   expect([status, error.code]).toEqual([409, "TICKET_CLOSED"]);
 });
 

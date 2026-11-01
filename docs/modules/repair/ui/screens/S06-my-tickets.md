@@ -1,6 +1,8 @@
 # S06 — ติดตามงานซ่อม
 
-Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068) · **layout replaced again by CR-019 (approved 2026-10-24)** · lead CTA / tabs and card heading changed by CR-021 (approved 2026-10-25) · CR-024 applied 2026-10-26 (block below)
+Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068) · **layout replaced again by CR-019 (approved 2026-10-24)** · lead CTA / tabs and card heading changed by CR-021 (approved 2026-10-25) · CR-024 applied 2026-10-26 (block below) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-034 (approved 2026-11-01):** needs `repair.ticket.report`; without it the repair nav has no `ติดตามงานซ่อม` and `/repair/my` shows the forbidden state (`ไม่มีสิทธิ์ดูหน้านี้`).
 
 > **CR-024 (approved 2026-10-26):** no executive role; Admin sees the same page with their own tickets.
 

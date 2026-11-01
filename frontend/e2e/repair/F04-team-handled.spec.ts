@@ -34,11 +34,11 @@ test.describe("housekeeper lead", () => {
     await fillPlace(page, tag(info), "/repair/new?mode=team");
     await attachPhoto(page);
 
-    await page.getByRole("button", { name: "ยืนยันบันทึกงานทีม" }).click();
-    await expect(page.getByText("กรุณาบอกสิ่งที่ทีมทำ").first()).toBeVisible();
-    await expect(page.getByText("แนบรูปหลังทำอย่างน้อย 1 รูป").first()).toBeVisible();
-
+    // CR-034: the final button cannot be pressed; the hint names what is missing, one at a time
+    await expect(page.getByRole("button", { name: "ยืนยันบันทึกงานทีม" })).toBeDisabled();
+    await expect(page.locator("#step-missing")).toHaveText("กรุณาบอกสิ่งที่ทีมทำ");
     await page.getByLabel("สิ่งที่ทีมทำ").fill("เช็ดพื้นและวางป้ายระวังลื่นแล้ว");
+    await expect(page.locator("#step-missing")).toHaveText("แนบรูปหลังทำอย่างน้อย 1 รูป");
     await attachVia(page, page.locator('[data-field="teamHandled.photoIds"] input[type=file]'));
     await page.getByRole("button", { name: "ยืนยันบันทึกงานทีม" }).click();
     await expect(page).toHaveURL(/\/repair\/new\/done\?id=/, { timeout: 15_000 });

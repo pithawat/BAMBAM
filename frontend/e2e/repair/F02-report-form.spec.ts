@@ -48,8 +48,9 @@ test("AC1 (CR-025): opens on สถานที่; a room is required; step 2 n
   const s = step(page, "location");
   await s.getByText("อาคาร 1", { exact: true }).click();
   await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("4", { exact: true }).click();
-  await next(page);
-  await expect(s.getByText("เลือกห้องหรือจุดที่เกิด", { exact: true })).toBeVisible();
+  // CR-034: ถัดไป cannot be pressed; the hint names the missing room
+  await expect(page.getByRole("button", { name: "ถัดไป" })).toBeDisabled();
+  await expect(page.locator("#step-missing")).toHaveText("เลือกห้องหรือจุดที่เกิด");
   // CR-025: plain room list, no "rooms matching the problem" group
   await expect(s.getByText(/ห้องที่ตรงกับปัญหา/)).toHaveCount(0);
   await s.getByText("อ.1 ห้อง 401", { exact: true }).click();

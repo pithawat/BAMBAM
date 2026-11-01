@@ -16,6 +16,7 @@ import {
   mockGetAssetTypes,
   mockHandoverTicket,
   mockListMyTickets,
+  mockTechnicians,
   mockListTickets,
   mockOverview,
   mockRecentPlaces,
@@ -54,6 +55,7 @@ import type {
   Ref,
   ResolveRequest,
   SendBackRequest,
+  StaffRef,
   TicketCounts,
   TicketCountsQuery,
   TicketDetail,
@@ -208,6 +210,12 @@ const ticketPath = (id: string) => `${BASE}/tickets/${encodeURIComponent(id)}`;
 /** S17: technician รับเรื่อง (sets the expected finish date) or changes it with an optional reason. */
 export function assessTicket(id: string, req: AssessRequest): Promise<TicketDetail> {
   return http.post<TicketDetail>(`${ticketPath(id)}/assess`, req);
+}
+
+/** #36 (CR-034): the S17 `ช่างผู้รับผิดชอบ` picker — active users with `repair.ticket.work`. */
+export async function getTechnicians(): Promise<StaffRef[]> {
+  if (env.useMocks) return mock(() => mockTechnicians, { read: true });
+  return http.get<StaffRef[]>(`${BASE}/technicians`);
 }
 
 /** S10: result note + photos, who did the work, contractor rating. */

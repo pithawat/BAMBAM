@@ -136,7 +136,7 @@ export function ticketStory(ticket: TicketDetail, viewer: StoryViewer, meId: str
 
   const workSub = of("assessment_changed", "priority_changed", "handed_over").filter((e) => !reaccepts.has(e.id) && (!sentBacks.length || e.at < sentBacks[0].at)).map(item);
   if (ticket.step === "awaiting_assessment") {
-    stages.push({ key: "work", state: "later", title: "กำลังดำเนินการ", desc: "ช่างกำหนดวันเสร็จและใครซ่อม แล้วเริ่มซ่อม", sub: [] });
+    stages.push({ key: "work", state: "later", title: "กำลังดำเนินการ", desc: "ช่างกำหนดวันเสร็จและผู้ดำเนินการซ่อม แล้วเริ่มซ่อม", sub: [] });
   } else if (ticket.step === "in_repair") {
     stages.push({ key: "work", state: "now", title: "กำลังดำเนินการ", desc: [`คาดว่าจะเสร็จ ${expected}`, ticket.technician?.name].filter(Boolean).join(" · "), sub: workSub });
   } else if (firstAssess || ticket.assessedAt) {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { API, as, attachPhoto, auth, bangkokToday, fillPlace, placeIds, postTicket, report, tag, uploadPhoto } from "./helpers";
+import { API, as, attachPhoto, auth, bangkokToday, fillPlace, myId, placeIds, postTicket, report, tag, uploadPhoto } from "./helpers";
 
 // F03 (Stage 4, CR-009 / CR-020 / CR-021): duplicate = same category + floor + room with no extra spot or the
 // same spot → follow the old case; another spot is only similar and can be sent. A duplicate found while filling
@@ -23,14 +23,14 @@ test.describe("employee", () => {
     await expect(card).toContainText('ถ้าเป็นคนละจุดในห้องนี้ ให้ระบุที่ "บอกจุดเพิ่มเติม"');
     await expect(location.getByText("จำเป็นเมื่อพบงานที่ตรงกัน")).toBeVisible();
 
-    await page.getByRole("button", { name: "ถัดไป" }).click();
-    await expect(location.getByText("กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ")).toBeVisible();
-    await expect(location.getByLabel("บอกจุดเพิ่มเติม")).toBeFocused();
+    // CR-034: ถัดไป cannot be pressed; the hint under the bar says why
+    await expect(page.getByRole("button", { name: "ถัดไป" })).toBeDisabled();
+    await expect(page.locator("#step-missing")).toHaveText("กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ");
     await expect(page.locator('[data-step="send"]')).toBeHidden();
 
     await location.getByLabel("บอกจุดเพิ่มเติม").fill(tag(info, "แอร์ตัวหน้าห้อง"));
     await expect(location.getByRole("region", { name: "มีงานคล้ายกันในห้องนี้" })).toContainText(old.ticketNo);
-    await expect(location.getByText("กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ")).toHaveCount(0);
+    await expect(page.locator("#step-missing")).toHaveCount(0);
     await page.getByRole("button", { name: "ถัดไป" }).click();
     await expect(page.locator('[data-step="send"]').getByRole("heading", { level: 2 })).toBeVisible();
     // the same value shows in step 1 and in the review
@@ -87,7 +87,7 @@ test.describe("employee", () => {
     await report(await as("security_lead", baseURL), spot);
     await page.goto("/repair/my");
     await fillPlace(page, spot);
-    await page.getByRole("button", { name: "ถัดไป" }).click(); // the inline card blocks here (CR-021) …
+    await expect(page.getByRole("button", { name: "ถัดไป" })).toBeDisabled(); // the inline card blocks here (CR-021, CR-034) …
     await page.locator('[data-step="problem"]').getByRole("region", { name: "มีคนแจ้งเรื่องนี้ไว้แล้ว" })
       .getByRole("button", { name: "ติดตามเคสนี้" }).waitFor();
     await expect(page.locator('[data-step="send"]')).toBeHidden();
@@ -135,7 +135,7 @@ test("API: own ticket awaiting ประเมินตรวจงาน → OW
   const technician = await as("technician", baseURL);
   const spot = tag(info);
   const old = await report(employee, spot);
-  expect((await technician.post(`${API}/tickets/${old.id}/assess`, { data: { expectedDoneOn: bangkokToday(), workBy: "in_house" } })).ok()).toBeTruthy();
+  expect((await technician.post(`${API}/tickets/${old.id}/assess`, { data: { expectedDoneOn: bangkokToday(), workBy: "in_house", assigneeId: await myId(technician) } })).ok()).toBeTruthy();
   const resolved = await technician.post(`${API}/tickets/${old.id}/resolve`, { data: { note: "ล้างแผงคอยล์แล้ว", photoIds: [await uploadPhoto(technician)] } });
   expect(resolved.ok(), await resolved.text()).toBeTruthy();
 

@@ -1,6 +1,8 @@
 # S10 — บันทึกผลซ่อม
 
-Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-034 (approved 2026-11-01):** top of the sheet / page: profile card of the responsible technician from S17 (initials avatar · name · role, caption `ช่างผู้รับผิดชอบ`; old tickets without one → `ยังไม่ระบุช่าง`); contractor job → contractor shop card (name · types). Label `ทำอะไรไป *` → `รายละเอียดการซ่อม *`, error `กรุณาใส่รายละเอียดการซ่อม`.
 
 > **CR-024 (approved 2026-10-26):** resolve toast "ส่งผลแล้ว รอผู้แจ้งตรวจรับ" (`_common.md` §9).
 

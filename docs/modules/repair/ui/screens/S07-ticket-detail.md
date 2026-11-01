@@ -1,6 +1,8 @@
 # S07 — รายละเอียดงาน
 
-Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14) · layout replaced by CR-011 (approved 2026-10-18) · **refined by CR-012 (approved 2026-10-19)** · **layout replaced by CR-019 (approved 2026-10-24)** · CR-024 applied 2026-10-26 (block below)
+Status: APPROVED (2026-10-14) · header card changed by CR-003 (approved 2026-10-14) · layout replaced by CR-011 (approved 2026-10-18) · **refined by CR-012 (approved 2026-10-19)** · **layout replaced by CR-019 (approved 2026-10-24)** · CR-024 applied 2026-10-26 (block below) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-034 (approved 2026-11-01):** copy `ใครซ่อม` → `ผู้ดำเนินการซ่อม` in the action card / progress; in-house jobs show `ช่างผู้รับผิดชอบ · {name}` to staff (the reporter's view is unchanged).
 
 > **CR-024 (approved 2026-10-26):** no executive row / note / read-only variant; every card text and dialog that promised a notification uses `_common.md` §9.
 

@@ -20,9 +20,12 @@ const WORK: Item = { label: "งานซ่อม", href: "/repair/work", icon:
 const QUEUE: Item = { label: "งานทั้งหมด", href: "/repair/admin/queue", icon: ListOrdered };
 const OVERVIEW: Item = { label: "ภาพรวมอาคาร", href: "/repair/admin/overview", icon: Building2 };
 
-/** D-050: งานซ่อม = `work`; ช่างภายนอก = `contractor.manage` or the manager queue; ภาพรวมอาคาร = manager + `overview.view`. */
+/**
+ * D-050: งานซ่อม = `work`; ช่างภายนอก = `contractor.manage` or the manager queue; ภาพรวมอาคาร = manager + `overview.view`.
+ * CR-034: ติดตามงานซ่อม = `report`.
+ */
 function itemsFor(me: Me): Item[] {
-  const items = [TRACK];
+  const items = can(me, PERM.ticketReport) ? [TRACK] : [];
   if (can(me, PERM.ticketWork)) items.push(WORK);
   if (seesRepairQueue(me)) items.push(QUEUE);
   if (can(me, PERM.contractorManage) || seesRepairQueue(me)) items.push(CONTRACTORS);

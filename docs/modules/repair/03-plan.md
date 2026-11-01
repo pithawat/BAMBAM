@@ -590,6 +590,30 @@ Status: done — accepted 2026-11-01 (tag `repair-stage-3D-5`). Built by Claude.
 
 ---
 
+## Stage 5P — page polish round 1 (CR-034)
+
+Status: done — accepted 2026-11-01 (tag `repair-stage-5P`) · approved 2026-11-01 (D-137), navbar = gear A + stacked logo B (D-138). Built by Claude (no Codex hand-off). Before Stage 5.
+
+**Scope**
+- S03 / S04: `ถัดไป` + final submit disabled with a "what is missing" hint (BR-F02-1a); blocking extra spot stays required after typing (BR-F03-2)
+- Shared navbar (`components/shared/app-navbar.tsx`, settings menu trigger): brand lock-up left, settings gear on the right next to the account menu — mockup `changes/CR-034/navbar.html` approved first
+- S17: `ประเภทผู้ดำเนินการซ่อม`, required `ช่างผู้รับผิดชอบ` picker (#36), required reschedule reason (not on re-accept)
+- S10: responsible technician / contractor card, `รายละเอียดการซ่อม`; S07 copy + assignee line
+- Tracking needs `repair.ticket.report`: repair nav, `/repair/my` forbidden, #35 403
+- Backend: migration `repair.tickets.assignee_id` (+ backfill from `technician_id` of assessed in-house tickets), #9 validation (`assigneeId`, `reason`), `assignee` in payloads, #36, #35 permission; Go unit + Pg tests
+
+**Acceptance criteria**
+1. S03 step with a missing required field or an unresolved blocking duplicate: `ถัดไป` cannot be pressed and the hint names what is missing; filling it enables the button
+2. Blocking duplicate: after typing the spot the label still shows `*`, never `ไม่บังคับ`
+3. Navbar matches the approved mockup on desktop and phone, both themes; settings opens from the right-side gear
+4. S17 in-house: the picker lists only active users with `repair.ticket.work`, defaults to me, is required; API rejects a missing / invalid `assigneeId`
+5. S17 reschedule without a reason → blocked (UI + API 400); re-accept after send back → allowed without a reason
+6. S10 shows the responsible technician card (contractor card for contractor jobs) and the `รายละเอียดการซ่อม` label
+7. A user without `repair.ticket.report` (technician default) sees no `ติดตามงานซ่อม`, `/repair/my` shows forbidden, #35 → 403
+8. Go lint / tests, FE lint / typecheck / build, e2e F02 / F03 / F06 / F07 / permission specs pass; Atlas tours F02 / F03 / F06 re-verified
+
+---
+
 ## Stage 5 — สแกน QR เติมฟอร์ม
 
 **Scope**

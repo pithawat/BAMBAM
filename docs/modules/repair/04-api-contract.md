@@ -293,6 +293,7 @@ Query: `scope=mine|all` (default `mine`) · `status` (comma list of statuses) ·
 | 400 | `VALIDATION_FAILED` | bad filter value |
 
 ### 35. GET /api/v1/repair/tickets/mine (CR-019)
+(CR-034) Caller needs `repair.ticket.report`, else 403 `FORBIDDEN` (`ไม่มีสิทธิ์ดูรายการนี้`).
 The S06 table's own paging endpoint: one page, only the columns S06 shows. Query: `relation`, `status`, `step`, `closedReason` (CR-021, S06 lead tab `ทีมแก้เอง` = `relation=reported&closedReason=team_handled`), `q`, `sort` as #6 mine (other #6 filters are ignored) · `page` · `pageSize` default **10** (max 100).
 
 - Always the caller's tickets (reported or followed, BR-F06-1); awaiting my confirmation first (BR-F06-2); same `total` as #6 mine with the same filters.
@@ -341,13 +342,20 @@ Empty list for a first-time reporter. S03 shows them as one-tap shortcuts, never
 Every action locks the ticket row first; a closed ticket → 409 `TICKET_CLOSED`, a ticket in another status → 409 `INVALID_STATE`. Each returns 200 `{ "data": <TicketDetail> }`.
 
 ### 9. POST /api/v1/repair/tickets/{id}/assess
-Request `{ "expectedDoneOn": "2026-10-20", "workBy": "contractor", "contractorId": "5c0a…", "reason": "รออะไหล่" }` — `reason` optional ≤ 100, kept only on a change (event `assessment_changed` `data.reason`, shown to the reporter in the S07 timeline, CR-008); `expectedDoneOn` today or later (Asia/Bangkok); `workBy` `in_house` · `contractor`; `contractorId` (active contractor) required for `contractor`, ignored for `in_house` (CR-006). First call → event `assessed`; later calls → `assessment_changed` (event `data`: `expectedDoneOn`, `workBy`). Sets `technician` = me. Allowed while `in_progress` (also during rework). Changing the contractor clears the previous contractor's rating on this ticket.
+Request `{ "expectedDoneOn": "2026-10-20", "workBy": "contractor", "contractorId": "5c0a…", "reason": "รออะไหล่" }` — (CR-034) `assigneeId` (uuid) **required for `in_house`** (active user with `repair.ticket.work`), ignored for `contractor` (assignee cleared); stored as the ticket `assignee`. (CR-034) `reason` **required** (≤ 100) when `expectedDoneOn` changes on an assessed ticket that is not `reworking`, otherwise optional ≤ 100; kept only on a change (event `assessment_changed` `data.reason`, shown to the reporter in the S07 timeline, CR-008); `expectedDoneOn` today or later (Asia/Bangkok); `workBy` `in_house` · `contractor`; `contractorId` (active contractor) required for `contractor`, ignored for `in_house` (CR-006). First call → event `assessed`; later calls → `assessment_changed` (event `data`: `expectedDoneOn`, `workBy`). Sets `technician` = me. Allowed while `in_progress` (also during rework). Changing the contractor clears the previous contractor's rating on this ticket.
 
 | Status | code | When | Thai message |
 |---|---|---|---|
 | 400 | `VALIDATION_FAILED` | `expectedDoneOn` REQUIRED / INVALID / PAST · `workBy` REQUIRED / INVALID · `contractorId` REQUIRED / INVALID | เลือกวันที่คาดว่าจะเสร็จ · เลือกวันนี้หรือหลังจากนี้ · เลือกผู้ดำเนินการ · เลือกช่างภายนอก |
 | 403 | `NOT_TECHNICIAN` | caller is not a technician | เฉพาะช่างเท่านั้นที่ทำรายการนี้ได้ |
 | 422 | `CONTRACTOR_NOT_FOUND` | unknown or inactive contractor | ไม่พบช่างภายนอกนี้ หรือถูกปิดใช้งานแล้ว |
+| 400 | `VALIDATION_FAILED` | (CR-034) `assigneeId` REQUIRED · `reason` REQUIRED | เลือกช่างผู้รับผิดชอบ · กรุณาใส่เหตุผลที่เลื่อน |
+| 422 | `ASSIGNEE_INVALID` | (CR-034) unknown / inactive user, or no `repair.ticket.work` | ช่างคนนี้รับงานซ่อมไม่ได้แล้ว เลือกคนอื่น |
+
+(CR-034) Ticket payloads (#7 detail, #9 / #10 responses, #6 / #35 / admin list rows) carry `assignee: { id, name, roleName } | null` — in-house jobs only; null for contractor jobs and for old in-house tickets without one (backfill = `technician_id` of assessed in-house tickets).
+
+### 36. GET /api/v1/repair/technicians (CR-034)
+Caller needs `repair.ticket.work` (else 403 `NOT_TECHNICIAN`). Returns every active user with `repair.ticket.work`, by name: `{ "data": [{ "id", "name", "roleName" }] }`. Used by the S17 `ช่างผู้รับผิดชอบ` picker.
 
 ### 10. POST /api/v1/repair/tickets/{id}/resolve
 Request:

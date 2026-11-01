@@ -64,6 +64,9 @@ export type TimelineEventType =
 
 export type PersonRef = { id: string; name: string; department: string | null };
 
+/** CR-034: a person with their role name — the ticket `assignee` and a #36 row. */
+export type StaffRef = { id: string; name: string; roleName: string };
+
 export type Photo = { id: string; thumbUrl: string; url: string };
 
 /** Lists and cards. */
@@ -104,6 +107,8 @@ export type TicketSummary = {
   contractor: Ref | null;
   /** Type names of the contractor — shown to everyone. */
   contractorTypes: string[];
+  /** CR-034: the responsible in-house technician (S17); null for contractor jobs and old tickets without one. */
+  assignee: StaffRef | null;
   /** RFC 3339 UTC */
   autoCloseAt: string | null;
   sendBackCount: number;
@@ -275,7 +280,7 @@ export type MyTicketsQuery = Pick<TicketListQuery, "relation" | "status" | "step
 /** One S06 row: only what the table shows (title joined by the API). */
 export type MyTicket = Pick<TicketSummary,
   "id" | "ticketNo" | "status" | "step" | "closedReason" | "category" | "categoryOther" | "building" | "floor" | "room"
-  | "locationDetail" | "awaitingMyConfirmation" | "expectedDoneOn" | "autoCloseAt" | "rating" | "resolvedAt" | "updatedAt"> & {
+  | "locationDetail" | "awaitingMyConfirmation" | "expectedDoneOn" | "assignee" | "autoCloseAt" | "rating" | "resolvedAt" | "updatedAt"> & {
   /** Symptom names, then the typed symptom, joined with " · " (same as `ticketTitle`). */
   title: string;
   /** Mine only, so never `technician` / `none`. */
@@ -304,8 +309,11 @@ export type TicketCounts = {
 
 // ---- #9–#12 ticket actions ----
 
-/** The assessment (CR-006): expected finish date + who does the work; `reason` only on a change (CR-008, ≤ 100). */
-export type AssessRequest = { expectedDoneOn: string; workBy: WorkBy; contractorId?: string; reason?: string };
+/**
+ * The assessment (CR-006): expected finish date + who does the work. CR-034: `assigneeId` required for `in_house`;
+ * `reason` (≤ 100) required when the date moves on an assessed ticket that is not reworking, else optional (CR-008).
+ */
+export type AssessRequest = { expectedDoneOn: string; workBy: WorkBy; contractorId?: string; assigneeId?: string; reason?: string };
 
 // ---- #28 GET /repair/me/recent-places (CR-008) ----
 
@@ -550,6 +558,7 @@ export type RepairErrorCode =
   | "INVALID_STATE"
   | "ASSESSMENT_REQUIRED"
   | "CONTRACTOR_NOT_FOUND"
+  | "ASSIGNEE_INVALID"
   | "CONTRACTOR_TYPE_NOT_FOUND"
   | "ALREADY_FOLLOWING"
   | "NOT_TEAM_HANDLED"

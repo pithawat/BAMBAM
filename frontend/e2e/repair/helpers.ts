@@ -120,9 +120,19 @@ async function act(api: APIRequestContext, id: string, action: string, data: obj
   return (await res.json()).data;
 }
 
-/** #9 as the technician: in house unless a contractor is given; expected today unless `on`. */
-export const assess = (technician: APIRequestContext, id: string, opts: { contractorId?: string; on?: string; reason?: string } = {}) =>
-  act(technician, id, "assess", { expectedDoneOn: opts.on ?? bangkokToday(), workBy: opts.contractorId ? "contractor" : "in_house", contractorId: opts.contractorId, reason: opts.reason });
+/** The signed-in user's id (`GET /api/v1/me`). */
+export async function myId(api: APIRequestContext): Promise<string> {
+  return (await (await api.get("/api/v1/me")).json()).data.id;
+}
+
+/**
+ * #9 as the technician: in house (CR-034: the technician is the assignee) unless a contractor is given; expected today
+ * unless `on`.
+ */
+export async function assess(technician: APIRequestContext, id: string, opts: { contractorId?: string; on?: string; reason?: string } = {}) {
+  const by = opts.contractorId ? { workBy: "contractor", contractorId: opts.contractorId } : { workBy: "in_house", assigneeId: await myId(technician) };
+  return act(technician, id, "assess", { expectedDoneOn: opts.on ?? bangkokToday(), ...by, reason: opts.reason });
+}
 
 /** #10 as the technician with one after photo; `rating` = the contractor stars of a contractor job. */
 export async function resolve(technician: APIRequestContext, id: string, rating?: number) {

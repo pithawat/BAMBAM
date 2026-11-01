@@ -190,15 +190,17 @@ function NextAction({ ticket, viewer, story, meId, actions }: { ticket: TicketDe
   let note = "";
   const buttons: ReactNode[] = [];
   if (viewer === "technician") {
-    const mine = ticket.technician?.id === meId;
+    // CR-034: an in-house job is owned by its assignee; older tickets fall back to the technician who holds it.
+    const owner = ticket.workBy === "in_house" && ticket.assignee ? ticket.assignee : ticket.technician;
+    const mine = owner?.id === meId;
     switch (ticket.step) {
       case "awaiting_assessment":
         icon = ClipboardList; title = "งานใหม่ รอคุณเริ่มดำเนินการ";
-        desc = `ความเร่งด่วน${PRIORITY_LABELS[ticket.priority]} · กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่ในหน้างานทันที`;
+        desc = `ความเร่งด่วน${PRIORITY_LABELS[ticket.priority]} · กำหนดวันที่คาดว่าจะเสร็จและผู้ดำเนินการซ่อม ผู้แจ้งจะเห็นวันที่ในหน้างานทันที`;
         if (actions.allowed.has("assess")) buttons.push(primary("เริ่มดำเนินการ", Check, actions.assess));
         break;
       case "in_repair":
-        title = `${mine ? "คุณกำลังซ่อมงานนี้" : `${ticket.technician?.name ?? "ช่าง"} กำลังซ่อมงานนี้`} · คาดว่าจะเสร็จ ${expected}`;
+        title = `${mine ? "คุณกำลังซ่อมงานนี้" : `${owner?.name ?? "ช่าง"} กำลังซ่อมงานนี้`} · คาดว่าจะเสร็จ ${expected}`;
         desc = "ซ่อมเสร็จแล้วถ่ายรูปหลังซ่อมและบันทึกผล แล้วงานจะรอผู้แจ้งตรวจรับ";
         if (actions.allowed.has("assess")) buttons.push(outline("เลื่อนวันเสร็จ", CalendarClock, actions.assess));
         if (actions.allowed.has("resolve")) buttons.push(primary("บันทึกผลซ่อม", Camera, actions.resolve));
@@ -343,7 +345,10 @@ function InfoTab({ ticket, viewer, story }: { ticket: TicketDetail; viewer: Stor
     <Section className={TWO_COLUMNS}>
       <Person label="ผู้แจ้ง" name={viewer === "reporter" ? `${ticket.reporter.name} (คุณ)` : ticket.reporter.name} initialsOf={ticket.reporter.name}
         sub={[ticket.reporter.department, others].filter(Boolean).join(" · ")} />
-      {fixer ? <Person label="ผู้ซ่อม" name={fixer.name} initialsOf={fixer.name} sub={workByText(ticket)} />
+      {/* CR-034: staff see the responsible in-house technician; the reporter's view is unchanged. */}
+      {staff && ticket.workBy === "in_house" ? <Person label="ช่างผู้รับผิดชอบ" name={ticket.assignee?.name ?? "ยังไม่ระบุช่าง"} initialsOf={ticket.assignee?.name}
+          sub={["ช่างของบริษัท", ticket.assignee?.roleName].filter(Boolean).join(" · ")} />
+        : fixer ? <Person label="ผู้ซ่อม" name={fixer.name} initialsOf={fixer.name} sub={workByText(ticket)} />
         : <Person label="ผู้ซ่อม" name={ticket.status === "in_progress" ? "รอช่างรับงาน" : "—"} sub={ticket.status === "in_progress" ? "จะแสดงเมื่อช่างเริ่มดำเนินการ" : ""} />}
     </Section>
     <Section className="flex items-start gap-3">

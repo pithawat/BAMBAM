@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowRight, HardHat, Info, Loader2, Plus, Star, Wrench } from "lucide-react";
+import { AlertCircle, ArrowRight, HardHat, Info, Loader2, Plus, Star, UserRound, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/components/shared/me-provider";
 import { Picker } from "@/components/shared/picker";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { Button } from "@/components/ui/button";
@@ -11,9 +12,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { assessTicket, closeTicket, confirmTicket, getContractors, getTicket, handoverTicket, sendBackTicket } from "../api";
+import { assessTicket, closeTicket, confirmTicket, getContractors, getTechnicians, getTicket, handoverTicket, sendBackTicket } from "../api";
 import { assessFieldMessages, errorCode, errorMessage, fieldErrors, handoverFieldMessages, reviewFieldMessages } from "../errors";
-import type { Contractor, TicketDetail, WorkBy } from "../types";
+import type { Contractor, StaffRef, TicketDetail, WorkBy } from "../types";
 import { ContractorFormDialog } from "./contractors";
 import { forgetUploads, photoBlocker, PhotoPicker, uploadKeptPhotos, type PhotoItem } from "./photo-picker";
 import { RESOLVED_TOAST, ResolveFields } from "./resolve-form";
@@ -87,13 +88,17 @@ function handleError(err: unknown, onStale: () => void): Record<string, string> 
   return {};
 }
 
-// ---- S17 เริ่มดำเนินการ / เลื่อนวันเสร็จ (CR-005, CR-006, CR-008 date chips + reason, CR-009 wording) ----
+// ---- S17 เริ่มดำเนินการ / เลื่อนวันเสร็จ (CR-005, CR-006, CR-008 date chips + reason, CR-009 wording; CR-034:
+// ประเภทผู้ดำเนินการซ่อม, required ช่างผู้รับผิดชอบ for in-house, required reason when the date moves outside a rework) ----
 
 const WORK_BY = [{ value: "in_house", label: "ช่างของบริษัท" }, { value: "contractor", label: "ช่างภายนอก" }];
 
 function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogProps & { reaccept: boolean }) {
+  const me = useCurrentUser();
   const today = todayBangkok();
   const first = !ticket.expectedDoneOn || !ticket.workBy;
+  // Same rule as #9: a reason is required when the date moves, except while reworking after a send back.
+  const reasonRequired = !first && !reaccept && ticket.sendBackCount === 0;
   const chips = [
     { key: "today", label: "วันนี้", day: today },
     { key: "tomorrow", label: "พรุ่งนี้", day: addDays(today, 1) },
@@ -103,15 +108,22 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
   const [picked, setPicked] = useState("");
   const [workBy, setWorkBy] = useState<WorkBy>(ticket.workBy ?? "in_house");
   const [contractorId, setContractorId] = useState(ticket.contractor?.id ?? "");
+  const [assigneeId, setAssigneeId] = useState("");
   const [reason, setReason] = useState("");
   const [contractors, setContractors] = useState<Contractor[]>();
+  const [technicians, setTechnicians] = useState<StaffRef[]>();
   const [adding, setAdding] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
     getContractors({ pageSize: 100 }).then((p) => setContractors(p.items), () => setContractors([]));
-  }, [open]);
+    // Default = the ticket's assignee, else me, when listed (CR-034).
+    getTechnicians().then((list) => {
+      setTechnicians(list);
+      setAssigneeId((cur) => cur || [ticket.assignee?.id, me.id].find((id) => id && list.some((t) => t.id === id)) || "");
+    }, () => setTechnicians([]));
+  }, [open, ticket.assignee?.id, me.id]);
   const day = chip === "pick" ? picked : chips.find((c) => c.key === chip)?.day ?? "";
   const clear = (name: string) => setErrors((e) => { const n = { ...e }; delete n[name]; return n; });
   async function submit(e: React.FormEvent) {
@@ -121,25 +133,35 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
     if (!day) local.expectedDoneOn = "เลือกวันที่คาดว่าจะเสร็จ";
     else if (day < today) local.expectedDoneOn = "เลือกวันนี้หรือหลังจากนี้";
     if (workBy === "contractor" && !contractorId) local.contractorId = "เลือกช่างภายนอก";
+    if (workBy === "in_house" && !assigneeId) local.assigneeId = "เลือกช่างผู้รับผิดชอบ";
+    if (reasonRequired && day && day !== ticket.expectedDoneOn && !reason.trim()) local.reason = "กรุณาใส่เหตุผลที่เลื่อน";
     if (Object.keys(local).length) { setErrors(local); return; }
     setBusy(true); setErrors({});
     try {
       onDone(await assessTicket(ticket.id, {
-        expectedDoneOn: day, workBy, ...(workBy === "contractor" ? { contractorId } : {}),
+        expectedDoneOn: day, workBy, ...(workBy === "contractor" ? { contractorId } : { assigneeId }),
         ...(!first && reason.trim() ? { reason: reason.trim() } : {}),
       }));
-    } catch (err) { setErrors(handleError(err, () => onOpenChange(false))); if (errorCode(err) === "CONTRACTOR_NOT_FOUND") setContractorId(""); }
+    } catch (err) {
+      if (errorCode(err) === "ASSIGNEE_INVALID") {
+        setAssigneeId(""); setErrors({ assigneeId: errorMessage(err) });
+        getTechnicians().then(setTechnicians, () => undefined);
+        return;
+      }
+      setErrors(handleError(err, () => onOpenChange(false))); if (errorCode(err) === "CONTRACTOR_NOT_FOUND") setContractorId("");
+    }
     finally { setBusy(false); }
   }
   const options = (contractors ?? []).filter((c) => c.isActive).map((c) => ({ value: c.id, label: c.name, description: c.types.map((t) => t.name).join(", ") }));
+  const techOptions = (technicians ?? []).map((t) => ({ value: t.id, label: t.id === me.id ? `${t.name} (ฉัน)` : t.name, description: t.roleName }));
   const title = first ? "เริ่มดำเนินการ" : reaccept ? "รับแก้ไขและกำหนดวันเสร็จใหม่" : "เลื่อนวันที่คาดว่าจะเสร็จ";
   // The contractor form is a sibling of this dialog (not inside its <form>): submit events bubble through portals.
   return <>
-    <Dialog open={open} onOpenChange={(o) => { if (o) { setChip(""); setPicked(""); setReason(""); setWorkBy(ticket.workBy ?? "in_house"); setContractorId(ticket.contractor?.id ?? ""); setErrors({}); } onOpenChange(o); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (o) { setChip(""); setPicked(""); setReason(""); setWorkBy(ticket.workBy ?? "in_house"); setContractorId(ticket.contractor?.id ?? ""); setAssigneeId(""); setTechnicians(undefined); setErrors({}); } onOpenChange(o); }}>
       <DialogContent className={sheetLike}>
         <form onSubmit={submit} noValidate className="space-y-5">
           <DialogHeader><DialogTitle className="text-lg">{title}</DialogTitle>
-            <DialogDescription>{first ? "กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่นี้ในหน้างานทันที" : `เดิม ${ticket.expectedDoneOn ? dayLabel(ticket.expectedDoneOn, true) : "—"} · ผู้แจ้งจะเห็นวันใหม่ในหน้างาน`}</DialogDescription></DialogHeader>
+            <DialogDescription>{first ? "กำหนดวันที่คาดว่าจะเสร็จและผู้ดำเนินการซ่อม ผู้แจ้งจะเห็นวันที่นี้ในหน้างานทันที" : `เดิม ${ticket.expectedDoneOn ? dayLabel(ticket.expectedDoneOn, true) : "—"} · ผู้แจ้งจะเห็นวันใหม่ในหน้างาน`}</DialogDescription></DialogHeader>
           <div className="space-y-2">
             <p id="expectedDoneOn-label" className="text-[15px] font-semibold">คาดว่าจะเสร็จ <span className="text-destructive">*</span></p>
             <div role="radiogroup" aria-labelledby="expectedDoneOn-label" aria-describedby="expectedDoneOn-error" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -154,9 +176,14 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
             {chip === "pick" && <Input id="expectedDoneOn" type="date" min={today} value={picked} onChange={(e) => { setPicked(e.target.value); clear("expectedDoneOn"); }} aria-label="เลือกวันที่คาดว่าจะเสร็จ" aria-invalid={!!errors.expectedDoneOn} className="h-12 rounded-sm bg-card text-base" />}
             <FieldError id="expectedDoneOn-error" message={errors.expectedDoneOn} />
           </div>
-          <div className="space-y-2"><p className="text-[15px] font-semibold">ใครซ่อม <span className="text-destructive">*</span></p>
-            <SegmentedControl label="ใครซ่อม" value={workBy} options={WORK_BY} onValueChange={(v) => { setWorkBy(v as WorkBy); clear("workBy"); clear("contractorId"); }} />
+          <div className="space-y-2"><p className="text-[15px] font-semibold">ประเภทผู้ดำเนินการซ่อม <span className="text-destructive">*</span></p>
+            <SegmentedControl label="ประเภทผู้ดำเนินการซ่อม" value={workBy} options={WORK_BY} onValueChange={(v) => { setWorkBy(v as WorkBy); clear("workBy"); clear("contractorId"); clear("assigneeId"); }} />
             <FieldError id="workBy-error" message={errors.workBy} />
+            {workBy === "in_house" && <div className="space-y-2 pt-1"><label id="assigneeId-label" className="text-sm font-medium">ช่างผู้รับผิดชอบ <span className="text-destructive">*</span></label>
+              <Picker id="assigneeId" title="ช่างผู้รับผิดชอบ" placeholder={technicians ? "เลือกช่างผู้รับผิดชอบ" : "กำลังโหลด…"} icon={UserRound} value={assigneeId}
+                onValueChange={(v) => { setAssigneeId(v); clear("assigneeId"); }} options={techOptions} invalid={!!errors.assigneeId} disabled={!technicians}
+                searchPlaceholder="ค้นหาชื่อช่าง" emptyText="ไม่มีผู้ใช้ที่รับงานซ่อมได้" aria-labelledby="assigneeId-label" aria-describedby="assigneeId-error" />
+              <FieldError id="assigneeId-error" message={errors.assigneeId} /></div>}
             {workBy === "contractor" && <div className="space-y-2 pt-1"><label id="contractorId-label" className="text-sm font-medium">ช่างภายนอก <span className="text-destructive">*</span></label>
               <Picker id="contractorId" title="ช่างภายนอก" placeholder={contractors ? "เลือกช่างภายนอก" : "กำลังโหลด…"} icon={HardHat} value={contractorId}
                 onValueChange={(v) => { setContractorId(v); clear("contractorId"); }} options={options} invalid={!!errors.contractorId} disabled={!contractors}
@@ -164,8 +191,10 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
               <Button type="button" variant="link" className="h-10 px-0" onClick={() => setAdding(true)}><Plus aria-hidden />เพิ่มช่างภายนอกใหม่</Button>
               <FieldError id="contractorId-error" message={errors.contractorId} /></div>}
           </div>
-          {!first && <div className="space-y-2"><label htmlFor="assess-reason" className="text-[15px] font-semibold">เหตุผลที่เลื่อน <span className="text-xs font-normal text-muted-foreground">ไม่บังคับ · ผู้แจ้งเห็นข้อความนี้</span></label>
-            <Input id="assess-reason" value={reason} onChange={(e) => { setReason(e.target.value); clear("reason"); }} maxLength={100} placeholder="เช่น รออะไหล่" aria-describedby="reason-error" className="h-12 rounded-sm bg-card text-base" />
+          {!first && <div className="space-y-2"><label htmlFor="assess-reason" className="text-[15px] font-semibold">เหตุผลที่เลื่อน{" "}
+            {reasonRequired ? <><span className="text-destructive">*</span> <span className="text-xs font-normal text-muted-foreground">ผู้แจ้งเห็นข้อความนี้</span></>
+              : <span className="text-xs font-normal text-muted-foreground">ไม่บังคับ · ผู้แจ้งเห็นข้อความนี้</span>}</label>
+            <Input id="assess-reason" value={reason} onChange={(e) => { setReason(e.target.value); clear("reason"); }} maxLength={100} placeholder="เช่น รออะไหล่" aria-invalid={!!errors.reason} aria-describedby="reason-error" className="h-12 rounded-sm bg-card text-base" />
             <FieldError id="reason-error" message={errors.reason} /></div>}
           <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>ยกเลิก</Button>
             <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}{first ? "เริ่มดำเนินการ" : "บันทึกวันใหม่"}</Button></DialogFooter>

@@ -39,6 +39,7 @@ SELECT
     t.rating, t.rating_comment, t.send_back_count,
     t.expected_done_on, t.assessed_at, t.work_by,
     t.contractor_id, ct.name AS contractor_name, t.contractor_rating, t.contractor_rating_comment,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = @viewer_id) AS viewer_subscribed,
     (SELECT count(*) FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id) AS subscriber_count
@@ -51,6 +52,7 @@ JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.people rb ON rb.id = t.resolved_by_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
 WHERE t.id = @id;
 
 -- name: ListTickets :many
@@ -67,6 +69,7 @@ SELECT
     t.rating, t.send_back_count,
     t.expected_done_on, t.assessed_at, t.work_by,
     t.contractor_id, ct.name AS contractor_name,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = @viewer_id) AS viewer_subscribed
 FROM repair.tickets t
@@ -77,6 +80,7 @@ LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
 WHERE (@scope_all::boolean OR (
         (@relation::text IN ('all', 'reported') AND t.reporter_id = @viewer_id)
      OR (@relation::text IN ('all', 'following') AND EXISTS (
@@ -124,12 +128,14 @@ SELECT
     t.location_detail,
     (t.reporter_id = @viewer_id)::boolean AS is_reporter,
     t.rating, t.send_back_count, t.expected_done_on,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.updated_at
 FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN platform.buildings b ON b.id = t.building_id
 JOIN platform.floors f ON f.id = t.floor_id
 LEFT JOIN platform.rooms rm ON rm.id = t.room_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
 WHERE ((@relation::text IN ('all', 'reported') AND t.reporter_id = @viewer_id)
      OR (@relation::text IN ('all', 'following') AND EXISTS (
             SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = @viewer_id)))
@@ -231,12 +237,12 @@ WHERE t.id = @id;
 
 -- name: LockTicket :one
 -- Every status change locks the row first, so concurrent actions see each other's result.
-SELECT id, status, closed_reason, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating FROM repair.tickets
+SELECT id, status, closed_reason, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating, send_back_count FROM repair.tickets
 WHERE id = @id
 FOR UPDATE;
 
 -- name: AssessTicket :exec
--- CR-006: the assessment = expected finish date + who does the work. Changing the contractor drops
+-- CR-006: the assessment = expected finish date + who does the work. CR-034: + the responsible in-house technician. Changing the contractor drops
 -- the old contractor's rating (it belonged to the previous one).
 UPDATE repair.tickets
 SET expected_done_on = @expected_done_on, holder_id = @technician_id,
@@ -244,6 +250,7 @@ SET expected_done_on = @expected_done_on, holder_id = @technician_id,
     contractor_rating = CASE WHEN contractor_id IS NOT DISTINCT FROM sqlc.narg('contractor_id')::uuid THEN contractor_rating END,
     contractor_rating_comment = CASE WHEN contractor_id IS NOT DISTINCT FROM sqlc.narg('contractor_id')::uuid THEN contractor_rating_comment END,
     contractor_id = sqlc.narg('contractor_id')::uuid,
+    assignee_id = sqlc.narg('assignee_id')::uuid,
     assessed_at = COALESCE(assessed_at, @now), updated_at = @now
 WHERE id = @id;
 
@@ -339,3 +346,20 @@ LIMIT @max_rows;
 INSERT INTO repair.ticket_subscribers (ticket_id, user_id, created_at, updated_at)
 VALUES (@ticket_id, @user_id, @now, @now)
 ON CONFLICT (ticket_id, user_id) DO NOTHING;
+
+-- name: ListTechnicians :many
+-- #36 (CR-034): everyone whose role has `repair.ticket.work`; super_admin has every key in code (BR-F25-1).
+SELECT st.id, st.name, st.role_name
+FROM repair.staff st
+WHERE st.role_key = 'super_admin' OR EXISTS (
+    SELECT 1 FROM platform.role_permissions rp JOIN platform.roles r ON r.id = rp.role_id
+    WHERE r.key = st.role_key AND rp.permission = 'repair.ticket.work')
+ORDER BY st.name COLLATE "th-x-icu", st.id;
+
+-- name: IsTechnician :one
+-- #9 (CR-034): the picked assignee still has `repair.ticket.work` (same rule as ListTechnicians).
+SELECT EXISTS (
+    SELECT 1 FROM repair.staff st
+    WHERE st.id = @id AND (st.role_key = 'super_admin' OR EXISTS (
+        SELECT 1 FROM platform.role_permissions rp JOIN platform.roles r ON r.id = rp.role_id
+        WHERE r.key = st.role_key AND rp.permission = 'repair.ticket.work')))::boolean;

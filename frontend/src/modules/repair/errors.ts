@@ -21,7 +21,8 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   NOT_REPORTER: "เฉพาะผู้แจ้งเท่านั้นที่ประเมินตรวจงานได้",
   TICKET_CLOSED: "งานนี้ปิดไปแล้ว",
   INVALID_STATE: "งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว",
-  ASSESSMENT_REQUIRED: "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และใครซ่อม) ก่อนบันทึกผล",
+  ASSESSMENT_REQUIRED: "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และผู้ดำเนินการซ่อม) ก่อนบันทึกผล", // CR-034 copy
+  ASSIGNEE_INVALID: "ช่างคนนี้รับงานซ่อมไม่ได้แล้ว เลือกคนอื่น", // CR-034 (#9)
   CONTRACTOR_NOT_FOUND: "ไม่พบช่างภายนอกนี้ หรือถูกปิดใช้งานแล้ว",
   CONTRACTOR_TYPE_NOT_FOUND: "ประเภทช่างบางรายการไม่มีในระบบแล้ว เลือกใหม่อีกครั้ง",
   CONTRACTOR_NAME_TAKEN: "มีช่างภายนอกชื่อนี้แล้ว",
@@ -126,14 +127,15 @@ export function fieldErrors(err: unknown, map: FieldMessages): Record<string, st
 /** S17 รับเรื่อง / เลื่อนวันเสร็จ. */
 export const assessFieldMessages: FieldMessages = {
   expectedDoneOn: { REQUIRED: "เลือกวันที่คาดว่าจะเสร็จ", INVALID: "เลือกวันที่คาดว่าจะเสร็จ", PAST: "เลือกวันนี้หรือหลังจากนี้" },
-  workBy: { REQUIRED: "เลือกใครซ่อม", INVALID: "เลือกใครซ่อม" },
+  workBy: { REQUIRED: "เลือกประเภทผู้ดำเนินการซ่อม", INVALID: "เลือกประเภทผู้ดำเนินการซ่อม" }, // CR-034
   contractorId: { REQUIRED: "เลือกช่างภายนอก", INVALID: "เลือกช่างภายนอก" },
-  reason: { TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
+  assigneeId: { REQUIRED: "เลือกช่างผู้รับผิดชอบ", INVALID: "เลือกช่างผู้รับผิดชอบ" }, // CR-034
+  reason: { REQUIRED: "กรุณาใส่เหตุผลที่เลื่อน", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
 };
 
 /** S10 resolve. */
 export const resolveFieldMessages: FieldMessages = {
-  note: { REQUIRED: "กรุณาบอกสิ่งที่ทำ", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
+  note: { REQUIRED: "กรุณาใส่รายละเอียดการซ่อม", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" }, // CR-034
   photoIds: { MIN_ITEMS: "แนบรูปหลังซ่อมอย่างน้อย 1 รูป", MAX_ITEMS: "แนบได้สูงสุด 5 รูป", INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" },
   contractorRating: { REQUIRED: "ให้คะแนนช่างภายนอก", INVALID: "ให้คะแนนช่างภายนอก" },
   contractorRatingComment: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },

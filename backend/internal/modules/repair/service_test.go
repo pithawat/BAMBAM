@@ -45,6 +45,7 @@ type fakeRepo struct {
 	dash     *dashFake  // CR-016 dashboard and equipment (service_dashboard_test.go)
 
 	contractors map[uuid.UUID]*Contractor // F24 (CR-023 name checks)
+	techs       map[uuid.UUID]bool        // users with repair.ticket.work (CR-034)
 }
 
 func newFakeRepo() *fakeRepo {
@@ -56,7 +57,7 @@ func newFakeRepo() *fakeRepo {
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
 		subs: map[uuid.UUID]map[uuid.UUID]bool{},
-		dash: newDashFake(), contractors: map[uuid.UUID]*Contractor{},
+		dash: newDashFake(), contractors: map[uuid.UUID]*Contractor{}, techs: map[uuid.UUID]bool{},
 	}
 }
 
@@ -164,13 +165,21 @@ func (f *fakeRepo) LockTicket(_ context.Context, id uuid.UUID) (LockedTicket, er
 	if !ok {
 		return LockedTicket{}, ErrTicketNotFound
 	}
-	lt := LockedTicket{ID: id, Status: t.Status, ReporterID: t.Reporter.ID, Assessed: t.ExpectedDoneOn != nil}
+	lt := LockedTicket{ID: id, Status: t.Status, ReporterID: t.Reporter.ID, Assessed: t.ExpectedDoneOn != nil,
+		ExpectedDoneOn: t.ExpectedDoneOn, SendBackCount: t.SendBackCount}
 	if t.ClosedReason != nil {
 		lt.ClosedReason = *t.ClosedReason
 	}
 	return lt, nil
 }
-func (f *fakeRepo) AssessTicket(context.Context, uuid.UUID, uuid.UUID, AssessInput, time.Time) error {
+func (f *fakeRepo) AssessTicket(_ context.Context, id, _ uuid.UUID, in AssessInput, _ time.Time) error {
+	t := f.tickets[id]
+	d := *in.ExpectedDoneOn
+	t.ExpectedDoneOn, t.WorkBy = &d, &in.WorkBy
+	t.Assignee = nil
+	if in.AssigneeID != nil {
+		t.Assignee = &Staff{ID: *in.AssigneeID}
+	}
 	return nil
 }
 func (f *fakeRepo) ResolveTicket(context.Context, uuid.UUID, uuid.UUID, ResolveInput, time.Time, time.Time) error {
@@ -250,6 +259,10 @@ func (f *fakeRepo) InsertSubscriber(_ context.Context, ticketID, userID uuid.UUI
 	return true, nil
 }
 func (f *fakeRepo) ActiveContractorExists(context.Context, uuid.UUID) (bool, error) { return true, nil }
+func (f *fakeRepo) IsTechnician(_ context.Context, id uuid.UUID) (bool, error) {
+	return f.techs[id], nil
+}
+func (f *fakeRepo) ListTechnicians(context.Context) ([]Staff, error) { return nil, nil }
 func (f *fakeRepo) CountContractorTypes(_ context.Context, ids []uuid.UUID) (int, error) {
 	return len(ids), nil
 }

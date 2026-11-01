@@ -16,9 +16,10 @@ import { LogoutDialog } from "./logout-dialog";
 import { SERVICES, type Service } from "./service-icon";
 
 // Top navigation on every page, settings included (_common.md §1, CR-010; settings CR-006 layout from
-// mockups/CR-006-design/App.tsx, flush with the top and side edges — owner 2026-11-01): BAMBAM | WORKPLACE · หน้าแรก ·
-// the services the user may use (`usesService`; a technician sees only แจ้งซ่อม) · the "ตั้งค่าระบบ" dropdown (any
-// `settings.*` permission) · account menu (no bell, repair CR-024). Repair tracking and staff tools live in the repair
+// mockups/CR-006-design/App.tsx, flush with the top and side edges — owner 2026-11-01). repair CR-034 (D-138,
+// `changes/CR-034/navbar.html`): stacked BAMBAM / WORKPLACE lock-up (option B) close to the left edge · หน้าแรก · the
+// services the user may use (`usesService`; a technician sees only แจ้งซ่อม) · on the right the "ตั้งค่าระบบ" gear
+// (option A, any `settings.*` permission) and the account menu (no bell, repair CR-024). Repair tracking and staff tools live in the repair
 // section nav (modules/repair/components/repair-nav.tsx). Desktop: sticky full-width bar. Phone / tablet: brand row
 // (+ settings sheet) and a row of the services; it scrolls away so route-local sticky bars keep the top edge.
 
@@ -47,11 +48,14 @@ export function AppNavbar({ me }: { me: Me }) {
 
   return (
     <header className="border-b bg-card print:hidden lg:sticky lg:top-0 lg:z-30">
-      <div className="flex h-15 items-center gap-2 px-4 lg:h-20 lg:gap-8 lg:px-10 xl:px-12">
-        <Link href="/" aria-label="BAMBAM หน้าแรก" className="flex shrink-0 items-center gap-4 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
-          <Image src="/brand/bam-logo.webp" alt="BAMBAM" width={96} height={31} className="h-7 w-auto lg:h-8.5" priority />
-          <span aria-hidden className="hidden h-6 w-px bg-border sm:block" />
-          <span className="hidden text-[10px] font-semibold tracking-[0.17em] text-muted-foreground sm:block">WORKPLACE</span>
+      <div className="flex h-15 items-center gap-2 pr-2 pl-3 lg:h-20 lg:gap-0 lg:pr-4 lg:pl-5">
+        <Link
+          href="/"
+          aria-label="BAMBAM หน้าแรก"
+          className="flex shrink-0 flex-col items-start gap-0.75 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30 lg:mr-14"
+        >
+          <Image src="/brand/bam-logo.webp" alt="BAMBAM" width={96} height={31} className="h-7 w-auto lg:h-7.5" priority />
+          <span className="pl-0.5 text-[9px] leading-none font-semibold tracking-[0.32em] text-muted-foreground">WORKPLACE</span>
         </Link>
 
         <nav aria-label="บริการหลัก" className="hidden h-full min-w-0 flex-1 items-center gap-1 lg:flex">
@@ -69,16 +73,19 @@ export function AppNavbar({ me }: { me: Me }) {
               </Link>
             );
           })}
-          {settings && <SettingsMenuDesktop me={me} />}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1 lg:gap-5">
+        <div className="ml-auto flex items-center gap-0.5 lg:gap-1.5">
           {settings && (
-            <div className="lg:hidden">
-              <SettingsMenuMobile me={me} />
-            </div>
+            <>
+              <div className="lg:hidden">
+                <SettingsMenuMobile me={me} />
+              </div>
+              <div className="hidden lg:block">
+                <SettingsMenuDesktop me={me} />
+              </div>
+            </>
           )}
-          <span aria-hidden className="hidden h-7 w-px bg-border lg:block" />
           <AccountMenu me={me} />
         </div>
       </div>

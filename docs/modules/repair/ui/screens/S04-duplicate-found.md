@@ -1,6 +1,8 @@
 # S04 — พบงานซ้ำ
 
-Status: APPROVED (2026-10-14) · card layout changed by CR-021 (approved 2026-10-25) · position changed by CR-025 (approved 2026-10-27)
+Status: APPROVED (2026-10-14) · card layout changed by CR-021 (approved 2026-10-25) · position changed by CR-025 (approved 2026-10-27) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-034 (approved 2026-11-01):** once a blocking duplicate was found for this room + category, `บอกจุดเพิ่มเติม` keeps `*` and the help `จำเป็นเมื่อพบงานที่ตรงกัน` after the spot is typed (never `ไม่บังคับ`), until the room or category changes.
 
 > **CR-025 (approved 2026-10-27):** the inline card moves from S03 step สถานที่ to step **ปัญหาที่พบ** (step 2), under the symptoms, and shows once a category is picked (room is already known). When a case `blocksReport`, the card contains the spot field `บอกจุดเพิ่มเติม * จำเป็นเมื่อพบงานที่ตรงกัน` (same value as S03 step 1 — editing either updates both; ≤ 100); `ถัดไป` shows `กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ` under it and focuses it. Card copy, actions and the submit-time dialog are unchanged (CR-020 / CR-021).
 

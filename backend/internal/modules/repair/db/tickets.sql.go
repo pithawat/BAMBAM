@@ -37,8 +37,9 @@ SET expected_done_on = $1, holder_id = $2,
     contractor_rating = CASE WHEN contractor_id IS NOT DISTINCT FROM $4::uuid THEN contractor_rating END,
     contractor_rating_comment = CASE WHEN contractor_id IS NOT DISTINCT FROM $4::uuid THEN contractor_rating_comment END,
     contractor_id = $4::uuid,
-    assessed_at = COALESCE(assessed_at, $5), updated_at = $5
-WHERE id = $6
+    assignee_id = $5::uuid,
+    assessed_at = COALESCE(assessed_at, $6), updated_at = $6
+WHERE id = $7
 `
 
 type AssessTicketParams struct {
@@ -46,11 +47,12 @@ type AssessTicketParams struct {
 	TechnicianID   *uuid.UUID
 	WorkBy         *string
 	ContractorID   *uuid.UUID
+	AssigneeID     *uuid.UUID
 	Now            time.Time
 	ID             uuid.UUID
 }
 
-// CR-006: the assessment = expected finish date + who does the work. Changing the contractor drops
+// CR-006: the assessment = expected finish date + who does the work. CR-034: + the responsible in-house technician. Changing the contractor drops
 // the old contractor's rating (it belonged to the previous one).
 func (q *Queries) AssessTicket(ctx context.Context, arg AssessTicketParams) error {
 	_, err := q.db.Exec(ctx, assessTicket,
@@ -58,6 +60,7 @@ func (q *Queries) AssessTicket(ctx context.Context, arg AssessTicketParams) erro
 		arg.TechnicianID,
 		arg.WorkBy,
 		arg.ContractorID,
+		arg.AssigneeID,
 		arg.Now,
 		arg.ID,
 	)
@@ -300,6 +303,7 @@ SELECT
     t.rating, t.rating_comment, t.send_back_count,
     t.expected_done_on, t.assessed_at, t.work_by,
     t.contractor_id, ct.name AS contractor_name, t.contractor_rating, t.contractor_rating_comment,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1) AS viewer_subscribed,
     (SELECT count(*) FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id) AS subscriber_count
@@ -312,6 +316,7 @@ JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.people rb ON rb.id = t.resolved_by_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
 WHERE t.id = $2
 `
 
@@ -361,6 +366,9 @@ type GetTicketRow struct {
 	ContractorName          *string
 	ContractorRating        *int16
 	ContractorRatingComment *string
+	AssigneeID              *uuid.UUID
+	AssigneeName            *string
+	AssigneeRoleName        *string
 	AutoCloseAt             *time.Time
 	ResolvedAt              *time.Time
 	ClosedAt                *time.Time
@@ -414,6 +422,9 @@ func (q *Queries) GetTicket(ctx context.Context, arg GetTicketParams) (GetTicket
 		&i.ContractorName,
 		&i.ContractorRating,
 		&i.ContractorRatingComment,
+		&i.AssigneeID,
+		&i.AssigneeName,
+		&i.AssigneeRoleName,
 		&i.AutoCloseAt,
 		&i.ResolvedAt,
 		&i.ClosedAt,
@@ -613,6 +624,22 @@ func (q *Queries) InsertTicketSymptoms(ctx context.Context, arg InsertTicketSymp
 	return err
 }
 
+const isTechnician = `-- name: IsTechnician :one
+SELECT EXISTS (
+    SELECT 1 FROM repair.staff st
+    WHERE st.id = $1 AND (st.role_key = 'super_admin' OR EXISTS (
+        SELECT 1 FROM platform.role_permissions rp JOIN platform.roles r ON r.id = rp.role_id
+        WHERE r.key = st.role_key AND rp.permission = 'repair.ticket.work')))::boolean
+`
+
+// #9 (CR-034): the picked assignee still has `repair.ticket.work` (same rule as ListTechnicians).
+func (q *Queries) IsTechnician(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isTechnician, id)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const listDuplicateTickets = `-- name: ListDuplicateTickets :many
 SELECT t.id, t.reporter_id, t.status,
        (CASE WHEN t.room_id IS NULL THEN $1::text = ''
@@ -695,12 +722,14 @@ SELECT
     t.location_detail,
     (t.reporter_id = $1)::boolean AS is_reporter,
     t.rating, t.send_back_count, t.expected_done_on,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.updated_at
 FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
 JOIN platform.buildings b ON b.id = t.building_id
 JOIN platform.floors f ON f.id = t.floor_id
 LEFT JOIN platform.rooms rm ON rm.id = t.room_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
 WHERE (($2::text IN ('all', 'reported') AND t.reporter_id = $1)
      OR ($2::text IN ('all', 'following') AND EXISTS (
             SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1)))
@@ -738,29 +767,32 @@ type ListMyTicketsParams struct {
 }
 
 type ListMyTicketsRow struct {
-	ID             uuid.UUID
-	TicketNo       string
-	Status         string
-	ClosedReason   *string
-	CategoryID     *uuid.UUID
-	CategoryName   *string
-	CategoryIcon   *string
-	CategoryOther  *string
-	Title          string
-	BuildingID     uuid.UUID
-	BuildingName   string
-	FloorID        uuid.UUID
-	FloorName      string
-	RoomID         *uuid.UUID
-	RoomName       *string
-	LocationDetail *string
-	IsReporter     bool
-	Rating         *int16
-	SendBackCount  int32
-	ExpectedDoneOn pgtype.Date
-	AutoCloseAt    *time.Time
-	ResolvedAt     *time.Time
-	UpdatedAt      time.Time
+	ID               uuid.UUID
+	TicketNo         string
+	Status           string
+	ClosedReason     *string
+	CategoryID       *uuid.UUID
+	CategoryName     *string
+	CategoryIcon     *string
+	CategoryOther    *string
+	Title            string
+	BuildingID       uuid.UUID
+	BuildingName     string
+	FloorID          uuid.UUID
+	FloorName        string
+	RoomID           *uuid.UUID
+	RoomName         *string
+	LocationDetail   *string
+	IsReporter       bool
+	Rating           *int16
+	SendBackCount    int32
+	ExpectedDoneOn   pgtype.Date
+	AssigneeID       *uuid.UUID
+	AssigneeName     *string
+	AssigneeRoleName *string
+	AutoCloseAt      *time.Time
+	ResolvedAt       *time.Time
+	UpdatedAt        time.Time
 }
 
 // #35 (S06, CR-019): one page of the viewer's own tickets with only the table's columns — no people, contractor,
@@ -805,6 +837,9 @@ func (q *Queries) ListMyTickets(ctx context.Context, arg ListMyTicketsParams) ([
 			&i.Rating,
 			&i.SendBackCount,
 			&i.ExpectedDoneOn,
+			&i.AssigneeID,
+			&i.AssigneeName,
+			&i.AssigneeRoleName,
 			&i.AutoCloseAt,
 			&i.ResolvedAt,
 			&i.UpdatedAt,
@@ -912,6 +947,42 @@ func (q *Queries) ListSymptomsForTickets(ctx context.Context, ticketIds []uuid.U
 	return items, nil
 }
 
+const listTechnicians = `-- name: ListTechnicians :many
+SELECT st.id, st.name, st.role_name
+FROM repair.staff st
+WHERE st.role_key = 'super_admin' OR EXISTS (
+    SELECT 1 FROM platform.role_permissions rp JOIN platform.roles r ON r.id = rp.role_id
+    WHERE r.key = st.role_key AND rp.permission = 'repair.ticket.work')
+ORDER BY st.name COLLATE "th-x-icu", st.id
+`
+
+type ListTechniciansRow struct {
+	ID       uuid.UUID
+	Name     string
+	RoleName string
+}
+
+// #36 (CR-034): everyone whose role has `repair.ticket.work`; super_admin has every key in code (BR-F25-1).
+func (q *Queries) ListTechnicians(ctx context.Context) ([]ListTechniciansRow, error) {
+	rows, err := q.db.Query(ctx, listTechnicians)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTechniciansRow
+	for rows.Next() {
+		var i ListTechniciansRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.RoleName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTicketEvents = `-- name: ListTicketEvents :many
 SELECT e.id, e.type, e.actor_id, ap.name AS actor_name, ap.department AS actor_department,
        e.note, e.data, e.created_at
@@ -974,6 +1045,7 @@ SELECT
     t.rating, t.send_back_count,
     t.expected_done_on, t.assessed_at, t.work_by,
     t.contractor_id, ct.name AS contractor_name,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1) AS viewer_subscribed
 FROM repair.tickets t
@@ -984,6 +1056,7 @@ LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
 WHERE ($2::boolean OR (
         ($3::text IN ('all', 'reported') AND t.reporter_id = $1)
      OR ($3::text IN ('all', 'following') AND EXISTS (
@@ -1067,6 +1140,9 @@ type ListTicketsRow struct {
 	WorkBy             *string
 	ContractorID       *uuid.UUID
 	ContractorName     *string
+	AssigneeID         *uuid.UUID
+	AssigneeName       *string
+	AssigneeRoleName   *string
 	AutoCloseAt        *time.Time
 	ResolvedAt         *time.Time
 	ClosedAt           *time.Time
@@ -1135,6 +1211,9 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Lis
 			&i.WorkBy,
 			&i.ContractorID,
 			&i.ContractorName,
+			&i.AssigneeID,
+			&i.AssigneeName,
+			&i.AssigneeRoleName,
 			&i.AutoCloseAt,
 			&i.ResolvedAt,
 			&i.ClosedAt,
@@ -1164,7 +1243,7 @@ func (q *Queries) LockDuplicateKey(ctx context.Context, key string) error {
 }
 
 const lockTicket = `-- name: LockTicket :one
-SELECT id, status, closed_reason, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating FROM repair.tickets
+SELECT id, status, closed_reason, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating, send_back_count FROM repair.tickets
 WHERE id = $1
 FOR UPDATE
 `
@@ -1178,6 +1257,7 @@ type LockTicketRow struct {
 	WorkBy           *string
 	ContractorID     *uuid.UUID
 	ContractorRating *int16
+	SendBackCount    int32
 }
 
 // Every status change locks the row first, so concurrent actions see each other's result.
@@ -1193,6 +1273,7 @@ func (q *Queries) LockTicket(ctx context.Context, id uuid.UUID) (LockTicketRow, 
 		&i.WorkBy,
 		&i.ContractorID,
 		&i.ContractorRating,
+		&i.SendBackCount,
 	)
 	return i, err
 }

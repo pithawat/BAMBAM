@@ -93,7 +93,7 @@ test.describe("technician", () => {
     await nextAction(page).getByRole("button", { name: "บันทึกผลอีกครั้ง" }).click();
     const sheet = page.getByRole("dialog", { name: "บันทึกผลการแก้ไข" });
     await attachVia(page, sheet.locator("input[type=file]"));
-    await sheet.getByLabel("ทำอะไรไป").fill("ขันน็อตยึดคอยล์ร้อน เสียงหายแล้ว");
+    await sheet.getByLabel("รายละเอียดการซ่อม").fill("ขันน็อตยึดคอยล์ร้อน เสียงหายแล้ว");
     await sheet.getByRole("button", { name: "ส่งผลการซ่อม" }).click();
     await expect(page.getByText("ส่งผลแล้ว รอผู้แจ้งตรวจรับ")).toBeVisible();
 

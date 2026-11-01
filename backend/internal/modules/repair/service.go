@@ -36,6 +36,8 @@ type Repository interface {
 	AutoCloseDue(ctx context.Context, now time.Time) (int, error)
 
 	ListContractorTypes(ctx context.Context) ([]Ref, error)
+	// ListTechnicians: every user whose role has `repair.ticket.work`, by name (CR-034, #36).
+	ListTechnicians(ctx context.Context) ([]Staff, error)
 	// EnsureContractorType returns the type with this name (case-insensitive), creating it when missing.
 	EnsureContractorType(ctx context.Context, name string, by uuid.UUID) (Ref, error)
 	ListContractors(ctx context.Context, f ContractorFilter) ([]Contractor, int64, error)
@@ -95,6 +97,8 @@ type TxRepository interface {
 	// InsertEvent writes a timeline event and attaches its photos.
 	InsertEvent(ctx context.Context, e NewEvent) error
 	ActiveContractorExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// IsTechnician: the user's role has `repair.ticket.work` (CR-034 assignee check).
+	IsTechnician(ctx context.Context, id uuid.UUID) (bool, error)
 	// ContractorWithName finds another contractor with this name, ignoring case, inactive included (CR-023).
 	ContractorWithName(ctx context.Context, name string, excludeID uuid.UUID) (owner NameOwner, found bool, err error)
 
@@ -415,8 +419,20 @@ func (s *Service) Tickets(ctx context.Context, v Viewer, f TicketFilter) ([]Tick
 }
 
 // MyTickets implements endpoint #35 (S06 table, CR-019): always the viewer's own tickets (BR-F06-1).
+// CR-034: tracking belongs to reporting — without `repair.ticket.report` there is no own list.
 func (s *Service) MyTickets(ctx context.Context, v Viewer, f TicketFilter) ([]MyTicket, int64, error) {
+	if !reports(v) {
+		return nil, 0, apperr.ErrForbidden
+	}
 	return s.repo.ListMyTickets(ctx, v.ID, f)
+}
+
+// Technicians implements endpoint #36 (CR-034): the S17 `ช่างผู้รับผิดชอบ` picker.
+func (s *Service) Technicians(ctx context.Context, v Viewer) ([]Staff, error) {
+	if !v.Can(PermWork) {
+		return nil, ErrNotTechnician
+	}
+	return s.repo.ListTechnicians(ctx)
 }
 
 // TicketCounts implements endpoint #7.
@@ -466,6 +482,8 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 	}
 	if in.WorkBy == WorkByInHouse {
 		in.ContractorID = nil
+	} else {
+		in.AssigneeID = nil
 	}
 	in.Reason = strings.TrimSpace(in.Reason)
 	data := map[string]string{"expectedDoneOn": in.ExpectedDoneOn.Format(time.DateOnly), "workBy": in.WorkBy}
@@ -473,6 +491,9 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 		t, err := lockOpen(ctx, tx, id, StatusInProgress)
 		if err != nil {
 			return err
+		}
+		if in.Reason == "" && rescheduleNeedsReason(t, *in.ExpectedDoneOn) {
+			return apperr.Validation(map[string]string{"reason": "REQUIRED"})
 		}
 		// CR-008: the reason is kept only when the assessment changes; the reporter sees it.
 		if t.Assessed && in.Reason != "" {
@@ -485,6 +506,15 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 			}
 			if !ok {
 				return ErrContractorInactive
+			}
+		}
+		if in.AssigneeID != nil {
+			ok, err := tx.IsTechnician(ctx, *in.AssigneeID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return ErrAssigneeInvalid
 			}
 		}
 		if err := tx.AssessTicket(ctx, id, v.ID, in, now); err != nil {

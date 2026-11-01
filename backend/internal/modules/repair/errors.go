@@ -24,6 +24,7 @@ var (
 	ErrAssessmentRequired   = apperr.New(apperr.KindBusinessRule, "ASSESSMENT_REQUIRED", "assess the ticket before resolving it")
 	ErrContractorNotFound   = apperr.New(apperr.KindNotFound, "CONTRACTOR_NOT_FOUND", "contractor not found")
 	ErrContractorInactive   = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_NOT_FOUND", "contractor unknown or inactive")
+	ErrAssigneeInvalid      = apperr.New(apperr.KindBusinessRule, "ASSIGNEE_INVALID", "assignee unknown or without repair.ticket.work") // CR-034
 	ErrContractorTypeAbsent = apperr.New(apperr.KindBusinessRule, "CONTRACTOR_TYPE_NOT_FOUND", "a contractor type does not exist")
 	// ErrContractorNameTaken comes from the unique index (no details); the service answers with contractorNameTaken.
 	ErrContractorNameTaken = apperr.New(apperr.KindConflict, "CONTRACTOR_NAME_TAKEN", "another contractor has this name")

@@ -4,13 +4,14 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Camera, Loader2, Send } from "lucide-react";
+import { AlertCircle, Camera, HardHat, Loader2, Send, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { ForbiddenState } from "@/components/shared/states";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { initials } from "@/lib/platform/roles";
 import { cn } from "@/lib/utils";
 import { MAX_PHOTOS, resolveTicket } from "../api";
 import { errorCode, errorMessage, fieldErrors, resolveFieldMessages } from "../errors";
@@ -24,7 +25,8 @@ import { useTicket } from "./use-ticket";
 
 // S10 บันทึกผลซ่อม (CR-005, CR-006, CR-008): after photos + what was done. Opened as a sheet from the
 // S07 action card; this page stays for direct links. Who does the work was set in S17; for a
-// contractor job the technician rates the contractor here (BR-F21-4, BR-F24-3).
+// contractor job the technician rates the contractor here (BR-F21-4, BR-F24-3). CR-034: a card at the top shows who
+// is responsible (the S17 technician, or the contractor shop); the note is `รายละเอียดการซ่อม`.
 
 export const RESOLVED_TOAST = "ส่งผลแล้ว รอผู้แจ้งตรวจรับ";
 
@@ -39,7 +41,7 @@ export function ResolveScreen({ id }: { id: string }) {
         <p className="mb-1 text-xs text-muted-foreground">{ticket.ticketNo}</p><h2 className="mb-3 text-lg font-semibold">{ticketTitle(ticket)}</h2>
         <ResolveFields ticket={ticket} onDone={() => { toast.success(RESOLVED_TOAST); router.replace(ticketHref(ticket.id)); }} cancel={<Button asChild variant="outline" className="h-12"><Link href={ticketHref(ticket.id)}>ยกเลิก</Link></Button>} />
       </div></div>
-      : <ForbiddenState title="บันทึกผลงานนี้ไม่ได้ตอนนี้" reason={ticket.blockedActions.resolve ? "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และใครซ่อม) ก่อนบันทึกผล" : "งานนี้ไม่ได้อยู่ระหว่างซ่อม หรือคุณไม่ใช่ช่าง"} />)}
+      : <ForbiddenState title="บันทึกผลงานนี้ไม่ได้ตอนนี้" reason={ticket.blockedActions.resolve ? "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และผู้ดำเนินการซ่อม) ก่อนบันทึกผล" : "งานนี้ไม่ได้อยู่ระหว่างซ่อม หรือคุณไม่ใช่ช่าง"} />)}
   </>;
 }
 
@@ -67,7 +69,7 @@ export function ResolveFields({ ticket, onDone, cancel, onStale }: { ticket: Tic
     const wait = photoBlocker(photos);
     if (wait) e.photoIds = wait;
     else if (!photos.length) e.photoIds = "ถ่ายหรือแนบรูปหลังซ่อมอย่างน้อย 1 รูป";
-    if (!note.trim()) e.note = "บอกสิ่งที่ทำ";
+    if (!note.trim()) e.note = "กรุณาใส่รายละเอียดการซ่อม";
     if (contractorJob && !alreadyRated && !rating) e.contractorRating = "ให้คะแนนช่างภายนอก";
     return e;
   }
@@ -103,6 +105,7 @@ export function ResolveFields({ ticket, onDone, cancel, onStale }: { ticket: Tic
   return <form onSubmit={submit} noValidate className="space-y-4">
     {submitError && <Alert variant="destructive"><AlertCircle /><AlertTitle>บันทึกไม่สำเร็จ</AlertTitle><AlertDescription>{submitError}</AlertDescription></Alert>}
     <fieldset disabled={busy} className="space-y-4 disabled:opacity-70">
+      <ResponsibleCard ticket={ticket} />
       <div className="grid gap-3 sm:grid-cols-2">
         {before && <div><p className="mb-1.5 text-[13.5px] font-medium text-muted-foreground">ก่อนซ่อม · จากผู้แจ้ง</p>
           <button type="button" onClick={() => setBeforeOpen(true)} className="block aspect-2/1 w-full overflow-hidden rounded-lg border bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="ดูรูปก่อนซ่อม"><img src={before.thumbUrl} alt="รูปก่อนซ่อม" className="size-full object-cover" /></button></div>}
@@ -122,7 +125,7 @@ export function ResolveFields({ ticket, onDone, cancel, onStale }: { ticket: Tic
           {err("photoIds")}
         </div>
       </div>
-      <div data-resolve-field="note"><label htmlFor="resolve-note" className="mb-1.5 block text-[15px] font-semibold">ทำอะไรไป <span className="text-destructive">*</span></label>
+      <div data-resolve-field="note"><label htmlFor="resolve-note" className="mb-1.5 block text-[15px] font-semibold">รายละเอียดการซ่อม <span className="text-destructive">*</span></label>
         <Textarea id="resolve-note" value={note} onChange={(e) => { setNote(e.target.value); setErrors((x) => { const n = { ...x }; delete n.note; return n; }); }} maxLength={500} rows={3} placeholder="เช่น ล้างแผงคอยล์เย็น เปลี่ยนท่อน้ำทิ้งที่แตก" aria-invalid={!!errors.note} aria-describedby="note-error" className="rounded-sm bg-card px-3.5 py-2.5 text-base" />
         {err("note")}</div>
       {contractorJob && <div data-resolve-field="contractorRating" className="space-y-2">
@@ -138,4 +141,22 @@ export function ResolveFields({ ticket, onDone, cancel, onStale }: { ticket: Tic
     <PhotoLightbox photos={ticket.photos} index={beforeOpen ? 0 : null} onIndexChange={(i) => setBeforeOpen(i !== null)} />
     <PhotoListLightbox items={photos} opened={opened} onOpened={setOpened} />
   </form>;
+}
+
+/** CR-034: the responsible technician from S17 (initials · name · role), or the contractor shop for a contractor job. */
+function ResponsibleCard({ ticket }: { ticket: TicketDetail }) {
+  const contractor = ticket.workBy === "contractor";
+  const name = contractor ? ticket.contractor?.name : ticket.assignee?.name;
+  const sub = contractor ? ["ช่างภายนอก", ...ticket.contractorTypes].join(" · ") : ticket.assignee?.roleName ?? "เลือกได้ตอนเลื่อนวันเสร็จ";
+  const Icon = contractor ? HardHat : UserRound;
+  return <section aria-label={contractor ? "ช่างภายนอก" : "ช่างผู้รับผิดชอบ"} className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3.5 py-3">
+    <span aria-hidden className={cn("grid size-11 shrink-0 place-items-center rounded-full text-sm font-semibold", name && !contractor ? "bg-secondary text-primary" : "border border-dashed bg-card text-muted-foreground")}>
+      {name && !contractor ? initials(name) : <Icon className="size-5" />}
+    </span>
+    <div className="min-w-0">
+      <span className="block text-xs leading-4.5 text-muted-foreground">{contractor ? "ช่างภายนอก" : "ช่างผู้รับผิดชอบ"}</span>
+      <strong className={cn("block truncate text-[15px] leading-6 font-semibold", !name && "font-medium text-muted-foreground")}>{name ?? "ยังไม่ระบุช่าง"}</strong>
+      <small className="block truncate text-xs leading-4.5 text-muted-foreground">{sub}</small>
+    </div>
+  </section>;
 }

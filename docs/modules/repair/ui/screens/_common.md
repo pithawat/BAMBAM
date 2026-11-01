@@ -15,6 +15,8 @@ Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
 
 ## 1. App shell per role
 
+> **CR-034 (approved 2026-11-01):** navbar layout — brand lock-up (logo + `WORKPLACE`, tighter gap) closer to the left edge with more space before the menu; `ตั้งค่าระบบ` leaves the menu and becomes a gear icon button (dropdown, label in tooltip / `aria-label`) on the right next to the account menu; the right cluster sits closer to the right edge. Layout per `changes/CR-034/navbar.html` once the owner picks it. Repair nav: `ติดตามงานซ่อม` only with `repair.ticket.report`.
+
 > **CR-010 (approved 2026-10-18) — replaces the bottom nav, the sidebar, the desktop top bar utilities and the role switcher placement below (D-064).**
 > - **Top navbar (`AppNavbar`, every role, every page):** BAMBAM logo (→ `/`) · หน้าแรก · แจ้งซ่อม · จองรถ · จองห้องประชุม (same size, icon and padding; only the current one is active) · ~~bell (→ `/notifications`)~~ (CR-024) · account (avatar; desktop adds name + role label) → menu `โปรไฟล์` (`/profile`) · `ออกจากระบบ` (S14 confirm). No repair CTA, no mascot. Desktop (≥ `lg`): floating white bar, sticky 12px from the top, max 1280px. Phone / tablet: brand row + a full-width row of the three services; scrolls away so page sticky bars (back bar, form actions) keep the top / bottom edge. (CR-010)
 > - **Service links:** แจ้งซ่อม → `/repair/my` (technician `/repair/work`), active on every `/repair/*` route · จองรถ → `/car-booking` · จองห้องประชุม → `/room-booking`; both show "เร็วๆ นี้" pages (no booking form) until their modules exist. (CR-010)

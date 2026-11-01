@@ -2,9 +2,15 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; next: 5 · of 8   **Updated:** 2026-11-01 (Stage 3D-5 wire)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; next: 5 · of 8   **Updated:** 2026-11-01 (Stage 5P accepted)
 
 ## Now
+
+- **Stage 5P accepted 2026-11-01**, tag `repair-stage-5P` (CR-034, D-137 / D-138). Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
+
+- **2026-11-01 CR-034 APPROVED (M, D-137)** — owner page polish: S03 disabled ถัดไป + hint, navbar layout (settings → right), S17 `ประเภทผู้ดำเนินการซ่อม` + required in-house technician (`assignee_id`, #36), S10 technician card + `รายละเอียดการซ่อม`, required reschedule reason (not re-accept), tracking needs `repair.ticket.report` (#35 403), extra spot stays required. Docs applied (flows, contract, screens, plan **Stage 5P** before Stage 5). Navbar mockup `changes/CR-034/navbar.html` (A inline lock-up + gear icon, B stacked + labelled button) — waiting for owner pick, then `/build-stage repair 5P`
+
+- **2026-11-01 Home + S06 design revision (owner request):** `output/home-user-redesign/index.html` uses the supplied reference's centered heading and overlapping three-service cards with existing app tokens; repair is active, car / room buttons are natively disabled. `repair-my.html` now separates the introduction and report action into two bordered cards (owner follow-up): pale sage mascot/heading panel and white action panel with the app-blue button; no gradients or extra mascot backdrop. Desktop cards align; mobile cards stack. Focused follow-up checks pass at 8 widths in both themes (16 layouts), including panel separation, content containment and report-dialog focus return. `car-booking.html` / `room-booking.html` reserve upcoming-service landing layouts only; booking rules remain undefined. All four HTML files embed fonts/assets. Browser checks pass: 56 layouts (7 widths, 320–1440px, both app themes), no mascot/text collisions or overflow; search, filters, review-first sorting, tabs, dialogs/focus, loading/empty/error/forbidden, disabled actions and offline loading pass. Further owner-requested alternatives: `repair-my-option-a.html` (white card, blue outline, navy button) and `repair-my-option-b.html` (navy card, white button). Both restore the original blue mascot surface, widen the report card and use a 54px+ action. A/B navigation, report dialog/focus and 32 layouts (8 widths, both themes) pass; minimum button text contrast 6.52:1. Next: owner reviews the proposals; production adoption follows the CR process. Production/shared code and approved source docs unchanged.
 
 - **Stage 3D-5 accepted 2026-11-01**, tag `repair-stage-3D-5` (CR-033, D-135 / D-136). Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
 
@@ -37,6 +43,9 @@
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 
 ## Open issues / questions
+
+- 5P: stale test servers from an earlier session still hold :3100 / :8090 (old code) and could not be stopped from this session — 5P e2e / Atlas ran on :3200 / :8190 (`E2E_PORT` / `E2E_API_URL`, dist `.next-e2e2`); stop the old ones before the next `test:e2e`. Picker `ช่างผู้รับผิดชอบ` lists Superadmin users too (they hold every key, BR-F25-1) — confirm. A view-all role without `report` now starts the repair service at งานทั้งหมด (`repairHome`, shared lib)
+- 5P: S07 shows `ช่างผู้รับผิดชอบ` to staff only for in-house jobs; old in-house tickets without an assignee show `ยังไม่ระบุช่าง` (the S17 picker fills it at the next reschedule)
 
 - CR-033 / 3D-5 owner checks: Riverside blocks vs OSM (D-136) — OSM shows one 99 × 40 m building where CPAC Warehouse 2 / 3 are (our Warehouse 3 80 × 40 frame also runs over an OSM road), Riverside 1 / 2 as one ~36 × 34 m block south of our Riverside 1–3 / อเนกประสงค์ frames, no CCTC / โรงเรือน; office plan details by Claude: shop heights from their "n-SC-F" labels, the unnamed building by the steel tower drawn 2 storeys, the transmission line and the plan's "new building" complex (where TrialMix stands) not drawn; Pracha Rat Sai / Phibun Songkhram curves on the Riverside side come from OSM, not a plan
 
@@ -94,6 +103,8 @@
 - Mock photo restore: drafts drop photos with `blob:` URLs (mock uploads), so in mock mode a restored draft needs photos again
 
 ## Stage log
+
+- 2026-11-01: **Stage 5P accepted**, tag `repair-stage-5P` (CR-034, D-137 / D-138) — disabled ถัดไป + hint, sticky spot `*`, navbar gear + stacked logo, `assignee` + #36 + required reschedule reason, S10 card, tracking needs `report`; Go lint 0 / tests incl. Pg pass, e2e 229 pass, Atlas 13 / 13
 
 - 2026-11-01: **Stage 3D-5 accepted**, tag `repair-stage-3D-5` (CR-033) — site ground from site plan p.4 / OSM, อาคาร 4 turned, in-map side button; budget 53 / 47 calls; e2e F23 / F31 + Atlas 13 / 13 pass
 

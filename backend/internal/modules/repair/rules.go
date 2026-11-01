@@ -255,6 +255,9 @@ func validateAssess(in AssessInput, today time.Time) map[string]string {
 	case "":
 		fields["workBy"] = "REQUIRED"
 	case WorkByInHouse:
+		if in.AssigneeID == nil {
+			fields["assigneeId"] = "REQUIRED" // CR-034
+		}
 	case WorkByContractor:
 		if in.ContractorID == nil {
 			fields["contractorId"] = "REQUIRED"
@@ -266,6 +269,12 @@ func validateAssess(in AssessInput, today time.Time) map[string]string {
 		fields["reason"] = "TOO_LONG"
 	}
 	return fields
+}
+
+// rescheduleNeedsReason: CR-034 — moving the expected date of an assessed ticket needs a reason the
+// reporter sees; the re-accept after a send back (reworking) does not.
+func rescheduleNeedsReason(t LockedTicket, newDate time.Time) bool {
+	return t.Assessed && t.SendBackCount == 0 && t.ExpectedDoneOn != nil && !t.ExpectedDoneOn.Equal(newDate)
 }
 
 // validateResolve checks BR-F21-4 / BR-F24-3 for endpoint #10. needRating = the ticket is a

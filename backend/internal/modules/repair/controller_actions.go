@@ -55,7 +55,8 @@ func (ctl *Controller) Assess(c *gin.Context) {
 		return
 	}
 	fields := map[string]string{}
-	in := AssessInput{WorkBy: req.WorkBy, ContractorID: parseOptionalID(req.ContractorID, "contractorId", fields), Reason: req.Reason}
+	in := AssessInput{WorkBy: req.WorkBy, ContractorID: parseOptionalID(req.ContractorID, "contractorId", fields),
+		AssigneeID: parseOptionalID(req.AssigneeID, "assigneeId", fields), Reason: req.Reason}
 	if s := strings.TrimSpace(req.ExpectedDoneOn); s != "" {
 		if d, err := time.Parse(time.DateOnly, s); err != nil {
 			fields["expectedDoneOn"] = "INVALID"
@@ -188,6 +189,20 @@ func (ctl *Controller) ContractorTypes(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, toRefDTOs(list))
+}
+
+// Technicians handles #36 GET /repair/technicians (CR-034).
+func (ctl *Controller) Technicians(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	list, err := ctl.svc.Technicians(c.Request.Context(), v)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	httpx.OK(c, toStaffDTOs(list))
 }
 
 // CreateContractorType handles #14 POST /repair/contractor-types (existing name → that type).

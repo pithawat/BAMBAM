@@ -156,6 +156,18 @@ func (r *PgRepository) DeleteUnattachedPhotos(ctx context.Context, olderThan tim
 
 // ---- tickets ----
 
+func (r *PgRepository) ListTechnicians(ctx context.Context) ([]Staff, error) {
+	rows, err := r.q.ListTechnicians(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Staff, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, Staff{ID: row.ID, Name: row.Name, RoleName: row.RoleName})
+	}
+	return out, nil
+}
+
 func (r *PgRepository) GetTicketAccess(ctx context.Context, id, viewerID uuid.UUID) (ticketAccess, error) {
 	row, err := r.q.GetTicketAccess(ctx, repairdb.GetTicketAccessParams{ID: id, ViewerID: viewerID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -190,6 +202,7 @@ func (r *PgRepository) GetTicket(ctx context.Context, id, viewerID uuid.UUID) (T
 			SendBackCount:    row.SendBackCount, Rating: row.Rating,
 			ExpectedDoneOn: dateOf(row.ExpectedDoneOn), AssessedAt: row.AssessedAt, WorkBy: row.WorkBy,
 			Contractor: ref(row.ContractorID, row.ContractorName), AutoCloseAt: row.AutoCloseAt,
+			Assignee:  staff(row.AssigneeID, row.AssigneeName, row.AssigneeRoleName),
 			CreatedAt: row.CreatedAt, ResolvedAt: row.ResolvedAt, ClosedAt: row.ClosedAt, UpdatedAt: row.UpdatedAt,
 		},
 		Details: row.Details, AssetCode: row.AssetCode, SubscriberCount: row.SubscriberCount, RatingComment: row.RatingComment,
@@ -313,6 +326,7 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 			SendBackCount:    row.SendBackCount, Rating: row.Rating,
 			ExpectedDoneOn: dateOf(row.ExpectedDoneOn), AssessedAt: row.AssessedAt, WorkBy: row.WorkBy,
 			Contractor: ref(row.ContractorID, row.ContractorName), AutoCloseAt: row.AutoCloseAt,
+			Assignee:  staff(row.AssigneeID, row.AssigneeName, row.AssigneeRoleName),
 			CreatedAt: row.CreatedAt, ResolvedAt: row.ResolvedAt, ClosedAt: row.ClosedAt, UpdatedAt: row.UpdatedAt,
 		}
 		if p, ok := thumbBy[row.ID]; ok {
@@ -354,6 +368,7 @@ func (r *PgRepository) ListMyTickets(ctx context.Context, viewerID uuid.UUID, f 
 			Building: Ref{ID: row.BuildingID, Name: row.BuildingName}, Floor: Ref{ID: row.FloorID, Name: row.FloorName},
 			Room: ref(row.RoomID, row.RoomName), LocationDetail: row.LocationDetail, IsReporter: row.IsReporter,
 			Rating: row.Rating, SendBackCount: row.SendBackCount, ExpectedDoneOn: dateOf(row.ExpectedDoneOn),
+			Assignee:    staff(row.AssigneeID, row.AssigneeName, row.AssigneeRoleName),
 			AutoCloseAt: row.AutoCloseAt, ResolvedAt: row.ResolvedAt, UpdatedAt: row.UpdatedAt,
 		})
 	}
@@ -650,6 +665,7 @@ func (r *pgTxRepository) LockTicket(ctx context.Context, id uuid.UUID) (LockedTi
 	t := LockedTicket{
 		ID: row.ID, Status: row.Status, ReporterID: row.ReporterID, ContractorID: row.ContractorID,
 		Assessed: row.ExpectedDoneOn.Valid && row.WorkBy != nil, Rated: row.ContractorRating != nil,
+		ExpectedDoneOn: dateOf(row.ExpectedDoneOn), SendBackCount: row.SendBackCount,
 	}
 	if row.ClosedReason != nil {
 		t.ClosedReason = *row.ClosedReason
@@ -663,8 +679,12 @@ func (r *pgTxRepository) LockTicket(ctx context.Context, id uuid.UUID) (LockedTi
 func (r *pgTxRepository) AssessTicket(ctx context.Context, id, technicianID uuid.UUID, in AssessInput, now time.Time) error {
 	return r.q.AssessTicket(ctx, repairdb.AssessTicketParams{
 		ID: id, TechnicianID: &technicianID, Now: now, ExpectedDoneOn: pgtype.Date{Time: *in.ExpectedDoneOn, Valid: true},
-		WorkBy: &in.WorkBy, ContractorID: in.ContractorID,
+		WorkBy: &in.WorkBy, ContractorID: in.ContractorID, AssigneeID: in.AssigneeID,
 	})
+}
+
+func (r *pgTxRepository) IsTechnician(ctx context.Context, id uuid.UUID) (bool, error) {
+	return r.q.IsTechnician(ctx, id)
 }
 
 func (r *pgTxRepository) ResolveTicket(ctx context.Context, id, technicianID uuid.UUID, in ResolveInput, now, autoCloseAt time.Time) error {
@@ -771,6 +791,20 @@ func (r *pgTxRepository) SetContractorTypes(ctx context.Context, id uuid.UUID, t
 		return err
 	}
 	return r.q.InsertContractorTypeLinks(ctx, repairdb.InsertContractorTypeLinksParams{ContractorID: id, TypeIds: typeIDs})
+}
+
+func staff(id *uuid.UUID, name, roleName *string) *Staff {
+	if id == nil {
+		return nil
+	}
+	s := &Staff{ID: *id}
+	if name != nil {
+		s.Name = *name
+	}
+	if roleName != nil {
+		s.RoleName = *roleName
+	}
+	return s
 }
 
 func person(id *uuid.UUID, name, department *string) *Person {

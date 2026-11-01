@@ -115,6 +115,9 @@ export function MyTicketsScreen() {
     </div>
   </>;
 
+  // CR-034: tracking belongs to reporting — #35 answers 403 without `repair.ticket.report`.
+  if (!reports) return <ForbiddenState title="ไม่มีสิทธิ์ดูหน้านี้" />;
+
   return <div className="space-y-4 px-4 pt-4 pb-8 lg:space-y-5 lg:px-0 lg:pt-2">
     <div className={cn("grid gap-4 lg:gap-5", (reports || lead) && "lg:grid-cols-[minmax(0,1fr)_23rem]")}>
       {/* Leads' CTA card holds two buttons, so their hero scales up to fill the taller row (owner, 2026-10-26). */}

@@ -22,6 +22,7 @@ func RegisterRoutes(rg *gin.RouterGroup, c *Controller) {
 	rg.POST("/tickets/:id/close", c.Close)
 	rg.POST("/tickets/:id/follow", c.Follow)
 	rg.POST("/tickets/:id/handover", c.Handover)
+	rg.GET("/technicians", c.Technicians) // CR-034
 	rg.GET("/contractor-types", c.ContractorTypes)
 	rg.POST("/contractor-types", c.CreateContractorType)
 	rg.GET("/contractors", c.Contractors)
