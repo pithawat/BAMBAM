@@ -8,7 +8,7 @@ import {
   AlertCircle, ArrowLeft, Bell, Building2, Camera, Check, ChevronDown, ChevronRight, CircleCheck, ClipboardCheck, DoorOpen, FileText, History, Info, Loader2, MapPin,
   RotateCcw, Send, SquareParking, Upload, Wrench,
 } from "lucide-react";
-import { Mascot } from "@/components/shared/mascot";
+import { MascotPanel } from "@/components/shared/mascot";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { can, canReport, PERM, repairHome } from "@/lib/platform/permissions";
@@ -494,7 +494,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
     </div>
   </section> : null;
 
-  // CR-019 heading (prototype v4): breadcrumb, guide mascot, eyebrow, title, ล้างแบบฟอร์ม. Leaving stays guarded
+  // CR-019 heading (prototype v4): breadcrumb, guide mascot, title, ล้างแบบฟอร์ม (CR-035: on the primary mascot panel). Leaving stays guarded
   // (useDiscardGuard catches link clicks); the footer's ยกเลิก on step 1 replaces the old phone top bar.
   const header = <header className="px-4 pt-3 lg:px-0 lg:pt-0">
     <nav aria-label="เส้นทางหน้า">
@@ -506,16 +506,11 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
         <li aria-current="page" className="text-foreground">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</li>
       </ol>
     </nav>
-    <div className="mt-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl border border-mascot-edge/30 bg-mascot-blue/15 p-4 lg:mb-5 lg:p-5">
-      <Mascot pose="guide" size={120} className="hidden shrink-0 sm:block" priority />
-      <Mascot pose="guide" size={88} className="shrink-0 sm:hidden" priority />
-      <div className="min-w-0 flex-1 basis-48">
-        <p className="text-[11px] leading-5 font-semibold tracking-[0.16em] text-primary uppercase">New request</p>
-        <h1 className="text-2xl leading-9 font-semibold lg:text-[28px] lg:leading-10">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</h1>
-        <p className="text-sm text-muted-foreground">{team ? "บันทึกปัญหาที่ทีมแก้ไขแล้ว พร้อมหลักฐานก่อนและหลังดำเนินการ งานจะปิดทันที ไม่ส่งถึงช่าง" : "กรอกทีละขั้น แล้วตรวจข้อมูลก่อนส่งให้ช่าง"} <span className="whitespace-nowrap">· ช่องที่มี <span className="text-destructive">*</span> จำเป็นต้องกรอก</span></p>
-      </div>
-      {dirty && master && <Button type="button" variant="link" className="h-9 px-0 max-sm:basis-full max-sm:justify-start" disabled={busy || following !== null} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}
-    </div>
+    <MascotPanel pose="guide" size={[84, 120]} priority className="mt-3 mb-4 lg:mb-5"
+      aside={dirty && master && <Button type="button" variant="link" className="h-9 px-0" disabled={busy || following !== null} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}>
+      <h1 className="text-2xl leading-9 font-semibold tracking-tight lg:text-[28px] lg:leading-10">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</h1>
+      <p className="mt-0.5 text-sm leading-6 text-primary-foreground/88">{team ? "บันทึกปัญหาที่ทีมแก้ไขแล้ว พร้อมหลักฐานก่อนและหลังดำเนินการ งานจะปิดทันที ไม่ส่งถึงช่าง" : "กรอกทีละขั้น แล้วตรวจข้อมูลก่อนส่งให้ช่าง"} <span className="whitespace-nowrap">· ช่องที่มี <span className="rounded-[4px] bg-card px-1 font-semibold text-destructive">*</span> จำเป็นต้องกรอก</span></p>
+    </MascotPanel>
   </header>;
   const discard = <AlertDialog open={guard.open} onOpenChange={guard.setOpen}><AlertDialogContent className="top-auto bottom-0 w-full max-w-none translate-y-0 rounded-b-none rounded-t-xl lg:top-1/2 lg:bottom-auto lg:max-w-lg lg:-translate-y-1/2 lg:rounded-xl"><AlertDialogHeader><AlertDialogTitle>ทิ้งข้อมูลที่กรอกไว้?</AlertDialogTitle><AlertDialogDescription>ข้อมูลและรูปที่แนบในหน้านี้จะหายไป</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>กรอกต่อ</AlertDialogCancel><Button variant="destructive" onClick={() => { dropDraft(); guard.discard(); }}>ทิ้งข้อมูล</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 

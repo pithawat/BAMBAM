@@ -6,7 +6,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Mascot } from "./mascot";
+import { MascotPanel } from "./mascot";
 
 // Shared state patterns — design-system.md "Patterns" and _common.md §6 copy.
 
@@ -17,20 +17,14 @@ type EmptyStateProps = {
   className?: string;
 };
 
-/** Soft card + mascot `guide` ~120px + H3 title + one-line hint + one small button. */
+/** CR-035: compact primary panel — mascot `guide` + H3 title + one-line hint + one small button. */
 export function EmptyState({ title, hint, action, className }: EmptyStateProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center rounded-xl border bg-card px-6 py-8 text-center",
-        className,
-      )}
-    >
-      <Mascot pose="guide" size={120} surface="sage" />
-      <h3 className="mt-3 font-heading text-base font-semibold">{title}</h3>
-      {hint && <p className="mt-1 text-[13.5px] text-muted-foreground">{hint}</p>}
-      {action && <div className="mt-4">{action}</div>}
-    </div>
+    <MascotPanel as="div" pose="guide" size={[72, 96]} className={cn("py-4 sm:py-5", className)}>
+      <h3 className="font-heading text-base leading-7 font-semibold">{title}</h3>
+      {hint && <p className="text-[13.5px] text-primary-foreground/85">{hint}</p>}
+      {action && <div className="mt-3">{action}</div>}
+    </MascotPanel>
   );
 }
 
@@ -67,15 +61,16 @@ export function ErrorState({
     );
   }
   return (
-    <div role="alert" className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
-      <Mascot pose="loading" size={140} surface="warm" />
-      <h2 className="mt-4 font-heading text-lg font-semibold">{title}</h2>
-      <p className="mt-1 text-[13.5px] text-muted-foreground">{hint}</p>
-      {onRetry && (
-        <Button className="mt-5" onClick={onRetry}>
-          ลองอีกครั้ง
-        </Button>
-      )}
+    <div role="alert" className={cn("px-4 py-10 lg:px-0", className)}>
+      <MascotPanel as="div" pose="loading" size={[96, 140]} className="mx-auto max-w-2xl">
+        <h2 className="font-heading text-xl leading-8 font-semibold">{title}</h2>
+        <p className="mt-0.5 text-sm text-primary-foreground/85">{hint}</p>
+        {onRetry && (
+          <Button className="mt-4" onClick={onRetry}>
+            ลองอีกครั้ง
+          </Button>
+        )}
+      </MascotPanel>
     </div>
   );
 }
@@ -89,7 +84,7 @@ type ForbiddenStateProps = {
   className?: string;
 };
 
-/** Mascot `review` + "คุณไม่มีสิทธิ์เข้าหน้านี้" + reason + "กลับหน้าแรก". Never show partial data. */
+/** Primary panel: mascot `review` + "คุณไม่มีสิทธิ์เข้าหน้านี้" + reason + "กลับหน้าแรก". Never show partial data. */
 export function ForbiddenState({
   reason,
   title = "คุณไม่มีสิทธิ์เข้าหน้านี้",
@@ -97,13 +92,14 @@ export function ForbiddenState({
   className,
 }: ForbiddenStateProps) {
   return (
-    <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
-      <Mascot pose="review" size={140} surface="blue" />
-      <h2 className="mt-4 font-heading text-lg font-semibold">{title}</h2>
-      {reason && <p className="mt-1 text-[13.5px] text-muted-foreground">{reason}</p>}
-      <Button asChild className="mt-5">
-        <Link href={action.href}>{action.label}</Link>
-      </Button>
+    <div className={cn("px-4 py-10 lg:px-0", className)}>
+      <MascotPanel as="div" pose="review" size={[96, 140]} className="mx-auto max-w-2xl">
+        <h2 className="font-heading text-xl leading-8 font-semibold">{title}</h2>
+        {reason && <p className="mt-0.5 text-sm text-primary-foreground/85">{reason}</p>}
+        <Button asChild className="mt-4">
+          <Link href={action.href}>{action.label}</Link>
+        </Button>
+      </MascotPanel>
     </div>
   );
 }

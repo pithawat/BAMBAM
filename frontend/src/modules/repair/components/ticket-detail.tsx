@@ -136,39 +136,39 @@ function Sub({ children, inline }: { children: ReactNode; inline?: boolean }) {
   return <small className={cn("text-[13px] leading-5 font-normal text-muted-foreground", inline ? "ml-2" : "block")}>{children}</small>;
 }
 
-// ---- the reporter's review band (CR-012, CR-019): a tapped star opens S08 with that draft score; nothing submits here ----
+// ---- the reporter's review band (CR-012, CR-019; CR-035 primary mascot panel): a tapped star opens S08 with that draft score; nothing submits here ----
 
 type Actions = ReturnType<typeof useTicketActions>;
 
 function ReviewBand({ ticket, actions }: { ticket: TicketDetail; actions: Actions }) {
   const autoClose = ticket.autoCloseAt ? `${shortDate(ticket.autoCloseAt, true)} เวลา ${timeOf(ticket.autoCloseAt)} น.` : "";
-  return <section aria-labelledby="review-title" className="border-y border-attention/15 bg-attention/5 px-4 pt-4 sm:px-7 sm:pt-5 print:hidden">
+  return <section aria-labelledby="review-title" className="mascot-panel bg-primary px-4 pt-4 text-primary-foreground sm:px-7 sm:pt-5 print:hidden">
     <div className="grid gap-x-8 gap-y-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
       <div className="flex items-center gap-4">
-        <Mascot pose="review" size={96} surface="warm" className="hidden shrink-0 sm:block" />
-        <Mascot pose="review" size={72} surface="warm" className="shrink-0 sm:hidden" />
+        <Mascot pose="review" size={104} className="hidden shrink-0 sm:block" />
+        <Mascot pose="review" size={76} className="shrink-0 sm:hidden" />
         <div className="min-w-0">
           <h2 id="review-title" className="text-lg leading-7 font-semibold">ซ่อมเสร็จแล้ว งานซ่อมเป็นอย่างไรบ้าง?</h2>
-          <p className="text-[13px] leading-5 text-muted-foreground">ตรวจผลซ่อมด้านล่าง แล้วให้คะแนนความพึงพอใจ</p>
+          <p className="text-[13px] leading-5 text-primary-foreground/88">ตรวจผลซ่อมด้านล่าง แล้วให้คะแนนความพึงพอใจ</p>
         </div>
       </div>
       <div className="flex flex-col items-center">
         <div role="group" aria-label="เลือกคะแนนเพื่อเปิดแบบประเมิน" className="flex gap-2 md:gap-1">
           {[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" onClick={() => actions.confirm(n)} aria-label={`ประเมิน ${n} ดาว · ${RATING_LABELS[n]}`}
-            className="group grid size-12 place-items-center rounded-sm text-muted-foreground/60 outline-none transition-colors hover:bg-secondary hover:text-primary focus-visible:bg-secondary focus-visible:text-primary focus-visible:ring-2 focus-visible:ring-ring md:size-11">
-            <Star className="size-7 group-hover:fill-secondary group-focus-visible:fill-secondary" strokeWidth={1.5} aria-hidden />
+            className="group grid size-12 place-items-center rounded-sm text-primary-foreground/75 outline-none transition-colors hover:bg-primary-foreground/12 hover:text-primary-foreground focus-visible:bg-primary-foreground/12 focus-visible:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground md:size-11">
+            <Star className="size-7 group-hover:fill-primary-foreground group-focus-visible:fill-primary-foreground" strokeWidth={1.5} aria-hidden />
           </button>)}
         </div>
-        <button type="button" onClick={() => actions.confirm(0)} className="inline-flex min-h-11 items-center gap-0.5 rounded-sm px-2 text-[13px] text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+        <button type="button" onClick={() => actions.confirm(0)} className="inline-flex min-h-11 items-center gap-0.5 rounded-sm px-2 text-[13px] font-medium text-primary-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-foreground">
           ประเมินพร้อมความคิดเห็น<ChevronRight className="size-3.5" aria-hidden />
         </button>
       </div>
     </div>
-    <div className="mt-2 flex flex-col gap-1 border-t py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <span className="flex items-start gap-1.5 py-1.5 text-xs leading-5 text-muted-foreground"><Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+    <div className="mt-2 flex flex-col gap-1 border-t border-primary-foreground/20 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <span className="flex items-start gap-1.5 py-1.5 text-xs leading-5 text-primary-foreground/88"><Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         {autoClose ? `ประเมินภายใน ${autoClose} ก่อนระบบปิดงานอัตโนมัติ` : "ตรวจรูปหลังซ่อม แล้วประเมินหรือส่งกลับให้แก้"}</span>
       {actions.allowed.has("send_back") && <button type="button" onClick={actions.sendBack}
-        className="-ml-1 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-sm px-1 text-[13px] font-medium outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring sm:ml-0">
+        className="-ml-1 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-sm px-1 text-[13px] font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-foreground sm:ml-0">
         <RotateCcw className="size-3.5" aria-hidden />ยังไม่เรียบร้อย · ส่งกลับให้แก้</button>}
     </div>
   </section>;

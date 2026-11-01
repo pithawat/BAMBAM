@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Building2, Check, ChevronRight, Clock, FileText, Move, Wrench, type LucideIcon } from "lucide-react";
-import { Mascot } from "@/components/shared/mascot";
+import { Mascot, MascotPanel } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { can, PERM, sees3D, usesService } from "@/lib/platform/permissions";
 import { Picker } from "@/components/shared/picker";
@@ -27,7 +27,7 @@ import { hasShape } from "./scene/registry";
 // S29 หน้าแรก Admin (CR-016, layout = ui/mockups/S29-admin-dashboard-modern.html, D-082):
 // ภาพรวมวันนี้ band · 3D site view → building (desktop + WebGL, CR-027) or the floor list · แจ้งซ่อม counts · งานที่ควรติดตาม ·
 // car / room services shown as "not open yet" without numbers (CR-017: every number comes from the API).
-// `settings.assets.manage` (Admin, Superadmin; settings CR-001) toggles จัดวางอุปกรณ์; anyone else reads only (BR-F23-2). CR-019 polish: welcome mascot heading, tiles with an
+// `settings.assets.manage` (Admin, Superadmin; settings CR-001) toggles จัดวางอุปกรณ์; anyone else reads only (BR-F23-2). CR-019 polish: welcome mascot heading (CR-035: primary mascot panel), tiles with an
 // icon, card headers with a sub-line and count chip, soft card shadows.
 
 const BuildingCard = dynamic(() => import("./building-card"), {
@@ -79,27 +79,22 @@ export function AdminDashboard() {
   if (state === "forbidden") return <ForbiddenState />;
 
   return <div className="px-4 pb-8 lg:px-0">
-    <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-mascot-edge/30 bg-mascot-blue/15 p-4 sm:p-5">
-      <div className="flex min-w-60 flex-1 items-center gap-4">
-        <Mascot pose="welcome" size={104} className="hidden shrink-0 sm:block" priority />
-        <Mascot pose="welcome" size={76} className="shrink-0 sm:hidden" priority />
-        <div className="min-w-0">
-          <p className="text-[11px] leading-5 font-semibold tracking-[0.16em] text-primary uppercase">Workplace overview</p>
-          <h1 className="font-heading text-2xl leading-normal font-semibold tracking-tight">{greeting()} คุณ{firstName}</h1>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">{formatLongDate(new Date())} · ภาพรวมวันนี้</p>
-        </div>
-      </div>
-      {buildings.length > 0 && <div className="w-full sm:w-60">
-        <Picker title="อาคาร" placeholder="เลือกอาคาร" icon={Building2} value={building?.id ?? SITE[side]} onValueChange={pick}
-          options={[
-            ...(siteView ? ([1, 2] as const).map((s) => ({ value: SITE[s], label: `ภาพรวม${SITE_SIDES[s]}`, description: "อาคารบนแผนที่" })) : []),
-            ...buildings.map((b) => ({ value: b.id, label: b.name, description: !with3D || modelBuildings.includes(b) ? undefined : "ยังไม่มีโมเดล" })),
-          ]} />
-      </div>}
-      {isAdmin && show3D && <Button aria-pressed={editing} onClick={() => setEditing((e) => !e)} variant={editing ? "secondary" : "default"} className="h-13">
-        {editing ? <Check aria-hidden /> : <Move aria-hidden />}{editing ? "เสร็จสิ้น" : "จัดวางอุปกรณ์"}
-      </Button>}
-    </div>
+    <MascotPanel as="header" pose="welcome" size={[76, 108]} priority className="mt-2 mb-6"
+      aside={(buildings.length > 0 || (isAdmin && show3D)) && <div className="flex flex-wrap items-center gap-3">
+        {buildings.length > 0 && <div className="w-full text-foreground sm:w-60">
+          <Picker title="อาคาร" placeholder="เลือกอาคาร" icon={Building2} value={building?.id ?? SITE[side]} onValueChange={pick}
+            options={[
+              ...(siteView ? ([1, 2] as const).map((s) => ({ value: SITE[s], label: `ภาพรวม${SITE_SIDES[s]}`, description: "อาคารบนแผนที่" })) : []),
+              ...buildings.map((b) => ({ value: b.id, label: b.name, description: !with3D || modelBuildings.includes(b) ? undefined : "ยังไม่มีโมเดล" })),
+            ]} />
+        </div>}
+        {isAdmin && show3D && <Button aria-pressed={editing} onClick={() => setEditing((e) => !e)} variant={editing ? "secondary" : "default"} className="h-13">
+          {editing ? <Check aria-hidden /> : <Move aria-hidden />}{editing ? "เสร็จสิ้น" : "จัดวางอุปกรณ์"}
+        </Button>}
+      </div>}>
+      <h1 className="font-heading text-2xl leading-normal font-semibold tracking-tight">{greeting()} คุณ{firstName}</h1>
+      <p className="mt-0.5 text-[13px] text-primary-foreground/88">{formatLongDate(new Date())} · ภาพรวมวันนี้</p>
+    </MascotPanel>
 
     {state === "error" && <ErrorState variant="inline" title="โหลดภาพรวมไม่สำเร็จ" onRetry={load} className="mb-6" />}
 
@@ -195,8 +190,8 @@ function AttentionPanel({ overview }: { overview: Overview | null }) {
   const list = overview?.attention.slice(0, 4);
   return <Panel title="งานที่ควรติดตาม" sub="เลยกำหนด ส่งกลับ หรือเร่งด่วน" count={overview?.attention.length} labelledBy="attention-title" className="flex flex-col">
     {!list ? <div className="space-y-2 px-5 pb-5">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
-      : list.length === 0 ? <div className="flex flex-col items-center gap-2 border-t px-5 py-6 text-center">
-          <Mascot pose="review" size={72} surface="sage" />
+      : list.length === 0 ? <div className="flex items-center gap-4 border-t px-5 py-5">
+          <span aria-hidden className="grid shrink-0 place-items-end overflow-hidden rounded-xl bg-primary px-2 pt-2"><Mascot pose="review" size={64} /></span>
           <p className="text-sm text-muted-foreground">ไม่มีงานที่ต้องติดตาม</p>
         </div>
       : list.map((t) => {

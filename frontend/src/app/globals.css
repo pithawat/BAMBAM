@@ -182,20 +182,20 @@
   color: var(--c);
 }
 
-/* CR-029: local backdrops keep white ears, paws and shoes visible on every light surface.
-   The frame owns layout so responsive visibility and Home's absolute positioning still work. */
-.mascot-frame:not([data-surface="none"])::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 38% 42% 28% 32%;
-  background: var(--mascot-blue);
-  border: 1px solid color-mix(in srgb, var(--mascot-edge) 45%, transparent);
+/* CR-035: the white tiger always sits on a solid primary panel (S06 tracking treatment, replaces the CR-029
+   blob backdrops). Inside the panel focus rings turn white and shared buttons flip to the blue surface. */
+.mascot-image { filter: drop-shadow(0 3px 4px rgb(10 18 60 / 28%)); }
+.mascot-panel :is(a, button):focus-visible { outline: 3px solid var(--primary-foreground); outline-offset: 2px; }
+.mascot-panel [data-slot="button"][data-variant="default"] { background: var(--primary-foreground); color: var(--primary); }
+.mascot-panel [data-slot="button"][data-variant="default"]:hover { background: var(--secondary); }
+.mascot-panel [data-slot="button"][data-variant="outline"] {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--primary-foreground) 45%, transparent);
+  color: var(--primary-foreground);
+  box-shadow: none;
 }
-.mascot-frame[data-surface="sage"]::before { background: var(--mascot-sage); }
-.mascot-frame[data-surface="warm"]::before { background: var(--mascot-warm); }
-.mascot-frame:not([data-surface="none"]) .mascot-image { padding: 5%; }
-.mascot-image { filter: drop-shadow(0 2px 2px rgb(23 32 51 / 16%)); }
+.mascot-panel [data-slot="button"][data-variant="outline"]:hover { background: color-mix(in srgb, var(--primary-foreground) 14%, transparent); }
+.mascot-panel [data-slot="button"][data-variant="link"] { color: var(--primary-foreground); text-decoration: underline; text-underline-offset: 4px; }
 
 /* S07 print report (A4). */
 @media print {

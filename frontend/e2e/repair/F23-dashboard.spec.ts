@@ -301,7 +301,7 @@ for (const role of ["employee", "technician"]) {
 
     test(`AC5: ${role} keeps the normal Home; #27 is 403`, async ({ page }) => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: /^สวัสดี คุณ/ }).first()).toBeVisible();
+      await expect(page.getByRole("main").getByText(/สวัสดี คุณ/)).toBeVisible();
       await expect(page.getByText("ภาพรวมวันนี้")).toHaveCount(0);
       expect((await page.request.get(`${API}/admin/overview`)).status()).toBe(403);
     });

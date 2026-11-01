@@ -42,7 +42,7 @@ test.describe("employee session", () => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "บริการหลัก" }).filter({ visible: true });
     for (const service of ["แจ้งซ่อม", "จองรถ", "จองห้องประชุม"]) await expect(nav.getByRole("link", { name: service })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "สวัสดี คุณวรรณา" }).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("main").getByText(/สวัสดี คุณวรรณา/)).toBeVisible(); // CR-035 greeting line
     const account = page.getByRole("button", { name: /เมนูบัญชี วรรณา สุขประเสริฐ/ });
     await account.click();
     await expect(page.getByRole("menuitem", { name: "โปรไฟล์" })).toBeVisible();

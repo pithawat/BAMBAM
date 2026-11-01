@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { Mascot } from "@/components/shared/mascot";
+import { MascotPanel } from "@/components/shared/mascot";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { ForbiddenState } from "@/components/shared/states";
@@ -18,7 +18,7 @@ import { categoryName, ticketHref, ticketLocation, ticketTitle } from "./ticket-
 import { usePriorityReason } from "./use-priority-reason";
 import { useTicket } from "./use-ticket";
 
-// S05 รับเรื่องแล้ว — CR-008 white success card, CR-009 wording (S05-report-success.md). Team / follow variants: Stage 4.
+// S05 รับเรื่องแล้ว — CR-008 white success card, CR-009 wording (S05-report-success.md); CR-035 mascot panel on top. Team / follow variants: Stage 4.
 
 const MINI_STEPS = ["แจ้งงาน", "รับเรื่อง", "กำลังดำเนินการ", "เสร็จ", "ประเมินตรวจงาน"];
 
@@ -38,10 +38,12 @@ export function ReportSuccessScreen() {
   }, [router]);
   return <><PageHeader title="แจ้งซ่อมใหม่" variant="none" />
     {loading ? <TicketSkeleton success /> : error ? <TicketFailure error={error} onRetry={reload} success /> : ticket && (ticket.viewerRelation !== "reporter" ? <ForbiddenState reason="หน้านี้แสดงเฉพาะงานที่คุณแจ้ง" /> :
-      <section aria-live="polite" className="mx-3 my-4 max-w-150 rounded-xl border bg-card px-4 py-6 text-center shadow-raised sm:mx-auto sm:px-8">
-        <div className="flex justify-center"><Mascot pose="welcome" size={120} surface="sage" priority /></div>
-        <h1 ref={heading} tabIndex={-1} className="mt-2 text-2xl leading-9 font-semibold outline-none">{team ? "บันทึกงานทีมเรียบร้อย" : "รับเรื่องแล้ว"}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">เลขงานของคุณ</p>
+      <section aria-live="polite" className="mx-3 my-4 max-w-150 rounded-xl border bg-card px-4 pt-4 pb-6 text-center shadow-raised sm:mx-auto sm:px-8 sm:pt-6">
+        <MascotPanel as="div" pose="welcome" size={[88, 112]} priority className="-mx-1 text-left sm:-mx-3">
+          <h1 ref={heading} tabIndex={-1} className="text-2xl leading-9 font-semibold tracking-tight outline-none">{team ? "บันทึกงานทีมเรียบร้อย" : "รับเรื่องแล้ว"}</h1>
+          <p className="mt-0.5 text-sm leading-6 text-primary-foreground/88">{team ? "ปิดงานแล้ว · นับเป็นผลงานของทีม" : "ส่งเรื่องถึงทีมอาคารแล้ว"}</p>
+        </MascotPanel>
+        <p className="mt-5 text-sm text-muted-foreground">เลขงานของคุณ</p>
         <CopyTicketNumber value={ticket.ticketNo} large />
 
         <ol aria-label="ความคืบหน้า" className="mx-auto mt-4 flex max-w-120 gap-1.5 text-left">{(team ? ["แจ้งงาน", "ทีมดำเนินการเอง", "ปิดงานแล้ว"] : MINI_STEPS).map((s, i) => <li key={s} className={cn("min-w-0 flex-1 text-xs leading-5", team ? "text-success" : i === 0 ? "text-foreground" : i === 1 ? "font-semibold text-primary" : "text-muted-foreground")}>

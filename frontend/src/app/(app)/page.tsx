@@ -1,45 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, QrCode, Wrench } from "lucide-react";
+import type { CSSProperties } from "react";
+import { ArrowRight, Clock, Sparkles, Wrench } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
-import { PageHeader } from "@/components/shared/page-header";
-import { SERVICES, ServiceIcon, SoonChip, type Service } from "@/components/shared/service-icon";
-import { Button } from "@/components/ui/button";
-import { formatLongDate } from "@/lib/format";
+import { SERVICES } from "@/components/shared/service-icon";
 import { EmptyState } from "@/components/shared/states";
-import { can, canReport, PERM, repairHome, usesService, type ServiceKey } from "@/lib/platform/permissions";
-import { initials } from "@/lib/platform/roles";
-import type { Me } from "@/lib/platform/types";
+import { Button } from "@/components/ui/button";
+import { can, canReport, PERM, repairHome, usesService } from "@/lib/platform/permissions";
 import { cn } from "@/lib/utils";
 import { AdminDashboard } from "@/modules/repair/components/dashboard/admin-dashboard";
+import { HomeTickets } from "@/modules/repair/components/home-tickets";
 
 // Home: whoever has `repair.overview.view` (Admin, Superadmin; settings CR-001) gets the S29 dashboard (repair
-// Stage 3D, CR-016); every other role keeps the
-// S02 Home — Stage 0 placeholder (D-023): greeting, the option-a CTA card and the services only. Settings CR-006:
-// services and the CTA follow permissions (no report → "ไปที่งานซ่อม"; no repair key → greeting only).
-// Role widgets and "ติดตามงานซ่อม" come in repair Stage 6 (no bell, repair CR-024). Account and role
-// switcher are in the navbar (CR-010).
+// Stage 3D, CR-016); every other role gets the S02 employee Home. CR-035 (layout from
+// output/home-user-redesign/index.html): centred greeting, overlapping service cards with the repair card in the
+// middle on the primary mascot panel, then รายการของฉัน (#35) for those who can report. Settings CR-006: services
+// and the CTA follow permissions (no report → "ไปที่งานซ่อม"; no repair key → no repair card). Car / room booking
+// are not open yet, so their cards only announce them. Account and role switcher are in the navbar (CR-010).
 
-type ServiceCard = { service: Service & ServiceKey; href?: string; hint: string };
+type SoonService = "car" | "room";
 
-function serviceCards(me: Me): ServiceCard[] {
-  const all: ServiceCard[] = [
-    canReport(me)
-      ? { service: "repair", href: "/repair/new", hint: "แจ้งปัญหาในอาคาร" }
-      : { service: "repair", href: repairHome(me), hint: "ดูงานซ่อม" },
-    { service: "car", hint: "รถส่วนกลาง" },
-    { service: "room", hint: "ห้องประชุมทุกชั้น" },
-  ];
-  return all.filter((c) => usesService(me, c.service));
-}
-
-const GRID_COLS = ["", "grid-cols-1", "grid-cols-2", "grid-cols-3"];
-
-function NoServices({ className }: { className?: string }) {
-  return <EmptyState title="ยังไม่มีบริการที่ใช้ได้" hint="ติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์" className={className} />;
-}
+const SOON: Record<SoonService, { title: string; hint: string }> = {
+  car: { title: "ทุกการเดินทาง", hint: "บริการจองรถส่วนกลาง" },
+  room: { title: "พื้นที่สำหรับไอเดีย", hint: "บริการจองห้องประชุม" },
+};
 
 export default function HomePage() {
   const me = useCurrentUser();
@@ -49,153 +35,161 @@ export default function HomePage() {
 function EmployeeHome() {
   const me = useCurrentUser();
   const firstName = me.name.split(/\s+/)[0];
-  const today = formatLongDate(new Date());
-  const services = serviceCards(me);
-  const report = canReport(me);
   const repair = usesService(me, "repair");
+  const report = canReport(me);
+  const soon = (["car", "room"] as const).filter((service) => usesService(me, service));
+  const count = soon.length + (repair ? 1 : 0);
 
   return (
-    <>
-      {/* mobile */}
-      <div className="lg:hidden">
-        <header className="relative overflow-hidden rounded-b-[34px] bg-brand px-4 pt-5 pb-36 text-white">
-          <span aria-hidden className="pointer-events-none absolute -top-18 -right-28 size-68 rounded-full bg-white/15" />
-          <span aria-hidden className="pointer-events-none absolute -bottom-24 -left-20 size-50 rounded-full bg-white/10" />
-          <div className="relative flex items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full border-2 border-white/65 bg-white/20 font-heading text-[15px] font-semibold">
-              {initials(me.name)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate font-heading text-xl font-semibold">สวัสดี คุณ{firstName}</h1>
-              <p className="truncate text-[13px] text-white/90">
-                {me.department ? `${me.department} · ` : ""}
-                {today}
-              </p>
-            </div>
-          </div>
-        </header>
+    <div className="px-4 lg:px-0">
+      <section aria-labelledby="home-title" className="pt-6 pb-5 text-center lg:pt-8 lg:pb-6">
+        <p className="mb-4 flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
+          <Sparkles className="size-4 shrink-0 text-primary" aria-hidden />
+          สวัสดี คุณ{firstName} · วันนี้ให้เราช่วยอะไรดี?
+        </p>
+        <h1 id="home-title" className="text-[32px] leading-[1.4] font-semibold tracking-[-0.04em] text-balance sm:text-[40px] lg:text-[46px] lg:leading-[1.35]">
+          เรื่องในที่ทำงาน<br />
+          <span className="text-primary">จัดการง่าย ในที่เดียว</span>
+        </h1>
+        <p className="mt-3.5 text-[13px] leading-7 text-muted-foreground sm:text-sm">
+          แจ้งซ่อม จองรถ และจองห้องประชุม<br />
+          พื้นที่บริการที่พร้อมช่วยดูแลวันทำงานของคุณ
+        </p>
+      </section>
 
-        <section className="relative mx-4 -mt-13.5 rounded-[26px] bg-card p-4.5 shadow-float">
-          <Mascot pose="welcome" size={104} surface="none" className="absolute -top-25 right-3" />
-          {report ? (
-            <>
-              <h2 className="font-heading text-lg font-semibold">เจออะไรเสีย บอก BAMBAM</h2>
-              <p className="mt-0.5 mb-3.5 text-[13.5px] text-muted-foreground">ถ่ายรูป เลือกอาการ ส่งถึงช่างในหมวดนั้นทันที</p>
-              <div className="flex gap-2.5">
-                <Button asChild variant="brand" className="flex-1">
-                  <Link href="/repair/new">
-                    <Wrench aria-hidden />
-                    แจ้งซ่อม
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/repair/scan">
-                    <QrCode aria-hidden />
-                    สแกน QR
-                  </Link>
-                </Button>
-              </div>
-            </>
-          ) : repair ? (
-            <>
-              <h2 className="font-heading text-lg font-semibold">งานซ่อมของคุณ</h2>
-              <p className="mt-0.5 mb-3.5 text-[13.5px] text-muted-foreground">ดูงานที่ได้รับมอบหมายและงานที่คุณติดตาม</p>
-              <Button asChild variant="brand" className="w-full">
-                <Link href={repairHome(me)}>
-                  <Wrench aria-hidden />
-                  ไปที่งานซ่อม
-                </Link>
-              </Button>
-            </>
-          ) : (
-            <h2 className="pr-28 font-heading text-lg font-semibold">สวัสดี คุณ{firstName}</h2>
+      {count === 0 ? (
+        <EmptyState title="ยังไม่มีบริการที่ใช้ได้" hint="ติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์" className="mx-auto mb-10 max-w-xl" />
+      ) : (
+        <section
+          aria-label="บริการสำหรับคุณ"
+          className={cn(
+            "mx-auto grid gap-3 pb-5 sm:grid-cols-2 sm:gap-4 lg:items-start lg:gap-0 lg:pb-12",
+            count === 3 ? "max-w-[1030px] lg:grid-cols-3 lg:px-5.5" : count === 2 ? "max-w-3xl lg:px-5.5" : "max-w-md sm:grid-cols-1",
           )}
+        >
+          {repair && <RepairCard report={report} href={report ? "/repair/new" : repairHome(me)} count={count} />}
+          {soon.map((service) => <SoonCard key={service} service={service} />)}
         </section>
+      )}
 
-        <section className="px-4 pt-5.5">
-          <h2 className="mb-3 font-heading text-lg font-semibold">บริการ</h2>
-          {services.length === 0 && <NoServices />}
-          <div className={cn("grid gap-2.5", GRID_COLS[services.length])}>
-            {services.map(({ service, href }) => {
-              const body = (
-                <>
-                  <ServiceIcon service={service} disabled={!href} />
-                  <b className="font-heading text-sm leading-snug font-semibold">{SERVICES[service].label}</b>
-                  {!href && <SoonChip />}
-                </>
-              );
-              const cls = "flex flex-col items-center gap-2 rounded-[22px] bg-card px-2 pt-4 pb-3 text-center shadow-card";
-              return href ? (
-                <Link key={service} href={href} className={cls}>
-                  {body}
-                </Link>
-              ) : (
-                <div key={service} className={cls} aria-disabled>
-                  {body}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+      {soon.length > 0 && (
+        <p className="mb-8 flex items-start gap-2 text-xs leading-5 text-muted-foreground sm:justify-center lg:mb-10">
+          <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {soon.map((service) => SERVICES[service].label).join("และ")}กำลังเตรียมเปิดให้บริการ
+        </p>
+      )}
 
-      {/* desktop */}
-      <div className="hidden lg:block">
-        <PageHeader title="หน้าแรก" variant="none" />
-        <section className="relative h-49 overflow-hidden rounded-2xl bg-brand px-9 py-7.5 text-white">
-          <span aria-hidden className="pointer-events-none absolute -top-52 right-30 size-95 rounded-full bg-white/15" />
-          <span aria-hidden className="pointer-events-none absolute -right-15 -bottom-35 size-60 rounded-full bg-white/10" />
-          <h2 className="relative font-heading text-[28px] leading-[38px] font-bold">สวัสดี คุณ{firstName}</h2>
-          <p className="relative mt-1 mb-4.5 text-[15px] text-white/95">{today}</p>
-          {repair && (
-            <div className="relative flex gap-2.5">
-              <Button asChild variant="white">
-                {report ? (
-                  <Link href="/repair/new">
-                    <Wrench aria-hidden />
-                    แจ้งซ่อม
-                  </Link>
-                ) : (
-                  <Link href={repairHome(me)}>
-                    <Wrench aria-hidden />
-                    ไปที่งานซ่อม
-                  </Link>
-                )}
-              </Button>
-              <Button asChild variant="glass">
-                <Link href="/repair/my">ติดตามงานซ่อม</Link>
-              </Button>
-            </div>
-          )}
-          <Mascot pose="welcome" size={184} surface="none" className="absolute right-17 bottom-2" />
-        </section>
+      {report && <HomeTickets />}
+    </div>
+  );
+}
 
-        {services.length === 0 && <NoServices className="my-5" />}
-        <div className={cn("grid gap-4.5", services.length > 0 && "my-5", GRID_COLS[services.length])}>
-          {services.map(({ service, href, hint }) => {
-            const body = (
-              <>
-                <ServiceIcon service={service} disabled={!href} />
-                <span className="min-w-0 flex-1">
-                  <b className="block font-heading text-base font-semibold">{SERVICES[service].label}</b>
-                  <span className="text-[13px] text-muted-foreground">{hint}</span>
-                </span>
-                {href ? <ChevronRight className="size-5 text-muted-foreground" aria-hidden /> : <SoonChip />}
-              </>
-            );
-            const cls = "flex items-center gap-3.5 rounded-xl bg-card px-4.5 py-4 shadow-card";
-            return href ? (
-              <Link key={service} href={href} className={cls}>
-                {body}
-              </Link>
-            ) : (
-              <div key={service} className={cls} aria-disabled>
-                {body}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </>
+const CARD_TITLE = "mt-2.5 text-[25px] leading-[1.35] font-semibold tracking-[-0.035em] sm:text-[27px] lg:mt-3.5";
+
+/** The live service, on the primary mascot panel (CR-035). Raised over its neighbours on desktop. */
+function RepairCard({ report, href, count }: { report: boolean; href: string; count: number }) {
+  return (
+    <article
+      aria-labelledby="repair-title"
+      className={cn(
+        "relative isolate flex h-63 flex-col overflow-hidden rounded-2xl bg-primary p-5 text-primary-foreground",
+        "sm:h-70 sm:px-7.5 sm:py-6.5",
+        "lg:z-3 lg:h-[345px] lg:p-6 lg:shadow-[0_16px_30px_-22px_color-mix(in_srgb,var(--primary)_65%,transparent)]",
+        count === 3 && "sm:col-span-2 lg:col-span-1",
+        count > 1 && "lg:-mx-4",
+      )}
+    >
+      <p className="flex items-center gap-2 text-xs text-primary-foreground/85">
+        <Wrench className="size-4" aria-hidden />
+        {SERVICES.repair.label}
+      </p>
+      {report ? (
+        <>
+          <h2 id="repair-title" className={CARD_TITLE}>เจออะไรเสีย<br />บอก BAMBAM</h2>
+          <p className="mt-1 max-w-40 text-[13px] leading-6 text-primary-foreground/88">แจ้งปัญหา<br />ให้ทีมอาคารช่วยดูแล</p>
+        </>
+      ) : (
+        <>
+          <h2 id="repair-title" className={CARD_TITLE}>งานซ่อมของคุณ</h2>
+          <p className="mt-1 max-w-44 text-[13px] leading-6 text-primary-foreground/88">ดูงานที่ได้รับมอบหมายและงานที่คุณติดตาม</p>
+        </>
+      )}
+      <Mascot pose="tracking" size={172} priority className="absolute right-3 bottom-2.5 -z-1 sm:hidden" />
+      <Mascot pose="tracking" size={225} priority className="absolute right-11 bottom-5 -z-1 hidden sm:inline-block lg:hidden" />
+      <Mascot pose="tracking" size={210} priority className="absolute right-1.5 bottom-2.5 -z-1 hidden lg:inline-block" />
+      <Button asChild variant="white" className="mt-auto h-11 self-start px-4 text-[13px]">
+        <Link href={href}>
+          {report ? "แจ้งซ่อมใหม่" : "ไปที่งานซ่อม"}
+          <ArrowRight aria-hidden />
+        </Link>
+      </Button>
+    </article>
+  );
+}
+
+/** A service that is not open yet: tinted card, line drawing, disabled action. Tilted under the repair card on desktop. */
+function SoonCard({ service }: { service: SoonService }) {
+  const { label, color } = SERVICES[service];
+  return (
+    <article
+      aria-labelledby={`${service}-title`}
+      style={{ "--c": color, background: "color-mix(in srgb, var(--c) 10%, var(--card))" } as CSSProperties}
+      className={cn(
+        "relative flex h-46 flex-col overflow-hidden rounded-2xl p-5 sm:h-57.5 sm:px-6 sm:py-5.5",
+        "lg:z-1 lg:h-[315px] lg:translate-y-6 lg:p-6",
+        service === "car" ? "lg:-order-1 lg:origin-[80%_85%] lg:-rotate-5" : "lg:origin-[20%_85%] lg:rotate-5",
+      )}
+    >
+      <p className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span>{label}</span>
+        <span className="inline-flex items-center gap-1.5"><span aria-hidden className="size-1.25 rounded-full bg-current" />เร็วๆ นี้</span>
+      </p>
+      <h2 id={`${service}-title`} className={cn(CARD_TITLE, "mt-2")}>{SOON[service].title}</h2>
+      <p className="mt-0.5 max-w-46 text-[13px] text-muted-foreground">{SOON[service].hint}</p>
+      <ServiceArt service={service} />
+      <Button disabled aria-label={`${label} ยังไม่เปิดให้บริการ`} className="relative mt-auto h-11 self-start bg-card/75 px-4 text-[13px] text-muted-foreground disabled:opacity-100">
+        ยังไม่เปิดให้บริการ
+      </Button>
+    </article>
+  );
+}
+
+/** Line drawing in the service colour (from the Home proposal). */
+function ServiceArt({ service }: { service: SoonService }) {
+  const paper = { fill: "var(--card)" };
+  const tint = { fill: "currentColor", stroke: "none", opacity: 0.13 };
+  return (
+    <svg
+      viewBox="0 0 185 145"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ color: "var(--c)" }}
+      className="absolute right-3 bottom-10 h-25 w-29 sm:right-5 sm:bottom-14 sm:h-22.5 sm:w-26 lg:right-6 lg:bottom-16 lg:h-35 lg:w-44.5"
+    >
+      {service === "car" ? (
+        <>
+          <path style={tint} d="M20 98h143v20H20z" />
+          <path style={paper} d="m35 60 17-30h69l24 30 15 10v34H22V75Z" />
+          <path style={tint} d="m45 57 12-20h58l17 20Z" />
+          <path d="M88 37v20M30 65h115M22 87h138m-126-14h21m72 0h21M73 96h36" />
+          <rect style={paper} x="32" y="99" width="19" height="19" rx="6" />
+          <rect style={paper} x="129" y="99" width="19" height="19" rx="6" />
+          <path opacity={0.45} d="M13 128h159M10 48h19m-16 9h10m123-27 8-6m3 17h11" />
+        </>
+      ) : (
+        <>
+          <path style={paper} d="M24 121V22h134v99Z" />
+          <path style={tint} d="M35 33h68v46H35z" />
+          <path d="M69 33v46M35 57h68M116 33h29v46h-29Z" />
+          <path style={paper} d="M49 87h82a5 5 0 0 1 0 10H49a5 5 0 0 1 0-10Z" />
+          <path d="M59 97v24m63-24v24M37 108h18m-18-10v23m94-13h15m0-10v23M16 122h151" />
+          <path opacity={0.45} d="M43 14h36M163 43h9m-4-5v10" />
+        </>
+      )}
+    </svg>
   );
 }

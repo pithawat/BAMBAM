@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 // White BAM tiger (CR-029): PNG masters and matching WebP exports in public/brand.
@@ -21,19 +22,16 @@ type MascotProps = {
   size?: number;
   className?: string;
   priority?: boolean;
-  /** Flat contrasting backdrop; use none when the surrounding hero already provides contrast. */
-  surface?: "blue" | "sage" | "warm" | "none";
 };
 
-/** Decorative BAM mascot (`aria-hidden`). */
-export function Mascot({ pose = "welcome", size = 120, className, priority, surface = "blue" }: MascotProps) {
+/** Decorative BAM mascot (`aria-hidden`). CR-035: always shown on a solid primary surface (`MascotPanel`). */
+export function Mascot({ pose = "welcome", size = 120, className, priority }: MascotProps) {
   const s = SOURCES[pose];
   const width = Math.round((s.width / s.height) * size);
   return (
     <span
       aria-hidden="true"
       data-mascot={pose}
-      data-surface={surface}
       className={cn("mascot-frame pointer-events-none relative inline-block shrink-0 select-none align-middle", className)}
       style={{ width, height: size }}
     >
@@ -47,5 +45,38 @@ export function Mascot({ pose = "welcome", size = 120, className, priority, surf
         className="mascot-image relative size-full object-contain"
       />
     </span>
+  );
+}
+
+type MascotPanelProps = Omit<ComponentProps<"section">, "children" | "ref"> & {
+  /** Tag of the panel: `header` for page headings, `section` / `div` elsewhere. */
+  as?: "header" | "section" | "div";
+  pose?: MascotPose;
+  /** Mascot height in px: [phone, sm and up]. */
+  size?: [number, number];
+  /** Replaces the pose image (settings role mascots). */
+  art?: ReactNode;
+  priority?: boolean;
+  /** Content after the heading block (pickers, actions); wraps under it on narrow screens. */
+  aside?: ReactNode;
+  children: ReactNode;
+};
+
+/**
+ * CR-035 — the S06 tracking treatment used wherever the mascot appears: the white tiger on a solid primary panel,
+ * beside white heading copy. Buttons inside flip to the panel (globals.css `.mascot-panel`).
+ */
+export function MascotPanel({ as: Tag = "section", pose = "welcome", size = [80, 120], art, priority, aside, className, children, ...props }: MascotPanelProps) {
+  return (
+    <Tag {...props} className={cn("mascot-panel flex flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl bg-primary px-5 py-5 text-primary-foreground sm:px-7 sm:py-6", className)}>
+      <div className="flex min-w-60 flex-1 basis-80 items-center gap-4 sm:gap-6">
+        {art ?? <>
+          <Mascot pose={pose} size={size[0]} priority={priority} className="sm:hidden" />
+          <Mascot pose={pose} size={size[1]} priority={priority} className="hidden sm:inline-block" />
+        </>}
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+      {aside && <div className="w-full sm:w-auto">{aside}</div>}
+    </Tag>
   );
 }

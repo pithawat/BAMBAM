@@ -254,7 +254,7 @@
   .bl-spin { animation: none; }
 }
 
-/* CR-029: cool workplace palette and a full-height sage backdrop for the white tiger.
+/* CR-029: cool workplace palette and a full-height backdrop for the white tiger (CR-035: primary panel).
    Keep the established composition and measured viewport fitting. */
 .bl-page { background: var(--background); color: var(--foreground); }
 .bl-title { color: var(--foreground); }
@@ -282,8 +282,9 @@
 .bl-roomArt > svg { stroke: var(--success); }
 .bl-slots i { background: var(--mascot-sage); }
 .bl-slots i:nth-child(2) { background: var(--success); }
-.bl-halo { inset: 0; border-radius: 40% 44% 30% 32%; background: var(--mascot-sage); border: 1px solid var(--mascot-edge); }
+/* Repair CR-035: the tiger stands on a solid primary panel, the S06 tracking treatment used app-wide. */
+.bl-halo { inset: 0; border-radius: 28px; background: var(--primary); border: 0; transform: rotate(-4deg); box-shadow: 0 18px 34px -22px color-mix(in srgb, var(--primary) 70%, transparent); }
 .bl-mascot { padding: 8px; filter: drop-shadow(0 4px 3px rgb(23 32 51 / 18%)); }
 .bl-speech { color: var(--secondary-foreground); }
-@media (max-width: 1050px) { .bl-halo { inset: 0; } }
+@media (max-width: 1050px) { .bl-halo { inset: 0; border-radius: 22px; transform: none; } }
 

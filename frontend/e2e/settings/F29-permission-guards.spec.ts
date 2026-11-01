@@ -34,12 +34,11 @@ test.describe("AC1: technician (seed defaults)", () => {
     }
     const home = page.getByRole("main");
     const shown = (name: string) => home.getByRole("link", { name, exact: true }).filter({ visible: true });
-    await expect(home.getByRole("heading", { name: isMobile ? "งานซ่อมของคุณ" : /สวัสดี คุณ/ }).filter({ visible: true })).toBeVisible();
+    // CR-035: the repair card without the report key — "งานซ่อมของคุณ" → the work list
+    await expect(home.getByRole("heading", { name: "งานซ่อมของคุณ" })).toBeVisible();
     await expect(home.locator('a[href="/repair/new"]').filter({ visible: true })).toHaveCount(0);
     await expect(shown("สแกน QR")).toHaveCount(0);
     await expect(shown("ไปที่งานซ่อม")).toHaveAttribute("href", "/repair/work");
-    // services: แจ้งซ่อม (→ the work list) only
-    await expect(home.getByRole("link", { name: /^แจ้งซ่อม/ }).filter({ visible: true })).toHaveAttribute("href", "/repair/work");
     await expect(home.getByText("จองรถ", { exact: true }).filter({ visible: true })).toHaveCount(0);
     await expect(home.getByText("จองห้องประชุม", { exact: true }).filter({ visible: true })).toHaveCount(0);
 
@@ -67,8 +66,8 @@ test.describe("Superadmin writes", () => {
       const user = await browserAs(browser, baseURL, role.key);
       const userPage = await user.newPage();
       await userPage.goto("/");
-      const hero = userPage.locator("div.hidden.lg\\:block");
-      await expect(hero.getByRole("link", { name: "แจ้งซ่อม", exact: true })).toBeVisible();
+      const hero = userPage.getByRole("main");
+      await expect(hero.getByRole("link", { name: "แจ้งซ่อมใหม่", exact: true })).toBeVisible();
 
       await openMatrix(page);
       await cell(page, "แจ้งซ่อม", role.name).click();
@@ -77,17 +76,17 @@ test.describe("Superadmin writes", () => {
 
       // พนักงานทั่วไป has no other repair key → greeting only, no repair service
       await userPage.reload();
-      await expect(hero.getByRole("heading", { name: /สวัสดี คุณ/ })).toBeVisible();
-      await expect(hero.getByRole("link", { name: "แจ้งซ่อม", exact: true })).toHaveCount(0);
+      await expect(hero.getByText(/สวัสดี คุณ/)).toBeVisible();
+      await expect(hero.getByRole("link", { name: "แจ้งซ่อมใหม่", exact: true })).toHaveCount(0);
       await expect(hero.getByRole("link", { name: "ไปที่งานซ่อม" })).toHaveCount(0);
-      await expect(hero.getByText("แจ้งปัญหาในอาคาร")).toHaveCount(0);
+      await expect(hero.getByRole("heading", { name: /บอก BAMBAM/ })).toHaveCount(0);
       expect((await userPage.request.post("/api/v1/repair/tickets", { data: {} })).status()).toBe(403);
 
       await cell(page, "แจ้งซ่อม", role.name).click();
       await saveMatrix(page);
 
       await userPage.reload();
-      await expect(hero.getByRole("link", { name: "แจ้งซ่อม", exact: true })).toBeVisible();
+      await expect(hero.getByRole("link", { name: "แจ้งซ่อมใหม่", exact: true })).toBeVisible();
       await user.close();
     } finally {
       await api.delete(`${SETTINGS_API}/roles/${role.id}`);

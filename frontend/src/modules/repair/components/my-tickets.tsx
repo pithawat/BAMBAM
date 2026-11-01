@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Select as SelectPrimitive } from "radix-ui";
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Plus, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
-import { Mascot } from "@/components/shared/mascot";
+import { ArrowRight, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Plus, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
+import { MascotPanel } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { can, canReport, PERM } from "@/lib/platform/permissions";
 import { MenuContent, MenuItem, type PickerOption } from "@/components/shared/picker";
@@ -28,7 +28,7 @@ import { TicketLink } from "./ticket-navigation";
 // rating first (BR-F06-2); their row keeps the ตรวจงาน button. Priority, contractor and other staff-side
 // fields are left out on purpose.
 // CR-021 (layout from maintenance-demo.html, no stats row): the list card opens with its own heading row; leads
-// also get บันทึกงานที่ทีมแก้แล้ว (locked team form) and the ทีมแก้เอง tab.
+// also get บันทึกงานที่ทีมแก้แล้ว (locked team form) and the ทีมแก้เอง tab. CR-035: top row from repair-my-option-b.html.
 
 const STATUSES: (PickerOption & { query?: Pick<MyTicketsQuery, "status" | "step"> })[] = [
   { value: "all", label: "ทุกสถานะ" },
@@ -118,36 +118,38 @@ export function MyTicketsScreen() {
   // CR-034: tracking belongs to reporting — #35 answers 403 without `repair.ticket.report`.
   if (!reports) return <ForbiddenState title="ไม่มีสิทธิ์ดูหน้านี้" />;
 
-  return <div className="space-y-4 px-4 pt-4 pb-8 lg:space-y-5 lg:px-0 lg:pt-2">
-    <div className={cn("grid gap-4 lg:gap-5", (reports || lead) && "lg:grid-cols-[minmax(0,1fr)_23rem]")}>
-      {/* Leads' CTA card holds two buttons, so their hero scales up to fill the taller row (owner, 2026-10-26). */}
-      <header className={cn("flex items-center gap-4 rounded-xl border border-mascot-edge/35 bg-mascot-blue/15 px-4 py-4 shadow-card sm:px-8 sm:py-5", lead ? "sm:gap-7" : "sm:gap-6")}>
-        <Mascot pose="tracking" size={lead ? 160 : 120} className="hidden shrink-0 sm:block" priority />
-        <Mascot pose="tracking" size={84} className="shrink-0 sm:hidden" priority />
-        <div className="min-w-0">
-          <p className={cn("leading-5 font-semibold tracking-[0.16em] text-primary uppercase", lead ? "text-xs" : "text-[11px]")}>Maintenance center</p>
-          <h1 className={cn("text-2xl leading-9 font-semibold", lead ? "lg:mt-0.5 lg:text-[34px] lg:leading-12" : "lg:text-[28px] lg:leading-10")}>ติดตามงานซ่อม</h1>
-          <p className={cn("text-sm text-muted-foreground", lead && "lg:mt-1 lg:text-base")}>งานที่คุณแจ้งและติดตาม · ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ</p>
-        </div>
-      </header>
-      {(reports || lead) && <section aria-labelledby="request-title" className="flex flex-col justify-center gap-4 rounded-xl bg-primary px-5 py-5 text-primary-foreground shadow-card sm:px-7">
+  return <div className="space-y-4 px-4 pt-3 pb-8 lg:space-y-5 lg:px-0 lg:pt-0">
+    <nav aria-label="เส้นทางหน้า">
+      <ol className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <li><Link href="/" className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">หน้าแรก</Link></li>
+        <li aria-hidden><ChevronRight className="size-3.5" /></li>
+        <li aria-current="page" className="text-foreground">ติดตามงานซ่อม</li>
+      </ol>
+    </nav>
+    {/* CR-035 (repair-my-option-b.html, layout only): blue mascot panel beside a navy report card; stacked below lg. */}
+    <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] lg:gap-5">
+      <MascotPanel as="header" pose="tracking" size={[100, 140]} priority className="min-h-44 lg:min-h-50">
+        <h1 className="text-2xl leading-9 font-semibold tracking-tight lg:text-[30px] lg:leading-11">ติดตามงานซ่อม</h1>
+        <p className="mt-1 max-w-100 text-sm leading-6 text-pretty text-primary-foreground/88">งานที่คุณแจ้งและติดตาม<br />ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ</p>
+      </MascotPanel>
+      <section aria-labelledby="request-title" className="grid content-center gap-4.5 rounded-2xl bg-foreground px-5 py-6 text-primary-foreground sm:grid-cols-[minmax(0,1fr)_15.5rem] sm:items-center sm:px-7 lg:grid-cols-1">
         <div>
-          <h2 id="request-title" className="text-lg leading-7 font-semibold">พบปัญหาในที่ทำงาน?</h2>
-          <p className="text-sm text-primary-foreground/85">{lead ? "เรียกช่างช่วยดูแล หรือบันทึกงานที่ทีมแก้ไขแล้ว" : "แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล"}</p>
+          <h2 id="request-title" className="text-xl leading-8 font-semibold tracking-tight">พบปัญหาในที่ทำงาน?</h2>
+          <p className="text-sm leading-6 text-primary-foreground/80">{lead ? "เรียกช่างช่วยดูแล หรือบันทึกงานที่ทีมแก้ไขแล้ว" : "แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล"}</p>
         </div>
         <div className="grid gap-2.5">
-          {reports && <Link href="/repair/new" className={cn("group flex items-center gap-3 rounded-lg bg-card px-3 text-base font-semibold text-primary outline-none transition-shadow hover:shadow-float focus-visible:ring-3 focus-visible:ring-white/60", lead ? "h-12" : "h-14")}>
-            <span aria-hidden className="grid size-8 place-items-center rounded-md bg-secondary"><Plus className="size-4.5" /></span>
+          <Link href="/repair/new" className={cn("group flex items-center gap-3 rounded-[10px] bg-card px-4 text-base font-semibold text-primary outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-primary-foreground/70", lead ? "h-12" : "h-14")}>
+            <Plus className="size-5" aria-hidden />
             <span className="flex-1">แจ้งซ่อมใหม่</span>
-            <ChevronRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-          </Link>}
-          {lead && <Link href="/repair/new?mode=team" className="group flex h-12 items-center gap-3 rounded-lg border border-primary-foreground/35 bg-primary-foreground/8 px-3 text-base font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-foreground/15 focus-visible:ring-3 focus-visible:ring-white/60">
-            <span aria-hidden className="grid size-8 place-items-center rounded-md bg-primary-foreground/15"><ClipboardCheck className="size-4.5" /></span>
+            <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </Link>
+          {lead && <Link href="/repair/new?mode=team" className="group flex h-12 items-center gap-3 rounded-[10px] border border-primary-foreground/35 px-4 text-base font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-foreground/10 focus-visible:ring-3 focus-visible:ring-primary-foreground/70">
+            <ClipboardCheck className="size-5" aria-hidden />
             <span className="flex-1">บันทึกงานที่ทีมแก้แล้ว</span>
-            <ChevronRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </Link>}
         </div>
-      </section>}
+      </section>
     </div>
     <Board key={`${q}|${scope}|${status}|${sort}|${page}`} filters={filters} relation={relations.find((r) => r.value === scope)!} filtered={filtered} onReset={reset} toolbar={toolbar} onPage={(p) => change({ page: p > 1 ? String(p) : null })} />
   </div>;

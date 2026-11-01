@@ -6,6 +6,10 @@
 
 ## Now
 
+- **2026-11-01 CR-035 accepted by owner, tag `repair-cr-035` (D-139, visual only):** employee Home from `output/home-user-redesign/index.html` (+ รายการของฉัน from #35), S06 top row from `repair-my-option-b.html`, one `MascotPanel` (white tiger on solid primary) for every mascot: login, S03, S05, S06, S07 review band, S29 + empty attention, settings headings, empty / error / forbidden. tsc / eslint pass; screenshots 390 / 820 / 1440, no overflow / JS errors; e2e F01 / F29 / F06 / F07 / F23 pass (selectors updated; one 3D budget load flake passed alone). Run on a scratch stack web :3300 / API :8290 (`.next-e2e3`). Next: `/atlas sync repair` (re-check tours that read Home / S06 headings), then Stage 5.
+
+- **2026-11-01 Home visual proposal accepted by owner:** `output/home-user-redesign/index.html` is the chosen employee Home layout. The standalone HTML is retained for the later CR / implementation handoff. Cache cleanup: owner authorized stopping the project Next.js servers on ports 3000 / 3100 / 3200; all three generated directories (`frontend/.next`, `.next-e2e`, `.next-e2e2`) were removed after their locks were released. `frontend/.gitignore` now covers future `.next-e2e*` directories.
+
 - **Stage 5P accepted 2026-11-01**, tag `repair-stage-5P` (CR-034, D-137 / D-138). Next: **Stage 5** (QR scan → prefilled S03, F13-B) — `/build-stage repair 5 prepare` in a fresh session
 
 - **2026-11-01 CR-034 APPROVED (M, D-137)** — owner page polish: S03 disabled ถัดไป + hint, navbar layout (settings → right), S17 `ประเภทผู้ดำเนินการซ่อม` + required in-house technician (`assignee_id`, #36), S10 technician card + `รายละเอียดการซ่อม`, required reschedule reason (not re-accept), tracking needs `repair.ticket.report` (#35 403), extra spot stays required. Docs applied (flows, contract, screens, plan **Stage 5P** before Stage 5). Navbar mockup `changes/CR-034/navbar.html` (A inline lock-up + gear icon, B stacked + labelled button) — waiting for owner pick, then `/build-stage repair 5P`
