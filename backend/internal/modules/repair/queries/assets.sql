@@ -126,7 +126,7 @@ WHERE a.id = @id AND a.is_active;
 -- name: LockAsset :one
 -- The asset as it is before a change (audit "before"); locked until the transaction ends.
 SELECT a.id, a.code, a.name, a.asset_type_id, a.room_id, COALESCE(a.pos_x, 0)::float8 AS pos_x, COALESCE(a.pos_z, 0)::float8 AS pos_z, (a.pos_x IS NOT NULL)::boolean AS placed,
-    a.rotation_deg, a.is_active
+    a.rotation_deg, a.is_active, (a.label_printed_at IS NOT NULL)::boolean AS label_printed
 FROM platform.assets a
 WHERE a.id = @id
 FOR UPDATE;

@@ -1,6 +1,7 @@
 import { Building2, HardHat, History, ShieldCheck, Tags, Users, Wrench, type LucideIcon } from "lucide-react";
 import { canAny, PERM, type PermissionKey } from "@/lib/platform/permissions";
 import type { Me } from "@/lib/platform/types";
+import { LABELS_PATH } from "./labels";
 
 // Settings navigation (settings ui/screens/_common.md §2, CR-006: the navbar "ตั้งค่าระบบ" dropdown). Claude owns this
 // file: the UI renders `settingsMenu(me)` and asks `settingsAccess(me, pathname)` — it never checks roles itself.
@@ -73,6 +74,7 @@ export function settingsMenu(me: Me): SettingsMenuGroup[] {
         has(PERM.settingsLocations) && { label: "อาคารและอุปกรณ์", href: SETTINGS_HOME },
         has(PERM.settingsLocations) && { label: "ประเภทอาคาร", href: tabHref("building-types") },
         has(PERM.settingsLocations) && has(PERM.settingsAssets) && { label: "ประเภทอุปกรณ์", href: tabHref("asset-types") },
+        has(PERM.settingsAssets) && { label: "พิมพ์ป้าย QR", href: LABELS_PATH },
       ]),
     },
     {
@@ -103,6 +105,7 @@ export function settingsMenu(me: Me): SettingsMenuGroup[] {
 export function settingsMenuCurrent(pathname: string, tab: string | null): string | null {
   const page = settingsPageOf(pathname);
   if (!page) return null;
+  if (pathname.startsWith(LABELS_PATH)) return LABELS_PATH;
   if (page === "buildings" && (tab === "building-types" || tab === "asset-types")) return tabHref(tab);
   return settingsHref(page);
 }
@@ -129,7 +132,9 @@ export type SettingsAccess =
  */
 export function settingsAccess(me: Me, pathname: string): SettingsAccess {
   const page = PAGES.find((d) => d.page === settingsPageOf(pathname));
-  if (page && canAny(me, ...page.permissions)) return { allowed: true };
+  // S30 พิมพ์ป้าย QR (CR-007) lives under อาคารและอุปกรณ์ but needs the asset key, not the locations one.
+  const labels = pathname.startsWith(LABELS_PATH);
+  if (labels ? canAny(me, PERM.settingsAssets) : page && canAny(me, ...page.permissions)) return { allowed: true };
   const home = canAny(me, PERM.settingsLocations) && page?.page !== "buildings" ? { label: "ไปที่อาคารและอุปกรณ์", href: SETTINGS_HOME } : undefined;
   return { allowed: false, title: "คุณไม่มีสิทธิ์เข้าถึงหน้านี้", reason: NO_ACCESS, action: home };
 }

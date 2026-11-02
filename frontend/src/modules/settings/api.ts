@@ -27,6 +27,8 @@ import {
   mockCreateBuildingType,
   mockUpdateBuildingType,
   mockRenameRoom,
+  mockLabelAssets,
+  mockMarkLabelsPrinted,
   mockRoomAssets,
   mockSuggestCode,
   mockUpdateAsset,
@@ -66,6 +68,8 @@ import type {
   BuildingTypeAdmin,
   CreateBuildingTypeInput,
   UpdateBuildingTypeInput,
+  LabelAsset,
+  LabelAssetsQuery,
   RoomAssetsQuery,
   UpdateAssetInput,
   UpdateAssetTypeInput,
@@ -250,10 +254,28 @@ export async function createAsset(input: CreateAssetInput): Promise<AssetAdmin> 
   return http.post<AssetAdmin>(`${BASE}/assets`, input);
 }
 
-/** #48 PATCH /settings/assets/{id}. Errors: as #47 + ASSET_NOT_FOUND, VERSION_CONFLICT. */
+/** #48 PATCH /settings/assets/{id}. Errors: as #47 + ASSET_NOT_FOUND, VERSION_CONFLICT, (CR-007) ASSET_CODE_LOCKED (code of a printed label). */
 export async function updateAsset(id: string, input: UpdateAssetInput): Promise<AssetAdmin> {
   if (env.useMocks) return mockWrite(() => mockUpdateAsset(id, input, mockActor()), PERM.settingsAssets);
   return http.patch<AssetAdmin>(`${BASE}/assets/${id}`, input);
+}
+
+/**
+ * #56 GET /settings/assets/labels — active assets of one building (S30), floor level → room → code, each with its
+ * `labelStatus`. Errors: VALIDATION_FAILED (`buildingId`), BUILDING_NOT_FOUND. (CR-007, repair CR-036)
+ */
+export async function getLabelAssets(params: LabelAssetsQuery): Promise<LabelAsset[]> {
+  if (env.useMocks) return mockRead(() => mockLabelAssets(params), PERM.settingsAssets);
+  return http.get<LabelAsset[]>(`${BASE}/assets/labels${query({ buildingId: params.buildingId, floorId: params.floorId, roomId: params.roomId })}`);
+}
+
+/**
+ * #57 POST /settings/assets/labels/printed — after the admin answers "ใช่ พิมพ์แล้ว" (BR-F13A-3). Returns the assets with
+ * `labelStatus: "current"`. Errors: VALIDATION_FAILED (`assetIds` REQUIRED / TOO_MANY), ASSET_NOT_ACTIVE (nothing saved).
+ */
+export async function markLabelsPrinted(assetIds: string[]): Promise<AssetAdmin[]> {
+  if (env.useMocks) return mockWrite(() => mockMarkLabelsPrinted(assetIds), PERM.settingsAssets);
+  return http.post<AssetAdmin[]>(`${BASE}/assets/labels/printed`, { assetIds });
 }
 
 /** #49 GET /settings/assets/suggest-code — next free `{prefix}-{floor}-{nnn}`. */

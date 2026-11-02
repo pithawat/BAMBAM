@@ -12,6 +12,19 @@ import (
 	"github.com/google/uuid"
 )
 
+const activeBuildingExists = `-- name: ActiveBuildingExists :one
+
+SELECT EXISTS (SELECT 1 FROM platform.buildings WHERE id = $1 AND is_active)::boolean
+`
+
+// QR labels (repair CR-036 / settings CR-007, Stage 5B, #56 / #57).
+func (q *Queries) ActiveBuildingExists(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, activeBuildingExists, id)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const assetCodeInUse = `-- name: AssetCodeInUse :one
 SELECT EXISTS (SELECT 1 FROM platform.assets WHERE lower(code) = lower($1::text) AND id <> $2)::boolean
 `
@@ -116,6 +129,7 @@ func (q *Queries) GetActiveAssetType(ctx context.Context, id uuid.UUID) (GetActi
 
 const getAssetAdmin = `-- name: GetAssetAdmin :one
 SELECT a.id, a.code, a.name, a.is_active, a.room_id, (a.pos_x IS NOT NULL)::boolean AS placed, a.updated_at,
+       a.label_snapshot, a.label_printed_at, r.name AS room_name, f.name AS floor_name, b.name AS building_name,
        t.id AS type_id, t.key AS type_key, t.name AS type_name, t.icon AS type_icon,
        ub.id AS updated_by_user_id, ub.employee_code AS updated_by_employee_code,
        ub.first_name_th AS updated_by_first_name_th, ub.last_name_th AS updated_by_last_name_th,
@@ -123,6 +137,9 @@ SELECT a.id, a.code, a.name, a.is_active, a.room_id, (a.pos_x IS NOT NULL)::bool
        ub.department AS updated_by_department
 FROM platform.assets a
 JOIN platform.asset_types t ON t.id = a.asset_type_id
+JOIN platform.rooms r ON r.id = a.room_id
+JOIN platform.floors f ON f.id = r.floor_id
+JOIN platform.buildings b ON b.id = f.building_id
 LEFT JOIN platform.users ub ON ub.id = a.updated_by
 WHERE a.id = $1
 `
@@ -135,6 +152,11 @@ type GetAssetAdminRow struct {
 	RoomID                uuid.UUID
 	Placed                bool
 	UpdatedAt             time.Time
+	LabelSnapshot         []byte
+	LabelPrintedAt        *time.Time
+	RoomName              string
+	FloorName             string
+	BuildingName          string
 	TypeID                uuid.UUID
 	TypeKey               string
 	TypeName              string
@@ -159,6 +181,11 @@ func (q *Queries) GetAssetAdmin(ctx context.Context, id uuid.UUID) (GetAssetAdmi
 		&i.RoomID,
 		&i.Placed,
 		&i.UpdatedAt,
+		&i.LabelSnapshot,
+		&i.LabelPrintedAt,
+		&i.RoomName,
+		&i.FloorName,
+		&i.BuildingName,
 		&i.TypeID,
 		&i.TypeKey,
 		&i.TypeName,
@@ -299,9 +326,79 @@ func (q *Queries) ListAssetTypesAdmin(ctx context.Context) ([]ListAssetTypesAdmi
 	return items, nil
 }
 
+const listLabelAssets = `-- name: ListLabelAssets :many
+SELECT a.id, a.code, a.name, a.label_snapshot, a.label_printed_at,
+       b.id AS building_id, b.name AS building_name, f.id AS floor_id, f.name AS floor_name, f.level AS floor_level,
+       r.id AS room_id, r.name AS room_name
+FROM platform.assets a
+JOIN platform.rooms r ON r.id = a.room_id AND r.is_active
+JOIN platform.floors f ON f.id = r.floor_id AND f.is_active
+JOIN platform.buildings b ON b.id = f.building_id
+WHERE b.id = $1 AND a.is_active
+  AND ($2::uuid IS NULL OR f.id = $2::uuid)
+  AND ($3::uuid IS NULL OR r.id = $3::uuid)
+ORDER BY f.level, r.name, lower(a.code)
+`
+
+type ListLabelAssetsParams struct {
+	BuildingID uuid.UUID
+	FloorID    *uuid.UUID
+	RoomID     *uuid.UUID
+}
+
+type ListLabelAssetsRow struct {
+	ID             uuid.UUID
+	Code           string
+	Name           string
+	LabelSnapshot  []byte
+	LabelPrintedAt *time.Time
+	BuildingID     uuid.UUID
+	BuildingName   string
+	FloorID        uuid.UUID
+	FloorName      string
+	FloorLevel     int32
+	RoomID         uuid.UUID
+	RoomName       string
+}
+
+// #56: active assets in active rooms of one building, floor level → room name → code.
+func (q *Queries) ListLabelAssets(ctx context.Context, arg ListLabelAssetsParams) ([]ListLabelAssetsRow, error) {
+	rows, err := q.db.Query(ctx, listLabelAssets, arg.BuildingID, arg.FloorID, arg.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLabelAssetsRow
+	for rows.Next() {
+		var i ListLabelAssetsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.LabelSnapshot,
+			&i.LabelPrintedAt,
+			&i.BuildingID,
+			&i.BuildingName,
+			&i.FloorID,
+			&i.FloorName,
+			&i.FloorLevel,
+			&i.RoomID,
+			&i.RoomName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRoomAssets = `-- name: ListRoomAssets :many
 
 SELECT a.id, a.code, a.name, a.is_active, a.room_id, (a.pos_x IS NOT NULL)::boolean AS placed, a.updated_at,
+       a.label_snapshot, a.label_printed_at, r.name AS room_name, f.name AS floor_name, b.name AS building_name,
        t.id AS type_id, t.key AS type_key, t.name AS type_name, t.icon AS type_icon,
        ub.id AS updated_by_user_id, ub.employee_code AS updated_by_employee_code,
        ub.first_name_th AS updated_by_first_name_th, ub.last_name_th AS updated_by_last_name_th,
@@ -309,6 +406,9 @@ SELECT a.id, a.code, a.name, a.is_active, a.room_id, (a.pos_x IS NOT NULL)::bool
        ub.department AS updated_by_department
 FROM platform.assets a
 JOIN platform.asset_types t ON t.id = a.asset_type_id
+JOIN platform.rooms r ON r.id = a.room_id
+JOIN platform.floors f ON f.id = r.floor_id
+JOIN platform.buildings b ON b.id = f.building_id
 LEFT JOIN platform.users ub ON ub.id = a.updated_by
 WHERE a.room_id = $1
   AND ($2::boolean OR a.is_active)
@@ -332,6 +432,11 @@ type ListRoomAssetsRow struct {
 	RoomID                uuid.UUID
 	Placed                bool
 	UpdatedAt             time.Time
+	LabelSnapshot         []byte
+	LabelPrintedAt        *time.Time
+	RoomName              string
+	FloorName             string
+	BuildingName          string
 	TypeID                uuid.UUID
 	TypeKey               string
 	TypeName              string
@@ -369,6 +474,11 @@ func (q *Queries) ListRoomAssets(ctx context.Context, arg ListRoomAssetsParams) 
 			&i.RoomID,
 			&i.Placed,
 			&i.UpdatedAt,
+			&i.LabelSnapshot,
+			&i.LabelPrintedAt,
+			&i.RoomName,
+			&i.FloorName,
+			&i.BuildingName,
 			&i.TypeID,
 			&i.TypeKey,
 			&i.TypeName,
@@ -392,17 +502,19 @@ func (q *Queries) ListRoomAssets(ctx context.Context, arg ListRoomAssetsParams) 
 }
 
 const lockAssetAdmin = `-- name: LockAssetAdmin :one
-SELECT id, code, name, asset_type_id, room_id, is_active, updated_at FROM platform.assets WHERE id = $1 FOR UPDATE
+SELECT id, code, name, asset_type_id, room_id, is_active, updated_at, (label_printed_at IS NOT NULL)::boolean AS label_printed
+FROM platform.assets WHERE id = $1 FOR UPDATE
 `
 
 type LockAssetAdminRow struct {
-	ID          uuid.UUID
-	Code        string
-	Name        string
-	AssetTypeID uuid.UUID
-	RoomID      uuid.UUID
-	IsActive    bool
-	UpdatedAt   time.Time
+	ID           uuid.UUID
+	Code         string
+	Name         string
+	AssetTypeID  uuid.UUID
+	RoomID       uuid.UUID
+	IsActive     bool
+	UpdatedAt    time.Time
+	LabelPrinted bool
 }
 
 func (q *Queries) LockAssetAdmin(ctx context.Context, id uuid.UUID) (LockAssetAdminRow, error) {
@@ -416,6 +528,7 @@ func (q *Queries) LockAssetAdmin(ctx context.Context, id uuid.UUID) (LockAssetAd
 		&i.RoomID,
 		&i.IsActive,
 		&i.UpdatedAt,
+		&i.LabelPrinted,
 	)
 	return i, err
 }
@@ -447,6 +560,77 @@ func (q *Queries) LockAssetType(ctx context.Context, id uuid.UUID) (LockAssetTyp
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const lockLabelAssets = `-- name: LockLabelAssets :many
+SELECT a.id, a.code, a.name, b.id AS building_id, b.name AS building_name, f.id AS floor_id, f.name AS floor_name,
+       r.id AS room_id, r.name AS room_name
+FROM platform.assets a
+JOIN platform.rooms r ON r.id = a.room_id
+JOIN platform.floors f ON f.id = r.floor_id
+JOIN platform.buildings b ON b.id = f.building_id
+WHERE a.id = ANY($1::uuid[]) AND a.is_active
+FOR UPDATE OF a
+`
+
+type LockLabelAssetsRow struct {
+	ID           uuid.UUID
+	Code         string
+	Name         string
+	BuildingID   uuid.UUID
+	BuildingName string
+	FloorID      uuid.UUID
+	FloorName    string
+	RoomID       uuid.UUID
+	RoomName     string
+}
+
+// #57: the active assets to mark printed, with today's label text; locked until the transaction ends.
+func (q *Queries) LockLabelAssets(ctx context.Context, ids []uuid.UUID) ([]LockLabelAssetsRow, error) {
+	rows, err := q.db.Query(ctx, lockLabelAssets, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockLabelAssetsRow
+	for rows.Next() {
+		var i LockLabelAssetsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.BuildingID,
+			&i.BuildingName,
+			&i.FloorID,
+			&i.FloorName,
+			&i.RoomID,
+			&i.RoomName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markLabelPrinted = `-- name: MarkLabelPrinted :exec
+UPDATE platform.assets SET label_snapshot = $1, label_printed_at = now(), label_printed_by = $2
+WHERE id = $3
+`
+
+type MarkLabelPrintedParams struct {
+	Snapshot []byte
+	ActorID  *uuid.UUID
+	ID       uuid.UUID
+}
+
+// Printing is not an edit: updated_at stays, so open S20 dialogs keep their version.
+func (q *Queries) MarkLabelPrinted(ctx context.Context, arg MarkLabelPrintedParams) error {
+	_, err := q.db.Exec(ctx, markLabelPrinted, arg.Snapshot, arg.ActorID, arg.ID)
+	return err
 }
 
 const updateAssetAdmin = `-- name: UpdateAssetAdmin :exec

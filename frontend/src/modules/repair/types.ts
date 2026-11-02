@@ -584,6 +584,7 @@ export type RepairErrorCode =
   | "NOT_TEAM_HANDLED"
   | "ASSET_NOT_FOUND"
   | "ASSET_CODE_TAKEN"
+  | "ASSET_CODE_LOCKED"
   | "POINT_OUTSIDE_ROOM"
   | "FLOOR_NOT_FOUND"
   | "NETWORK";

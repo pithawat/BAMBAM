@@ -69,6 +69,62 @@ func TestAssetAuditAction(t *testing.T) {
 	}
 }
 
+// BR-F13A-4: the label status from the printed snapshot vs today's data.
+func TestLabelStatus(t *testing.T) {
+	room := uuid.New()
+	now := LabelSnapshot{Code: "AC-5-012", Name: "แอร์ห้องประชุม 5B", BuildingName: "อาคาร 1", FloorName: "5", RoomID: room, RoomName: "ห้องประชุม 5B"}
+	with := func(f func(s *LabelSnapshot)) *LabelSnapshot {
+		s := now
+		f(&s)
+		return &s
+	}
+	cases := []struct {
+		name    string
+		printed *LabelSnapshot
+		want    string
+	}{
+		{"never printed", nil, LabelNever},
+		{"same text", with(func(*LabelSnapshot) {}), LabelCurrent},
+		{"other room", with(func(s *LabelSnapshot) { s.RoomID, s.RoomName = uuid.New(), "ห้องอื่น" }), LabelMoved},
+		{"other room, same name", with(func(s *LabelSnapshot) { s.RoomID = uuid.New() }), LabelMoved},
+		{"asset renamed", with(func(s *LabelSnapshot) { s.Name = "แอร์เก่า" }), LabelChanged},
+		{"room renamed", with(func(s *LabelSnapshot) { s.RoomName = "ห้อง 5B" }), LabelChanged},
+		{"floor renamed", with(func(s *LabelSnapshot) { s.FloorName = "ชั้น 5" }), LabelChanged},
+		{"building renamed", with(func(s *LabelSnapshot) { s.BuildingName = "อาคาร 1 (สำนักงานใหญ่)" }), LabelChanged},
+	}
+	for _, tc := range cases {
+		if got := LabelStatus(tc.printed, now); got != tc.want {
+			t.Errorf("%s = %s, want %s", tc.name, got, tc.want)
+		}
+	}
+	if parseSnapshot(nil) != nil || parseSnapshot([]byte("not json")) != nil {
+		t.Error("empty / bad snapshot should read as never printed")
+	}
+	if s := parseSnapshot([]byte(`{"code":"AC-1","roomId":"` + room.String() + `"}`)); s == nil || s.RoomID != room {
+		t.Errorf("parse = %+v", s)
+	}
+}
+
+// #57 input rules before the database: 1–500 distinct ids.
+func TestMarkLabelsPrintedInput(t *testing.T) {
+	svc := NewService(nil, nil)
+	var fe *apperr.Error
+	if _, err := svc.MarkLabelsPrinted(context.Background(), uuid.New(), nil); !errors.As(err, &fe) || fe.Fields["assetIds"] != "REQUIRED" {
+		t.Errorf("empty: %v", err)
+	}
+	many := make([]uuid.UUID, MaxLabelsPerPrint+1)
+	for i := range many {
+		many[i] = uuid.New()
+	}
+	if _, err := svc.MarkLabelsPrinted(context.Background(), uuid.New(), many); !errors.As(err, &fe) || fe.Fields["assetIds"] != "TOO_MANY" {
+		t.Errorf("501: %v", err)
+	}
+	id := uuid.New()
+	if got := uniqueIDs([]uuid.UUID{id, id}); len(got) != 1 {
+		t.Errorf("duplicates kept: %v", got)
+	}
+}
+
 // Runs when TEST_DATABASE_URL points at a migrated database: F26 asset and type rules against Postgres
 // (seed rooms of อาคาร 1 from the repair CR-014 / CR-016 migrations).
 func TestAssetLifecycle(t *testing.T) {
@@ -193,4 +249,138 @@ func toLower(s string) string {
 		}
 	}
 	return string(b)
+}
+
+// Stage 5B (repair CR-036): #56 / #57 / #48 on Postgres — never → current after a print, moved via #48,
+// changed after a room rename, code locked, inactive id saves nothing, filters and order.
+func TestAssetLabels(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+
+	// two active rooms on the same floor of one building
+	var building, floor, roomA, roomB uuid.UUID
+	var roomAName string
+	if err := pool.QueryRow(ctx, `SELECT b.id, f.id, r.id, r.name FROM platform.rooms r JOIN platform.floors f ON f.id = r.floor_id AND f.is_active
+		JOIN platform.buildings b ON b.id = f.building_id AND b.is_active
+		WHERE r.is_active AND (SELECT count(*) FROM platform.rooms x WHERE x.floor_id = f.id AND x.is_active) >= 2
+		ORDER BY b.sort_order, f.level, r.sort_order LIMIT 1`).Scan(&building, &floor, &roomA, &roomAName); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT id FROM platform.rooms WHERE floor_id = $1 AND is_active AND id <> $2 ORDER BY sort_order LIMIT 1`, floor, roomA).Scan(&roomB); err != nil {
+		t.Fatal(err)
+	}
+	var typeID uuid.UUID
+	if err := pool.QueryRow(ctx, `SELECT id FROM platform.asset_types WHERE is_active ORDER BY sort_order LIMIT 1`).Scan(&typeID); err != nil {
+		t.Fatal(err)
+	}
+	suffix := uuid.NewString()[:6]
+	var actor uuid.UUID
+	if err := pool.QueryRow(ctx, `INSERT INTO platform.users (employee_code, first_name_th) VALUES ($1, 'ทดสอบป้าย') RETURNING id`, "ITLB"+suffix).Scan(&actor); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewService(NewRepository(pool), locations.NewService(locations.NewRepository(pool)))
+	str := func(s string) *string { return &s }
+	var ids []uuid.UUID
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `UPDATE platform.rooms SET name = $2 WHERE id = $1`, roomA, roomAName)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM platform.audit_log WHERE actor_user_id = $1`, actor)
+		for _, id := range ids {
+			_, _ = pool.Exec(context.Background(), `DELETE FROM platform.assets WHERE id = $1`, id)
+		}
+		_, _ = pool.Exec(context.Background(), `DELETE FROM platform.users WHERE id = $1`, actor)
+	})
+	mk := func(code string, room uuid.UUID) Asset {
+		a, err := svc.CreateAsset(ctx, actor, AssetInput{RoomID: &room, AssetTypeID: &typeID, Code: str(code), Name: str("ป้ายทดสอบ " + code)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, a.ID)
+		return a
+	}
+	a1, a2 := mk("TLB2-"+suffix, roomA), mk("TLB1-"+suffix, roomA)
+	off := mk("TLB3-"+suffix, roomB)
+	if a1.LabelStatus != LabelNever || a1.LabelPrintedAt != nil {
+		t.Errorf("new asset = %s", a1.LabelStatus)
+	}
+
+	mine := func(list []LabelAsset) []LabelAsset {
+		out := []LabelAsset{}
+		for _, x := range list {
+			for _, id := range ids {
+				if x.ID == id {
+					out = append(out, x)
+				}
+			}
+		}
+		return out
+	}
+	list, err := svc.LabelAssets(ctx, LabelFilter{BuildingID: building, RoomID: &roomA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := mine(list); len(got) != 2 || got[0].ID != a2.ID || got[0].LabelStatus != LabelNever || got[0].BuildingID != building {
+		t.Fatalf("#56 room = %+v", got)
+	}
+	if _, err := svc.LabelAssets(ctx, LabelFilter{BuildingID: uuid.New()}); !errors.Is(err, locations.ErrBuildingNotFound) {
+		t.Errorf("unknown building: %v", err)
+	}
+
+	// an inactive id saves nothing
+	offAt := off.UpdatedAt
+	if _, err := svc.UpdateAsset(ctx, actor, off.ID, AssetInput{IsActive: ptr(false), UpdatedAt: offAt}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.MarkLabelsPrinted(ctx, actor, []uuid.UUID{a1.ID, off.ID}); !errors.Is(err, ErrAssetNotActive) {
+		t.Fatalf("inactive in the print: %v", err)
+	}
+	if cur, _ := NewRepository(pool).Asset(ctx, a1.ID); cur.LabelStatus != LabelNever {
+		t.Fatalf("rolled back = %s", cur.LabelStatus)
+	}
+	if list, _ := svc.LabelAssets(ctx, LabelFilter{BuildingID: building, FloorID: &floor}); len(mine(list)) != 2 {
+		t.Errorf("#56 lists the inactive asset: %+v", mine(list))
+	}
+
+	printed, err := svc.MarkLabelsPrinted(ctx, actor, []uuid.UUID{a1.ID, a2.ID, a1.ID})
+	if err != nil || len(printed) != 2 || printed[0].LabelStatus != LabelCurrent || printed[0].LabelPrintedAt == nil {
+		t.Fatalf("#57 = %+v, %v", printed, err)
+	}
+	if printed[0].UpdatedAt != a1.UpdatedAt {
+		t.Errorf("printing changed updatedAt")
+	}
+	var audits int
+	_ = pool.QueryRow(ctx, `SELECT count(*) FROM platform.audit_log WHERE actor_user_id = $1 AND action = 'asset.label_printed' AND (data->>'count')::int = 2`, actor).Scan(&audits)
+	if audits != 1 {
+		t.Errorf("audit rows = %d", audits)
+	}
+
+	// code locked; a rename keeps working and shows `changed`; a move shows `moved`
+	if _, err := svc.UpdateAsset(ctx, actor, a1.ID, AssetInput{Code: str("TLB9-" + suffix), UpdatedAt: a1.UpdatedAt}); !errors.Is(err, ErrCodeLocked) {
+		t.Fatalf("code change after print: %v", err)
+	}
+	renamed, err := svc.UpdateAsset(ctx, actor, a1.ID, AssetInput{Code: str(a1.Code), Name: str("ป้ายทดสอบ ใหม่"), UpdatedAt: a1.UpdatedAt})
+	if err != nil || renamed.LabelStatus != LabelChanged {
+		t.Fatalf("rename = %s, %v", renamed.LabelStatus, err)
+	}
+	moved, err := svc.UpdateAsset(ctx, actor, a1.ID, AssetInput{RoomID: &roomB, UpdatedAt: renamed.UpdatedAt})
+	if err != nil || moved.LabelStatus != LabelMoved {
+		t.Fatalf("move = %s, %v", moved.LabelStatus, err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE platform.rooms SET name = name || ' (ใหม่)' WHERE id = $1`, roomA); err != nil {
+		t.Fatal(err)
+	}
+	if cur, _ := NewRepository(pool).Asset(ctx, a2.ID); cur.LabelStatus != LabelChanged {
+		t.Errorf("after room rename = %s", cur.LabelStatus)
+	}
+	// reprint clears it
+	if again, err := svc.MarkLabelsPrinted(ctx, actor, []uuid.UUID{a1.ID, a2.ID}); err != nil || again[0].LabelStatus != LabelCurrent || again[1].LabelStatus != LabelCurrent {
+		t.Fatalf("reprint = %+v, %v", again, err)
+	}
 }

@@ -412,6 +412,20 @@ func TestUpdateAndDeactivateAsset(t *testing.T) {
 		t.Errorf("other's code: %v", err)
 	}
 
+	// CR-036 (BR-F13A-5): after the QR label is printed the code is locked (even a case change); the rest stays editable.
+	a.repo.dash.assets[created.ID].LabelPrinted = true
+	printedCode := a.repo.dash.assets[created.ID].Code
+	if _, err := a.svc.UpdateAsset(ctx, a.admin, created.ID, a.input("AC-1-009", a.plan.dd, 2, 2)); code(err) != "ASSET_CODE_LOCKED" {
+		t.Errorf("printed code change: %v", err)
+	}
+	if _, err := a.svc.UpdateAsset(ctx, a.admin, created.ID, a.input(strings.ToUpper(printedCode)+"x", a.plan.dd, 2, 2)); code(err) != "ASSET_CODE_LOCKED" {
+		t.Errorf("printed code change (suffix): %v", err)
+	}
+	if _, err := a.svc.UpdateAsset(ctx, a.admin, created.ID, a.input(printedCode, a.plan.dd, 3, 2)); err != nil {
+		t.Errorf("printed asset moved with its own code: %v", err)
+	}
+	a.repo.dash.assets[created.ID].LabelPrinted = false
+
 	// Deactivate (BR-F31-4): gone from reads and writes, the code stays taken.
 	if err := a.svc.DeactivateAsset(ctx, a.admin, other.ID); err != nil {
 		t.Fatal(err)

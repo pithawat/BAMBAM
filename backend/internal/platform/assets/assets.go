@@ -55,6 +55,8 @@ type Asset struct {
 	RoomID          uuid.UUID
 	Placed          bool
 	OpenTicketCount int64
+	LabelStatus     string
+	LabelPrintedAt  *time.Time
 	UpdatedAt       time.Time
 	UpdatedBy       *people.Ref
 }
@@ -105,6 +107,7 @@ type Repository interface {
 	// ActiveType returns ok=false for an unknown or inactive type.
 	ActiveType(ctx context.Context, id uuid.UUID) (AssetType, bool, error)
 	CodesStartingWith(ctx context.Context, prefix string) ([]string, error)
+	LabelRepository
 	InTx(ctx context.Context, fn func(tx TxRepository) error) error
 }
 
@@ -113,6 +116,7 @@ type LockedAsset struct {
 	Code, Name              string
 	IsActive                bool
 	UpdatedAt               time.Time
+	LabelPrinted            bool // the code is locked (ErrCodeLocked)
 }
 
 type TxRepository interface {
@@ -127,6 +131,7 @@ type TxRepository interface {
 	PrefixTaken(ctx context.Context, prefix string, self uuid.UUID) (bool, error)
 	InsertType(ctx context.Context, t AssetType, actor uuid.UUID) error
 	UpdateType(ctx context.Context, t AssetType, actor uuid.UUID) error
+	LabelTx
 	Audit(ctx context.Context, e audit.Entry) error
 }
 
@@ -304,6 +309,9 @@ func (s *Service) UpdateAsset(ctx context.Context, actor, id uuid.UUID, in Asset
 			return ErrAssetNotFound // repair #32: only active assets are edited; reactivate first
 		}
 		if in.Code != nil {
+			if cur.LabelPrinted && *in.Code != cur.Code {
+				return ErrCodeLocked
+			}
 			next.Code = *in.Code
 		}
 		if in.Name != nil {

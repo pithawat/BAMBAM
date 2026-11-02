@@ -356,7 +356,7 @@ export async function createAsset(req: CreateAssetRequest): Promise<Asset> {
   return http.post<Asset>(`${BASE}/assets`, req);
 }
 
-/** #32 admin edits / moves equipment (same errors as #31, plus 404 `ASSET_NOT_FOUND`). */
+/** #32 admin edits / moves equipment (same errors as #31, plus 404 `ASSET_NOT_FOUND`, CR-036 422 `ASSET_CODE_LOCKED` after a QR print). */
 export async function updateAsset(id: string, req: UpdateAssetRequest): Promise<Asset> {
   if (env.useMocks) {
     if (mockScenario() === "error") return mockFail(mockErrors.network());

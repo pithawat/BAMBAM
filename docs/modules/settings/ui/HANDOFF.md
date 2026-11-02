@@ -1,6 +1,6 @@
 # UI handoff — ตั้งค่าระบบ (Admin / Superadmin)
 
-Status: ACCEPTED — Stage R1 (2026-11-01, built and wired by Claude, D-133 / D-134, tag `settings-stage-R1`). Before: ACCEPTED — Stages 1–6 (2026-10-27) and 4P (2026-10-29, tags `settings-stage-1`…`6`, `settings-stage-4P`)
+Status: BUILT BY CLAUDE — repair Stage 5B (2026-11-02, CR-007: S30 + S20 print actions / label badge / code lock; see `../../repair/ui/HANDOFF.md`). Before: ACCEPTED — Stage R1 (2026-11-01, built and wired by Claude, D-133 / D-134, tag `settings-stage-R1`). Before: ACCEPTED — Stages 1–6 (2026-10-27) and 4P (2026-10-29, tags `settings-stage-1`…`6`, `settings-stage-4P`)
 
 <!-- Written by Claude (/ui-spec settings 2026-10-16, updated by /build-stage prepare). Codex starts here.
      Only build the screens of the current stage. -->

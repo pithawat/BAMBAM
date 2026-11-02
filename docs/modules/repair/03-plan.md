@@ -29,7 +29,7 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 3D-4 | **CR-031 / CR-032:** โมเดลจริงฝั่ง Riverside 9 อาคาร + ถนน ทางเดิน ที่จอดรถใน site view | F23, F31 | S29 | done — accepted 2026-10-30, tag `repair-stage-3D-4` |
 | 3D-5 | **CR-033 rework:** site view ตรงตามแปลนผังบริเวณ (ฝั่งสนญ. จากแปลน, ฝั่ง Riverside จาก OpenStreetMap + ครอปแปลน) · อาคาร 4 หมุน 180° · ปุ่มข้ามถนนไปอีกฝั่งในแผนที่ (ปุ่มด้านบนยังอยู่) · เบาเท่าเดิม | F23 | S29 | done — accepted 2026-11-01, tag `repair-stage-3D-5` |
 | 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) · QR = `/q/{code}`, ปุ่มสแกนเฉพาะมือถือ (CR-036) | F13-B | S16, S03 (QR banner), S06 / Home scan button (CR-036) | done — accepted 2026-11-02, tag `repair-stage-5` |
-| 5B | **CR-036:** สร้างและพิมพ์ป้าย QR ในแอป — ทีละชิ้น ทั้งห้อง หรือหลายชิ้น (A4 3 × 4) · ป้ายเตือนเมื่อย้าย / เปลี่ยนชื่อหลังพิมพ์ · ล็อกรหัสหลังพิมพ์ | F13-A | settings S30 (new), S20 | pending |
+| 5B | **CR-036:** สร้างและพิมพ์ป้าย QR ในแอป — ทีละชิ้น ทั้งห้อง หรือหลายชิ้น (A4 3 × 4) · ป้ายเตือนเมื่อย้าย / เปลี่ยนชื่อหลังพิมพ์ · ล็อกรหัสหลังพิมพ์ | F13-A | settings S30 (new), S20 | done — 2026-11-02 |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
 | 8 | ตรวจสิทธิ์ทุก role, edge cases, a11y และความพร้อม UAT | all phase-1 flows | all | pending |
@@ -664,7 +664,7 @@ Status: done — accepted 2026-11-02 (tag `repair-stage-5`); UI built by Claude 
 
 ## Stage 5B — พิมพ์ป้าย QR (CR-036)
 
-Status: pending — approved 2026-11-01 (D-140). Runs after Stage 5 (needs `/q/{code}`). UI builder (Codex or Claude) chosen at prepare.
+Status: done — accepted 2026-11-02 (prepare + wire in one session, UI by Claude, D-142), tag `repair-stage-5B`. Approved 2026-11-01 (D-140).
 
 **Scope**
 - Flows: F13-A (BR-F13A-1…5)
@@ -674,22 +674,22 @@ Status: pending — approved 2026-11-01 (D-140). Runs after Stage 5 (needs `/q/{
 - Out of this stage: label templates other than A4 3 × 4, printing from S29 (3D)
 
 **Backend (Claude)**
-- [ ] Migration `…_platform_asset_labels.sql`: `platform.assets` + `label_printed_at timestamptz NULL`, `label_printed_by uuid NULL → platform.users ON DELETE SET NULL`, `label_snapshot jsonb NULL` (`code`, `name`, `buildingId/Name`, `floorId/Name`, `roomId/Name`); Down drops them
-- [ ] `internal/platform/assets`: `labelStatus` = `never` · `current` · `moved` (snapshot room ≠ room) · `changed` (any name differs), computed on read; used by #46 and #56
-- [ ] #56 list (building required, floor / room optional, active only, sorted floor level → room → code) · #57 record snapshot for up to 500 ids in one transaction (inactive / unknown id → 422 whole call) · audit log entry per call (`asset.label_printed`, count)
-- [ ] #48 / repair #32: code change when `label_printed_at IS NOT NULL` → 422 `ASSET_CODE_LOCKED`
-- [ ] Tests: status rules (move via #48 and via #32, rename room / building), code lock on both endpoints, #57 rejects inactive, 403 without `settings.assets.manage`, migration up / down
+- [x] Migration `…_platform_asset_labels.sql`: `platform.assets` + `label_printed_at timestamptz NULL`, `label_printed_by uuid NULL → platform.users ON DELETE SET NULL`, `label_snapshot jsonb NULL` (`code`, `name`, `buildingId/Name`, `floorId/Name`, `roomId/Name`); Down drops them
+- [x] `internal/platform/assets`: `labelStatus` = `never` · `current` · `moved` (snapshot room ≠ room) · `changed` (any name differs), computed on read; used by #46 and #56
+- [x] #56 list (building required, floor / room optional, active only, sorted floor level → room → code) · #57 record snapshot for up to 500 ids in one transaction (inactive / unknown id → 422 whole call) · audit log entry per call (`asset.label_printed`, count)
+- [x] #48 / repair #32: code change when `label_printed_at IS NOT NULL` → 422 `ASSET_CODE_LOCKED`
+- [x] Tests: status rules (move via #48 and via #32, rename room / building), code lock on both endpoints, #57 rejects inactive, 403 without `settings.assets.manage`, migration up / down
 
 **Frontend contract (Claude)**
-- [ ] Types / mocks / api for #56, #57 + `labelStatus` on `AssetAdmin`; `shortLocation()` helper (BR-F13A-1); `qrcode` package; HANDOFF → Stage 5B
+- [x] Types / mocks / api for #56, #57 + `labelStatus` on `AssetAdmin`; `shortLocation()` helper (BR-F13A-1); `qrcode` package; HANDOFF → Stage 5B
 
 **Frontend UI**
-- [ ] S30: building select → floor / room tree with tick boxes ("ทั้งอาคาร") → asset list with tick boxes + filter (ทั้งหมด · ควรพิมพ์ใหม่ · ยังไม่เคยพิมพ์) → preview → พิมพ์ → confirm dialog
-- [ ] Print sheet: `@media print`, A4 portrait 3 × 4 cells (≈ 70 × 74 mm), QR SVG 40 mm (error correction M), text per BR-F13A-1, no app chrome
-- [ ] S20: row menu "พิมพ์ป้าย QR" → S30 preselected; room heading "พิมพ์ป้ายทั้งห้อง"; badge per `labelStatus`; edit dialog: code read-only with hint when printed
+- [x] S30: building select → floor / room tree with tick boxes ("ทั้งอาคาร") → asset list with tick boxes + filter (ทั้งหมด · ควรพิมพ์ใหม่ · ยังไม่เคยพิมพ์) → preview → พิมพ์ → confirm dialog
+- [x] Print sheet: `@media print`, A4 portrait 3 × 4 cells (≈ 70 × 74 mm), QR SVG 40 mm (error correction M), text per BR-F13A-1, no app chrome
+- [x] S20: row menu "พิมพ์ป้าย QR" → S30 preselected; room heading "พิมพ์ป้ายทั้งห้อง"; badge per `labelStatus`; edit dialog: code read-only with hint when printed
 
 **Wiring + e2e (Claude)**
-- [ ] `e2e/settings/F13A-qr-labels.spec.ts`: select 2 rooms → preview count → print (stub `window.print`) → confirm → statuses `current`; move one asset → "ย้ายแล้ว ควรพิมพ์ป้ายใหม่"; code edit refused; technician gets Forbidden
+- [x] `e2e/settings/F13A-qr-labels.spec.ts`: select 2 rooms → preview count → print (stub `window.print`) → confirm → statuses `current`; move one asset → "ย้ายแล้ว ควรพิมพ์ป้ายใหม่"; code edit refused; technician gets Forbidden
 
 **Acceptance criteria**
 - [ ] AC1: Admin prints one asset from S20 and a whole floor from S30; each label shows QR + code + name + `อ.1 · ชั้น 5 · …` and the QR opens `{FRONTEND_URL}/q/{code}`

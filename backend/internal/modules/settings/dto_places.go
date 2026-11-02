@@ -118,6 +118,8 @@ type AssetAdminResponse struct {
 	RoomID          string           `json:"roomId"`
 	Placed          bool             `json:"placed"`
 	OpenTicketCount int64            `json:"openTicketCount"`
+	LabelStatus     string           `json:"labelStatus"`
+	LabelPrintedAt  *time.Time       `json:"labelPrintedAt"`
 	UpdatedAt       time.Time        `json:"updatedAt"`
 	UpdatedBy       *people.Ref      `json:"updatedBy"`
 }
@@ -132,7 +134,52 @@ type AssetTypeRefResp struct {
 func newAssetAdminResponse(a assets.Asset) AssetAdminResponse {
 	return AssetAdminResponse{ID: a.ID.String(), Code: a.Code, Name: a.Name, IsActive: a.IsActive,
 		Type:   AssetTypeRefResp{ID: a.Type.ID.String(), Key: a.Type.Key, Name: a.Type.Name, Icon: a.Type.Icon},
-		RoomID: a.RoomID.String(), Placed: a.Placed, OpenTicketCount: a.OpenTicketCount, UpdatedAt: a.UpdatedAt.UTC(), UpdatedBy: a.UpdatedBy}
+		RoomID: a.RoomID.String(), Placed: a.Placed, OpenTicketCount: a.OpenTicketCount, LabelStatus: a.LabelStatus, LabelPrintedAt: utcPtr(a.LabelPrintedAt),
+		UpdatedAt: a.UpdatedAt.UTC(), UpdatedBy: a.UpdatedBy}
+}
+
+func utcPtr(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := t.UTC()
+	return &u
+}
+
+// LabelAssetResponse is one #56 row (repair CR-036).
+type LabelAssetResponse struct {
+	ID             string        `json:"id"`
+	Code           string        `json:"code"`
+	Name           string        `json:"name"`
+	Building       NamedRef      `json:"building"`
+	Floor          LabelFloorRef `json:"floor"`
+	Room           NamedRef      `json:"room"`
+	LabelStatus    string        `json:"labelStatus"`
+	LabelPrintedAt *time.Time    `json:"labelPrintedAt"`
+}
+
+type NamedRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type LabelFloorRef struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Level int32  `json:"level"`
+}
+
+func newLabelAssetResponse(a assets.LabelAsset) LabelAssetResponse {
+	return LabelAssetResponse{ID: a.ID.String(), Code: a.Code, Name: a.Name,
+		Building:    NamedRef{ID: a.BuildingID.String(), Name: a.BuildingName},
+		Floor:       LabelFloorRef{ID: a.FloorID.String(), Name: a.FloorName, Level: a.FloorLevel},
+		Room:        NamedRef{ID: a.RoomID.String(), Name: a.RoomName},
+		LabelStatus: a.LabelStatus, LabelPrintedAt: utcPtr(a.LabelPrintedAt)}
+}
+
+// LabelsPrintedRequest is #57.
+type LabelsPrintedRequest struct {
+	AssetIDs []string `json:"assetIds"`
 }
 
 // AssetRequest is #47 (all fields) and #48 (only the changing ones + updatedAt).

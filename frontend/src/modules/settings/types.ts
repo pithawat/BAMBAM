@@ -255,6 +255,9 @@ export type AssetAdmin = {
   roomId: string;
   placed: boolean;
   openTicketCount: number;
+  /** (CR-007, repair CR-036) QR label vs today's data; computed on read. */
+  labelStatus: LabelStatus;
+  labelPrintedAt: string | null;
   updatedAt: string;
   updatedBy: PersonRef | null;
 };
@@ -288,6 +291,35 @@ export type CreateAssetTypeInput = { name: string; codePrefix: string; icon?: As
 
 /** #52 body: only the changing fields + `updatedAt`. */
 export type UpdateAssetTypeInput = { name?: string; codePrefix?: string; icon?: AssetIconName; mount?: AssetMount; updatedAt: string };
+
+// ---- QR labels (CR-007, repair CR-036, built in repair Stage 5B: #56, #57) ----
+
+/**
+ * `never` no label printed · `current` label = today's data · `moved` printed room ≠ room · `changed` same room, but the
+ * asset / building / floor / room name differs (repair BR-F13A-4). Moves from S20 and from repair S29 both count.
+ */
+export type LabelStatus = "never" | "current" | "moved" | "changed";
+
+/** #56 row: active assets of one building, ordered floor `level` → room name → code. */
+export type LabelAsset = {
+  id: string;
+  code: string;
+  name: string;
+  building: { id: string; name: string };
+  floor: { id: string; name: string; level: number };
+  room: { id: string; name: string };
+  labelStatus: LabelStatus;
+  labelPrintedAt: string | null;
+};
+
+/** #56 query: `buildingId` required; `floorId` / `roomId` narrow it. */
+export type LabelAssetsQuery = { buildingId: string; floorId?: string; roomId?: string };
+
+/** #57 body: 1–500 ids (`LABELS_MAX`). */
+export type LabelsPrintedInput = { assetIds: string[] };
+
+/** #57 limit (S30: the primary button is disabled above it). */
+export const LABELS_MAX = 500;
 
 // ---- Stage 5: categories, symptoms, contractor types (F27, F28, #32–#45) ----
 

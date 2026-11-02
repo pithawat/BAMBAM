@@ -61,6 +61,8 @@ var (
 	ErrAssetCodeTaken   = apperr.New(apperr.KindConflict, "ASSET_CODE_TAKEN", "asset code used by another asset")
 	ErrPointOutsideRoom = apperr.New(apperr.KindBusinessRule, "POINT_OUTSIDE_ROOM", "point is not inside the room outline")
 	ErrFloorNotFound    = apperr.New(apperr.KindNotFound, "FLOOR_NOT_FOUND", "floor not found")
+	// ErrAssetCodeLocked (CR-036): the printed QR label carries the code (BR-F13A-5).
+	ErrAssetCodeLocked = apperr.New(apperr.KindBusinessRule, "ASSET_CODE_LOCKED", "asset code is on a printed QR label")
 )
 
 // contractorNameTaken is 409 CONTRACTOR_NAME_TAKEN with the contractor that has the name (CR-023): the form

@@ -270,7 +270,7 @@ func (r *pgTxRepository) LockAsset(ctx context.Context, id uuid.UUID) (LockedAss
 		return LockedAsset{}, err
 	}
 	out := LockedAsset{ID: a.ID, AssetTypeID: a.AssetTypeID, RoomID: a.RoomID, Code: a.Code, Name: a.Name,
-		RotationDeg: a.RotationDeg, IsActive: a.IsActive}
+		RotationDeg: a.RotationDeg, IsActive: a.IsActive, LabelPrinted: a.LabelPrinted}
 	if a.Placed {
 		x, z := a.PosX, a.PosZ
 		out.X, out.Z = &x, &z

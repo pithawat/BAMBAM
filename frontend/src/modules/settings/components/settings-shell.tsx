@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { ForbiddenState } from "@/components/shared/states";
 import { canAnySettings } from "@/lib/platform/permissions";
+import { LABELS_HEADING, LABELS_PATH } from "../labels";
 import { settingsAccess, settingsHeading, settingsPageOf } from "../nav";
 import { SettingsHeading } from "./settings-heading";
 
@@ -36,7 +37,7 @@ export function SettingsShell({ children }: { children: ReactNode }) {
         children
       ) : (
         <>
-          {page && <SettingsHeading {...settingsHeading(page)} />}
+          {page && <SettingsHeading {...(pathname.startsWith(LABELS_PATH) ? LABELS_HEADING : settingsHeading(page))} />}
           <section className="rounded-xl border bg-card shadow-card">
             <ForbiddenState title={access.title} reason={access.reason} action={access.action} />
           </section>

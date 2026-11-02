@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Info, Loader2, Plus } from "lucide-react";
+import { Info, Loader2, Plus, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { AssetIcon } from "@/components/shared/asset-icon";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,8 @@ import { errorCode, errorFields, GENERIC_ERROR, sheetOnMobile } from "../setting
 import { checkTypeForm, ConflictAlert, conflictText, FieldLabel, FormError, MountChoice, typeErrorText } from "./place-dialogs";
 
 // S20 asset dialog (CR-001 design asset-form-desktop.png): building · floor · room, type (+ inline "เพิ่มประเภทใหม่"),
-// code (suggested by #49 on add until typed), name. Edit = แก้ไข / ย้ายห้อง: the type is read-only.
+// code (suggested by #49 on add until typed), name. Edit = แก้ไข / ย้ายห้อง: the type is read-only, and so is the code once
+// its QR label was printed (CR-007).
 
 export type AssetDialogTarget = { mode: "add"; roomId: string } | { mode: "edit"; asset: AssetAdmin };
 
@@ -47,6 +48,7 @@ export function AssetDialog({ target, tree, types, onOpenChange, onSaved, onType
   const [codeTouched, setCodeTouched] = useState(false);
   const [version, setVersion] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [codeLockedError, setCodeLockedError] = useState(false);
   const [conflict, setConflict] = useState<{ text: string; updatedAt: string } | null>(null);
   const [busy, setBusy] = useState(false);
   // inline type editor
@@ -73,6 +75,7 @@ export function AssetDialog({ target, tree, types, onOpenChange, onSaved, onType
       setCodeTouched(target.mode === "edit");
       setVersion(target.mode === "edit" ? target.asset.updatedAt : "");
       setError(null);
+      setCodeLockedError(false);
       setConflict(null);
       setTypeOpen(false);
     }
@@ -132,6 +135,7 @@ export function AssetDialog({ target, tree, types, onOpenChange, onSaved, onType
     if (!roomId || !typeId) return setError(GENERIC_ERROR);
     setBusy(true);
     setError(null);
+    setCodeLockedError(false);
     try {
       let saved: AssetAdmin;
       if (editing) {
@@ -151,6 +155,7 @@ export function AssetDialog({ target, tree, types, onOpenChange, onSaved, onType
       const c = errorCode(err);
       const f = errorFields(err);
       if (c === "ASSET_CODE_TAKEN") setError("รหัสอุปกรณ์นี้มีอยู่แล้ว กรุณาใช้รหัสอื่น");
+      else if (c === "ASSET_CODE_LOCKED") setCodeLockedError(true);
       else if (c === "VALIDATION_FAILED" && (f.code || f.name)) setError(f.code === "INVALID" ? "รหัสอุปกรณ์ใช้ได้เฉพาะ A–Z 0–9 - _ ไม่เกิน 50 ตัว" : "กรุณากรอกรหัสและชื่ออุปกรณ์");
       else if (editing && c === "VERSION_CONFLICT") {
         const fresh = await fetchFresh(editing).catch(() => null);
@@ -163,6 +168,8 @@ export function AssetDialog({ target, tree, types, onOpenChange, onSaved, onType
   }
 
   const moved = !!editing && roomId !== editing.roomId;
+  // CR-007 (repair BR-F13A-5): the printed QR carries the code, so it is read-only after any print.
+  const codeLocked = !!editing && editing.labelStatus !== "never";
 
   return (
     <Dialog open={!!target} onOpenChange={(o) => !busy && !typeBusy && onOpenChange(o)}>
@@ -286,10 +293,18 @@ export function AssetDialog({ target, tree, types, onOpenChange, onSaved, onType
               value={code}
               onChange={(e) => { setCode(e.target.value); setCodeTouched(true); }}
               placeholder="เช่น AC-1-003"
-              className="h-11 font-mono"
+              className="h-11 font-mono read-only:bg-muted/50"
+              readOnly={codeLocked}
+              aria-invalid={codeLockedError || undefined}
               aria-describedby="asset-code-hint"
             />
-            <p id="asset-code-hint" className="text-xs text-muted-foreground">รหัสต้องไม่ซ้ำกับอุปกรณ์อื่นในระบบ</p>
+            {codeLocked || codeLockedError ? (
+              <p id="asset-code-hint" className={cn("flex items-center gap-1.5 text-xs", codeLockedError ? "text-destructive" : "text-muted-foreground")}>
+                <QrCode className="size-3.5" aria-hidden />พิมพ์ป้าย QR แล้ว จึงเปลี่ยนรหัสไม่ได้
+              </p>
+            ) : (
+              <p id="asset-code-hint" className="text-xs text-muted-foreground">รหัสต้องไม่ซ้ำกับอุปกรณ์อื่นในระบบ</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <FieldLabel htmlFor="asset-name" required>ชื่ออุปกรณ์</FieldLabel>

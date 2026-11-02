@@ -48,6 +48,8 @@ var routes = []route{
 	{"46", "GET", "/rooms/:id/assets", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.RoomAssets }},
 	{"47", "POST", "/assets", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.CreateAsset }},
 	{"48", "PATCH", "/assets/:id", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.UpdateAsset }},
+	{"56", "GET", "/assets/labels", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.LabelAssets }},
+	{"57", "POST", "/assets/labels/printed", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.MarkLabelsPrinted }},
 	{"49", "GET", "/assets/suggest-code", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.SuggestAssetCode }},
 	{"50", "GET", "/asset-types", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.AssetTypes }},
 	{"51", "POST", "/asset-types", []string{PermAssets}, func(c *Controller) gin.HandlerFunc { return c.CreateAssetType }},

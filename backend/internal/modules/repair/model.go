@@ -727,6 +727,7 @@ type LockedAsset struct {
 	X, Z                    *float64
 	RotationDeg             int16
 	IsActive                bool
+	LabelPrinted            bool // CR-036: the code is locked
 }
 
 // Audit actions for platform.audit_log (BR-F31-5).

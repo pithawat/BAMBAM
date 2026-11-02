@@ -32,6 +32,8 @@ type Assets interface {
 	Types(ctx context.Context) ([]assets.AssetType, error)
 	CreateType(ctx context.Context, actor uuid.UUID, in assets.TypeInput) (assets.AssetType, error)
 	UpdateType(ctx context.Context, actor, id uuid.UUID, in assets.TypeInput) (assets.AssetType, error)
+	LabelAssets(ctx context.Context, f assets.LabelFilter) ([]assets.LabelAsset, error)
+	MarkLabelsPrinted(ctx context.Context, actor uuid.UUID, ids []uuid.UUID) ([]assets.Asset, error)
 }
 
 // RepairUsage is repair's SettingsAdmin as far as Stage 4 needs it.
@@ -193,6 +195,26 @@ func (s *Service) UpdateAsset(ctx context.Context, v Viewer, id uuid.UUID, in as
 	}
 	a, err := s.assets.UpdateAsset(ctx, v.ID, id, in)
 	return s.oneWithOpenTickets(ctx, a, err)
+}
+
+// LabelAssets implements #56 (repair CR-036): what S30 can print for one building.
+func (s *Service) LabelAssets(ctx context.Context, v Viewer, f assets.LabelFilter) ([]assets.LabelAsset, error) {
+	if !v.Can(PermAssets) {
+		return nil, apperr.ErrForbidden
+	}
+	return s.assets.LabelAssets(ctx, f)
+}
+
+// MarkLabelsPrinted implements #57: the admin confirmed the print (BR-F13A-3).
+func (s *Service) MarkLabelsPrinted(ctx context.Context, v Viewer, ids []uuid.UUID) ([]assets.Asset, error) {
+	if !v.Can(PermAssets) {
+		return nil, apperr.ErrForbidden
+	}
+	list, err := s.assets.MarkLabelsPrinted(ctx, v.ID, ids)
+	if err != nil {
+		return nil, err
+	}
+	return s.withOpenTickets(ctx, list)
 }
 
 // SuggestAssetCode implements #49.

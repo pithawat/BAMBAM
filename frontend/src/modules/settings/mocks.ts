@@ -25,6 +25,9 @@ import type {
   BuildingTypeAdmin,
   CreateBuildingTypeInput,
   UpdateBuildingTypeInput,
+  LabelAsset,
+  LabelAssetsQuery,
+  LabelStatus,
   RoomAssetsQuery,
   UpdateAssetInput,
   UpdateAssetTypeInput,
@@ -569,7 +572,10 @@ const placeStore = {
 
 function seedAsset(id: string, code: string, name: string, typeIndex: number, roomKey: string, placed = true): AssetAdmin {
   const t = placeStore.types[typeIndex];
-  return { id: placeId(id), code, name, isActive: true, type: { id: t.id, key: t.key, name: t.name, icon: t.icon }, roomId: placeId(roomKey), placed, openTicketCount: 0, updatedAt: SEED_AT, updatedBy: null };
+  return {
+    id: placeId(id), code, name, isActive: true, type: { id: t.id, key: t.key, name: t.name, icon: t.icon }, roomId: placeId(roomKey), placed,
+    openTicketCount: 0, labelStatus: "never", labelPrintedAt: null, updatedAt: SEED_AT, updatedBy: null,
+  };
 }
 placeStore.assets = [
   seedAsset("a1", "AC-1-001", "แอร์ห้องประชุม 1A", 0, "r111"),
@@ -578,7 +584,41 @@ placeStore.assets = [
   seedAsset("a4", "TV-1-001", "จอทีวีห้องประชุม 1A", 3, "r111"),
   seedAsset("a5", "AC-1-002", "แอร์ห้องประชุม 1B", 0, "r112"),
   seedAsset("a6", "AC-2-001", "แอร์ฝ่ายบัญชี", 0, "r121", false),
+  seedAsset("a7", "AC-2-002", "แอร์ฝ่ายจัดซื้อ ตัวซ้าย", 0, "r122"),
+  seedAsset("a8", "AC-2-003", "แอร์ฝ่ายจัดซื้อ ตัวขวา", 0, "r122"),
+  seedAsset("a9", "TV-2-001", "จอแสดงผลหน้าลิฟต์ ชั้น 2", 3, "r123"),
+  seedAsset("a10", "AC-3-001", "แอร์ห้องประชุม 3A", 0, "r131"),
+  seedAsset("a11", "MIC-3-001", "ไมโครโฟนตั้งโต๊ะ ห้องประชุม 3A", 1, "r131"),
+  seedAsset("a12", "SPK-3-001", "ลำโพงเพดาน ห้องประชุม 3A ตัวหน้าเวที", 2, "r131"),
+  seedAsset("a13", "TV-3-001", "จอทีวีห้องประชุม 3A", 3, "r131"),
+  seedAsset("a14", "AC-1-101", "แอร์ห้องประชุม อาคาร 2", 0, "r211"),
 ];
+
+// QR labels (CR-007): what each printed label says, by asset id. a1 / a4 current, a2 renamed since (changed),
+// a5 printed in ห้องประชุม 1A then moved to 1B (moved); the rest never printed.
+type LabelSnap = { code: string; name: string; buildingName: string; floorName: string; roomId: string; roomName: string; printedAt: string };
+const labelStore = new Map<string, LabelSnap>();
+
+function snapOf(a: AssetAdmin): Omit<LabelSnap, "printedAt"> {
+  const p = allRooms().find((x) => x.room.id === a.roomId)!;
+  return { code: a.code, name: a.name, buildingName: p.building.name, floorName: p.floor.name, roomId: p.room.id, roomName: p.room.name };
+}
+
+function labelOf(a: AssetAdmin): { labelStatus: LabelStatus; labelPrintedAt: string | null } {
+  const s = labelStore.get(a.id);
+  if (!s) return { labelStatus: "never", labelPrintedAt: null };
+  const cur = snapOf(a);
+  const status: LabelStatus =
+    s.roomId !== cur.roomId ? "moved"
+    : s.code !== cur.code || s.name !== cur.name || s.buildingName !== cur.buildingName || s.floorName !== cur.floorName || s.roomName !== cur.roomName ? "changed"
+    : "current";
+  return { labelStatus: status, labelPrintedAt: s.printedAt };
+}
+
+/** An asset as the API returns it: a copy with `labelStatus` computed now. */
+function assetOut(a: AssetAdmin): AssetAdmin {
+  return { ...structuredClone(a), ...labelOf(a) };
+}
 
 function allRooms(): { room: PlanRoom; floor: PlanFloor; building: PlanBuilding }[] {
   return placeStore.buildings.flatMap((b) => b.floors.flatMap((f) => f.rooms.map((r) => ({ room: r, floor: f, building: b }))));
@@ -588,6 +628,16 @@ function withCounts<T>(value: T): T {
   for (const { room: r } of allRooms()) r.activeAssetCount = placeStore.assets.filter((a) => a.roomId === r.id && a.isActive).length;
   for (const t of placeStore.types) t.activeAssetCount = placeStore.assets.filter((a) => a.type.id === t.id && a.isActive).length;
   return structuredClone(value);
+}
+
+for (const [key, patch] of [
+  ["a1", {}],
+  ["a4", {}],
+  ["a2", { name: "ไมโครโฟนไร้สาย" }],
+  ["a5", { roomId: placeId("r111"), roomName: "ห้องประชุม 1A" }],
+] as const) {
+  const a = placeStore.assets.find((x) => x.id === placeId(key))!;
+  labelStore.set(a.id, { ...snapOf(a), ...patch, printedAt: "2026-10-28T03:00:00Z" });
 }
 
 const placeText = (p: { floor: PlanFloor; building: PlanBuilding; room: PlanRoom }) => `${p.building.name} ชั้น ${p.floor.name} · ${p.room.name}`;
@@ -715,7 +765,7 @@ export function mockRoomAssets(roomId: string, query: RoomAssetsQuery): AssetAdm
       .filter((a) => !query.assetTypeId || a.type.id === query.assetTypeId)
       .filter((a) => !q || a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q))
       .sort((a, b) => a.code.localeCompare(b.code)),
-  );
+  ).map(assetOut);
 }
 
 const CODE_RE = /^[A-Za-z0-9_-]{1,50}$/;
@@ -748,11 +798,12 @@ export function mockCreateAsset(input: CreateAssetInput, actor: PersonRef): Asse
   if (codeTaken(input.code)) throw mockErrors.code(409, "ASSET_CODE_TAKEN");
   const a: AssetAdmin = {
     id: crypto.randomUUID(), code: input.code.trim(), name: input.name.trim(), isActive: true,
-    type: { id: type!.id, key: type!.key, name: type!.name, icon: type!.icon }, roomId: input.roomId, placed: false, openTicketCount: 0, updatedAt: now(), updatedBy: actor,
+    type: { id: type!.id, key: type!.key, name: type!.name, icon: type!.icon }, roomId: input.roomId, placed: false, openTicketCount: 0,
+    labelStatus: "never", labelPrintedAt: null, updatedAt: now(), updatedBy: actor,
   };
   placeStore.assets.push(a);
   mockAuditAppend({ action: "create", entityType: "asset", entityId: a.id, entityName: a.name, parentName: placeText(place!), changes: [] }, actor);
-  return structuredClone(a);
+  return assetOut(a);
 }
 
 /** #48 */
@@ -766,6 +817,7 @@ export function mockUpdateAsset(id: string, input: UpdateAssetInput, actor: Pers
   if (a.updatedAt !== input.updatedAt) throw mockErrors.code(409, "VERSION_CONFLICT");
   const editing = input.code !== undefined || input.name !== undefined || input.roomId !== undefined;
   if (editing && !a.isActive) throw mockErrors.code(404, "ASSET_NOT_FOUND");
+  if (input.code !== undefined && input.code.trim() !== a.code && labelStore.has(id)) throw mockErrors.code(422, "ASSET_CODE_LOCKED");
   if (input.code !== undefined && codeTaken(input.code, id)) throw mockErrors.code(409, "ASSET_CODE_TAKEN");
   const before = { ...a };
   if (input.code !== undefined) a.code = input.code.trim();
@@ -781,7 +833,38 @@ export function mockUpdateAsset(id: string, input: UpdateAssetInput, actor: Pers
   ];
   const action = changes.length ? "update" : a.isActive ? "activate" : "deactivate";
   mockAuditAppend({ action, entityType: "asset", entityId: id, entityName: a.name, parentName: placeText(place), changes }, actor);
-  return structuredClone(a);
+  return assetOut(a);
+}
+
+/** #56 — active assets of one building, floor level → room name → code. */
+export function mockLabelAssets(query: LabelAssetsQuery): LabelAsset[] {
+  if (!query.buildingId) throw mockErrors.code(400, "VALIDATION_FAILED", { buildingId: "REQUIRED" });
+  if (!placeStore.buildings.some((b) => b.id === query.buildingId)) throw mockErrors.code(404, "BUILDING_NOT_FOUND");
+  const rows: LabelAsset[] = [];
+  for (const a of placeStore.assets) {
+    const p = a.isActive ? allRooms().find((x) => x.room.id === a.roomId) : undefined;
+    if (!p || p.building.id !== query.buildingId) continue;
+    if ((query.floorId && p.floor.id !== query.floorId) || (query.roomId && p.room.id !== query.roomId)) continue;
+    rows.push({
+      id: a.id, code: a.code, name: a.name,
+      building: { id: p.building.id, name: p.building.name }, floor: { id: p.floor.id, name: p.floor.name, level: p.floor.level },
+      room: { id: p.room.id, name: p.room.name }, ...labelOf(a),
+    });
+  }
+  rows.sort((x, y) => x.floor.level - y.floor.level || x.room.name.localeCompare(y.room.name, "th") || x.code.toLowerCase().localeCompare(y.code.toLowerCase()));
+  return structuredClone(rows);
+}
+
+/** #57 — every id active, or nothing is saved (422 ASSET_NOT_ACTIVE). The API also writes one audit row (not listed in S26). */
+export function mockMarkLabelsPrinted(assetIds: string[]): AssetAdmin[] {
+  const ids = [...new Set(assetIds)];
+  if (ids.length === 0) throw mockErrors.code(400, "VALIDATION_FAILED", { assetIds: "REQUIRED" });
+  if (ids.length > 500) throw mockErrors.code(400, "VALIDATION_FAILED", { assetIds: "TOO_MANY" });
+  const list = ids.map((id) => placeStore.assets.find((a) => a.id === id && a.isActive));
+  if (list.some((a) => !a)) throw mockErrors.code(422, "ASSET_NOT_ACTIVE");
+  const at = now();
+  for (const a of list) labelStore.set(a!.id, { ...snapOf(a!), printedAt: at });
+  return list.map((a) => assetOut(a!));
 }
 
 /** #49 */

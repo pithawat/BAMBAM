@@ -162,6 +162,9 @@ func (s *Service) UpdateAsset(ctx context.Context, v Viewer, id uuid.UUID, in As
 		if !before.IsActive {
 			return ErrAssetNotFound
 		}
+		if before.LabelPrinted && in.Code != before.Code {
+			return ErrAssetCodeLocked
+		}
 		in.AssetTypeID = before.AssetTypeID
 		if in.RotationDeg == nil {
 			r := int(before.RotationDeg)

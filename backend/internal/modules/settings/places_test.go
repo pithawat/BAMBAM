@@ -85,6 +85,20 @@ func (f fakeAssets) UpdateType(context.Context, uuid.UUID, uuid.UUID, assets.Typ
 	return assets.AssetType{ID: uuid.New()}, f.err
 }
 
+func (f fakeAssets) LabelAssets(_ context.Context, lf assets.LabelFilter) ([]assets.LabelAsset, error) {
+	return []assets.LabelAsset{{ID: sampleAsset.ID, Code: "AC-5-012", Name: "แอร์ห้องประชุม 5B", BuildingID: lf.BuildingID, BuildingName: "อาคาร 1",
+		FloorID: uuid.New(), FloorName: "5", FloorLevel: 5, RoomID: uuid.New(), RoomName: "ห้องประชุม 5B", LabelStatus: assets.LabelMoved}}, f.err
+}
+func (f fakeAssets) MarkLabelsPrinted(_ context.Context, _ uuid.UUID, ids []uuid.UUID) ([]assets.Asset, error) {
+	out := make([]assets.Asset, 0, len(ids))
+	for _, id := range ids {
+		a := sampleAsset
+		a.ID, a.LabelStatus = id, assets.LabelCurrent
+		out = append(out, a)
+	}
+	return out, f.err
+}
+
 type fakeRepair struct{}
 
 func (fakeRepair) OpenTicketCounts(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]int64, error) {
@@ -135,6 +149,13 @@ func TestPlacesErrors(t *testing.T) {
 		{"bad room id", "POST", "/assets", `{"roomId":"x"}`, fakeLocations{}, fakeAssets{}, 400, "roomId"},
 		{"prefix taken", "POST", "/asset-types", `{"name":"x","codePrefix":"AC"}`, fakeLocations{}, fakeAssets{err: assets.ErrPrefixTaken}, 409, "CODE_PREFIX_TAKEN"},
 		{"suggest needs ids", "GET", "/assets/suggest-code?assetTypeId=x&roomId=y", "", fakeLocations{}, fakeAssets{}, 400, "assetTypeId"},
+		{"code locked", "PATCH", "/assets/:id", `{"code":"AC-1-009",` + at + `}`, fakeLocations{}, fakeAssets{err: assets.ErrCodeLocked}, 422, "ASSET_CODE_LOCKED"},
+		{"labels need building", "GET", "/assets/labels", "", fakeLocations{}, fakeAssets{}, 400, `"buildingId":"REQUIRED"`},
+		{"labels bad floor", "GET", "/assets/labels?buildingId=:id&floorId=x", "", fakeLocations{}, fakeAssets{}, 400, `"floorId":"INVALID"`},
+		{"labels unknown building", "GET", "/assets/labels?buildingId=:id", "", fakeLocations{}, fakeAssets{err: locations.ErrBuildingNotFound}, 404, "BUILDING_NOT_FOUND"},
+		{"printed malformed id", "POST", "/assets/labels/printed", `{"assetIds":["x"]}`, fakeLocations{}, fakeAssets{}, 422, "ASSET_NOT_ACTIVE"},
+		{"printed inactive", "POST", "/assets/labels/printed", `{"assetIds":["` + uuid.NewString() + `"]}`, fakeLocations{}, fakeAssets{err: assets.ErrAssetNotActive}, 422, "ASSET_NOT_ACTIVE"},
+		{"printed too many", "POST", "/assets/labels/printed", `{"assetIds":[` + strings.Repeat(`"x",`, 500) + `"x"]}`, fakeLocations{}, fakeAssets{}, 400, "TOO_MANY"},
 	}
 	for _, tc := range cases {
 		w := callBody(placesRouter(users.RoleSuperAdmin, tc.l, tc.a), tc.method, tc.path, tc.body)
@@ -158,5 +179,28 @@ func TestAssetsCarryOpenTickets(t *testing.T) {
 	}
 	if w := call(r, "GET", "/assets/suggest-code?assetTypeId="+uuid.NewString()+"&roomId="+uuid.NewString()); !strings.Contains(w.Body.String(), "AC-1-003") {
 		t.Errorf("suggest: %s", w.Body.String())
+	}
+}
+
+func TestLabelsShape(t *testing.T) {
+	r := placesRouter(users.RoleAdmin, fakeLocations{}, fakeAssets{})
+	w := call(r, "GET", "/assets/labels?buildingId=:id")
+	for _, want := range []string{`"building":{"id":`, `"floor":{"id":`, `"level":5`, `"room":{"id":`, `"labelStatus":"moved"`, `"labelPrintedAt":null`} {
+		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), want) {
+			t.Errorf("#56 missing %s: %d %s", want, w.Code, w.Body.String())
+		}
+	}
+	id := uuid.NewString()
+	w = callBody(r, "POST", "/assets/labels/printed", `{"assetIds":["`+id+`"]}`)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"labelStatus":"current"`) || !strings.Contains(w.Body.String(), id) || !strings.Contains(w.Body.String(), `"openTicketCount":2`) {
+		t.Errorf("#57: %d %s", w.Code, w.Body.String())
+	}
+	// settings.assets.manage only: a technician has no asset permission
+	tech := placesRouter(users.RoleTechnician, fakeLocations{}, fakeAssets{})
+	if w := call(tech, "GET", "/assets/labels?buildingId=:id"); w.Code != http.StatusForbidden {
+		t.Errorf("technician #56: %d", w.Code)
+	}
+	if w := callBody(tech, "POST", "/assets/labels/printed", `{"assetIds":["`+id+`"]}`); w.Code != http.StatusForbidden {
+		t.Errorf("technician #57: %d", w.Code)
 	}
 }

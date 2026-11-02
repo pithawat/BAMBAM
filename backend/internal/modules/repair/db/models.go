@@ -12,19 +12,22 @@ import (
 )
 
 type PlatformAsset struct {
-	ID          uuid.UUID
-	Code        string
-	Name        string
-	AssetTypeID uuid.UUID
-	RoomID      uuid.UUID
-	PosX        pgtype.Numeric
-	PosZ        pgtype.Numeric
-	RotationDeg int16
-	IsActive    bool
-	CreatedBy   *uuid.UUID
-	UpdatedBy   *uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             uuid.UUID
+	Code           string
+	Name           string
+	AssetTypeID    uuid.UUID
+	RoomID         uuid.UUID
+	PosX           pgtype.Numeric
+	PosZ           pgtype.Numeric
+	RotationDeg    int16
+	IsActive       bool
+	CreatedBy      *uuid.UUID
+	UpdatedBy      *uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	LabelPrintedAt *time.Time
+	LabelPrintedBy *uuid.UUID
+	LabelSnapshot  []byte
 }
 
 type PlatformAssetType struct {

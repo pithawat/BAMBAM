@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pithawat/BAMBAM/backend/internal/platform/assets"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/locations"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
@@ -81,5 +83,42 @@ func TestPgAssetLookupAndTicketLink(t *testing.T) {
 	// the ticket keeps its asset line after the asset is removed (BR-F31-4)
 	if detail, err = p.svc.Ticket(ctx, reporter, d.ID); err != nil || detail.Asset == nil {
 		t.Fatalf("ticket after deactivate: %+v %v", detail.Asset, err)
+	}
+}
+
+// Stage 5B (CR-036, BR-F13A-4 / -5): after the QR label is printed (settings #57), #32 refuses another code
+// but still moves the asset, and the move shows as `moved` on the settings read.
+func TestPgPrintedAssetCodeLocked(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	admin := p.user(t, users.RoleAdmin)
+	t.Cleanup(func() {
+		for _, q := range []string{
+			`DELETE FROM platform.audit_log WHERE actor_user_id = $1`,
+			`DELETE FROM platform.assets WHERE created_by = $1`,
+		} {
+			if _, err := p.pool.Exec(context.Background(), q, admin.ID); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
+		}
+	})
+
+	code1 := "TLB-" + uuid.NewString()[:6]
+	a, err := p.svc.CreateAsset(ctx, admin, AssetInput{AssetTypeID: acType, Code: code1, Name: "แอร์ทดสอบป้าย", RoomID: b1HR3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels := assets.NewService(assets.NewRepository(p.pool), locations.NewService(locations.NewRepository(p.pool)))
+	if _, err := labels.MarkLabelsPrinted(ctx, admin.ID, []uuid.UUID{a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.svc.UpdateAsset(ctx, admin, a.ID, AssetInput{Code: code1 + "X", Name: "แอร์ทดสอบป้าย", RoomID: b1HR3}); code(err) != "ASSET_CODE_LOCKED" {
+		t.Fatalf("code change after print: %v", err)
+	}
+	if _, err := p.svc.UpdateAsset(ctx, admin, a.ID, AssetInput{Code: code1, Name: "แอร์ทดสอบป้าย", RoomID: b1WC}); err != nil {
+		t.Fatalf("move after print: %v", err)
+	}
+	if got, err := assets.NewRepository(p.pool).Asset(ctx, a.ID); err != nil || got.LabelStatus != assets.LabelMoved {
+		t.Fatalf("status after a 3D move = %q, %v", got.LabelStatus, err)
 	}
 }

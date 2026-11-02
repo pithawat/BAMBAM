@@ -217,6 +217,77 @@ func (ctl *Controller) UpdateAsset(c *gin.Context) {
 	httpx.OK(c, newAssetAdminResponse(a))
 }
 
+// LabelAssets handles #56 GET /api/v1/settings/assets/labels?buildingId=&floorId=&roomId=.
+func (ctl *Controller) LabelAssets(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	fields := map[string]string{}
+	f := assets.LabelFilter{}
+	if raw := c.Query("buildingId"); raw == "" {
+		fields["buildingId"] = "REQUIRED"
+	} else if id := optionalID(fields, "buildingId", &raw); id != nil {
+		f.BuildingID = *id
+	}
+	if raw := c.Query("floorId"); raw != "" {
+		f.FloorID = optionalID(fields, "floorId", &raw)
+	}
+	if raw := c.Query("roomId"); raw != "" {
+		f.RoomID = optionalID(fields, "roomId", &raw)
+	}
+	if len(fields) > 0 {
+		httpx.Error(c, apperr.Validation(fields))
+		return
+	}
+	list, err := ctl.svc.LabelAssets(c.Request.Context(), v, f)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	out := make([]LabelAssetResponse, 0, len(list))
+	for _, a := range list {
+		out = append(out, newLabelAssetResponse(a))
+	}
+	httpx.OK(c, out)
+}
+
+// MarkLabelsPrinted handles #57 POST /api/v1/settings/assets/labels/printed.
+func (ctl *Controller) MarkLabelsPrinted(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	var req LabelsPrintedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Error(c, errMalformedBody)
+		return
+	}
+	if len(req.AssetIDs) > assets.MaxLabelsPerPrint {
+		httpx.Error(c, apperr.Validation(map[string]string{"assetIds": "TOO_MANY"}))
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(req.AssetIDs))
+	for _, raw := range req.AssetIDs {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			httpx.Error(c, assets.ErrAssetNotActive) // an id that cannot exist is "unknown" (nothing saved)
+			return
+		}
+		ids = append(ids, id)
+	}
+	list, err := ctl.svc.MarkLabelsPrinted(c.Request.Context(), v, ids)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	out := make([]AssetAdminResponse, 0, len(list))
+	for _, a := range list {
+		out = append(out, newAssetAdminResponse(a))
+	}
+	httpx.OK(c, out)
+}
+
 // SuggestAssetCode handles #49 GET /api/v1/settings/assets/suggest-code?assetTypeId=&roomId=.
 func (ctl *Controller) SuggestAssetCode(c *gin.Context) {
 	v, ok := viewer(c)

@@ -688,23 +688,24 @@ func (q *Queries) ListSiteBlocks(ctx context.Context) ([]ListSiteBlocksRow, erro
 
 const lockAsset = `-- name: LockAsset :one
 SELECT a.id, a.code, a.name, a.asset_type_id, a.room_id, COALESCE(a.pos_x, 0)::float8 AS pos_x, COALESCE(a.pos_z, 0)::float8 AS pos_z, (a.pos_x IS NOT NULL)::boolean AS placed,
-    a.rotation_deg, a.is_active
+    a.rotation_deg, a.is_active, (a.label_printed_at IS NOT NULL)::boolean AS label_printed
 FROM platform.assets a
 WHERE a.id = $1
 FOR UPDATE
 `
 
 type LockAssetRow struct {
-	ID          uuid.UUID
-	Code        string
-	Name        string
-	AssetTypeID uuid.UUID
-	RoomID      uuid.UUID
-	PosX        float64
-	PosZ        float64
-	Placed      bool
-	RotationDeg int16
-	IsActive    bool
+	ID           uuid.UUID
+	Code         string
+	Name         string
+	AssetTypeID  uuid.UUID
+	RoomID       uuid.UUID
+	PosX         float64
+	PosZ         float64
+	Placed       bool
+	RotationDeg  int16
+	IsActive     bool
+	LabelPrinted bool
 }
 
 // The asset as it is before a change (audit "before"); locked until the transaction ends.
@@ -722,6 +723,7 @@ func (q *Queries) LockAsset(ctx context.Context, id uuid.UUID) (LockAssetRow, er
 		&i.Placed,
 		&i.RotationDeg,
 		&i.IsActive,
+		&i.LabelPrinted,
 	)
 	return i, err
 }

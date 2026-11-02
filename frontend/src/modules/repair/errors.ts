@@ -30,6 +30,7 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   NOT_TEAM_HANDLED: "งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว",
   ASSET_NOT_FOUND: "ไม่พบอุปกรณ์นี้",
   ASSET_CODE_TAKEN: "รหัสนี้มีอุปกรณ์อื่นใช้แล้ว",
+  ASSET_CODE_LOCKED: "พิมพ์ป้าย QR ของอุปกรณ์นี้แล้ว จึงเปลี่ยนรหัสไม่ได้", // CR-036 (#32, BR-F13A-5)
   POINT_OUTSIDE_ROOM: "วางอุปกรณ์ในห้องที่เลือกเท่านั้น",
   FLOOR_NOT_FOUND: "ไม่พบชั้นนี้",
 };

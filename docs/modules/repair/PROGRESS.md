@@ -2,11 +2,12 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 accepted 2026-11-02 · of 8   **Updated:** 2026-11-02 (Stage 5 accepted)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 / 5B accepted 2026-11-02 · of 8   **Updated:** 2026-11-02 (Stage 5B accepted)
 
 ## Now
 
-- **Stage 5 accepted 2026-11-02**, tag `repair-stage-5` (CR-036 F13-B). Next: **Stage 5B** (print QR labels in the app, settings S30 + S20 actions) — `/build-stage repair 5B prepare` in a fresh session
+- **Stage 5B accepted 2026-11-02**, tag `repair-stage-5B` (CR-036 F13-A, D-142). Next: **Stage 6** (home by role) — `/build-stage repair 6 prepare` in a fresh session
+- **Stage 5 accepted 2026-11-02**, tag `repair-stage-5` (CR-036 F13-B)
 
 - **2026-11-01 CR-036 APPROVED (M, D-140) + settings CR-007:** QR = `{FRONTEND_URL}/q/{code}` (redirect to `/repair/new?asset=`, replaces D-024); in-app scan on phones only, desktop = manual code; asset code stays optional in S03; new **Stage 5B** after Stage 5 = print QR labels in the app (settings S30 + S20 actions, A4 3 × 4, label status never / current / moved / changed, code locked after print). Docs applied (flows F13-A / F13-B, plan Stage 5 + 5B, contracts, S16 / S03 / S06 / S02, settings S20 / S30, HANDOFFs). No code yet.
 
@@ -46,7 +47,7 @@
 
    - (2026-10-27) System Atlas already follows CR-024 / CR-025 / CR-026: no executive role, no F19-B / bell, 4R + 4P on the timeline (pending, no flows bound — owner's choice), F07 tour added (verify passes); 4R only re-checks with `/atlas sync repair` + `verify` after its FE changes
    - (D-113, 2026-10-26) the backend part is done in settings Stage 1 (migration executive → employee, no executive role, `Viewer.Can`, Go tests); 4R keeps FE copy / bell / toasts, e2e and the Atlas
-0. Stage 5B (QR labels, CR-036) — `/build-stage repair 5B prepare` in a fresh session
+0. Owner: try S30 on a real printer (Chrome / Edge, 100 % scale) and scan a paper label with a phone — not done yet
 0. Shared dev DB: run migrations up to `20261026000001` once a writable user exists (dev DB still rejects DDL)
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 
@@ -56,7 +57,10 @@
 - e2e: F06 BR-F06-2 assumes the employee's only ticket awaiting rating is its own — flaky in a full parallel run (passes alone); make it pick by id
 - CR-036: is UAT / prod served over HTTPS? The in-app camera (S16) needs a secure context; the phone's own camera + `/q/{code}` works either way. Owner not sure (2026-11-01) — confirm before UAT
 - CR-036: settings R2 (S20 restyle) and repair 5B (S20 print actions) both touch S20 — the later stage keeps the other's changes
-- `er-diagram.dbml` still shows the old planned `repair.assets`; real table is `platform.assets` (CR-016) + Stage 5B label columns — refresh the diagram when 5B is built
+- `er-diagram.dbml` still shows the old planned `repair.assets`; real table is `platform.assets` (CR-016) + Stage 5B label columns (`label_printed_at`, `label_printed_by`, `label_snapshot`) — refresh the diagram
+- 5B: the repair S29 3D asset dialog cannot show the code read-only up front (repair `<Asset>` has no label field); it shows `ASSET_CODE_LOCKED` under the code field after saving. Adding `labelPrinted` to `<Asset>` would be a small CR — owner to decide
+- 5B: AC2 checked by a Chromium print-to-PDF (A4, 12 cells per page, only labels) and the e2e; a real paper print + phone scan is still to do
+- 5B: when starting the e2e stack by hand, the API also needs `SUPER_ADMIN_EMPLOYEE_CODES=EMP0105` (see `e2e/test-stack.cjs` apiEnv) or F15 AC3 / F29 AC3 fail
 
 - 5P: stale test servers from an earlier session still hold :3100 / :8090 (old code) and could not be stopped from this session — 5P e2e / Atlas ran on :3200 / :8190 (`E2E_PORT` / `E2E_API_URL`, dist `.next-e2e2`); stop the old ones before the next `test:e2e`. Picker `ช่างผู้รับผิดชอบ` lists Superadmin users too (they hold every key, BR-F25-1) — confirm. A view-all role without `report` now starts the repair service at งานทั้งหมด (`repairHome`, shared lib)
 - 5P: S07 shows `ช่างผู้รับผิดชอบ` to staff only for in-house jobs; old in-house tickets without an assignee show `ยังไม่ระบุช่าง` (the S17 picker fills it at the next reschedule)
@@ -117,6 +121,8 @@
 - Mock photo restore: drafts drop photos with `blob:` URLs (mock uploads), so in mock mode a restored draft needs photos again
 
 ## Stage log
+
+- 2026-11-02: **Stage 5B accepted**, tag `repair-stage-5B` (CR-036 F13-A, D-142) — QR labels: #56 / #57, `labelStatus`, code lock (#48 / #32), S30 + S20 actions, e2e F13A
 
 - 2026-11-02: **Stage 5 accepted**, tag `repair-stage-5` (CR-036) — #25 asset lookup + `assetCode` on #5; S16 camera / manual / desktop card, S03 QR banner + prefill (QR replaces a saved draft, D-141), สแกน QR on S06 / Home (phones only); `/q/{code}` route handler; e2e F13B 11 / 11, full run 246 pass (5 parallel flakes pass alone); UI built by Claude, AC6 no screen e2e
 

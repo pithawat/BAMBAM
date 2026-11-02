@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Box, Building2, ChevronRight, DoorOpen, Lock, MoreHorizontal, Pencil, Plus, Power, Search, Tags } from "lucide-react";
+import { AlertCircle, Box, Building2, ChevronRight, DoorOpen, Lock, MoreHorizontal, Pencil, Plus, Power, Printer, QrCode, Search, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { AssetIcon } from "@/components/shared/asset-icon";
 import { useCurrentUser } from "@/components/shared/me-provider";
@@ -27,6 +28,8 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { getAssetTypes, getBuildingTypes, getPlanBuildings, getRoomAssets, updateAsset } from "../../api";
 import type { AssetAdmin, AssetTypeAdmin, BuildingTypeAdmin, PlanBuilding } from "../../types";
+import { labelsHref } from "../../labels";
+import { LabelBadge } from "../labels/label-badge";
 import { BuildingTypeDialog, BuildingTypesPanel } from "./building-types";
 import { SettingsHeading } from "../settings-heading";
 import { errorCode, GENERIC_ERROR, panelClass, sheetOnMobile } from "../settings-ui";
@@ -401,9 +404,19 @@ function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloa
                   <p className="text-[13px] text-muted-foreground">อุปกรณ์ {activeCount} ชิ้น</p>
                 </div>
                 {canAssets && (
-                  <Button className="h-11" onClick={() => setAssetDialog({ mode: "add", roomId: room.id })} disabled={types.length === 0}>
-                    <Plus aria-hidden />เพิ่มอุปกรณ์
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {/* CR-007: S30 with this room's active assets ticked */}
+                    {activeCount > 0 ? (
+                      <Button asChild variant="outline" className="h-11">
+                        <Link href={labelsHref({ building: building.id, floor: floor?.id, room: room.id })}><Printer aria-hidden />พิมพ์ป้ายทั้งห้อง</Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className="h-11" disabled><Printer aria-hidden />พิมพ์ป้ายทั้งห้อง</Button>
+                    )}
+                    <Button className="h-11" onClick={() => setAssetDialog({ mode: "add", roomId: room.id })} disabled={types.length === 0}>
+                      <Plus aria-hidden />เพิ่มอุปกรณ์
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -462,9 +475,10 @@ function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloa
                               </span>
                               <span className="min-w-0">
                                 <span className={cn("block truncate font-medium", a.isActive && "text-foreground")}>{a.name}</span>
-                                <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+                                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-muted-foreground">
                                   {a.code}
                                   {!a.isActive && <span className="rounded-sm bg-muted px-1.5 font-sans">ปิดใช้งาน</span>}
+                                  {a.isActive && <LabelBadge status={a.labelStatus} />}
                                 </span>
                               </span>
                             </div>
@@ -482,6 +496,9 @@ function AssetsTab({ tree, types, canRename, canAssets, search, setParams, reloa
                                 {a.isActive ? (
                                   <>
                                     <DropdownMenuItem className="min-h-10" onSelect={() => setAssetDialog({ mode: "edit", asset: a })}><Pencil aria-hidden />แก้ไข / ย้ายห้อง</DropdownMenuItem>
+                                    <DropdownMenuItem asChild className="min-h-10">
+                                      <Link href={labelsHref({ building: building.id, floor: floor?.id, room: room.id, assets: [a.id] })}><QrCode aria-hidden />พิมพ์ป้าย QR</Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem className="min-h-10" variant="destructive" onSelect={() => setDeactivating(a)}><Power aria-hidden />ปิดใช้งาน</DropdownMenuItem>
                                   </>
                                 ) : (

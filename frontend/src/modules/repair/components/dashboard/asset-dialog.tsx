@@ -103,6 +103,7 @@ export function AssetDialog({ draft, plan, types, onClose, onSaved }: {
     } catch (err) {
       const fields = fieldErrors(err, assetFieldMessages);
       if (errorCode(err) === "ASSET_CODE_TAKEN") setErrors({ code: "รหัสนี้มีอุปกรณ์อื่นใช้แล้ว" });
+      else if (errorCode(err) === "ASSET_CODE_LOCKED") setErrors({ code: "พิมพ์ป้าย QR ของอุปกรณ์นี้แล้ว จึงเปลี่ยนรหัสไม่ได้" }); // CR-036
       else if (Object.keys(fields).length) setErrors(fields);
       else toast.error(errorMessage(err));
     } finally {
