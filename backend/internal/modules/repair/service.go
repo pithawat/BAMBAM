@@ -61,6 +61,13 @@ type Repository interface {
 	ActiveAssetType(ctx context.Context, id uuid.UUID) (t AssetType, ok bool, err error)
 	AssetCodesWithPrefix(ctx context.Context, prefix string) ([]string, error)
 
+	// Stage 5 QR (service_qr.go). LookupAsset returns ErrAssetNotFound unless the asset, its room,
+	// floor and building are active; the code is matched ignoring case.
+	LookupAsset(ctx context.Context, code string) (AssetLookup, error)
+	// AssetTypeCategories: the active categories of the type, "อื่น ๆ" last, each with whether the
+	// building's type uses it.
+	AssetTypeCategories(ctx context.Context, typeID, buildingID uuid.UUID) ([]AssetCategory, error)
+
 	// InTx runs fn in one transaction with a repository bound to it.
 	InTx(ctx context.Context, fn func(tx TxRepository) error) error
 }
@@ -79,6 +86,8 @@ type TxRepository interface {
 	LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error)
 	TicketNumberFormat(ctx context.Context) (TicketNumberFormat, error)
 	NextTicketCounter(ctx context.Context, year int) (int64, error)
+	// ActiveAssetIDByCode: ok is false when no active asset has the code (ignoring case).
+	ActiveAssetIDByCode(ctx context.Context, code string) (id uuid.UUID, ok bool, err error)
 	// InsertTicket writes the ticket, its symptoms, attaches the photos and writes the `created` event.
 	InsertTicket(ctx context.Context, t NewTicket) error
 
@@ -317,6 +326,14 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 				return err
 			} else if !ok {
 				return ErrCategoryNotForBuilding
+			}
+		}
+		// F13-B: a report from a QR links the asset; an unknown code is kept as typed, unlinked.
+		if t.AssetCode != nil {
+			if id, ok, err := tx.ActiveAssetIDByCode(ctx, *t.AssetCode); err != nil {
+				return err
+			} else if ok {
+				t.AssetID = &id
 			}
 		}
 		k := DuplicateKey{CategoryID: t.CategoryID, FloorID: t.FloorID, RoomID: t.RoomID, Spot: normalizeSpot(in.LocationDetail)}

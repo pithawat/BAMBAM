@@ -4,6 +4,8 @@ Status: APPROVED (2026-10-16) — user approved screens + plan · rewritten by C
 
 > **CR-006 (2026-10-29):** layout per `../mockups/CR-006-design/App.tsx` (location panel: building select · floor grid · room list; equipment panel: room header + add, three stat tiles, search + type filter, table, footer pagination, "แสดงอุปกรณ์ที่ไม่ใช้งาน"). ประเภทอาคาร and ประเภทอุปกรณ์ become sub-menus of สถานที่และอุปกรณ์ (same content as today's tabs; `?tab=` kept as their routes). Behaviour, data and permissions otherwise unchanged. (CR-006)
 
+> **CR-007 (approved 2026-11-01, repair CR-036 — built in repair Stage 5B):** (1) row menu (active assets) adds `พิมพ์ป้าย QR` → S30 with this asset ticked; room heading adds an outline button `พิมพ์ป้ายทั้งห้อง` (`Printer` icon) → S30 with the room's active assets ticked; สถานที่และอุปกรณ์ gets the sub-menu `พิมพ์ป้าย QR` (S30). (2) Asset rows show a small badge from `labelStatus`: `moved` → **ย้ายแล้ว ควรพิมพ์ป้ายใหม่** (warning) · `changed` → **ข้อมูลบนป้ายเปลี่ยน ควรพิมพ์ใหม่** (warning) · `never` → **ยังไม่เคยพิมพ์ป้าย** (muted) · `current` → none. (3) Edit dialog: when `labelStatus` ≠ `never`, รหัสอุปกรณ์ is read-only with hint **พิมพ์ป้าย QR แล้ว จึงเปลี่ยนรหัสไม่ได้** (API 422 `ASSET_CODE_LOCKED` shows the same text under the field).
+
 - **Flows:** F26 (see ../../02-flows.md)
 - **Persona:** Admin and Superadmin on desktop (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** pick a room from the building plan and keep its equipment, the equipment types and the building / room names right.

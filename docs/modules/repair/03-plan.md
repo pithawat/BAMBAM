@@ -28,7 +28,8 @@ Repair Stage 1 needs: SSO login (S01 `/login`, `/signed-out`), `proxy.ts` gate, 
 | 3D-3 | **CR-030:** โมเดลจริงฝั่งสำนักงานใหญ่ — อาคาร 3, 4, TrialMix, โรงอาหาร, ห้องประชุม 60 ปี เป็นอาคารจริง (ชั้น ห้อง ผัง อุปกรณ์) | F23, F31 | S29 | done — accepted 2026-10-29, tag `repair-stage-3D-3` |
 | 3D-4 | **CR-031 / CR-032:** โมเดลจริงฝั่ง Riverside 9 อาคาร + ถนน ทางเดิน ที่จอดรถใน site view | F23, F31 | S29 | done — accepted 2026-10-30, tag `repair-stage-3D-4` |
 | 3D-5 | **CR-033 rework:** site view ตรงตามแปลนผังบริเวณ (ฝั่งสนญ. จากแปลน, ฝั่ง Riverside จาก OpenStreetMap + ครอปแปลน) · อาคาร 4 หมุน 180° · ปุ่มข้ามถนนไปอีกฝั่งในแผนที่ (ปุ่มด้านบนยังอยู่) · เบาเท่าเดิม | F23 | S29 | done — accepted 2026-11-01, tag `repair-stage-3D-5` |
-| 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) | F13-B | S16, S03 (QR banner) | pending |
+| 5 | สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้ให้ (CR-016: ตาราง assets มาจาก 3D แล้ว เหลือ lookup + สแกน) · QR = `/q/{code}`, ปุ่มสแกนเฉพาะมือถือ (CR-036) | F13-B | S16, S03 (QR banner), S06 / Home scan button (CR-036) | done — accepted 2026-11-02, tag `repair-stage-5` |
+| 5B | **CR-036:** สร้างและพิมพ์ป้าย QR ในแอป — ทีละชิ้น ทั้งห้อง หรือหลายชิ้น (A4 3 × 4) · ป้ายเตือนเมื่อย้าย / เปลี่ยนชื่อหลังพิมพ์ · ล็อกรหัสหลังพิมพ์ | F13-A | settings S30 (new), S20 | pending |
 | 6 | หน้าแรกตาม role (CR-016: admin ทำแล้วใน 3D) ~~และแจ้งเตือนเฉพาะตัวพร้อมกระดิ่ง~~ (CR-024) | F01 (Home) ~~, F19-B~~ | S02 ~~, S13, bell~~ | pending |
 | 7 | ~~ภาพรวมองค์กร S27~~ — **replaced by Stage 3D (CR-016)**; left: models for the other buildings when their data arrives | F23 | — | replaced |
 | 8 | ตรวจสิทธิ์ทุก role, edge cases, a11y และความพร้อม UAT | all phase-1 flows | all | pending |
@@ -616,38 +617,91 @@ Status: done — accepted 2026-11-01 (tag `repair-stage-5P`) · approved 2026-11
 
 ## Stage 5 — สแกน QR เติมฟอร์ม
 
+Status: done — accepted 2026-11-02 (tag `repair-stage-5`); UI built by Claude (owner request, no Codex hand-off). AC6 (move the asset in S20, then the same `/q/{code}` shows the new room) has no screen e2e — backend reads the current room each call; accepted with the gap (D-141). S03 + `?asset=` replaces a saved draft (owner, 2026-11-02).
+
 **Scope**
 - Flows: F13-B (in-app scan, phone-camera deep link, manual code, not found)
 - Screens: S16, S03 QR banner (found / not found / "ไม่ใช่อุปกรณ์นี้")
 - Endpoint: 25; asset seed
-- Out of this stage: F13-A (printing QR labels) — phase 1 labels are generated outside the app from the URL format in the contract (D-024)
+- ~~Out of this stage: F13-A (printing QR labels) — phase 1 labels are generated outside the app from the URL format in the contract (D-024)~~ → F13-A = Stage 5B (CR-036)
+
+> **CR-036 (2026-11-01):** QR = `{FRONTEND_URL}/q/{code}` (D-140); in-app scan on phones only; the report form never requires an asset code.
 
 **Backend (Claude)**
-- [ ] (CR-025) The prefilled form opens on step 2 ปัญหาที่พบ (place + category filled); a prefilled category not used in the asset's building type is dropped
-- [ ] ~~Migration `assets`~~ — created in Stage 3D (CR-016: `platform.assets`, room only, category via `asset_type_categories`); here: #25 lookup returns `room` + type, S03 prefills, ticket stores `asset_id` + `asset_code`
-- [ ] Endpoint 25; tests
+- [x] (CR-025) The prefilled form opens on step 2 ปัญหาที่พบ (place + category filled); a prefilled category not used in the asset's building type is dropped
+- [x] ~~Migration `assets`~~ — created in Stage 3D (CR-016: `platform.assets`, room only, category via `asset_type_categories`); here: #25 lookup returns `room` + type, S03 prefills, ticket stores `asset_id` + `asset_code`
+- [x] Endpoint 25; tests (2026-11-01: `service_qr.go`, unit + controller + Pg tests; no asset seed — assets come from S29 / S20, e2e creates its own)
 
 **Frontend contract (Claude)**
-- [ ] Types/mocks/api for 25 (`AC-05-012` found, anything else not found); QR decoder library chosen (BarcodeDetector + fallback — proposed) and added; HANDOFF → Stage 6
-- [ ] `proxy.ts` keeps `?asset=` through the login redirect (F13-B) — verify, it is shared code
+- [x] Types/mocks/api for 25 (`AC-05-012` found, anything else not found); QR decoder library chosen (BarcodeDetector + fallback — proposed) and added; HANDOFF → Stage 5 (`jsqr` fallback, `qr.ts`)
+- [x] `proxy.ts` keeps `?asset=` through the login redirect (F13-B) — verify, it is shared code; (CR-036) also `/q/{code}` (the gate already sends `next` = path + query — verify only, no change)
+- [x] (CR-036) Route `app/q/[code]/page.tsx` (outside the `(app)` layout): server redirect to `/repair/new?asset={code}` (code URL-encoded); no lookup there — S03 handles not found
+- [x] (CR-036) `canScanInApp()` helper in `modules/repair` = `(pointer: coarse)` + `navigator.mediaDevices?.getUserMedia`
 
 **Frontend UI (Codex)**
-- [ ] S16 camera / blocked / manual sheet / desktop
-- [ ] S03 QR banner states
+- [x] S16 camera / blocked / manual sheet / desktop (2026-11-01, built by Claude — owner request)
+- [x] S03 QR banner states
+- [x] (CR-036) S16 accepts only same-origin `/q/{code}`; S06 report card + Home repair card show a secondary "สแกน QR" button on phones only (`canScanInApp()`)
 
 **Wiring + e2e (Claude)**
-- [ ] `e2e/repair/F13B-qr-prefill.spec.ts` (deep link logged out → login → prefilled form; manual code not found)
+- [x] `e2e/repair/F13B-qr-prefill.spec.ts` (deep link logged out → login → prefilled form; manual code not found); (CR-036) the deep link is `/q/{code}`; desktop project has no scan button
 
 **Acceptance criteria**
-- [ ] AC1: Opening `/repair/new?asset=AC-05-012` while logged out → after login the form shows the QR banner with ระบบปรับอากาศ, อาคารหลัก ชั้น 5, ห้องประชุม 5B prefilled and editable
+- [ ] AC1: Opening `/q/AC-05-012` (CR-036; was `/repair/new?asset=`) while logged out → after login the form shows the QR banner with ระบบปรับอากาศ, อาคารหลัก ชั้น 5, ห้องประชุม 5B prefilled and editable
 - [ ] AC2: Unknown code → "ไม่พบอุปกรณ์นี้" and an empty form that still submits
 - [ ] AC3: On a phone, the scan button reads a printed test QR and opens the prefilled form; denying camera shows "เปิดกล้องไม่ได้" with manual entry
 - [ ] AC4: The created ticket shows the asset line in S07
+- [ ] AC5 (CR-036): Desktop shows no scan button on S06 / Home; `/repair/scan` on desktop shows the manual-code card; a QR that is not `/q/{code}` of this origin → toast "QR นี้ไม่ใช่ของ BAMBAM", scanning continues
+- [ ] AC6 (CR-036): Moving the asset to another room (S20) and opening the same `/q/{code}` → the form shows the new room
 
 **Demo script**
-1. Print / show a QR of `{FRONTEND_URL}/repair/new?asset=AC-05-012`
+1. Print / show a QR of `{FRONTEND_URL}/q/AC-05-012` (CR-036)
 2. Scan with the phone camera (logged out) → login → prefilled form → submit
 3. In the app, สแกน → deny camera → กรอกรหัสอุปกรณ์เอง → `XX-99` → not found
+4. (CR-036) Move the asset in S20 → scan the same QR → new room prefilled
+
+---
+
+## Stage 5B — พิมพ์ป้าย QR (CR-036)
+
+Status: pending — approved 2026-11-01 (D-140). Runs after Stage 5 (needs `/q/{code}`). UI builder (Codex or Claude) chosen at prepare.
+
+**Scope**
+- Flows: F13-A (BR-F13A-1…5)
+- Screens: settings **S30** พิมพ์ป้าย QR (`/settings/buildings/labels`, new), settings S20 (row menu "พิมพ์ป้าย QR", room action "พิมพ์ป้ายทั้งห้อง", label-status badge, code locked after print)
+- Endpoints: settings #56, #57; settings #46 + `labelStatus`; settings #48 and repair #32 refuse a code change after print (`ASSET_CODE_LOCKED`)
+- Shared code touched: `frontend/package.json` (`qrcode` + types)
+- Out of this stage: label templates other than A4 3 × 4, printing from S29 (3D)
+
+**Backend (Claude)**
+- [ ] Migration `…_platform_asset_labels.sql`: `platform.assets` + `label_printed_at timestamptz NULL`, `label_printed_by uuid NULL → platform.users ON DELETE SET NULL`, `label_snapshot jsonb NULL` (`code`, `name`, `buildingId/Name`, `floorId/Name`, `roomId/Name`); Down drops them
+- [ ] `internal/platform/assets`: `labelStatus` = `never` · `current` · `moved` (snapshot room ≠ room) · `changed` (any name differs), computed on read; used by #46 and #56
+- [ ] #56 list (building required, floor / room optional, active only, sorted floor level → room → code) · #57 record snapshot for up to 500 ids in one transaction (inactive / unknown id → 422 whole call) · audit log entry per call (`asset.label_printed`, count)
+- [ ] #48 / repair #32: code change when `label_printed_at IS NOT NULL` → 422 `ASSET_CODE_LOCKED`
+- [ ] Tests: status rules (move via #48 and via #32, rename room / building), code lock on both endpoints, #57 rejects inactive, 403 without `settings.assets.manage`, migration up / down
+
+**Frontend contract (Claude)**
+- [ ] Types / mocks / api for #56, #57 + `labelStatus` on `AssetAdmin`; `shortLocation()` helper (BR-F13A-1); `qrcode` package; HANDOFF → Stage 5B
+
+**Frontend UI**
+- [ ] S30: building select → floor / room tree with tick boxes ("ทั้งอาคาร") → asset list with tick boxes + filter (ทั้งหมด · ควรพิมพ์ใหม่ · ยังไม่เคยพิมพ์) → preview → พิมพ์ → confirm dialog
+- [ ] Print sheet: `@media print`, A4 portrait 3 × 4 cells (≈ 70 × 74 mm), QR SVG 40 mm (error correction M), text per BR-F13A-1, no app chrome
+- [ ] S20: row menu "พิมพ์ป้าย QR" → S30 preselected; room heading "พิมพ์ป้ายทั้งห้อง"; badge per `labelStatus`; edit dialog: code read-only with hint when printed
+
+**Wiring + e2e (Claude)**
+- [ ] `e2e/settings/F13A-qr-labels.spec.ts`: select 2 rooms → preview count → print (stub `window.print`) → confirm → statuses `current`; move one asset → "ย้ายแล้ว ควรพิมพ์ป้ายใหม่"; code edit refused; technician gets Forbidden
+
+**Acceptance criteria**
+- [ ] AC1: Admin prints one asset from S20 and a whole floor from S30; each label shows QR + code + name + `อ.1 · ชั้น 5 · …` and the QR opens `{FRONTEND_URL}/q/{code}`
+- [ ] AC2: Print preview / paper: 12 labels per A4 page, no cut-off text, nothing else on the page
+- [ ] AC3: After confirming, moving the asset (S20 or 3D) shows "ย้ายแล้ว ควรพิมพ์ป้ายใหม่"; renaming its room shows "ข้อมูลบนป้ายเปลี่ยน ควรพิมพ์ใหม่"; reprint clears it
+- [ ] AC4: Editing the code of a printed asset is not possible (S20 read-only, API 422 on #48 / #32)
+- [ ] AC5: Answering "ยังไม่" to the confirm records nothing
+
+**Demo script**
+1. Admin → ตั้งค่า → สถานที่และอุปกรณ์ → พิมพ์ป้าย QR → อาคาร 1 ชั้น 5 → preview → พิมพ์ → ใช่
+2. S20: move one asset to another room → badge "ย้ายแล้ว ควรพิมพ์ป้ายใหม่"
+3. Scan the printed label on a phone → form shows the new room
 
 ---
 
@@ -763,7 +817,7 @@ Status: done — accepted 2026-11-01 (tag `repair-stage-5P`) · approved 2026-11
 - D-021 IDs are UUIDs (not guessable in URLs; tickets are shown by `ticketNo`)
 - D-022 Photos: `PhotoStore` interface, phase 1 local directory (`PHOTO_STORAGE_DIR`, persistent volume), max 10 MB, client resize 1920px JPEG (quality 0.25, CR-026 / D-119), photos uploaded only on submit (CR-026 A1 / D-120), unattached photos deleted after 24 h
 - D-023 Platform screens: S01, S14, S15 + AppShell in Stage 0; S02 Home ~~and S13 notifications (+ `platform.notifications`)~~ (CR-024) in repair Stage 6
-- D-024 QR content = `{FRONTEND_URL}/repair/new?asset={code}`; F13-A label printing stays outside the app in phase 1
+- ~~D-024 QR content = `{FRONTEND_URL}/repair/new?asset={code}`; F13-A label printing stays outside the app in phase 1~~ → D-140: QR = `{FRONTEND_URL}/q/{code}`, labels printed in the app (Stage 5B) (CR-036)
 - D-025 Drag-and-drop library `@dnd-kit/sortable` (dropped by CR-005 — no queue); S12 rendered as data-driven SVG (no 3D library)
 - CR-005 decisions: D-038 – D-041
 

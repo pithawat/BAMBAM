@@ -146,6 +146,27 @@ type AssetDTO struct {
 	Name string `json:"name"`
 }
 
+// AssetLookupDTO = #25 (F13-B). `category` is null when the building's type uses no category of the
+// asset type (CR-025); `locationDetail` stays null — an asset is linked to a room only (CR-014).
+type AssetLookupDTO struct {
+	Code           string  `json:"code"`
+	Name           string  `json:"name"`
+	Category       *RefDTO `json:"category"`
+	Building       RefDTO  `json:"building"`
+	Floor          RefDTO  `json:"floor"`
+	Room           RefDTO  `json:"room"`
+	LocationDetail *string `json:"locationDetail"`
+}
+
+func toAssetLookupDTO(a AssetLookup) AssetLookupDTO {
+	d := AssetLookupDTO{Code: a.Code, Name: a.Name, Building: RefDTO(a.Building), Floor: RefDTO(a.Floor), Room: RefDTO(a.Room)}
+	if a.Category != nil {
+		c := RefDTO(*a.Category)
+		d.Category = &c
+	}
+	return d
+}
+
 type TicketResultDTO struct {
 	Note                    string        `json:"note"`
 	Photos                  []PhotoDTO    `json:"photos"`
@@ -507,7 +528,9 @@ func toDetailDTO(t TicketDetail) TicketDetailDTO {
 		SubscriberCount: t.SubscriberCount, RatingComment: t.RatingComment,
 		AllowedActions: t.AllowedActions, BlockedActions: t.BlockedActions,
 	}
-	// `asset` is filled from the asset register in Stage 6 (F13-B); until then it stays null.
+	if t.Asset != nil {
+		d.Asset = &AssetDTO{Code: t.Asset.Code, Name: t.Asset.Name}
+	}
 	if t.Result != nil {
 		d.Result = &TicketResultDTO{
 			Note: t.Result.Note, Photos: toPhotoDTOs(t.Result.Photos), By: toPersonDTO(t.Result.By), At: utcPtr(t.Result.At),

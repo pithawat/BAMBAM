@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Select as SelectPrimitive } from "radix-ui";
-import { ArrowRight, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Plus, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowRight, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Plus, QrCode, RotateCcw, Search, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
 import { MascotPanel } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { can, canReport, PERM } from "@/lib/platform/permissions";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getMyTickets } from "../api";
+import { useCanScanInApp } from "../qr";
 import { errorCode } from "../errors";
 import type { MyTicket, MyTicketPage, MyTicketsQuery, TicketSort } from "../types";
 import { CategoryTile } from "./category-icon";
@@ -65,6 +66,8 @@ export function MyTicketsScreen() {
   const lead = can(me, PERM.ticketTeamHandle);
   // settings CR-006: without `repair.ticket.report` there is no แจ้งซ่อมใหม่ (a lead keeps the team record)
   const reports = canReport(me);
+  // F13-B (CR-036): สแกน QR on phones only (coarse pointer + camera API).
+  const scan = useCanScanInApp();
   const relations = lead ? [...RELATIONS, TEAM_RELATION] : RELATIONS;
   const q = (params.get("q") ?? "").slice(0, 50);
   const scope = pick(relations, params.get("scope"));
@@ -138,7 +141,7 @@ export function MyTicketsScreen() {
           <p className="text-sm leading-6 text-primary-foreground/80">{lead ? "เรียกช่างช่วยดูแล หรือบันทึกงานที่ทีมแก้ไขแล้ว" : "แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล"}</p>
         </div>
         <div className="grid gap-2.5">
-          <Link href="/repair/new" className={cn("group flex items-center gap-3 rounded-[10px] bg-card px-4 text-base font-semibold text-primary outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-primary-foreground/70", lead ? "h-12" : "h-14")}>
+          <Link href="/repair/new" className={cn("group flex items-center gap-3 rounded-[10px] bg-card px-4 text-base font-semibold text-primary outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-primary-foreground/70", lead || scan ? "h-12" : "h-14")}>
             <Plus className="size-5" aria-hidden />
             <span className="flex-1">แจ้งซ่อมใหม่</span>
             <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -146,6 +149,11 @@ export function MyTicketsScreen() {
           {lead && <Link href="/repair/new?mode=team" className="group flex h-12 items-center gap-3 rounded-[10px] border border-primary-foreground/35 px-4 text-base font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-foreground/10 focus-visible:ring-3 focus-visible:ring-primary-foreground/70">
             <ClipboardCheck className="size-5" aria-hidden />
             <span className="flex-1">บันทึกงานที่ทีมแก้แล้ว</span>
+            <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </Link>}
+          {scan && <Link href="/repair/scan" className="group flex h-12 items-center gap-3 rounded-[10px] border border-primary-foreground/35 px-4 text-base font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-foreground/10 focus-visible:ring-3 focus-visible:ring-primary-foreground/70">
+            <QrCode className="size-5" aria-hidden />
+            <span className="flex-1">สแกน QR</span>
             <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </Link>}
         </div>

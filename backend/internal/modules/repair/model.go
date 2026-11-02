@@ -300,6 +300,7 @@ type TicketDetail struct {
 	TicketSummary
 	Details         *string
 	AssetCode       *string
+	Asset           *AssetRef // the linked asset (tickets.asset_id, F13-B); nil when none
 	Photos          []uuid.UUID
 	SubscriberCount int64
 	Result          *TicketResult
@@ -446,6 +447,7 @@ type NewTicket struct {
 	LocationDetail *string
 	Details        *string
 	AssetCode      *string
+	AssetID        *uuid.UUID // the active asset with AssetCode (F13-B); nil when none matches
 	ReporterID     uuid.UUID
 	SymptomIDs     []uuid.UUID
 	PhotoIDs       []uuid.UUID
@@ -675,6 +677,26 @@ type FloorPlan struct {
 	ModelFile      *string
 	Rooms          []PlanRoom
 	Assets         []Asset
+}
+
+// AssetRef is the asset line of a ticket (TicketDetail `asset`, S07).
+type AssetRef struct {
+	Code, Name string
+}
+
+// AssetLookup is #25 (F13-B): where the asset is now and the category the report form prefills.
+type AssetLookup struct {
+	Code, Name            string
+	TypeID                uuid.UUID
+	Building, Floor, Room Ref
+	Category              *Ref // nil when no category of the asset type is used in the building (CR-025)
+}
+
+// AssetCategory is one active category of an asset type, for the #25 prefill.
+type AssetCategory struct {
+	Ref
+	IsOther        bool
+	UsedInBuilding bool // the building's type uses the category (BR-F02-8)
 }
 
 // AssetInput is the body of #31 / #32 (AssetTypeID is ignored on #32: the type never changes).

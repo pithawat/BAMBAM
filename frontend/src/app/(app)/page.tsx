@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { ArrowRight, Clock, Sparkles, Wrench } from "lucide-react";
+import { ArrowRight, Clock, QrCode, Sparkles, Wrench } from "lucide-react";
 import { Mascot } from "@/components/shared/mascot";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { SERVICES } from "@/components/shared/service-icon";
@@ -12,6 +12,7 @@ import { can, canReport, PERM, repairHome, usesService } from "@/lib/platform/pe
 import { cn } from "@/lib/utils";
 import { AdminDashboard } from "@/modules/repair/components/dashboard/admin-dashboard";
 import { HomeTickets } from "@/modules/repair/components/home-tickets";
+import { useCanScanInApp } from "@/modules/repair/qr";
 
 // Home: whoever has `repair.overview.view` (Admin, Superadmin; settings CR-001) gets the S29 dashboard (repair
 // Stage 3D, CR-016); every other role gets the S02 employee Home. CR-035 (layout from
@@ -88,12 +89,14 @@ const CARD_TITLE = "mt-2.5 text-[25px] leading-[1.35] font-semibold tracking-[-0
 
 /** The live service, on the primary mascot panel (CR-035). Raised over its neighbours on desktop. */
 function RepairCard({ report, href, count }: { report: boolean; href: string; count: number }) {
+  // F13-B (CR-036): สแกน QR on phones only; desktop never shows it.
+  const scan = useCanScanInApp() && report;
   return (
     <article
       aria-labelledby="repair-title"
       className={cn(
-        "relative isolate flex h-63 flex-col overflow-hidden rounded-2xl bg-primary p-5 text-primary-foreground",
-        "sm:h-70 sm:px-7.5 sm:py-6.5",
+        "relative isolate flex min-h-63 flex-col overflow-hidden rounded-2xl bg-primary p-5 text-primary-foreground",
+        "sm:min-h-70 sm:px-7.5 sm:py-6.5",
         "lg:z-3 lg:h-[345px] lg:p-6 lg:shadow-[0_16px_30px_-22px_color-mix(in_srgb,var(--primary)_65%,transparent)]",
         count === 3 && "sm:col-span-2 lg:col-span-1",
         count > 1 && "lg:-mx-4",
@@ -117,12 +120,22 @@ function RepairCard({ report, href, count }: { report: boolean; href: string; co
       <Mascot pose="tracking" size={172} priority className="absolute right-3 bottom-2.5 -z-1 sm:hidden" />
       <Mascot pose="tracking" size={225} priority className="absolute right-11 bottom-5 -z-1 hidden sm:inline-block lg:hidden" />
       <Mascot pose="tracking" size={210} priority className="absolute right-1.5 bottom-2.5 -z-1 hidden lg:inline-block" />
-      <Button asChild variant="white" className="mt-auto h-11 self-start px-4 text-[13px]">
-        <Link href={href}>
-          {report ? "แจ้งซ่อมใหม่" : "ไปที่งานซ่อม"}
-          <ArrowRight aria-hidden />
-        </Link>
-      </Button>
+      <div className="mt-auto flex flex-col items-start gap-2">
+        <Button asChild variant="white" className="h-11 px-4 text-[13px]">
+          <Link href={href}>
+            {report ? "แจ้งซ่อมใหม่" : "ไปที่งานซ่อม"}
+            <ArrowRight aria-hidden />
+          </Link>
+        </Button>
+        {scan && (
+          <Button asChild variant="glass" size="sm" className="h-9 px-3.5 text-[13px]">
+            <Link href="/repair/scan">
+              <QrCode aria-hidden />
+              สแกน QR
+            </Link>
+          </Button>
+        )}
+      </div>
     </article>
   );
 }

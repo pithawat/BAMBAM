@@ -16,6 +16,7 @@ import {
   mockGetAssetTypes,
   mockHandoverTicket,
   mockListMyTickets,
+  mockLookupAsset,
   mockTechnicians,
   mockListTickets,
   mockOverview,
@@ -30,6 +31,7 @@ import {
 import type {
   AssessRequest,
   Asset,
+  AssetLookup,
   AssetType,
   Building,
   Category,
@@ -278,6 +280,19 @@ export async function handoverTicket(id: string, req: HandoverRequest): Promise<
     return mock(() => mockHandoverTicket(id, req.reason, mockViewer()), { delayMs: 500 });
   }
   return http.post<TicketDetail>(`${ticketPath(id)}/handover`, req);
+}
+
+// ---- #25 asset lookup (Stage 5 QR, F13-B) ----
+
+/**
+ * #25 S03 `?asset=` prefill and S16 manual code. 404 `ASSET_NOT_FOUND` → S03 "ไม่พบอุปกรณ์นี้" (form
+ * stays empty and usable) / S16 "ไม่พบอุปกรณ์รหัสนี้" under the field · 403 without `repair.ticket.report`.
+ * Any other failure: S03 treats it as not found, S16 shows the generic toast. The code is matched
+ * ignoring case; send it trimmed.
+ */
+export async function lookupAsset(code: string): Promise<AssetLookup> {
+  if (env.useMocks) return mock(() => mockLookupAsset(code, mockViewer()), { read: true, needsData: false });
+  return http.get<AssetLookup>(`${BASE}/assets/${encodeURIComponent(code.trim())}`);
 }
 
 // ---- #13–#19 contractors (F24) ----

@@ -184,3 +184,31 @@ SELECT asset_id::uuid AS asset_id, count(*)::bigint AS open_count
 FROM repair.tickets
 WHERE asset_id = ANY(@asset_ids::uuid[]) AND status <> 'closed'
 GROUP BY asset_id;
+
+-- name: LookupAssetByCode :one
+-- #25 (F13-B): an active asset whose room, floor and building are active; code ignoring case.
+SELECT a.code, a.name, a.asset_type_id,
+    r.id AS room_id, r.name AS room_name, f.id AS floor_id, f.name AS floor_name,
+    b.id AS building_id, b.name AS building_name
+FROM platform.assets a
+JOIN platform.rooms r ON r.id = a.room_id AND r.is_active
+JOIN platform.floors f ON f.id = r.floor_id AND f.is_active
+JOIN platform.buildings b ON b.id = f.building_id AND b.is_active
+WHERE lower(a.code) = lower(@code) AND a.is_active;
+
+-- name: ListAssetTypeCategories :many
+-- #25: the active categories of an asset type, with whether the building's type uses each (CR-025).
+SELECT c.id, c.name, c.is_other,
+    EXISTS (
+        SELECT 1 FROM platform.buildings b
+        JOIN repair.category_building_types cbt ON cbt.building_type_id = b.building_type_id
+        WHERE b.id = @building_id AND cbt.category_id = c.id
+    ) AS used_in_building
+FROM repair.asset_type_categories atc
+JOIN repair.categories c ON c.id = atc.category_id AND c.is_active
+WHERE atc.asset_type_id = @asset_type_id
+ORDER BY c.is_other, c.sort_order, c.name;
+
+-- name: ActiveAssetIDByCode :one
+-- #5: the asset a QR report links to (tickets.asset_id); the typed asset_code is kept as sent.
+SELECT id FROM platform.assets WHERE lower(code) = lower(@code) AND is_active;

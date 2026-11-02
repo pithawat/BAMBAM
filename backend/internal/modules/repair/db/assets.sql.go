@@ -13,6 +13,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activeAssetIDByCode = `-- name: ActiveAssetIDByCode :one
+SELECT id FROM platform.assets WHERE lower(code) = lower($1) AND is_active
+`
+
+// #5: the asset a QR report links to (tickets.asset_id); the typed asset_code is kept as sent.
+func (q *Queries) ActiveAssetIDByCode(ctx context.Context, code string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, activeAssetIDByCode, code)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const assetCodeTaken = `-- name: AssetCodeTaken :one
 SELECT EXISTS (
     SELECT 1 FROM platform.assets WHERE lower(code) = lower($1) AND id <> $2
@@ -422,6 +434,57 @@ func (q *Queries) ListAssetCodesWithPrefix(ctx context.Context, prefix string) (
 	return items, nil
 }
 
+const listAssetTypeCategories = `-- name: ListAssetTypeCategories :many
+SELECT c.id, c.name, c.is_other,
+    EXISTS (
+        SELECT 1 FROM platform.buildings b
+        JOIN repair.category_building_types cbt ON cbt.building_type_id = b.building_type_id
+        WHERE b.id = $1 AND cbt.category_id = c.id
+    ) AS used_in_building
+FROM repair.asset_type_categories atc
+JOIN repair.categories c ON c.id = atc.category_id AND c.is_active
+WHERE atc.asset_type_id = $2
+ORDER BY c.is_other, c.sort_order, c.name
+`
+
+type ListAssetTypeCategoriesParams struct {
+	BuildingID  uuid.UUID
+	AssetTypeID uuid.UUID
+}
+
+type ListAssetTypeCategoriesRow struct {
+	ID             uuid.UUID
+	Name           string
+	IsOther        bool
+	UsedInBuilding bool
+}
+
+// #25: the active categories of an asset type, with whether the building's type uses each (CR-025).
+func (q *Queries) ListAssetTypeCategories(ctx context.Context, arg ListAssetTypeCategoriesParams) ([]ListAssetTypeCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, listAssetTypeCategories, arg.BuildingID, arg.AssetTypeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAssetTypeCategoriesRow
+	for rows.Next() {
+		var i ListAssetTypeCategoriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.IsOther,
+			&i.UsedInBuilding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFloorAssets = `-- name: ListFloorAssets :many
 SELECT a.id, a.code, a.name, at.id AS type_id, at.key AS type_key, at.name AS type_name,
     r.id AS room_id, r.name AS room_name, COALESCE(a.pos_x, 0)::float8 AS pos_x, COALESCE(a.pos_z, 0)::float8 AS pos_z, (a.pos_x IS NOT NULL)::boolean AS placed, a.rotation_deg,
@@ -659,6 +722,47 @@ func (q *Queries) LockAsset(ctx context.Context, id uuid.UUID) (LockAssetRow, er
 		&i.Placed,
 		&i.RotationDeg,
 		&i.IsActive,
+	)
+	return i, err
+}
+
+const lookupAssetByCode = `-- name: LookupAssetByCode :one
+SELECT a.code, a.name, a.asset_type_id,
+    r.id AS room_id, r.name AS room_name, f.id AS floor_id, f.name AS floor_name,
+    b.id AS building_id, b.name AS building_name
+FROM platform.assets a
+JOIN platform.rooms r ON r.id = a.room_id AND r.is_active
+JOIN platform.floors f ON f.id = r.floor_id AND f.is_active
+JOIN platform.buildings b ON b.id = f.building_id AND b.is_active
+WHERE lower(a.code) = lower($1) AND a.is_active
+`
+
+type LookupAssetByCodeRow struct {
+	Code         string
+	Name         string
+	AssetTypeID  uuid.UUID
+	RoomID       uuid.UUID
+	RoomName     string
+	FloorID      uuid.UUID
+	FloorName    string
+	BuildingID   uuid.UUID
+	BuildingName string
+}
+
+// #25 (F13-B): an active asset whose room, floor and building are active; code ignoring case.
+func (q *Queries) LookupAssetByCode(ctx context.Context, code string) (LookupAssetByCodeRow, error) {
+	row := q.db.QueryRow(ctx, lookupAssetByCode, code)
+	var i LookupAssetByCodeRow
+	err := row.Scan(
+		&i.Code,
+		&i.Name,
+		&i.AssetTypeID,
+		&i.RoomID,
+		&i.RoomName,
+		&i.FloorID,
+		&i.FloorName,
+		&i.BuildingID,
+		&i.BuildingName,
 	)
 	return i, err
 }

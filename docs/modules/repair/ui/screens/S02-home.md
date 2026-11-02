@@ -3,6 +3,7 @@
 Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below) · **employee variant replaced by CR-035 (2026-11-01)**
 
 > **CR-035 (approved 2026-11-01) — replaces variant A below for every role without `repair.overview.view`; visual source `output/home-user-redesign/index.html` (layout only).** Centred greeting + H1 `เรื่องในที่ทำงาน / จัดการง่าย ในที่เดียว`; three overlapping service cards (repair in the middle on the primary mascot panel → `แจ้งซ่อมใหม่`, or `งานซ่อมของคุณ` → `ไปที่งานซ่อม` without the report key; car / room tilted "เร็วๆ นี้" cards, disabled); `รายการของฉัน` (report key only): 3 newest #35 rows + `มี {n} งานรอคุณประเมินตรวจงาน` + `ดูงานซ่อมทั้งหมด`. No QR button, no brand hero. Details: `../../changes/CR-035.md`.
+> **CR-036 (approved 2026-11-01, Stage 5):** the repair card gets a small secondary link-button `สแกน QR` (`QrCode` icon) → S16 `/repair/scan` under `แจ้งซ่อมใหม่`, **phones only** (`(pointer: coarse)` + camera API) and only with the report key. Desktop keeps no QR button.
 
 > **CR-024 (approved 2026-10-26):** no executive role — variant C / S29 is for `admin` only; no bell in the hero, no "แจ้งเตือนล่าสุด" desktop card, no notification preview; empty technician list copy per `_common.md` §9.
 

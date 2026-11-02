@@ -207,6 +207,9 @@ func (r *PgRepository) GetTicket(ctx context.Context, id, viewerID uuid.UUID) (T
 		},
 		Details: row.Details, AssetCode: row.AssetCode, SubscriberCount: row.SubscriberCount, RatingComment: row.RatingComment,
 	}
+	if row.LinkedAssetCode != nil && row.LinkedAssetName != nil {
+		d.Asset = &AssetRef{Code: *row.LinkedAssetCode, Name: *row.LinkedAssetName}
+	}
 	if err := r.fillContractorTypes(ctx, []*TicketSummary{&d.TicketSummary}); err != nil {
 		return TicketDetail{}, err
 	}
@@ -630,7 +633,7 @@ func (r *pgTxRepository) InsertTicket(ctx context.Context, t NewTicket) error {
 		ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority, PrioritySource: t.PrioritySource,
 		CategoryID: &t.CategoryID, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther, BuildingID: t.BuildingID,
 		FloorID: t.FloorID, RoomID: &t.RoomID, LocationDetail: t.LocationDetail, Details: t.Details, AssetCode: t.AssetCode,
-		ReporterID: t.ReporterID, CreatedAt: t.CreatedAt,
+		AssetID: t.AssetID, ReporterID: t.ReporterID, CreatedAt: t.CreatedAt,
 	}
 	if t.TeamHandled {
 		reason, at := ClosedReasonTeamHandled, t.CreatedAt

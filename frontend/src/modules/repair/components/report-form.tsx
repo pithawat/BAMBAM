@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertCircle, ArrowLeft, Bell, Building2, Camera, Check, ChevronDown, ChevronRight, CircleCheck, ClipboardCheck, DoorOpen, FileText, History, Info, Loader2, MapPin,
-  RotateCcw, Send, SquareParking, Upload, Wrench,
+  QrCode, RotateCcw, Send, SquareParking, Upload, Wrench,
 } from "lucide-react";
 import { MascotPanel } from "@/components/shared/mascot";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
@@ -24,11 +24,11 @@ import { clearDraftPhotos, purgeExpiredDraftPhotos, readDraftPhotos, saveDraftPh
 import { clearDraft, draftKey, readDraft, writeDraft } from "@/lib/drafts";
 import { initials } from "@/lib/platform/roles";
 import { cn } from "@/lib/utils";
-import { createTicket, followTicket, getDuplicates, getBuildings, getCategories, getRecentPlaces, MAX_PHOTOS } from "../api";
+import { createTicket, followTicket, getDuplicates, getBuildings, getCategories, getRecentPlaces, lookupAsset, MAX_PHOTOS } from "../api";
 import { createTicketFieldErrors, duplicateMatches, ownTicketAwaitingRating, errorCode, errorMessage } from "../errors";
 import { priorityReason, ticketPriority, type PriorityResult } from "../priority";
 import { categoryUsedIn } from "../types";
-import type { Building, Category, DuplicateTicket, Floor, Photo, RecentPlace, Room } from "../types";
+import type { AssetLookup, Building, Category, DuplicateTicket, Floor, Photo, RecentPlace, Room } from "../types";
 import { DuplicateCard, DuplicateDialog } from "./duplicate-dialog";
 import { CategoryTile, categoryIcon } from "./category-icon";
 import { forgetUploads, keptPhoto, photoBlocker, PhotoListLightbox, PhotoPicker, PhotoTile, uploadKeptPhotos, usePhotoList, type PhotoItem } from "./photo-picker";
@@ -147,6 +147,13 @@ function categoryNotUsed(v: Pick<Values, "categoryId" | "buildingId">, categorie
   return !!category && !!building && !categoryUsedIn(category, building);
 }
 
+/**
+ * F13-B QR prefill (Stage 5): `?asset={code}` (a scanned label, `/q/{code}` redirects here) looks the asset up once per
+ * visit. Found → banner + place / category filled, sent as `assetCode` while the banner is kept; not found or any
+ * error → Alert and an empty form (the code is never required, CR-036).
+ */
+type QrState = { status: "loading"; code: string } | { status: "found"; code: string; asset: AssetLookup } | { status: "missing"; code: string };
+
 /** The first step (in wizard order) that still has a problem, or undefined. */
 const firstOpenStep = (errors: Record<string, string>) => STEPS.find((s) => Object.keys(errors).some((k) => FIELD_STEP[k] === s.key))?.key;
 
@@ -165,16 +172,20 @@ const REPORT_FORBIDDEN = "บัญชีนี้ไม่มีสิทธิ
 /** The route entry: the mode comes from the URL and a new mode mounts a fresh form (no state leaks between modes). */
 export function ReportForm() {
   const me = useCurrentUser();
-  const mode = useSearchParams().get("mode");
+  const params = useSearchParams();
+  const mode = params.get("mode");
   const canTeam = can(me, PERM.ticketTeamHandle);
   const team = canTeam && mode === "team";
   // settings CR-006: reporting needs `repair.ticket.report`; a lead's team record needs only team_handle (the API agrees)
   if (!team && !canReport(me)) return <ForbiddenState reason={REPORT_FORBIDDEN} action={{ label: "ไปที่งานซ่อม", href: repairHome(me) }} />;
-  return <ReportFormBody key={team ? "team" : "repair"} team={team} canTeam={canTeam} />;
+  // F13-B: the QR prefill is for a new report only (team mode ignores `?asset=`).
+  const asset = team ? null : params.get("asset")?.trim() || null;
+  return <ReportFormBody key={team ? "team" : "repair"} team={team} canTeam={canTeam} asset={asset} />;
 }
 
-function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) {
+function ReportFormBody({ team, canTeam, asset }: { team: boolean; canTeam: boolean; asset: string | null }) {
   const me = useCurrentUser();
+  const router = useRouter();
   // Drafts are kept per mode (CR-021).
   const storageKey = draftKey(team ? "repair-team" : "repair-report", me.employeeCode);
   const [values, setValues] = useState<Values>(initial);
@@ -204,6 +215,11 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
   const [resetOpen, setResetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [qr, setQr] = useState<QrState | null>(null);
+  /** The `?asset=` of this visit was applied: a master reload never prefills again over the user's edits. */
+  const qrApplied = useRef(false);
+  // Read at load time only: dropping `asset` from the URL (ไม่ใช่อุปกรณ์นี้) must not reload the form.
+  const takeAsset = useEffectEvent(() => asset);
   const submitting = useRef(false);
   const frame = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -233,8 +249,25 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
 
   useEffect(() => {
     let active = true;
+    const code = takeAsset();
     Promise.all([getCategories(), getBuildings()]).then(async ([categories, buildings]) => {
       if (!active) return;
+      if (code && !qrApplied.current) {
+        // F13-B (owner proposal, confirmed at wire): the QR starts a new report — the saved draft is not restored,
+        // the autosave replaces it. Every prefilled field stays editable (BR-F13B-2).
+        qrApplied.current = true;
+        setMaster({ categories, buildings }); setMasterError(false); setQr({ status: "loading", code });
+        const found = await lookupAsset(code).catch(() => null);
+        if (!active) return;
+        if (found) {
+          // A category the building type does not use is dropped by sanitizeValues (CR-025); a room missing from
+          // #2 (master changed meanwhile) leaves the place open on step 1.
+          const next = sanitizeValues({ buildingId: found.building.id, floorId: found.floor.id, roomId: found.room.id, categoryId: found.category?.id ?? "" }, categories, buildings);
+          setValues(next); setStep(next.roomId ? "problem" : "location"); setQr({ status: "found", code, asset: found });
+        } else setQr({ status: "missing", code });
+        setReady(true);
+        return;
+      }
       // Restore the local draft once per visit (design-system.md "Draft"); its photo files come from
       // IndexedDB, entries older than 24 h are deleted first (CR-026 A1).
       const draft = readDraft<Draft>(storageKey);
@@ -273,6 +306,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
     setValues(initial); setPhotos([]); setStep("location"); setAttempted([]); setServerErrors({}); setSubmitError(""); setCategoryCleared(false);
     setMasterError(false); setReady(false); setRestoredAt(null); setPhotosLost(false); setSending("");
     setTeamPhotos([]); setDuplicateDialog(null); setFollowing(null); setMatches({ key: "", room: "", tickets: [] });
+    setQr(null); qrApplied.current = false;
     submitting.current = false; setBusy(false);
   }, []);
 
@@ -387,6 +421,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
         ...(values.details.trim() ? { details: values.details.trim() } : {}),
         photoIds,
         teamHandled: team ? { note: values.teamNote.trim(), photoIds: teamPhotoIds } : null,
+        ...(qr?.status === "found" ? { assetCode: qr.asset.code } : {}),
       });
       dropDraft();
       // Stays busy until the route is hidden; the effect cleanup above resets the form.
@@ -427,8 +462,13 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
       submitting.current = false; setBusy(false);
     }
   }
+  /** ไม่ใช่อุปกรณ์นี้: the asset link and banner go, the field values stay; a reload no longer prefills. */
+  function dropQr() {
+    setQr(null);
+    if (asset) router.replace("/repair/new", { scroll: false });
+  }
   function resetForm() {
-    dropDraft();
+    dropDraft(); if (qr) dropQr();
     setValues(initial); setPhotos([]); setStep("location"); setAttempted([]); setServerErrors({}); setSubmitError(""); setCategoryCleared(false);
     setRestoredAt(null); setPhotosLost(false); setResetOpen(false);
     setTeamPhotos([]); setDuplicateDialog(null);
@@ -479,6 +519,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
       <FieldError id="duplicateSpot-error" message={shown.duplicateSpot ?? shown.locationDetail} />
     </div>
   </DuplicateCard> : null;
+  const qrAsset = qr?.status === "found" ? qr.asset : null;
   const visibleCategories = building ? categories.filter((c) => categoryUsedIn(c, building)) : categories;
   const teamFields = canTeam ? <section hidden={!team} aria-label="งานที่ทีมทำ" className="space-y-4 rounded-lg border bg-muted/30 p-4">
     <div data-field="teamHandled.note">
@@ -567,6 +608,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
 
         <fieldset disabled={busy || following !== null || masterReloading} data-testid="report-body"
           className="grid min-w-0 rounded-xl border bg-card p-4 shadow-card disabled:opacity-70 sm:p-6 lg:rounded-none lg:border-0 lg:px-6 lg:py-5 lg:shadow-none">
+          {qr && <QrBanner qr={qr} onDismiss={dropQr} />}
           {panel("location", <>
             {stepHeading("location", "ปัญหาเกิดขึ้นที่ไหน", "เลือกอาคาร ชั้น และห้อง", <RecentPlaces recent={recent} buildings={buildings} onPick={update} />)}
             <LocationStep values={values} buildings={buildings} building={building} floor={floor} errors={shown} onChange={update} spotRequired={spotRequired} />
@@ -587,7 +629,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
             {stepHeading("send", "รูปภาพและตรวจสอบก่อนส่ง", "แนบรูปอย่างน้อย 1 รูป เล่าเพิ่มได้ถ้าต้องการ แล้วตรวจข้อมูลก่อนกดส่ง")}
             <SendStep photos={photos} onPhotosChange={(next) => { setPhotos(next); setServerErrors((old) => { const n = { ...old }; delete n.photoIds; return n; }); }}
               disabled={busy || following !== null} errors={shown} details={values.details} onDetails={(details) => update({ details })} teamFields={teamFields} team={team}
-              summary={<><ReviewList category={category} values={values} priority={priority} building={building} floor={floor} room={room} team={team} onEdit={(key) => go(key)} />{duplicateCard && <div className="mt-4">{duplicateCard}</div>}</>} />
+              summary={<><ReviewList category={category} values={values} priority={priority} building={building} floor={floor} room={room} asset={qrAsset} team={team} onEdit={(key) => go(key)} />{duplicateCard && <div className="mt-4">{duplicateCard}</div>}</>} />
           </>)}
         </fieldset>
 
@@ -612,7 +654,7 @@ function ReportFormBody({ team, canTeam }: { team: boolean; canTeam: boolean }) 
         <Info className="mt-0.5 size-4 shrink-0" aria-hidden />ต้องการเปลี่ยนประเภทงาน? ปิดฟอร์มนี้แล้วเริ่มใหม่ ข้อมูลที่กรอกจะไม่ถูกบันทึก
       </p>}
       </div>
-      <Summary category={category} values={values} priority={priority} building={building} floor={floor} room={room} me={me} team={team}
+      <Summary category={category} values={values} priority={priority} building={building} floor={floor} room={room} asset={qrAsset} me={me} team={team}
         mode={canTeam} duplicateCard={step === "send" ? duplicateCard : null} onEdit={(key) => go(key)} />
       <div className="h-4 lg:hidden" aria-hidden />
     </form>
@@ -876,8 +918,8 @@ function SendStep({ photos, onPhotosChange, disabled, errors, details, onDetails
 }
 
 /** ตรวจสอบก่อนส่ง: สถานที่ · ปัญหา · ความเร่งด่วน (CR-025 order), each with แก้ไข back to its step (photos are not repeated). */
-function ReviewList({ category, values, priority, building, floor, room, onEdit, team }: {
-  category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room; onEdit: (step: StepKey) => void; team: boolean;
+function ReviewList({ category, values, priority, building, floor, room, asset, onEdit, team }: {
+  category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room; asset: AssetLookup | null; onEdit: (step: StepKey) => void; team: boolean;
 }) {
   const symptoms = [
     ...(category?.symptoms.filter((s) => values.symptomIds.includes(s.id)).map((s) => s.name) ?? []),
@@ -891,7 +933,7 @@ function ReviewList({ category, values, priority, building, floor, room, onEdit,
     {step ? <Button type="button" variant="link" className="h-6 px-0 text-sm" onClick={() => onEdit(step)} aria-label={`แก้ไข${label}`}>แก้ไข</Button> : <span />}
   </div>;
   return <dl className="overflow-hidden rounded-lg border bg-card">
-    {row("สถานที่", building && floor ? <>{building.name} · {floorLabel(floor.name)}<span className="block">{room ? <b className="font-semibold">{room.name}</b> : dash}{values.locationDetail.trim() && <span className="text-muted-foreground"> · {values.locationDetail.trim()}</span>}</span></> : dash, "location")}
+    {row("สถานที่", building && floor ? <>{building.name} · {floorLabel(floor.name)}<span className="block">{room ? <b className="font-semibold">{room.name}</b> : dash}{values.locationDetail.trim() && <span className="text-muted-foreground"> · {values.locationDetail.trim()}</span>}</span>{asset && <AssetLine asset={asset} />}</> : dash, "location")}
     {row("ปัญหา", category ? <><b className="font-semibold">{categoryLabel}</b>{symptoms.length > 0 && <span className="block">{symptoms.join(" · ")}</span>}</> : dash, "problem")}
     {row("ความเร่งด่วน", priority ? <span className="flex flex-wrap items-center gap-1.5"><PriorityBadge priority={priority.priority} /><span className="text-muted-foreground">{priority.source === "symptom" ? "จากอาการ" : "ระดับเริ่มต้นของหมวด"}</span></span> : dash)}
     {team && row("งานที่ทีมทำ", values.teamNote.trim() || <span className="text-muted-foreground">ยังไม่ได้กรอก</span>, "send")}
@@ -899,8 +941,8 @@ function ReviewList({ category, values, priority, building, floor, room, onEdit,
 }
 
 /** สรุปการแจ้งซ่อม (CR-019, desktop): live on every step; แก้ไข jumps back to that step. */
-function Summary({ category, values, priority, building, floor, room, me, onEdit, team, mode, duplicateCard }: {
-  category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room;
+function Summary({ category, values, priority, building, floor, room, asset, me, onEdit, team, mode, duplicateCard }: {
+  category?: Category; values: Values; priority: PriorityResult | null; building?: Building; floor?: Floor; room?: Room; asset: AssetLookup | null;
   me: { name: string; department: string | null }; onEdit: (step: StepKey) => void;
   /** `mode`: leads see which form they opened (CR-021, the mode is fixed per entry point). */
   team: boolean; mode: boolean; duplicateCard: ReactNode;
@@ -930,7 +972,7 @@ function Summary({ category, values, priority, building, floor, room, me, onEdit
       <dl>
         {team && row("งานที่ทีมทำ", <span aria-hidden className={soft}><CircleCheck className="size-4" /></span>, values.teamNote.trim() || "ยังไม่ได้กรอก", "send")}
         {row("สถานที่", <span aria-hidden className={soft}><MapPin className="size-4.5" /></span>,
-          building && floor ? <><b className="font-semibold">{building.name} · {floorLabel(floor.name)}</b><span className="block text-muted-foreground">{room ? room.name : "ยังไม่ได้เลือกห้อง"}{values.locationDetail.trim() && ` · ${values.locationDetail.trim()}`}</span></> : dash, "location")}
+          building && floor ? <><b className="font-semibold">{building.name} · {floorLabel(floor.name)}</b><span className="block text-muted-foreground">{room ? room.name : "ยังไม่ได้เลือกห้อง"}{values.locationDetail.trim() && ` · ${values.locationDetail.trim()}`}</span>{asset && <AssetLine asset={asset} />}</> : dash, "location")}
         {row("ปัญหาที่พบ", <CategoryTile icon={category?.icon} />,
           category ? <><b className="font-semibold">{categoryLabel}</b>{symptoms.length > 0 && <span className="block text-muted-foreground">{symptoms.join(" · ")}</span>}</> : dash, "problem")}
         {priority && row("ความเร่งด่วน", <span aria-hidden className={soft}><AlertCircle className="size-4.5" /></span>,
@@ -945,4 +987,33 @@ function Summary({ category, values, priority, building, floor, room, me, onEdit
       <p><b className="block text-sm font-semibold text-foreground">ส่งแล้วติดตามได้ตลอด</b>ดูความคืบหน้าได้ที่หน้าติดตามงานซ่อม ตั้งแต่รับเรื่องจนปิดงาน</p>
     </div>
   </aside>;
+}
+
+/** S03 QR banner (F13-B): skeleton while #25 answers, then found (asset + ไม่ใช่อุปกรณ์นี้) or not found. */
+function QrBanner({ qr, onDismiss }: { qr: QrState; onDismiss: () => void }) {
+  if (qr.status === "missing") return <Alert className="mb-4 border-primary/15" data-testid="qr-banner">
+    <QrCode aria-hidden className="text-primary" />
+    <AlertTitle className="font-semibold">ไม่พบอุปกรณ์นี้</AlertTitle>
+    <AlertDescription>กรอกข้อมูลเองได้เลย</AlertDescription>
+  </Alert>;
+  return <div role="status" aria-busy={qr.status === "loading" || undefined} data-testid="qr-banner"
+    className="mb-4 flex items-start gap-3 rounded-lg border border-primary/15 bg-secondary px-3.5 py-3 text-sm text-secondary-foreground sm:px-4">
+    <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground"><QrCode className="size-5" /></span>
+    {qr.status === "loading" ? <div className="min-w-0 flex-1 space-y-2 py-1">
+      <span className="sr-only">กำลังค้นหาอุปกรณ์ {qr.code}</span>
+      <Skeleton className="h-4 w-36" />
+      <Skeleton className="h-3.5 w-60 max-w-full" />
+    </div> : <div className="min-w-0 flex-1 leading-6">
+      <p className="font-semibold">เติมข้อมูลจาก QR แล้ว</p>
+      <p className="wrap-break-word text-foreground">{qr.asset.name} · <span className="font-medium whitespace-nowrap tabular-nums">{qr.asset.code}</span></p>
+      <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[13px]">แก้ไขได้ถ้าไม่ตรง
+        <Button type="button" variant="link" className="h-7 px-0 text-[13px]" onClick={onDismiss}>ไม่ใช่อุปกรณ์นี้</Button></p>
+    </div>}
+  </div>;
+}
+
+/** The asset line under สถานที่ (review card, desktop summary) while the QR banner is kept. */
+function AssetLine({ asset }: { asset: AssetLookup }) {
+  return <span className="mt-0.5 flex items-start gap-1.5 text-muted-foreground"><QrCode className="mt-1 size-3.5 shrink-0" aria-hidden />
+    <span className="min-w-0">อุปกรณ์ <span className="font-medium text-foreground tabular-nums">{asset.code}</span> {asset.name}</span></span>;
 }

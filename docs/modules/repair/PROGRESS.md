@@ -2,9 +2,13 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; next: 5 · of 8   **Updated:** 2026-11-01 (Stage 5P accepted)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 accepted 2026-11-02 · of 8   **Updated:** 2026-11-02 (Stage 5 accepted)
 
 ## Now
+
+- **Stage 5 accepted 2026-11-02**, tag `repair-stage-5` (CR-036 F13-B). Next: **Stage 5B** (print QR labels in the app, settings S30 + S20 actions) — `/build-stage repair 5B prepare` in a fresh session
+
+- **2026-11-01 CR-036 APPROVED (M, D-140) + settings CR-007:** QR = `{FRONTEND_URL}/q/{code}` (redirect to `/repair/new?asset=`, replaces D-024); in-app scan on phones only, desktop = manual code; asset code stays optional in S03; new **Stage 5B** after Stage 5 = print QR labels in the app (settings S30 + S20 actions, A4 3 × 4, label status never / current / moved / changed, code locked after print). Docs applied (flows F13-A / F13-B, plan Stage 5 + 5B, contracts, S16 / S03 / S06 / S02, settings S20 / S30, HANDOFFs). No code yet.
 
 - **2026-11-01 CR-035 accepted by owner, tag `repair-cr-035` (D-139, visual only):** employee Home from `output/home-user-redesign/index.html` (+ รายการของฉัน from #35), S06 top row from `repair-my-option-b.html`, one `MascotPanel` (white tiger on solid primary) for every mascot: login, S03, S05, S06, S07 review band, S29 + empty attention, settings headings, empty / error / forbidden. tsc / eslint pass; screenshots 390 / 820 / 1440, no overflow / JS errors; e2e F01 / F29 / F06 / F07 / F23 pass (selectors updated; one 3D budget load flake passed alone). Run on a scratch stack web :3300 / API :8290 (`.next-e2e3`). Atlas synced (CR-035 on the timeline, verify 13 / 13 pass). Next: Stage 5 (`/build-stage repair 5 prepare` in a fresh session).
 
@@ -36,17 +40,23 @@
 - **CR-023 done 2026-10-26 (M, D-105):** contractor names unique ignoring case / spaces, inactive included (re-activate instead); branch typed into the name; migration `20261026000001` (stops on existing duplicates); 409 `CONTRACTOR_NAME_TAKEN`; S18 `ดูร้านนี้` / S17 `เลือกร้านนี้`; Go unit + Pg + e2e F24 AC8
 - **e2e coverage round 2026-10-26:** specs F06 / F07 / F21 / F24 (+ F02 draft restore) — full run 118 passed, 0 failed (before CR-023's case); fixed S18 / S09 desktop header buttons and the empty S18 edit form; D-103 (no software WebGL on desktop, fixed the F03 AC1 "33 s" issue); Atlas `upload` action (D-104); tours F03 / F04 / F05, every runnable tour passes
 - **Atlas tours 2026-10-26:** 12 runnable flows have tours and pass `cli verify` — F01-B, F02, F03, F04, F05, F06, F08-B, F21, F22, F23, F24, F31; F07 has none (F07-2 auto-close has no e2e — owner: no test case); OV (overview path) has no tour of its own. Full e2e after CR-023: 120 passed, 0 failed, 6 skipped
-- CR-004 (Home blocks) PROPOSED, waiting for a pick · `ui/HANDOFF.md`: Stage 4 built and accepted; Stage 5 not prepared yet
+- CR-004 (Home blocks) PROPOSED, waiting for a pick · `ui/HANDOFF.md`: READY FOR CODEX — Stage 5 (2026-11-01)
 
 ## Next
 
    - (2026-10-27) System Atlas already follows CR-024 / CR-025 / CR-026: no executive role, no F19-B / bell, 4R + 4P on the timeline (pending, no flows bound — owner's choice), F07 tour added (verify passes); 4R only re-checks with `/atlas sync repair` + `verify` after its FE changes
    - (D-113, 2026-10-26) the backend part is done in settings Stage 1 (migration executive → employee, no executive role, `Viewer.Can`, Go tests); 4R keeps FE copy / bell / toasts, e2e and the Atlas
-0. `/build-stage repair 5 prepare` (QR scan → prefilled S03, F13-B; `03-plan.md` Stage 5) — start in a fresh session
+0. Stage 5B (QR labels, CR-036) — `/build-stage repair 5B prepare` in a fresh session
 0. Shared dev DB: run migrations up to `20261026000001` once a writable user exists (dev DB still rejects DDL)
 0. Owner checks the อาคาร 1 room data (Open issues "3D rooms")
 
 ## Open issues / questions
+
+- Stage 5: plan AC1 names the old sample place (อาคารหลัก ชั้น 5 ห้องประชุม 5B); the real DB has no asset yet. Mocks keep `AC-05-012` in อาคารฝั่ง Office ชั้น 5 ห้องประชุม 5B; on the real API the e2e creates its own asset in a real room (อาคาร 1) — demo: add `AC-05-012` in S29 / S20 first. BR-F13B-1 asset list file still not received
+- e2e: F06 BR-F06-2 assumes the employee's only ticket awaiting rating is its own — flaky in a full parallel run (passes alone); make it pick by id
+- CR-036: is UAT / prod served over HTTPS? The in-app camera (S16) needs a secure context; the phone's own camera + `/q/{code}` works either way. Owner not sure (2026-11-01) — confirm before UAT
+- CR-036: settings R2 (S20 restyle) and repair 5B (S20 print actions) both touch S20 — the later stage keeps the other's changes
+- `er-diagram.dbml` still shows the old planned `repair.assets`; real table is `platform.assets` (CR-016) + Stage 5B label columns — refresh the diagram when 5B is built
 
 - 5P: stale test servers from an earlier session still hold :3100 / :8090 (old code) and could not be stopped from this session — 5P e2e / Atlas ran on :3200 / :8190 (`E2E_PORT` / `E2E_API_URL`, dist `.next-e2e2`); stop the old ones before the next `test:e2e`. Picker `ช่างผู้รับผิดชอบ` lists Superadmin users too (they hold every key, BR-F25-1) — confirm. A view-all role without `report` now starts the repair service at งานทั้งหมด (`repairHome`, shared lib)
 - 5P: S07 shows `ช่างผู้รับผิดชอบ` to staff only for in-house jobs; old in-house tickets without an assignee show `ยังไม่ระบุช่าง` (the S17 picker fills it at the next reschedule)
@@ -107,6 +117,8 @@
 - Mock photo restore: drafts drop photos with `blob:` URLs (mock uploads), so in mock mode a restored draft needs photos again
 
 ## Stage log
+
+- 2026-11-02: **Stage 5 accepted**, tag `repair-stage-5` (CR-036) — #25 asset lookup + `assetCode` on #5; S16 camera / manual / desktop card, S03 QR banner + prefill (QR replaces a saved draft, D-141), สแกน QR on S06 / Home (phones only); `/q/{code}` route handler; e2e F13B 11 / 11, full run 246 pass (5 parallel flakes pass alone); UI built by Claude, AC6 no screen e2e
 
 - 2026-11-01: **Stage 5P accepted**, tag `repair-stage-5P` (CR-034, D-137 / D-138) — disabled ถัดไป + hint, sticky spot `*`, navbar gear + stacked logo, `assignee` + #36 + required reschedule reason, S10 card, tracking needs `report`; Go lint 0 / tests incl. Pg pass, e2e 229 pass, Atlas 13 / 13
 

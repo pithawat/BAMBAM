@@ -7,12 +7,13 @@
 -- A team-handled record (F04) is created `closed` / `team_handled`; every other ticket `in_progress`.
 INSERT INTO repair.tickets (
     id, ticket_no, status, closed_reason, closed_at, priority, priority_source, category_id, category_other, symptom_other,
-    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id, created_at, updated_at
+    building_id, floor_id, room_id, location_detail, details, asset_code, asset_id, reporter_id, created_at, updated_at
 ) VALUES (
     @id, @ticket_no, @status, sqlc.narg('closed_reason')::text, sqlc.narg('closed_at')::timestamptz,
     @priority, @priority_source, sqlc.narg('category_id')::uuid,
     sqlc.narg('category_other')::text, sqlc.narg('symptom_other')::text,
-    @building_id, @floor_id, @room_id, @location_detail, @details, @asset_code, @reporter_id, @created_at, @created_at
+    @building_id, @floor_id, @room_id, @location_detail, @details, @asset_code, sqlc.narg('asset_id')::uuid,
+    @reporter_id, @created_at, @created_at
 );
 
 -- name: InsertTicketSymptoms :exec
@@ -31,7 +32,7 @@ SELECT
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.room_id, rm.name AS room_name,
-    t.location_detail, t.details, t.asset_code,
+    t.location_detail, t.details, t.asset_code, ast.code AS linked_asset_code, ast.name AS linked_asset_name,
     t.reporter_id, rp.name AS reporter_name, rp.department AS reporter_department,
     t.holder_id, hp.name AS holder_name, hp.department AS holder_department,
     t.result_note,
@@ -53,6 +54,7 @@ LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.people rb ON rb.id = t.resolved_by_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
 LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
+LEFT JOIN platform.assets ast ON ast.id = t.asset_id
 WHERE t.id = @id;
 
 -- name: ListTickets :many

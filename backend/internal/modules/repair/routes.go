@@ -38,4 +38,5 @@ func RegisterRoutes(rg *gin.RouterGroup, c *Controller) {
 	rg.POST("/assets", c.CreateAsset)
 	rg.PUT("/assets/:id", c.UpdateAsset)
 	rg.POST("/assets/:id/deactivate", c.DeactivateAsset)
+	rg.GET("/assets/:code", c.Asset) // Stage 5 QR lookup (#25)
 }

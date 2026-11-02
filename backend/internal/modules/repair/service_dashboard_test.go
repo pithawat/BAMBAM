@@ -32,6 +32,9 @@ type dashFake struct {
 	shapes     map[uuid.UUID][]RoomShape // floor → active rooms with outlines
 	floorNames map[uuid.UUID]string
 	assets     map[uuid.UUID]*fakeAsset
+	lookups    map[string]AssetLookup           // Stage 5 #25: lower-case code → active asset in place
+	typeCats   map[[2]uuid.UUID][]AssetCategory // {asset type, building} → categories
+	lookedUp   int                              // #25 repository calls
 	audit      []auditRow
 	// #27 inputs and what the service passed in
 	counts                    OverviewCounts
@@ -43,7 +46,8 @@ type dashFake struct {
 
 func newDashFake() *dashFake {
 	return &dashFake{types: map[uuid.UUID]AssetType{}, rooms: map[uuid.UUID]PlacementRoom{},
-		shapes: map[uuid.UUID][]RoomShape{}, floorNames: map[uuid.UUID]string{}, assets: map[uuid.UUID]*fakeAsset{}}
+		shapes: map[uuid.UUID][]RoomShape{}, floorNames: map[uuid.UUID]string{}, assets: map[uuid.UUID]*fakeAsset{},
+		lookups: map[string]AssetLookup{}, typeCats: map[[2]uuid.UUID][]AssetCategory{}}
 }
 
 func (f *fakeRepo) OverviewCounts(_ context.Context, today, dayStart, weekStart time.Time) (OverviewCounts, error) {

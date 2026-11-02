@@ -295,7 +295,7 @@ SELECT
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.room_id, rm.name AS room_name,
-    t.location_detail, t.details, t.asset_code,
+    t.location_detail, t.details, t.asset_code, ast.code AS linked_asset_code, ast.name AS linked_asset_name,
     t.reporter_id, rp.name AS reporter_name, rp.department AS reporter_department,
     t.holder_id, hp.name AS holder_name, hp.department AS holder_department,
     t.result_note,
@@ -317,6 +317,7 @@ LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.people rb ON rb.id = t.resolved_by_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
 LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
+LEFT JOIN platform.assets ast ON ast.id = t.asset_id
 WHERE t.id = $2
 `
 
@@ -346,6 +347,8 @@ type GetTicketRow struct {
 	LocationDetail          *string
 	Details                 *string
 	AssetCode               *string
+	LinkedAssetCode         *string
+	LinkedAssetName         *string
 	ReporterID              uuid.UUID
 	ReporterName            string
 	ReporterDepartment      *string
@@ -402,6 +405,8 @@ func (q *Queries) GetTicket(ctx context.Context, arg GetTicketParams) (GetTicket
 		&i.LocationDetail,
 		&i.Details,
 		&i.AssetCode,
+		&i.LinkedAssetCode,
+		&i.LinkedAssetName,
 		&i.ReporterID,
 		&i.ReporterName,
 		&i.ReporterDepartment,
@@ -519,12 +524,13 @@ const insertTicket = `-- name: InsertTicket :exec
 
 INSERT INTO repair.tickets (
     id, ticket_no, status, closed_reason, closed_at, priority, priority_source, category_id, category_other, symptom_other,
-    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id, created_at, updated_at
+    building_id, floor_id, room_id, location_detail, details, asset_code, asset_id, reporter_id, created_at, updated_at
 ) VALUES (
     $1, $2, $3, $4::text, $5::timestamptz,
     $6, $7, $8::uuid,
     $9::text, $10::text,
-    $11, $12, $13, $14, $15, $16, $17, $18, $18
+    $11, $12, $13, $14, $15, $16, $17::uuid,
+    $18, $19, $19
 )
 `
 
@@ -545,6 +551,7 @@ type InsertTicketParams struct {
 	LocationDetail *string
 	Details        *string
 	AssetCode      *string
+	AssetID        *uuid.UUID
 	ReporterID     uuid.UUID
 	CreatedAt      time.Time
 }
@@ -574,6 +581,7 @@ func (q *Queries) InsertTicket(ctx context.Context, arg InsertTicketParams) erro
 		arg.LocationDetail,
 		arg.Details,
 		arg.AssetCode,
+		arg.AssetID,
 		arg.ReporterID,
 		arg.CreatedAt,
 	)

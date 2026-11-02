@@ -536,6 +536,26 @@ export type FollowRequest = { note?: string; photoIds: string[] };
 /** #24 body: reason 1–500 (required). */
 export type HandoverRequest = { reason: string };
 
+// ---- Stage 5 QR: #25 GET /repair/assets/{code} (F13-B) ----
+
+/**
+ * #25: the asset behind a QR / typed code, with its **current** place (BR-F13B-3: a moved asset gives
+ * its new room). S03 prefills building, floor, room and category (all editable, BR-F13B-2) and opens on
+ * step 2 ปัญหาที่พบ (CR-025). `category` is `null` when the building's type uses none of the asset type's
+ * categories (CR-025, BR-F02-8) — the user picks one. `locationDetail` is always `null` (an asset is
+ * linked to a room only, CR-014); keep the form's extra spot empty. 404 `ASSET_NOT_FOUND` for an unknown
+ * or inactive code. Send `assetCode` = `code` with #5 while the QR banner is kept.
+ */
+export type AssetLookup = {
+  code: string;
+  name: string;
+  category: Ref | null;
+  building: Ref;
+  floor: Ref;
+  room: Ref;
+  locationDetail: string | null;
+};
+
 // ---- errors (04-api-contract.md "Error codes") ----
 
 export type RepairErrorCode =

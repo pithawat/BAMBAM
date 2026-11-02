@@ -480,8 +480,10 @@ Request `{ "reason": "ทีมเช็ดแล้วแต่ยังมี�
 ```
 404 `ASSET_NOT_FOUND` → S03 "ไม่พบอุปกรณ์นี้" / S16 "ไม่พบอุปกรณ์รหัสนี้". Code is matched case-insensitively.
 (CR-014) Assets belong to a room: the response adds `"room": { "id", "name" }` and S03 prefills it; `locationDetail` becomes the optional extra spot. Shape fixed in Stage 5.
+**Shape as built (Stage 5, 2026-11-01):** `room` always set (the asset's current room, BR-F13B-3); `category` = the first active category of the asset type (`repair.asset_type_categories`) that the building's type uses (`อื่น ๆ` everywhere), **`null` when none** (CR-025 — S03 leaves the category empty); `locationDetail` always `null`. 404 also when the asset is inactive, its room / floor / building is inactive, or the code cannot be an asset code (BR-F31-1). 403 without `repair.ticket.report` (or `repair.ticket.team_handle`, as #5). #5: `assetCode` matching an active asset (ignoring case) sets `tickets.asset_id`; the code is stored as sent, an unknown code stays unlinked. `TicketDetail.asset` = the linked asset (`code`, `name`), kept after the asset is deactivated.
 
-**QR content (D-024):** `{FRONTEND_URL}/repair/new?asset={code}`. S16 accepts a QR whose origin equals the current origin and whose path is `/repair/new` with `asset`.
+~~**QR content (D-024):** `{FRONTEND_URL}/repair/new?asset={code}`. S16 accepts a QR whose origin equals the current origin and whose path is `/repair/new` with `asset`.~~
+**QR content (D-140, CR-036):** `{FRONTEND_URL}/q/{code}` — a frontend route that only redirects to `/repair/new?asset={code}` (no API call; the code is URL-encoded). S16 accepts a QR whose origin equals the current origin and whose path is `/q/{code}`. `/repair/new?asset=` stays the internal URL (S16 manual code, `/q`); printed labels never use it. Labels: settings #56 / #57 (Stage 5B).
 
 ---
 
@@ -585,6 +587,7 @@ Errors: 400 `VALIDATION_FAILED` (`code` REQUIRED / TOO_LONG > 50 / INVALID (lett
 
 ### 32. PUT /api/v1/repair/assets/{id}
 Same body as #31 except `assetTypeId` (type never changes) → 200 `<Asset>`. Moving = new `roomId` / `x` / `z`. 404 `ASSET_NOT_FOUND` (also for inactive), other errors as #31.
+(CR-036, Stage 5B) A different `code` when the asset's QR label was printed → 422 `ASSET_CODE_LOCKED` "พิมพ์ป้าย QR ของอุปกรณ์นี้แล้ว จึงเปลี่ยนรหัสไม่ได้" (BR-F13A-5); the 3D asset dialog shows the code read-only then.
 
 ### 33. POST /api/v1/repair/assets/{id}/deactivate → 204
 `is_active = false`; tickets keep their `asset_id`; the code stays taken (a new asset cannot reuse it). 404 `ASSET_NOT_FOUND`.

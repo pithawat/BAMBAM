@@ -3,6 +3,7 @@
 Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068) · **layout replaced again by CR-019 (approved 2026-10-24)** · lead CTA / tabs and card heading changed by CR-021 (approved 2026-10-25) · CR-024 applied 2026-10-26 (block below) · CR-034 applied 2026-11-01 (block below) · CR-035 top row 2026-11-01 (block below)
 
 > **CR-035 (approved 2026-11-01) — top row from `output/home-user-redesign/repair-my-option-b.html` (layout only):** breadcrumb `หน้าแรก › ติดตามงานซ่อม`; blue mascot panel (tracking mascot, H1, `งานที่คุณแจ้งและติดตาม / ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ`, no eyebrow) 1.55 : 1 beside a navy report card (white `แจ้งซ่อมใหม่` with + / →; leads add the outlined `บันทึกงานที่ทีมแก้แล้ว`); stacked below 1024px. List card unchanged.
+> **CR-036 (approved 2026-11-01, Stage 5):** on phones only (`(pointer: coarse)` + camera API), the report card adds a secondary outlined-on-navy button `สแกน QR` (`QrCode` icon) → S16 `/repair/scan`, under `แจ้งซ่อมใหม่` (leads: after `บันทึกงานที่ทีมแก้แล้ว`). Desktop unchanged.
 
 > **CR-034 (approved 2026-11-01):** needs `repair.ticket.report`; without it the repair nav has no `ติดตามงานซ่อม` and `/repair/my` shows the forbidden state (`ไม่มีสิทธิ์ดูหน้านี้`).
 

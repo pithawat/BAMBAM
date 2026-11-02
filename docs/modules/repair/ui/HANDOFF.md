@@ -1,10 +1,90 @@
-# UI handoff — ระบบแจ้งซ่อม — Stages 1–4P, 3D-5
+# UI handoff — ระบบแจ้งซ่อม — Stages 1–5
 
-Status: BUILT BY CLAUDE — Stage 5P (2026-11-01, CR-034 page polish: S03 / S04 step gating + sticky spot `*`, navbar gear right + stacked lock-up (D-138), S17 assignee + required reschedule reason, S10 responsible card, S07 copy, tracking needs `report`; wired + e2e; ACCEPTED 2026-11-01, tag `repair-stage-5P`). Codex has nothing to build until Stage 5 prepare; `components/shared/app-navbar.tsx`, `modules/settings/components/settings-menu.tsx` and `modules/repair/components/**` are Claude-owned until 5P is accepted. Before: BUILT BY CLAUDE — Stage 3D-5 (2026-11-01, CR-033: ground from the site plan / OSM, อาคาร 4 turned, in-map side button; wired + e2e; waiting for acceptance). Codex has nothing to build. Before: PREPARED — Stage 3D-5. Before: BUILT BY CLAUDE — Stage 4R (2026-10-29, CR-024: no executive, no bell / notification copy; no new UI, Codex has nothing to build; waiting for acceptance). Before: BUILT BY CLAUDE — Stage 4P (2026-10-29, owner asked Claude to build the UI instead of Codex; wired + e2e; waiting for acceptance). Codex has nothing to build. Before: READY FOR CODEX — Stage 4P. Before: ACCEPTED — Stage 4 (2026-10-26, tag `repair-stage-4`; incl. CR-021 / CR-022 built by Claude). Codex has nothing to build until Stage 5 prepare. Before: BUILT BY CLAUDE — Stage 4 CR-021 rework (2026-10-25, waiting for user acceptance with Stage 4: S03 / S04 / S06 relayout, built by Claude with the Impeccable skill — Codex has nothing to build; files below are Claude-owned until this note changes). Before: WIRED — Stage 4 (2026-10-25, Claude: real API + e2e F03 / F04 / F05), waiting for user acceptance. Earlier: UI DONE — Stage 4 by Codex (2026-10-24: S03 team mode + duplicate card, S04, S05 team variant, S07 / S11 hand over — section "Stage 4" below). Earlier: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+Status: BUILT BY CLAUDE — Stage 5 (2026-11-01, owner asked Claude to build the UI with the Impeccable skill instead of Codex; S16 scan page, S03 QR banner + prefill, สแกน QR on S06 / Home; wired + e2e F13B; ACCEPTED 2026-11-02, tag `repair-stage-5`). Codex has nothing to build until Stage 5B prepare. Before: READY FOR CODEX — Stage 5 (2026-11-01, F13-B QR scan → prefilled S03; CR-036: `/q/{code}`, scan button on phones only). Before: BUILT BY CLAUDE — Stage 5P (2026-11-01, CR-034 page polish: S03 / S04 step gating + sticky spot `*`, navbar gear right + stacked lock-up (D-138), S17 assignee + required reschedule reason, S10 responsible card, S07 copy, tracking needs `report`; wired + e2e; ACCEPTED 2026-11-01, tag `repair-stage-5P`). Codex has nothing to build until Stage 5 prepare; `components/shared/app-navbar.tsx`, `modules/settings/components/settings-menu.tsx` and `modules/repair/components/**` are Claude-owned until 5P is accepted. Before: BUILT BY CLAUDE — Stage 3D-5 (2026-11-01, CR-033: ground from the site plan / OSM, อาคาร 4 turned, in-map side button; wired + e2e; waiting for acceptance). Codex has nothing to build. Before: PREPARED — Stage 3D-5. Before: BUILT BY CLAUDE — Stage 4R (2026-10-29, CR-024: no executive, no bell / notification copy; no new UI, Codex has nothing to build; waiting for acceptance). Before: BUILT BY CLAUDE — Stage 4P (2026-10-29, owner asked Claude to build the UI instead of Codex; wired + e2e; waiting for acceptance). Codex has nothing to build. Before: READY FOR CODEX — Stage 4P. Before: ACCEPTED — Stage 4 (2026-10-26, tag `repair-stage-4`; incl. CR-021 / CR-022 built by Claude). Codex has nothing to build until Stage 5 prepare. Before: BUILT BY CLAUDE — Stage 4 CR-021 rework (2026-10-25, waiting for user acceptance with Stage 4: S03 / S04 / S06 relayout, built by Claude with the Impeccable skill — Codex has nothing to build; files below are Claude-owned until this note changes). Before: WIRED — Stage 4 (2026-10-25, Claude: real API + e2e F03 / F04 / F05), waiting for user acceptance. Earlier: UI DONE — Stage 4 by Codex (2026-10-24: S03 team mode + duplicate card, S04, S05 team variant, S07 / S11 hand over — section "Stage 4" below). Earlier: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
 
 > **CR-024 (approved 2026-10-26):** no `executive` role and no notifications. Stage 4R (`03-plan.md`) is built by Claude — Codex has nothing to build for it; the files it touches (incl. `components/shared/app-navbar.tsx`, `bell-button.tsx`, `modules/repair/components/**`) are Claude-owned until Stage 4R is accepted. Copy changes: `screens/_common.md` §9.
 
 > **CR-025 (approved 2026-10-27):** S03 place-first with categories filtered by building type, S04 inline card in step 2 — **Stage 4P, ready for Codex (section below)**. CR-026 (quality 0.25 + A1 upload on submit) is already built by Claude. 4P runs before 4R (D-121).
+
+## Stage 5 (2026-11-01) — READY FOR CODEX: S16 สแกน QR, S03 QR banner + prefill, "สแกน QR" on S06 / Home (F13-B, CR-036)
+
+Goal: `../03-plan.md` Stage 5 "Frontend UI (Codex)" + AC1–AC6. Done by Claude: backend #25 + the asset link on #5 + the S07 asset line (already rendered by `ticket-detail.tsx`), `types.ts` (`AssetLookup`), `api.ts` (`lookupAsset`), `mocks.ts`, `qr.ts` (URL rule, phone check, decoder), the route `/q/{code}` (`src/app/q/[code]/page.tsx`, redirect only) and the `jsqr` package.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md`
+2. `../02-flows.md` F13-B (BR-F13B-1…5) · `../03-plan.md` Stage 5 · `../changes/CR-036.md`
+3. Screens — the **CR-036 box at the top of each first**: `S16-scan-qr.md`, `S03-report-form.md` (QR banner rows + "QR prefill"; the CR-025 box: place first, 3 steps), `S06-my-tickets.md`, `S02-home.md`. Visual reference: `mockups/S03-report-form.html` (top bar, QR banner, sheet).
+
+### What to build
+
+| Screen | Where | What |
+|---|---|---|
+| S16 page | `src/app/(app)/repair/scan/page.tsx` (+ `loading.tsx` if needed; delete `.gitkeep`) → `components/scan-qr.tsx` (new) | Route `/repair/scan`. Without `canReport(me)` → `ForbiddenState` like S03 (`report-form.tsx` line ~172). **Camera view only when `useCanScanInApp()`** (`qr.ts`, the CR-036 phone rule) — otherwise the S16 "Desktop" card (manual code inline + `แจ้งซ่อมโดยไม่สแกน`), at every width |
+| S16 camera | `components/scan-qr.tsx` (`QrScanner`) | `navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })` into a muted `playsInline` `<video>`; `const decode = await createQrDecoder()` once, then decode about every 200 ms. Text → `assetCodeFromQr(text)`: a code → `navigator.vibrate?.(50)`, stop the camera, `router.push(assetFormPath(code))` (**no lookup here** — S03 handles not found); `null` → toast `QR นี้ไม่ใช่ของ BAMBAM` and keep scanning (do not repeat the toast for the same text within ~3 s). Stop every track on unmount / back / navigation. `NotAllowedError` / `NotFoundError` / no camera / insecure context → blocked card (`เปิดกล้องไม่ได้` …; `ลองอีกครั้ง` restarts the camera). Scanning line hidden with reduced motion |
+| S16 manual code | same (bottom `Sheet` on the camera view, inline on the desktop card) | Trim + uppercase, max 30; empty → `กรุณากรอกรหัสอุปกรณ์`. `lookupAsset(code)`: found → `router.push(assetFormPath(found.code))` · 404 `ASSET_NOT_FOUND` → `ไม่พบอุปกรณ์รหัสนี้` under the field (stay) · any other error → toast `ทำรายการไม่สำเร็จ ลองอีกครั้ง` (`GENERIC_ERROR`). Spinner in `ค้นหา` while waiting |
+| S03 prefill | `components/report-form.tsx` | With `?asset={code}` (not with `?mode=team`): after #1 / #2 load, call `lookupAsset(code)` once; the banner shows a skeleton line meanwhile. **Found** → building / floor / room from the result (the ids are in #2); category = `result.category` when it is not `null` and `categoryUsedIn(category, building)`; symptoms and extra spot empty; open on step 2 **ปัญหาที่พบ** (CR-025) — or on step 1 when the room is not in #2 (master data changed meanwhile). Every field stays editable (BR-F13B-2). `category: null` (e.g. `AC-W1-001` in the warehouse) → step 2 with no category picked, no extra note. Send `assetCode: result.code` with #5 while the banner is kept. **Not found or any error** → Alert `ไม่พบอุปกรณ์นี้` / `กรอกข้อมูลเองได้เลย`, empty form on step 1, no `assetCode`. The step-2 duplicate card works as today once category + room are set |
+| S03 banner | same | Phone: above the step content; desktop: above the first section. Found: `เติมข้อมูลจาก QR แล้ว` · `{name} · {code}` · `แก้ไขได้ถ้าไม่ตรง` + link button `ไม่ใช่อุปกรณ์นี้` → removes the banner and `assetCode`, keeps the field values, and drops `asset` from the URL (`router.replace`) so a reload does not prefill again. Review card (phone) / summary (desktop): the สถานที่ row adds `อุปกรณ์ {code} {name}` while the banner is kept |
+| S03 draft + QR | same | Proposal (owner confirms at wire — see Open questions): with `?asset=` the saved draft is **not** restored; the QR prefill starts a new report and the autosave replaces the draft; no restored-draft banner |
+| S06 button | `components/my-tickets.tsx` | Report card: under `แจ้งซ่อมใหม่` (leads: after `บันทึกงานที่ทีมแก้แล้ว`) a secondary outlined-on-navy button `สแกน QR` (`QrCode` icon) → `/repair/scan`, only when `reports && useCanScanInApp()` |
+| S02 Home button | `src/app/(app)/page.tsx` (repair card) | Under `แจ้งซ่อมใหม่` a small secondary link-button `สแกน QR` (`QrCode`) → `/repair/scan`, only with the report key and `useCanScanInApp()`. Desktop never shows it |
+
+### Data and helpers (Claude-owned — use, do not edit)
+
+| Function | # / file | Notes |
+|---|---|---|
+| `lookupAsset(code)` → `AssetLookup` | #25, `api.ts` | `{ code, name, category: Ref or null, building, floor, room, locationDetail: null }`; 404 `ASSET_NOT_FOUND`; 403 without the report key |
+| `createTicket(req)` with `assetCode` | #5 | links the asset; S05 / S07 then show `ticket.asset` |
+| `assetCodeFromQr(text, origin?)` | `qr.ts` | the code of a `/q/{code}` URL of this origin, else `null` (other host, `/repair/new?asset=`, plain text …) |
+| `assetFormPath(code)` | `qr.ts` | `/repair/new?asset={code}` (encoded) |
+| `useCanScanInApp()` / `canScanInApp()` | `qr.ts` | `(pointer: coarse)` + `getUserMedia`; `false` on the server and the first paint |
+| `createQrDecoder()` → `(video) => Promise<string or null>` | `qr.ts` | `BarcodeDetector` when it supports `qr_code` (Android Chrome), else `jsqr` (iOS Safari; loaded lazily) |
+| `categoryUsedIn(category, building)` | `types.ts` | the CR-025 filter the form already uses |
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`)
+
+- `AC-05-012` → เครื่องปรับอากาศ ห้องประชุม 5B · อาคารฝั่ง Office ชั้น 5 · ระบบปรับอากาศ. As พนักงาน (วรรณา) that room + category already has her open case → the step-2 duplicate card shows (same as the server); type an extra spot to send. `AC-W1-001` → โกดังเก็บของ 1 (ตัวอย่าง), `category: null`. The 3D codes (`AC-1-003`, `TV-4-001` …) are found too; anything else (`XX-99`) → 404. Codes match ignoring case.
+- Scenarios: `empty` → every code 404 · `error` → network error (S03 → not-found alert, S16 manual → toast) · `slow` → 3 s · `forbidden` (or technician in the role switcher) → 403.
+- A created ticket with a found `assetCode` shows the asset line in S05 / S07; sample ticket 160 shows `AC-1-003`.
+- Camera on a laptop: Chrome DevTools device mode (touch → `pointer: coarse`) on `localhost`; show a QR of `http://localhost:3000/q/AC-05-012` on another screen or phone (any QR generator). Without device mode the page shows the desktop card — that is correct.
+- Deep link without a camera: open `http://localhost:3000/q/AC-05-012` → `/repair/new?asset=AC-05-012` (mock mode skips login).
+
+### You may edit (Stage 5)
+
+- `frontend/src/app/(app)/repair/scan/**` (new), `frontend/src/modules/repair/components/scan-qr.tsx` (new)
+- `frontend/src/modules/repair/components/report-form.tsx`, `components/my-tickets.tsx`
+- `frontend/src/app/(app)/page.tsx` — only the "สแกน QR" button in the repair card
+- This file: Stage 5 checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,priority,plan-geometry,qr}.ts`, `src/app/q/**`, `src/proxy.ts`, `src/lib/**`, `components/shared/**`, `components/ui/**`, `package.json`, backend, other docs.
+
+### Done when (Codex fills the Stage 5 checklist below)
+
+- [ ] AC1: `/q/AC-05-012` → S03 with the banner; อาคารฝั่ง Office ชั้น 5 ห้องประชุม 5B + ระบบปรับอากาศ prefilled and editable; opens on ปัญหาที่พบ
+- [ ] AC2: `/repair/new?asset=XX-99` → `ไม่พบอุปกรณ์นี้` + an empty form on สถานที่ that still submits (no `assetCode`)
+- [ ] AC3: phone (device mode): camera view; a `/q/AC-05-012` QR opens the prefilled form; denying the camera shows `เปิดกล้องไม่ได้` with manual entry; manual empty / not found / found with the exact copy
+- [ ] AC4: submitting with the banner kept → S05 / S07 show the asset line; after `ไม่ใช่อุปกรณ์นี้` the ticket has no asset
+- [ ] AC5: desktop: no `สแกน QR` on S06 / Home; `/repair/scan` shows the manual card; a QR of another site or of `/repair/new?asset=` → toast `QR นี้ไม่ใช่ของ BAMBAM`, scanning continues
+- [ ] `AC-W1-001` → place prefilled, no category; the camera stops when leaving S16; reduced motion hides the scanning line
+- [ ] 375 px and 1280 px, no horizontal scroll; keyboard / screen reader can use the manual entry
+- [ ] `npm run lint && npm run typecheck` pass
+
+### Stage 5 checklist results (built by Claude, 2026-11-01)
+
+| Screen | All items pass? | Notes |
+|---|---|---|
+| S16 | ✅ | `components/scan-qr.tsx`: camera (window scrim, corner marks, scan line hidden with reduced motion, spinner while starting), blocked card (`MascotPanel` per CR-035 instead of a bust card), manual `Sheet` / desktop card; camera stops on leave (checked: no live `srcObject` after navigation); same foreign QR toasts once per 3 s; e2e F13B on mobile (fake camera + stub `BarcodeDetector`) and desktop |
+| S03 (QR) | ✅ | banner skeleton → found / not found; opens on ปัญหาที่พบ; `ไม่ใช่อุปกรณ์นี้` → `router.replace("/repair/new")`; `อุปกรณ์ {code} {name}` in the review card and the desktop summary; `assetCode` sent only while the banner is kept; ล้างแบบฟอร์ม also drops the banner |
+| S06 / S02 button | ✅ | S06: outlined-on-navy `สแกน QR` under the report buttons (the primary drops to h-12 when it shows); Home: small `glass` button under `แจ้งซ่อมใหม่` (card height is now `min-h` so the extra button fits on phones). Hidden on desktop (e2e) |
+
+### Differences from spec — Stage 5 (Claude)
+
+- S16 blocked state uses the CR-035 `MascotPanel` (pose `review`) — the spec's "mascot bust card" predates CR-035 (one mascot panel app-wide).
+- `/q/{code}` is a route handler (`src/app/q/[code]/route.ts`, 307 with a relative `Location`) instead of `page.tsx`: with `cacheComponents` the page logged "runtime data during prerendering" on every hit. Same behaviour.
+
+### Open questions — Stage 5 (Codex fills — never guess)
+
+- (answered 2026-11-02, owner) S03 with `?asset=` and a saved draft: the QR wins, the draft is replaced.
 
 ## Stage 4P (2026-10-29) — READY FOR CODEX: S03 place first + categories by building type, S04 card in step 2 (CR-025)
 
@@ -413,7 +493,9 @@ Empty route folders exist (with `.gitkeep`; delete it when you add the page). Pu
 | S13 แจ้งเตือน | `screens/S13-notifications.md` | — (`option-a.html` notification rows) | `/notifications` | 7 |
 | S14 โปรไฟล์ | `screens/S14-profile.md` | — (`option-a.html`) | `/profile` | 0 (platform) |
 | S15 ตัวสลับบทบาท | `screens/S15-role-switcher.md` | — (pill in `option-a.html`) | — (component) | 0 (platform) |
-| S16 สแกน QR | `screens/S16-scan-qr.md` | — (`mockups/S03-report-form.html`) | `/repair/scan` | 6 |
+| S16 สแกน QR | `screens/S16-scan-qr.md` (+ CR-036 block: `/q/{code}`, phones only) | — (`mockups/S03-report-form.html`) | `/repair/scan` | 5 |
+| S06 / S02 "สแกน QR" button, phones only (CR-036) | S06 / S02 CR-036 blocks | — | `/repair/my`, `/` | 5 |
+| S30 พิมพ์ป้าย QR + S20 print actions (settings CR-007, CR-036) | `../../settings/ui/screens/S30-qr-labels.md`, S20 CR-007 block | — (S20 CR-006 frame) | `/settings/buildings/labels` | 5B |
 
 **Shared / platform screens:** S01, S02, S13, S14 and S15 live outside `app/(app)/repair` (routes `/login`, `/signed-out`, `/`, `/notifications`, `/profile`, and `components/shared/RoleSwitcher`). S01, S14, S15 and the AppShell are built in Stage 0 (`docs/shared/00-platform.md`); S02 and S13 in repair Stage 7, when "You may edit" is widened to `app/(app)/page.tsx` and `app/(app)/notifications/**` for that stage only.
 

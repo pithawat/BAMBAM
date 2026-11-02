@@ -7,6 +7,7 @@
 ## Now
 
 - Stage R1 accepted 2026-11-01 (tag `settings-stage-R1`). Nothing in progress; next is R2.
+- 2026-11-01 CR-007 APPROVED (mirror of repair CR-036, D-140): new S30 พิมพ์ป้าย QR, S20 print actions / label badge / code lock, #56 / #57 — built in **repair Stage 5B**, not a settings stage. R2 and repair 5B both touch S20: the later one keeps the other's changes.
 
 ## Next
 

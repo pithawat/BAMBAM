@@ -505,3 +505,16 @@ func bangkokDayStart(t time.Time) time.Time {
 	b := t.In(bangkok)
 	return time.Date(b.Year(), b.Month(), b.Day(), 0, 0, 0, 0, bangkok)
 }
+
+// prefillCategory picks the #25 category (F13-B, CR-025): the first category of the asset type that
+// the building's type uses ("อื่น ๆ" is used everywhere); none when the building uses none of them,
+// so S03 never prefills a category it would not offer (BR-F02-8).
+func prefillCategory(cats []AssetCategory) *Ref {
+	for _, c := range cats {
+		if c.IsOther || c.UsedInBuilding {
+			r := c.Ref
+			return &r
+		}
+	}
+	return nil
+}

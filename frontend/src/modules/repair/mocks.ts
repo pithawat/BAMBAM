@@ -5,6 +5,7 @@ import { roomAt } from "./plan-geometry";
 import { ticketPriority } from "./priority";
 import type { Role } from "@/lib/platform/types";
 import type {
+  AssetLookup,
   AreaType,
   Asset,
   AssetType,
@@ -76,6 +77,12 @@ import { categoryUsedIn } from "./types";
 // tickets and no equipment, `error` → reads fail, `forbidden` → 403, `slow` → skeletons. Equipment
 // writes keep the backend rules (AC-1-004 is inactive, so its code is taken). Switch role with the
 // role switcher: `settings.assets.manage` edits, `repair.overview.view` reads, other roles get 403 (S02 Home).
+// Stage 5 QR (#25, F13-B): `AC-05-012` = แอร์ห้องประชุม 5B (อาคารฝั่ง Office ชั้น 5 → ระบบปรับอากาศ prefilled;
+// that room + category already has วรรณา's open case, so S03 shows the duplicate card in step 2, like the
+// server) · `AC-W1-001` = แอร์ in โกดังเก็บของ 1 (ตัวอย่าง): found, `category: null` (CR-025: the warehouse
+// type does not use ระบบปรับอากาศ) · the 3D codes (`AC-1-003` …) are found too · anything else → 404
+// `ASSET_NOT_FOUND`. Codes match ignoring case; moving an asset in S29 changes the room the lookup returns.
+// `empty` → every code 404 · `error` → network error · `forbidden` / no `repair.ticket.report` → 403.
 
 export const MOCK_SCENARIOS = [
   "normal",
@@ -745,7 +752,13 @@ export function mockTicketDetail(id: string, v: Viewer): TicketDetail {
   const t = store.tickets.find((x) => x.id === id);
   if (!t) throw mockErrors.notFound();
   if (!canView(t, v)) throw mockErrors.forbidden();
-  return withActions(decorate(t, v), v);
+  return withActions(decorate({ ...t, asset: t.asset ?? assetLine(t.id) }, v), v);
+}
+
+/** S07 asset line for the sample tickets linked in `ticketAsset` (160 = AC-1-003). */
+function assetLine(id: string): TicketDetail["asset"] {
+  const a = assetStore.items.find((x) => x.id === ticketAsset.get(id));
+  return a ? { code: a.code, name: a.name } : null;
 }
 
 /** Same rule as the backend `allowedActions` (rules.go), so S07 shows the right buttons in mock mode. */
@@ -1059,6 +1072,7 @@ export function mockCreateTicket(req: CreateTicketRequest, reporter: PersonRef, 
     allowedActions: [],
     blockedActions: {},
   };
+  detail.asset = linkAsset(detail.id, req.assetCode);
   store.tickets.unshift(detail);
   store.subscribers.set(detail.id, []);
   return withActions(decorate(detail, v), v);
@@ -1090,10 +1104,13 @@ const assetStore: { items: MockAsset[]; seq: number } = {
     { id: assetId(6), code: "TV-4-001", name: "จอทีวีห้อง 401", typeId: TV, roomId: b1RoomId(4, 1), x: 0.4, z: 7.5, rotationDeg: 90, isActive: true },
     { id: assetId(7), code: "MIC-4-001", name: "ไมค์ห้อง 401 ตัวที่ 1", typeId: MIC, roomId: b1RoomId(4, 1), x: 4, z: 6, rotationDeg: 0, isActive: true },
     { id: assetId(8), code: "MIC-6-001", name: "ไมค์ห้อง CPAC 72 ปี", typeId: MIC, roomId: b1RoomId(6, 7), x: 18, z: 12, rotationDeg: 0, isActive: true },
+    // Stage 5 QR (F13-B): the printed test label of 04-api-contract.md #25, and one in the warehouse (CR-025).
+    { id: assetId(10), code: "AC-05-012", name: "เครื่องปรับอากาศ ห้องประชุม 5B", typeId: AC, roomId: roomId(1, 5, 2), x: null, z: null, rotationDeg: 0, isActive: true },
+    { id: assetId(11), code: "AC-W1-001", name: "แอร์ห้องควบคุมโกดัง", typeId: AC, roomId: "c025e000-0000-4000-8000-000000000001", x: null, z: null, rotationDeg: 0, isActive: true },
     // Deactivated: off the plan, but its code stays taken (BR-F31-4).
     { id: assetId(9), code: "AC-1-004", name: "แอร์ HR เครื่องเก่า", typeId: AC, roomId: b1RoomId(1, 4), x: 26, z: 0.6, rotationDeg: 180, isActive: false },
   ],
-  seq: 10,
+  seq: 12,
 };
 
 /** Open tickets reported from an asset (`tickets.asset_id`, Stage 5 QR); 160 = the leaking HR air conditioner. */
@@ -1206,6 +1223,42 @@ function toAsset(a: MockAsset): Asset {
     id: a.id, code: a.code, name: a.name, type: { id: type.id, key: type.key, name: type.name }, room: { id: a.roomId, name: roomName },
     x: a.x, z: a.z, rotationDeg: a.rotationDeg, openTickets,
   };
+}
+
+// ---- Stage 5 QR: #25 asset lookup (F13-B) ----
+
+/** Categories per asset type — repair.asset_type_categories (CR-016 migration): แอร์ → ระบบปรับอากาศ, the rest → ห้องประชุมฯ. */
+const assetTypeCategories: Record<string, number[]> = { [AC]: [2], [MIC]: [4], [SPK]: [4], [TV]: [4] };
+
+const activeAssetByCode = (code: string) =>
+  assetStore.items.find((a) => a.isActive && a.code.toLowerCase() === code.trim().toLowerCase());
+
+/** #25. Same rules as service_qr.go: report (or team) permission; place from the asset's current room; the first type category the building uses. */
+export function mockLookupAsset(code: string, v: Viewer): AssetLookup {
+  if (mockScenario() === "forbidden" || !(can(v, PERM.ticketReport) || isLead(v))) throw mockErrors.forbidden();
+  const notFound = () => new ApiError(404, "ASSET_NOT_FOUND", "mock: asset not found");
+  const a = /^[A-Za-z0-9_-]{1,50}$/.test(code.trim()) ? activeAssetByCode(code) : undefined;
+  if (!a || mockScenario() === "empty") throw notFound();
+  for (const b of mockBuildings) {
+    for (const f of b.floors) {
+      const r = f.rooms.find((x) => x.id === a.roomId);
+      if (!r) continue;
+      const category = (assetTypeCategories[a.typeId] ?? []).map((n) => mockCategories[n - 1]).find((c) => categoryUsedIn(c, b));
+      return {
+        code: a.code, name: a.name, category: category ? { id: category.id, name: category.name } : null,
+        building: { id: b.id, name: b.name }, floor: { id: f.id, name: f.name }, room: { id: r.id, name: r.name }, locationDetail: null,
+      };
+    }
+  }
+  throw notFound();
+}
+
+/** #5 links the active asset with the typed code (tickets.asset_id); an unknown code stays unlinked. */
+function linkAsset(ticketId: string, assetCode: string | undefined): TicketDetail["asset"] {
+  const a = assetCode ? activeAssetByCode(assetCode) : undefined;
+  if (!a) return null;
+  ticketAsset.set(ticketId, a.id);
+  return { code: a.code, name: a.name };
 }
 
 /** #30. Floors of อาคาร 1 have a plan; every other floor answers with `widthM: null` and no outlines. */

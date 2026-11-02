@@ -381,10 +381,12 @@
       "id": "5",
       "short": "สแกน QR",
       "name": "สแกน QR ที่อุปกรณ์แล้วได้ฟอร์มที่กรอกไว้",
-      "status": "pending",
+      "status": "accepted",
       "flows": [
         "F13-B"
-      ]
+      ],
+      "cr": "CR-036",
+      "date": "2026-11-02"
     },
     {
       "id": "6",
@@ -630,8 +632,8 @@
         "all"
       ],
       "stage": "5",
-      "status": "pending",
-      "e2e": "none",
+      "status": "accepted",
+      "e2e": "pass",
       "group": "แจ้งปัญหา"
     },
     {

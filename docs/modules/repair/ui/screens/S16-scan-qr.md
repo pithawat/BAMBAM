@@ -1,6 +1,8 @@
 # S16 — สแกน QR
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-036 applied 2026-11-01 (block below)
+
+> **CR-036 (approved 2026-11-01):** a valid QR is `{current origin}/q/{code}` (D-140, replaces `/repair/new?asset=`); success navigates to `/repair/new?asset={code}` as before. Entry buttons ("สแกน QR" on S06 report card and the Home repair card) show only on phones — `(pointer: coarse)` and `navigator.mediaDevices.getUserMedia`; desktop opening `/repair/scan` gets the desktop card below (manual code only). The phone's own camera opens `/q/{code}` → redirect → S03. The in-app camera needs HTTPS (localhost is fine on dev).
 
 - **Flows:** F13-B steps A–B ("ปุ่มสแกนในแอป"), BR-F13B-1 (see ../../02-flows.md)
 - **Persona:** every role on mobile, standing at the equipment (see ../../01-users.md)
@@ -73,7 +75,7 @@ Desktop (≥1024px): sidebar + top bar (title "สแกน QR แจ้งซ�
 
 ## Interactions
 
-- A QR is valid when it is a BAMBAM asset URL for this environment (format fixed in `/stage-plan`, F13-A). Extract the asset code and go to S03; S03 handles "not found" (F13-B).
+- A QR is valid when it is a BAMBAM asset URL for this environment: same origin, path `/q/{code}` (CR-036). Extract the asset code and go to S03; S03 handles "not found" (F13-B).
 - Manual code → lookup first; found → S03 with `?asset=`; not found → message under the field (stay).
 - "แจ้งซ่อมโดยไม่สแกน" → S03 without prefill.
 - Back → previous page; camera stops.
@@ -88,3 +90,4 @@ Desktop (≥1024px): sidebar + top bar (title "สแกน QR แจ้งซ�
 - [ ] Uses only design-system tokens and shadcn components
 - [ ] Keyboard and screen-reader basics (manual entry fully usable without a camera)
 - [ ] Works with mocks (`NEXT_PUBLIC_USE_MOCKS=true`): `AC-05-012` found, any other code not found
+- [ ] (CR-036) Accepts `/q/{code}` of this origin only; scan entry buttons hidden on desktop / without a camera

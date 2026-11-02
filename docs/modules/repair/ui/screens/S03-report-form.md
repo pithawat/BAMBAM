@@ -44,7 +44,7 @@ Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR
 - **Flows:** F02 (all steps), F04 (team handled option), F13-B (prefill from QR) (see ../../02-flows.md)
 - **Persona:** every role, mobile first (employee standing at the broken thing); desktop usable (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** report a problem with category, symptoms, place, photos and urgency in under a minute — or, for team leads, record a job the team already fixed.
-- **Route:** `/repair/new` · with QR: `/repair/new?asset={asset_code}`
+- **Route:** `/repair/new` · with QR: `/repair/new?asset={asset_code}` (printed QR = `/q/{code}`, which redirects here; the asset code is never required — CR-036)
 - **Mockup:** `../mockups/S03-report-form.html` (wizard steps, QR prefill, validation errors, team-handled option; also S04 and S05 frames — its desktop frame is superseded) · desktop: `../mockups/S03-report-form-desktop.html` (CR-002)
 - **Data:** categories + symptoms, buildings + floors, asset lookup by code, photo upload, create ticket (returns either the new ticket or a list of open duplicates → S04) → `modules/repair/api.ts` (names fixed in 04-api-contract.md)
 

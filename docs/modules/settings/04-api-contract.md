@@ -110,6 +110,8 @@ Permission column (CR-001): `loc` = `settings.locations.manage` · `asset` = `se
 | 53 | GET | `/api/v1/settings/building-types` | building types with usage counts (CR-005) | loc · cat | 4P |
 | 54 | POST | `/api/v1/settings/building-types` | add a building type + its categories (CR-005) | loc | 4P |
 | 55 | PATCH | `/api/v1/settings/building-types/{id}` | rename / (de)activate a building type (CR-005) | loc | 4P |
+| 56 | GET | `/api/v1/settings/assets/labels?buildingId=&floorId=&roomId=` | active assets to print QR labels for (CR-007, repair CR-036) | asset | repair 5B |
+| 57 | POST | `/api/v1/settings/assets/labels/printed` | record that labels were printed (snapshot) (CR-007) | asset | repair 5B |
 
 ---
 
@@ -318,6 +320,28 @@ Floors and rooms come from the building plan: settings never creates, deletes, r
 
 ### 48. PATCH /api/v1/settings/assets/{id}
 `{ "code"?, "name"?, "roomId"?, "isActive"?, "updatedAt" }` → 200 `<AssetAdmin>`. The type never changes (repair #32 rule). Moving to another room clears the 3D position. `isActive` alone = (de)activate; a deactivated asset keeps its code taken. Errors: as #47 + 404 `ASSET_NOT_FOUND`, 409 `VERSION_CONFLICT`. Audit `asset.created` / `asset.updated` / `asset.deactivated` / `asset.activated` as repair CR-016.
+(CR-007) A different `code` once the label was printed (`labelStatus` ≠ `never`) → 422 `ASSET_CODE_LOCKED` "พิมพ์ป้าย QR ของอุปกรณ์นี้แล้ว จึงเปลี่ยนรหัสไม่ได้" (repair BR-F13A-5). Moving / renaming stays allowed and only changes `labelStatus`.
+
+### Labels (CR-007, repair CR-036 — built in repair Stage 5B)
+
+`AssetAdmin` gains (CR-007):
+```json
+{ "labelStatus": "moved", "labelPrintedAt": "2026-11-02T03:00:00Z" }
+```
+`labelStatus` ∈ `never` (no label printed) · `current` (label text = today's data) · `moved` (printed room ≠ current room) · `changed` (same room, but asset / building / floor / room name differs). Computed on read from `platform.assets.label_snapshot`; moves through #48 and repair #32 both count. S20 copy: `moved` → ย้ายแล้ว ควรพิมพ์ป้ายใหม่ · `changed` → ข้อมูลบนป้ายเปลี่ยน ควรพิมพ์ใหม่ · `never` → ยังไม่เคยพิมพ์ป้าย · `current` → no badge.
+
+### 56. GET /api/v1/settings/assets/labels?buildingId=&floorId=&roomId=
+`buildingId` required; `floorId` / `roomId` narrow it. Active assets only, ordered floor `level` → room name → `code`.
+```json
+{ "data": [ { "id": "a1…", "code": "AC-1-012", "name": "แอร์ห้องประชุม 1A ตัวซ้าย",
+  "building": { "id": "b1…", "name": "อาคาร 1" }, "floor": { "id": "f5…", "name": "5", "level": 5 },
+  "room": { "id": "r5…", "name": "ห้องประชุม 5B" },
+  "labelStatus": "never", "labelPrintedAt": null } ] }
+```
+No pagination (one building ≤ ~2 000 assets). The QR text and the short location (`อ.1 · ชั้น 5 · ห้องประชุม 5B`) are built by the frontend (`{FRONTEND_URL}/q/{code}`, repair BR-F13A-1). Errors: 400 `VALIDATION_FAILED` (`buildingId: REQUIRED|INVALID`), 404 `BUILDING_NOT_FOUND`.
+
+### 57. POST /api/v1/settings/assets/labels/printed
+`{ "assetIds": ["a1…", "…"] }` (1–500) → 200 `{ "data": [ <AssetAdmin> ] }` with `labelStatus: "current"`. Stores `label_snapshot` (code, name, building / floor / room id + name), `label_printed_at = now()`, `label_printed_by` = caller, in one transaction. Errors: 400 `VALIDATION_FAILED` (`assetIds: REQUIRED|TOO_MANY`), 422 `ASSET_NOT_ACTIVE` (any id unknown or inactive → nothing saved). Audit `asset.label_printed` (count + ids).
 
 ### 49. GET /api/v1/settings/assets/suggest-code?assetTypeId=&roomId= → `{ "data": { "code": "AC-1-003" } }`
 Same rule as repair #34 (`{codePrefix}-{floor name}-{nnn}`), floor taken from the room.
