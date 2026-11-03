@@ -679,6 +679,20 @@ type FloorPlan struct {
 	Assets         []Asset
 }
 
+// RoomPlan is #36 (CR-038): a floor plan without tickets or equipment, plus the building's 3D shape
+// (nil = no shape or no plan footprint: the form draws the plan in 2D only).
+type RoomPlan struct {
+	Plan  FloorPlan
+	Model *PlanModel
+}
+
+// PlanModel is what the 3D engine needs to open a building: shape key, footprint, top floor level.
+type PlanModel struct {
+	Key            string
+	WidthM, DepthM float64
+	Floors         int32
+}
+
 // AssetRef is the asset line of a ticket (TicketDetail `asset`, S07).
 type AssetRef struct {
 	Code, Name string

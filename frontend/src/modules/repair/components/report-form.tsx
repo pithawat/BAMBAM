@@ -32,6 +32,7 @@ import type { AssetLookup, Building, Category, DuplicateTicket, Floor, Photo, Re
 import { DuplicateCard, DuplicateDialog } from "./duplicate-dialog";
 import { CategoryTile, categoryIcon } from "./category-icon";
 import { forgetUploads, keptPhoto, photoBlocker, PhotoListLightbox, PhotoPicker, PhotoTile, uploadKeptPhotos, usePhotoList, type PhotoItem } from "./photo-picker";
+import { RoomPlanPicker } from "./room-plan-picker";
 import { floorLabel, listDate, timeOf } from "./ticket-presentation";
 import { useDiscardGuard } from "@/components/shared/use-discard-guard";
 
@@ -834,7 +835,8 @@ function LocationStep({ values, buildings, building, floor, errors, onChange, sp
     <div data-field="roomId">
       <Label id="room-label" required>ห้องหรือจุดที่เกิด</Label>
       <div>
-        {floor ? <RoomChoice rooms={floor.rooms} value={values.roomId} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />
+        {floor ? <RoomPlanPicker floorId={floor.id} value={values.roomId} onPick={(roomId) => onChange({ roomId })}
+          list={<RoomChoice rooms={floor.rooms} value={values.roomId} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />} />
           : <p className="grid min-h-23 place-items-center rounded-sm border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground">เลือกอาคารและชั้น แล้วเลือกห้องหรือจุดที่เกิดได้ที่นี่</p>}
         <FieldError id="roomId-error" message={errors.roomId} />
       </div>
@@ -848,7 +850,7 @@ function LocationStep({ values, buildings, building, floor, errors, onChange, sp
   </div>;
 }
 
-/** Room cards on every floor (CR-022: no picker for big floors), in their normal order (CR-025: the area-type hint is retired). */
+/** Room cards on every floor (CR-022: no picker for big floors; CR-038: behind "เลือกจากรายชื่อ" when the floor has a plan), in their normal order (CR-025: the area-type hint is retired). */
 function RoomChoice({ rooms, value, invalid, onPick }: {
   rooms: Room[]; value: string; invalid: boolean; onPick: (id: string) => void;
 }) {

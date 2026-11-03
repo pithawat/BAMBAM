@@ -29,7 +29,12 @@ async function pickPlace(page: Page, building: string, floor: string | null, roo
   await s.getByText(building, { exact: true }).click();
   if (floor) await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText(floor, { exact: true }).click();
   else await s.getByRole("radiogroup", { name: "เลือกชั้น" }).locator("label").first().click();
-  await s.getByRole("radiogroup", { name: /ห้องหรือจุดที่เกิด/ }).getByText(room, { exact: true }).click();
+  // CR-038: a floor with a plan shows the plan first; the name list sits behind "เลือกจากรายชื่อ"
+  const toList = s.getByRole("button", { name: "เลือกจากรายชื่อ" });
+  const list = s.getByRole("radiogroup", { name: /ห้องหรือจุดที่เกิด/ });
+  await expect(toList.or(list).first()).toBeVisible();
+  if (await toList.isVisible()) await toList.click();
+  await list.getByText(room, { exact: true }).click();
   if (spot) await s.getByLabel("บอกจุดเพิ่มเติม").fill(spot);
 }
 
@@ -292,3 +297,18 @@ test("AC4 (CR-022): the frame keeps its width; room cards leave no reserved gap 
   // CR-019: the frame shares the row with the สรุปการแจ้งซ่อม column, so its width follows the shell.
 });
 
+test("CR-038: the room is picked on the floor plan (3D on desktop, flat plan on phones)", async ({ page, isMobile }) => {
+  await open(page);
+  const s = step(page, "location");
+  await s.getByText("อาคาร 1", { exact: true }).click();
+  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("4", { exact: true }).click();
+  await expect(s.getByRole("button", { name: "เลือกจากรายชื่อ" })).toBeVisible();
+  if (isMobile) {
+    await s.getByRole("radiogroup", { name: /แปลนชั้น/ }).getByRole("radio", { name: "WPS ห้องกาแฟ" }).click();
+  } else {
+    await expect(s.locator("canvas")).toBeVisible();
+    await s.getByRole("button", { name: "เลือกจากรายชื่อ" }).click();
+    await s.getByRole("radiogroup", { name: /ห้องหรือจุดที่เกิด/ }).getByText("WPS ห้องกาแฟ", { exact: true }).click();
+  }
+  await expect(s.getByText("ห้องที่เลือก: WPS ห้องกาแฟ")).toBeVisible();
+});

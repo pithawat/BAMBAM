@@ -1,290 +1,74 @@
-﻿/* S01 login / signed-out (CR-019), global classes prefixed bl- (the turbopack *.css rule in next.config.ts
-   serves every .css as plain CSS, so CSS modules are not used): a 1:1 port of bam-workplace-login-v7.html (owner's prototype) — sizes, pastel
-   card colours, breakpoints, its IBM Plex Sans Thai (loaded in login-card.tsx) and #373BFF come from it (screen spec S01,
-   CR-019 block; D-095). */
+﻿/* S01 login / signed-out (CR-037), global classes prefixed bl- (the turbopack *.css rule in next.config.ts
+   serves every .css as plain CSS, so CSS modules are not used): a port of output/qr-login-redesign/login.html —
+   sizes, #2741fa, the arch behind the mascot and the breakpoints come from it. Font = the app's Anuphan. */
 
-/* Fit the current viewport, including changes to mobile browser chrome. */
-.bl-page { height: 100dvh; overflow: hidden; background: #fdfdff; color: #242835; position: relative; display: flex; flex-direction: column; font-size: 16px; line-height: 1.5; }
-.bl-page h1, .bl-page h2, .bl-page h3 { font-family: inherit; } /* globals.css puts headings on --font-heading */
-.bl-page svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.bl-page { --bl-blue: #2741fa; --bl-ink: #10131c; --bl-muted: #5b6676; --bl-line: #e5e8ef;
+  /* owner 2026-11-03: white edge to edge, logo / footer near the edges, one screen with no scroll bar —
+     the page is exactly the viewport and the mascot + headline scale with its height */
+  --bl-edge: 32px; height: 100dvh; overflow: hidden; width: 100%; padding: 0 var(--bl-edge); display: flex; flex-direction: column;
+  background: #fff; color: var(--bl-ink); line-height: 1.5; }
+.bl-page h1 { font-family: inherit; } /* globals.css puts headings on --font-heading */
+.bl-page svg { display: block; fill: none; stroke: currentColor; stroke-width: 2; }
+.bl-page button:focus-visible { outline: 3px solid var(--bl-blue); outline-offset: 5px; }
 
 /* ---- top bar ---- */
-.bl-nav { width: min(1400px, 100% - 96px); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 30px 0; position: relative; z-index: 5; }
-.bl-brand { display: inline-flex; align-items: center; gap: 15px; }
-.bl-brandLogo { display: block; width: 124px; height: auto; flex-shrink: 0; }
-.bl-brandCaption { font: 600 9px/1.5 Arial, sans-serif; letter-spacing: 1.7px; color: #8c91a4; border-left: 1px solid #e4e5ec; padding-left: 15px; }
-.bl-help { display: inline-flex; align-items: center; gap: 8px; padding: 10px 15px; border: 1px solid #e7e8ef; border-radius: 30px; background: #fff; color: #62697e; font-size: 11px; cursor: pointer; }
-.bl-help:hover { background: #f3f3ff; border-color: #cecff5; }
+.bl-nav { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 0; }
+.bl-logo { display: block; width: 100px; height: auto; }
+.bl-help { min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: var(--bl-muted); font-size: 14px; cursor: pointer; text-underline-offset: 5px; }
+.bl-help:hover { text-decoration: underline; }
 
-/* ---- stage: centred copy, decoration around it ---- */
-.bl-stage { width: min(1420px, 100% - 64px); min-height: 650px; flex: 1 0 auto; position: relative; margin: 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.bl-main { width: 640px; max-width: 100%; text-align: center; padding: 45px 0 70px; position: relative; z-index: 3; }
-.bl-eyebrow { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e6e6f3; background: #f6f6fc; padding: 7px 13px; border-radius: 24px; font-size: 10px; color: #7d8297; margin-bottom: 23px; }
-.bl-eyebrow > span { width: 5px; height: 5px; border-radius: 50%; background: #7b76f7; }
-.bl-title { font-size: 58px; line-height: 1.38; font-weight: 650; letter-spacing: -1.7px; margin: 0; color: #272b38; }
-.bl-title > span { color: #393bfa; position: relative; display: inline-block; }
-.bl-title > span::after { content: ""; height: 9px; position: absolute; bottom: 3px; left: 5%; right: 4%; border-bottom: 3px solid #c5c3ff; border-radius: 50%; transform: rotate(-1deg); }
-.bl-description { font-size: 15px; line-height: 1.9; color: #8a8e9e; margin: 20px 0 29px; }
-.bl-notice { margin: 0 auto 22px; max-width: 420px; text-align: left; }
-.bl-cta { display: inline-flex; align-items: center; justify-content: center; gap: 13px; min-height: 58px; min-width: 320px; padding: 16px 23px; border-radius: 32px; border: 1px solid #373bff; background: #373bff; color: #fff; font-size: 14px; font-weight: 550; box-shadow: 0 8px 23px rgb(55 59 255 / 14%); cursor: pointer; transition: transform .15s, box-shadow .15s, background .15s; }
-.bl-cta:hover:not(:disabled) { background: #282bdc; transform: translateY(-2px); box-shadow: 0 12px 28px rgb(55 59 255 / 19%); }
-.bl-cta:disabled { opacity: .6; cursor: default; }
-.bl-cta:focus-visible, .bl-help:focus-visible, .bl-footerHelp:focus-visible { outline: 3px solid #9c9eff; outline-offset: 4px; }
-.bl-ctaArrow { margin-left: 5px; }
-.bl-spin { animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.bl-accountNote { line-height: 1.8; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; color: #979caf; margin: 13px 0 0; }
-.bl-accountNote svg { width: 14px; height: 14px; stroke-width: 1.5; }
+/* ---- hero: copy left, mascot right ---- */
+.bl-hero { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.35fr 1fr; gap: 70px; align-items: center; width: 100%; max-width: 1120px; margin: 0 auto; padding: clamp(8px, 3dvh, 40px) 0; }
+.bl-copy { padding: 24px 0; }
+/* headline: the previous login's type (Plex 650, -1.7px, swoosh under the second line); size from login.html */
+.bl-title { margin: 0; font-size: clamp(28px, min(3.5vw, 6dvh), 52px); font-weight: 650; line-height: 1.38; letter-spacing: -1.7px; color: var(--foreground); }
+.bl-title > span { position: relative; display: inline-block; color: var(--primary); }
+.bl-title > span::after { content: ""; position: absolute; bottom: 3px; left: 5%; right: 4%; height: 9px; border-bottom: 3px solid var(--mascot-blue); border-radius: 50%; transform: rotate(-1deg); }
+.bl-description { margin: clamp(10px, 2dvh, 20px) 0 clamp(18px, 4dvh, 36px); font-size: 18px; line-height: 1.75; color: var(--bl-muted); }
 
-.bl-services { margin: 29px auto 0; width: min(420px, 100%); }
-.bl-servicesTitle { display: block; font-size: 9px; line-height: 1.5; letter-spacing: .2px; color: #a5a9b8; margin: 0 0 11px; font-weight: 400; }
-.bl-serviceList { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0; }
-.bl-serviceList > li { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 13px 6px 12px; border: 1px solid #eeeff5; border-radius: 13px; background: #fff; color: #7b8196; font-size: 11px; line-height: 1.5; }
-.bl-symbol { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; }
-.bl-symbol svg { width: 19px; height: 19px; stroke-width: 1.6; }
-.bl-maintenance { background: #f0edff; color: #8881cd; }
-.bl-vehicle { background: #eaf5fc; color: #6c9ebc; }
-.bl-meeting { background: #eaf5f0; color: #72a58f; }
+.bl-notice { max-width: 380px; margin: 0 0 24px; padding: 14px 16px; background: #f1f3f7; border-left: 3px solid var(--bl-blue); border-radius: 4px 10px 10px 4px; font-size: 14px; }
+.bl-notice strong { display: block; margin-bottom: 4px; }
+.bl-noticeError { background: #fff2f0; border-color: #c33432; }
 
-/* ---- floating cards ---- */
-.bl-card { position: absolute; background: #fff; border: 1px solid #e9eaf1; border-radius: 16px; box-shadow: 0 5px 18px rgb(52 56 75 / 3%), 0 1px 3px rgb(52 56 75 / 2.4%); z-index: 1; pointer-events: none; }
-.bl-card h3 { font-size: 13px; font-weight: 550; color: #434b60; line-height: 1.6; margin: 4px 0 0; }
-.bl-cardEyebrow { font-size: 9px; letter-spacing: .2px; color: #959bae; display: flex; align-items: center; gap: 7px; }
-.bl-cardCopy { padding: 17px 18px; }
-.bl-tags { display: flex; gap: 6px; margin-top: 11px; }
-.bl-tags span { font-size: 9px; background: #f5f6fa; color: #9298aa; padding: 3px 8px; border-radius: 5px; }
+.bl-cta { width: 100%; max-width: 380px; min-height: 68px; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  border: 0; border-radius: 16px; background: var(--bl-blue); color: #fff; font-size: 19px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 6px 0 #192abc; transition: background .15s, transform .15s; -webkit-tap-highlight-color: transparent; }
+.bl-cta svg { width: 23px; height: 23px; }
+.bl-cta:hover { background: #1b31d6; }
+.bl-cta:active { transform: translateY(3px); box-shadow: 0 3px 0 #192abc; }
+.bl-cta:disabled { opacity: .55; cursor: default; transform: none; }
+.bl-accountNote { margin: 18px 0 0; font-size: 13px; color: var(--bl-muted); }
 
-.bl-repair { width: 222px; left: 1%; top: 70px; transform: rotate(-8deg); overflow: hidden; }
-.bl-repairArt { height: 126px; display: flex; align-items: center; justify-content: center; position: relative; background: #eeedff; }
-.bl-repairArt > svg { width: 52px; height: 52px; stroke: #6762da; stroke-width: 1.25; transform: rotate(12deg); background: rgb(255 255 255 / 61%); box-sizing: content-box; padding: 15px; border-radius: 24px; box-shadow: 0 6px 0 #d5d1f4; }
-.bl-spark { position: absolute; font-size: 26px; color: #a59ee7; top: 17px; right: 28px; }
-.bl-dot { width: 8px; height: 8px; border-radius: 50%; background: #c1b9ee; position: absolute; left: 28px; bottom: 25px; }
-
-.bl-car { left: 3.5%; top: 366px; width: 216px; padding: 16px 18px 18px; transform: rotate(6deg); overflow: hidden; }
-.bl-car h3 { font-size: 13px; line-height: 1.6; color: #5c6e84; margin: 4px 0 0; }
-.bl-car .bl-tags { margin-top: 10px; gap: 4px; }
-.bl-car .bl-tags span { font-size: 8px; padding: 3px 6px; background: #f4f8fc; }
-.bl-carArt { display: flex; align-items: center; justify-content: center; position: relative; height: 85px; margin: -16px -18px 16px; background: #eaf4fc; }
-.bl-carArt > svg { width: 74px; height: 57px; stroke: #8ab0cb; stroke-width: 1.2; position: relative; z-index: 1; }
-.bl-carArt > span { position: absolute; width: 124px; height: 4px; border-radius: 50%; background: #d7e7f4; bottom: 14px; left: 50%; transform: translateX(-50%); }
-
-.bl-room { width: 224px; right: 1%; top: 24px; transform: rotate(7deg); overflow: hidden; }
-.bl-roomArt { height: 83px; background: #edf6f1; display: flex; align-items: center; justify-content: center; gap: 18px; }
-.bl-roomArt > svg { width: 48px; height: 48px; stroke: #8bb5a2; stroke-width: 1.2; }
-.bl-slots { display: flex; flex-direction: column; gap: 6px; }
-.bl-slots i { width: 36px; height: 7px; border-radius: 4px; background: #c8e0d4; }
-.bl-slots i:nth-child(2) { background: #9dc5b2; }
-.bl-room .bl-cardCopy { padding: 14px 17px 15px; }
-.bl-room .bl-cardCopy h3 { margin-top: 3px; }
-.bl-room .bl-cardCopy p { font-size: 9px; line-height: 1.6; color: #a0acaa; margin: 4px 0 0; }
-
-.bl-account { right: 2%; top: 550px; display: flex; align-items: center; gap: 11px; width: 258px; padding: 16px 17px; transform: rotate(-5deg); }
-.bl-account h3 { font-size: 11px; }
-.bl-account p { font-size: 9px; color: #a2a8b7; line-height: 1.6; margin: 3px 0 0; }
-.bl-account .bl-cardEyebrow { font: 500 7px/1.5 Arial, sans-serif; letter-spacing: .7px; }
-.bl-check { display: flex; align-items: center; justify-content: center; background: #eeeffc; color: #9a9dce; border-radius: 12px; width: 40px; height: 43px; flex-shrink: 0; }
-.bl-check svg { width: 23px; height: 23px; stroke-width: 1.4; }
-
-/* ---- mascot ---- */
-.bl-scene { position: absolute; right: 0; top: 210px; width: 285px; height: 310px; z-index: 2; pointer-events: none; }
-.bl-mascot { position: relative; display: block; object-fit: contain; width: 100%; height: 100%; z-index: 1; transform: rotate(4deg); }
-.bl-halo { position: absolute; inset: 60px -5px 22px 36px; background: #f0edff; border-radius: 49% 51% 37% 63%; transform: rotate(-12deg); }
-.bl-speech { position: absolute; top: -18px; left: 18px; background: #fff; border: 1px solid #e5e4f2; border-radius: 15px 15px 3px; padding: 10px 14px; font-size: 12px; color: #6c6a8f; box-shadow: 0 4px 12px rgb(52 56 75 / 2%); transform: rotate(-5deg); z-index: 3; white-space: nowrap; }
-.bl-speech span { color: #a7a2e9; padding-left: 5px; }
-.bl-mascotLabel { position: absolute; bottom: -19px; left: 35px; right: 0; text-align: center; letter-spacing: 2px; font: 500 8px/1.5 Arial, sans-serif; color: #adb0c1; }
+/* as tall as the space between top bar and footer allows (nav 84 + footer 46 + hero padding) */
+.bl-visual { position: relative; isolation: isolate; display: flex; align-items: end; justify-content: center; aspect-ratio: .88;
+  width: min(100%, calc((100dvh - 150px - 2 * clamp(8px, 3dvh, 40px)) * .88)); justify-self: center; border-radius: 160px 160px 32px 32px; background: var(--bl-blue); }
+.bl-visual img { position: relative; display: block; width: 112%; max-width: none; height: auto; margin: 0 -6% -3%; }
 
 /* ---- footer ---- */
-.bl-footer { width: min(1400px, 100% - 96px); margin: 0 auto; padding: 30px 0 25px; display: flex; justify-content: space-between; align-items: center; gap: 18px; font-size: 9px; color: #a0a4b3; position: relative; z-index: 3; }
-.bl-footer i { font-style: normal; margin: 0 8px; color: #c6c8d2; }
-.bl-footerHelp { display: flex; align-items: center; gap: 6px; color: #878da0; font-size: 9px; padding: 4px 0; background: none; border: 0; cursor: pointer; }
-.bl-footerHelp:hover { color: #242835; }
-.bl-footer .bl-footerHelp svg { width: 13px; height: 13px; }
+.bl-footer { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--bl-line); font-size: 12px; color: var(--bl-muted); }
 
-/* ---- prototype breakpoints ---- */
-@media (min-height: 900px) and (min-width: 1051px) {
-  .bl-stage { min-height: 710px; }
-  .bl-main { padding-bottom: 80px; }
-  .bl-repair { top: 95px; }
-  .bl-room { top: 58px; }
-  .bl-scene { top: 260px; }
-  .bl-car { top: 402px; }
-  .bl-account { top: 610px; }
-}
-@media (max-width: 1280px) and (min-width: 1051px) {
-  .bl-main { width: 560px; }
-  .bl-title { font-size: 50px; }
-  .bl-description { font-size: 14px; }
-  .bl-repair { width: 184px; left: 0; }
-  .bl-repairArt { height: 105px; }
-  .bl-car { width: 184px; left: 0; }
-  .bl-card h3 { font-size: 11px; }
-  .bl-car h3 { font-size: 11px; }
-  .bl-car .bl-tags { flex-wrap: wrap; }
-  .bl-carArt { height: 75px; }
-  .bl-room { width: 202px; right: 0; top: 26px; }
-  .bl-roomArt { height: 74px; }
-  .bl-room .bl-cardCopy { padding: 12px 14px; }
-  .bl-room .bl-cardCopy h3 { font-size: 11px; }
-  .bl-room .bl-cardEyebrow { font-size: 8px; }
-  .bl-scene { width: 225px; height: 255px; top: 250px; right: -10px; }
-  .bl-speech { font-size: 10px; }
-  .bl-account { width: 214px; right: 0; padding: 12px; gap: 8px; }
-  .bl-account h3 { font-size: 9px; }
-  .bl-account p { font-size: 8px; }
-  .bl-services { width: 390px; }
-}
 @media (max-width: 1050px) {
-  .bl-nav { width: calc(100% - 64px); padding: 26px 0; }
-  .bl-stage { min-height: 0; width: calc(100% - 48px); padding: 22px 0 35px; }
-  .bl-card { display: none; }
-  .bl-scene { position: relative; top: auto; right: auto; order: 0; width: 160px; height: 170px; margin: 0 auto 6px; }
-  .bl-mascot { transform: none; }
-  .bl-halo { inset: 22px 1px 7px 14px; }
-  .bl-speech, .bl-mascotLabel { display: none; }
-  .bl-main { order: 1; width: 640px; padding: 10px 0 0; }
-  .bl-services { margin-top: 25px; width: 400px; max-width: 100%; }
-  .bl-title { font-size: 48px; }
-  .bl-eyebrow { margin-bottom: 16px; }
-  .bl-description { margin: 17px 0 23px; }
-  .bl-footer { width: calc(100% - 64px); padding: 22px 0; flex-wrap: wrap; justify-content: center; gap: 8px 24px; }
-  .bl-footer > span:first-child { display: none; }
+  .bl-hero { gap: 36px; }
+  .bl-title { font-size: clamp(28px, 5dvh, 36px); }
+  .bl-description { font-size: 16px; }
+  .bl-visual { border-radius: 110px 110px 24px 24px; }
+  .bl-cta { font-size: 17px; }
 }
-@media (max-width: 520px) {
-  .bl-nav { width: calc(100% - 40px); padding: 24px 0 14px; }
-  .bl-brandLogo { width: 100px; }
-  .bl-brand { gap: 11px; }
-  .bl-brandCaption { font-size: 7px; letter-spacing: 1.2px; padding-left: 11px; }
-  .bl-help { padding: 8px 10px; font-size: 10px; gap: 5px; }
-  .bl-help svg { width: 16px; height: 16px; }
-  .bl-stage { width: calc(100% - 32px); padding-top: 12px; padding-bottom: 25px; }
-  .bl-scene { width: 134px; height: 142px; }
-  .bl-main { padding-top: 5px; }
-  .bl-title { font-size: 37px; line-height: 1.4; letter-spacing: -1.2px; }
+@media (max-width: 760px) {
+  .bl-page { --bl-edge: 20px; }
+  .bl-nav { padding: 14px 0; }
+  .bl-logo { width: 84px; }
+  .bl-hero { display: flex; flex-direction: column-reverse; justify-content: center; gap: clamp(12px, 3dvh, 24px); }
+  .bl-visual { flex: none; width: clamp(96px, 20dvh, 160px); aspect-ratio: 1; border-radius: 70px 70px 20px 20px; }
+  .bl-visual img { width: 111%; margin-bottom: -4%; }
+  .bl-copy { width: 100%; max-width: 460px; padding: 0; text-align: center; }
+  .bl-title { font-size: clamp(26px, 6.8vw, 40px); line-height: 1.4; letter-spacing: -1.2px; }
   .bl-title > span::after { bottom: 0; height: 6px; border-bottom-width: 2px; }
-  .bl-eyebrow { font-size: 8px; padding: 6px 10px; gap: 6px; margin-bottom: 15px; }
-  .bl-description { font-size: 12px; margin: 17px 0 24px; }
-  .bl-cta { min-width: 0; width: min(100%, 320px); min-height: 54px; font-size: 12px; padding: 14px 18px; gap: 11px; }
-  .bl-cta svg { width: 18px; height: 18px; }
-  .bl-accountNote { font-size: 9px; margin-top: 11px; }
-  .bl-title { font-size: 35px; }
-  .bl-services { margin-top: 22px; width: 340px; }
-  .bl-servicesTitle { font-size: 8px; margin-bottom: 9px; }
-  .bl-serviceList { gap: 8px; }
-  .bl-serviceList > li { font-size: 10px; padding: 11px 4px; gap: 7px; border-radius: 11px; }
-  .bl-symbol { width: 30px; height: 30px; border-radius: 9px; }
-  .bl-symbol svg { width: 17px; height: 17px; }
-  .bl-footer { width: calc(100% - 32px); font-size: 8px; padding: 18px 0 24px; }
-  .bl-footerHelp { font-size: 8px; }
+  .bl-description { margin: clamp(6px, 1.6dvh, 14px) 0 clamp(14px, 3dvh, 26px); font-size: 14px; line-height: 1.8; }
+  .bl-cta { max-width: none; min-height: 58px; padding: 16px 20px; font-size: 17px; border-radius: 14px; }
+  .bl-accountNote { margin-top: clamp(10px, 2dvh, 18px); font-size: 12px; }
+  .bl-notice { max-width: none; text-align: left; }
+  .bl-footer { justify-content: center; padding: 10px 0; font-size: 11px; }
+  .bl-footer span:first-child { display: none; }
 }
-@media (max-width: 360px) {
-  .bl-title { font-size: 31px; }
-  .bl-serviceList > li { font-size: 9px; }
-  .bl-help span { display: none; }
-  .bl-description { font-size: 11px; }
-}
-/* Fit content to the remaining height without changing the full-width stage.
-   The measured factor includes notice text and font loading at every viewport size. */
-.bl-nav, .bl-footer { flex-shrink: 0; }
-.bl-stage { min-height: 0; flex: 1 1 0; }
-.bl-main { flex-shrink: 0; zoom: var(--bl-fit, 1); }
-@media (min-width: 1051px) {
-  .bl-card, .bl-scene { zoom: var(--bl-decoration-fit, 1); }
-}
-@media (min-width: 1051px) and (max-height: 899px) {
-  .bl-scene { top: 230px; width: 265px; height: 290px; }
-}
-@media (min-width: 1051px) and (max-width: 1280px) and (max-height: 899px) {
-  .bl-scene { width: 225px; height: 255px; }
-}
-@media (min-height: 900px) and (min-width: 1051px) {
-  .bl-repair { top: 95px; }
-  .bl-car { top: 402px; }
-  .bl-room { top: 58px; }
-  .bl-scene { top: 260px; }
-  .bl-account { top: 610px; }
-}
-@media (max-width: 1050px) {
-  .bl-scene { flex-shrink: 0; zoom: var(--bl-fit, 1); }
-}
-@media (max-height: 760px) {
-  .bl-nav { padding-top: 18px; padding-bottom: 10px; }
-  .bl-footer { padding-top: 12px; padding-bottom: 16px; }
-}
-/* Use the desktop canvas rather than a capped 1420px island on wide screens. */
-@media (min-width: 1281px) {
-  .bl-nav, .bl-footer { width: calc(100% - 96px); }
-  .bl-nav { padding: 24px 0; }
-  .bl-footer { padding: 18px 0; font-size: 10px; }
-  .bl-stage { width: calc(100% - 96px); }
-  .bl-main { width: min(760px, 52%); padding: 12px 0 24px; }
-  .bl-title { font-size: clamp(58px, 4.4vw, 78px); }
-  .bl-eyebrow { font-size: 12px; margin-bottom: 20px; }
-  .bl-description { font-size: 18px; margin: 20px 0 28px; }
-  .bl-cta { min-width: 400px; min-height: 64px; font-size: 16px; }
-  .bl-accountNote { font-size: 12px; }
-  .bl-services { width: 560px; max-width: 100%; margin-top: 30px; }
-  .bl-servicesTitle { font-size: 11px; }
-  .bl-serviceList { gap: 14px; }
-  .bl-serviceList > li { padding: 16px 8px; font-size: 13px; gap: 10px; }
-  .bl-symbol { width: 42px; height: 42px; }
-  .bl-symbol svg { width: 23px; height: 23px; }
-  .bl-repair { width: clamp(260px, 19vw, 340px); left: 1%; top: 48px; }
-  .bl-repairArt { height: 150px; }
-  .bl-cardCopy { padding: 20px 22px; }
-  .bl-card h3, .bl-car h3 { font-size: 16px; }
-  .bl-cardEyebrow { font-size: 11px; }
-  .bl-tags span { font-size: 11px; }
-  .bl-car { width: clamp(250px, 18vw, 320px); left: 3%; top: 410px; }
-  .bl-carArt { height: 108px; }
-  .bl-car .bl-tags span { font-size: 10px; }
-  .bl-room { width: clamp(260px, 18vw, 320px); right: 1%; top: 10px; }
-  .bl-roomArt { height: 92px; }
-  .bl-room .bl-cardCopy { padding: 16px 20px; }
-  .bl-room .bl-cardCopy p { font-size: 11px; }
-  .bl-scene { right: 0; top: 242px; width: 330px; height: 340px; }
-  .bl-speech { font-size: 13px; }
-  .bl-account { width: 310px; right: 1%; top: 625px; }
-  .bl-account h3 { font-size: 13px; }
-  .bl-account p { font-size: 11px; }
-  .bl-account .bl-cardEyebrow { font-size: 8px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .bl-cta { transition: none; }
-  .bl-cta:hover:not(:disabled) { transform: none; }
-  .bl-spin { animation: none; }
-}
-
-/* CR-029: cool workplace palette and a full-height backdrop for the white tiger (CR-035: primary panel).
-   Keep the established composition and measured viewport fitting. */
-.bl-page { background: var(--background); color: var(--foreground); }
-.bl-title { color: var(--foreground); }
-.bl-title > span { color: var(--primary); }
-.bl-title > span::after { border-color: var(--mascot-blue); }
-.bl-brandCaption, .bl-description, .bl-accountNote, .bl-servicesTitle,
-.bl-mascotLabel, .bl-footer, .bl-footerHelp { color: var(--muted-foreground); }
-.bl-eyebrow { background: var(--secondary); color: var(--secondary-foreground); border-color: var(--border); }
-.bl-eyebrow > span { background: var(--primary); }
-.bl-help, .bl-serviceList > li, .bl-card, .bl-speech { background: var(--card); border-color: var(--border); }
-.bl-help, .bl-serviceList > li, .bl-cardEyebrow, .bl-room .bl-cardCopy p,
-.bl-account p, .bl-tags span, .bl-car .bl-tags span { color: var(--muted-foreground); }
-.bl-card h3, .bl-car h3 { color: var(--foreground); }
-.bl-help:hover { background: var(--secondary); border-color: var(--mascot-edge); }
-.bl-cta { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
-.bl-cta:hover:not(:disabled) { background: var(--secondary-foreground); }
-.bl-cta:focus-visible, .bl-help:focus-visible, .bl-footerHelp:focus-visible { outline-color: var(--ring); }
-.bl-maintenance, .bl-repairArt, .bl-check { background: var(--secondary); color: var(--primary); }
-.bl-repairArt > svg { stroke: var(--primary); box-shadow: 0 6px 0 var(--mascot-blue); }
-.bl-spark, .bl-speech span { color: var(--primary); }
-.bl-dot { background: var(--mascot-blue); }
-.bl-vehicle, .bl-carArt { background: color-mix(in srgb, var(--mascot-blue) 25%, var(--card)); color: var(--svc-car); }
-.bl-carArt > svg { stroke: var(--svc-car); }
-.bl-meeting, .bl-roomArt { background: color-mix(in srgb, var(--mascot-sage) 25%, var(--card)); color: var(--success); }
-.bl-roomArt > svg { stroke: var(--success); }
-.bl-slots i { background: var(--mascot-sage); }
-.bl-slots i:nth-child(2) { background: var(--success); }
-/* Repair CR-035: the tiger stands on a solid primary panel, the S06 tracking treatment used app-wide. */
-.bl-halo { inset: 0; border-radius: 28px; background: var(--primary); border: 0; transform: rotate(-4deg); box-shadow: 0 18px 34px -22px color-mix(in srgb, var(--primary) 70%, transparent); }
-.bl-mascot { padding: 8px; filter: drop-shadow(0 4px 3px rgb(23 32 51 / 18%)); }
-.bl-speech { color: var(--secondary-foreground); }
-@media (max-width: 1050px) { .bl-halo { inset: 0; border-radius: 22px; transform: none; } }
-
+@media (prefers-reduced-motion: reduce) { .bl-cta { transition: none; } }

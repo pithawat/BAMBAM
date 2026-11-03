@@ -34,6 +34,7 @@ func RegisterRoutes(rg *gin.RouterGroup, c *Controller) {
 	rg.GET("/admin/overview", c.Overview)
 	rg.GET("/asset-types", c.AssetTypes)
 	rg.GET("/floors/:id/plan", c.FloorPlan)
+	rg.GET("/floors/:id/room-plan", c.RoomPlan) // CR-038: S03 room picker
 	rg.GET("/assets/suggest-code", c.SuggestAssetCode)
 	rg.POST("/assets", c.CreateAsset)
 	rg.PUT("/assets/:id", c.UpdateAsset)

@@ -17,6 +17,7 @@ import type {
   DuplicatesQuery,
   DuplicateTicket,
   FloorPlan,
+  RoomPlan,
   FollowRequest,
   Overview,
   OverviewBuilding,
@@ -1285,6 +1286,27 @@ export function mockFloorPlan(floorId: string, v: Viewer): FloorPlan {
     }),
     assets: mockScenario() === "empty" ? []
       : assetStore.items.filter((a) => a.isActive && roomIds.has(a.roomId)).sort((a, b) => a.code.localeCompare(b.code)).map(toAsset),
+  };
+}
+
+/** #36 (CR-038): any reporter; the plan without counts or equipment. */
+export function mockRoomPlan(floorId: string, v: Viewer): RoomPlan {
+  if (mockScenario() === "forbidden" || !(can(v, PERM.ticketReport) || can(v, PERM.ticketTeamHandle))) throw mockErrors.forbidden();
+  const found = findFloor(floorId);
+  if (!found) throw new ApiError(404, "FLOOR_NOT_FOUND", "mock: floor not found");
+  const { building, floor } = found;
+  const hasPlan = building.id === B1_ID;
+  return {
+    floor: { id: floor.id, name: floor.name, level: floor.level },
+    building: { id: building.id, name: building.name },
+    widthM: hasPlan ? B1_SIZE.widthM : null,
+    depthM: hasPlan ? B1_SIZE.depthM : null,
+    modelUrl: null,
+    rooms: floor.rooms.map((r) => ({
+      id: r.id, name: r.name, areaType: r.areaType, shape: hasPlan ? (b1Shapes.get(r.id) ?? null) : null, openCount: 0, highestPriority: null,
+    })),
+    assets: [],
+    model: hasPlan ? { key: "b1", widthM: B1_SIZE.widthM, depthM: B1_SIZE.depthM, floors: Math.max(...building.floors.map((f) => f.level)) } : null,
   };
 }
 

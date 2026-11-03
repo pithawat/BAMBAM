@@ -2,9 +2,18 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 / 5B accepted 2026-11-02 · of 8   **Updated:** 2026-11-02 (Stage 5B accepted)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 / 5B accepted 2026-11-02 · of 8   **Updated:** 2026-11-03 (CR-037 / CR-038 accepted)
 
 ## Now
+
+- **2026-11-03 CR-037 + CR-038 accepted by owner 2026-11-03:** S01 login = `login.html` (headline keeps Plex 650 + swoosh); S30 label = `label-v7.html`, text `สแกนแจ้งปัญหา`, mono toggle; S03 room picked on the floor plan (desktop 3D, phones 2D, list behind "เลือกจากรายชื่อ"), new #36 `floors/{id}/room-plan` (D-143). Go build / unit tests, tsc, eslint pass. **Not run:** e2e (Docker down), browser check (the dev server stopped on start to show a Next.js upgrade notice), paper print + phone scan of the v7 label. Proposal history: CR-037 v2–v7 in `output/qr-login-redesign/`.
+
+
+
+
+- **2026-11-02 CR-037 v2 revision ready:** separate `output/qr-login-redesign/{index-v2,login-v2}.html`; original BAM face / fur in a generated QR-holding pose, second-reference yellow arrow + black graphics, login's existing IBM Plex Sans Thai, centered CTA and concise service explanations. V1 retained. Done: 12 layouts, 5 login states, font / center checks, QR decode, one-page A4 PDFs and text containment pass. Next: owner reviews v2; production still unchanged, physical print / phone scan pending. Prompt / asset recorded in `output/qr-login-redesign/imagegen-v2-prompt.md`.
+
+- **2026-11-02 CR-037 PROPOSED (M):** owner-requested QR + login redesign ready at `output/qr-login-redesign/{index,login}.html`, with colour / monochrome 12-label A4 PDFs and a large poster. No emoji; flat tiger holding a real QR; simpler login keeps the exact headline and a prominent CTA without in-button status. Done: 12 responsive layouts, 5 login states, dialog focus, rendered QR decoding, print geometry / text containment all pass; each PDF is one A4 page. Next: owner approves the design / CR, then a bounded handoff; physical paper scan remains open. Production / shared code untouched; existing source edits preserved. Stage 6 not started.
 
 - **Stage 5B accepted 2026-11-02**, tag `repair-stage-5B` (CR-036 F13-A, D-142). Next: **Stage 6** (home by role) — `/build-stage repair 6 prepare` in a fresh session
 - **Stage 5 accepted 2026-11-02**, tag `repair-stage-5` (CR-036 F13-B)

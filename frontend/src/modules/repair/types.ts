@@ -491,6 +491,15 @@ export type FloorPlan = {
   assets: Asset[];
 };
 
+/**
+ * #36 (CR-038) the S03 room picker: #30 without counts (always 0 / null) or equipment, plus the building's 3D
+ * shape. `model` null = no 3D shape: the form draws the plan in 2D (also on phones and without WebGL).
+ */
+export type RoomPlan = Omit<FloorPlan, "assets"> & {
+  assets: [];
+  model: { key: string; widthM: number; depthM: number; floors: number } | null;
+};
+
 /** #31 body. Omit `x` / `z` (or send null) to add without a point (F31 step 5). */
 export type CreateAssetRequest = {
   assetTypeId: string;

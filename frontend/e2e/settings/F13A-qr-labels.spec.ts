@@ -104,7 +104,7 @@ test.describe("admin", () => {
     const cell = preview.getByTestId("qr-label").filter({ hasText: first.code });
     await expect(cell).toContainText(first.name);
     await expect(cell).toContainText(`${short(place.building.name)} · ชั้น ${place.floor.name} · ${place.a.name}`);
-    await expect(cell).toContainText("สแกนเพื่อแจ้งซ่อม · BAMBAM");
+    await expect(cell).toContainText("สแกนแจ้งปัญหา"); // CR-037 v7 label
     await expect(cell.locator("svg[data-qr]")).toHaveAttribute("data-qr", `${baseURL}/q/${encodeURIComponent(first.code)}`);
     // the print sheet holds the same labels and nothing else prints (only .qr-print-root under @media print)
     await expect(page.locator(".qr-print-root [data-testid=qr-label]")).toHaveCount(13);

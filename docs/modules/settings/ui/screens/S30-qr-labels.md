@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-11-01) — owner approved repair CR-036 / settings CR-007. Layout detail is confirmed at repair Stage 5B prepare (no mockup yet; follows the S20 CR-006 page frame).
 
+> **repair CR-037 (2026-11-03):** label cell = `output/qr-login-redesign/label-v7.html` (blue, peeking mascot, 40 mm QR on a white card, curved arrow, `สแกนแจ้งปัญหา` + logo top left, dark footer code 10 pt / name 9 pt / location 8 pt one line each). Colour by default; "พิมพ์แบบขาวดำ" in the preview. Supersedes the black-on-white-only rule of BR-F13A-1 for the look; the content is unchanged.
+
 - **Flows:** repair F13-A, BR-F13A-1…5 (see ../../../repair/02-flows.md)
 - **Persona:** Admin or Superadmin on desktop with a printer; phones can preview but printing is a desktop job (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** choose equipment by building, floor and room, preview the QR labels on A4 and print them, then mark them printed.

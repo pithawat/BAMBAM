@@ -68,6 +68,38 @@ func (s *Service) FloorPlan(ctx context.Context, v Viewer, floorID uuid.UUID) (F
 	return s.repo.GetFloorPlan(ctx, floorID)
 }
 
+// RoomPlan implements #36 (CR-038): the floor plan the S03 report form picks a room on — room outlines only, no
+// ticket counts or equipment — plus the building's 3D shape when it has one. Anyone who reports may read it.
+func (s *Service) RoomPlan(ctx context.Context, v Viewer, floorID uuid.UUID) (RoomPlan, error) {
+	if !reports(v) && !isLead(v) {
+		return RoomPlan{}, apperr.ErrForbidden
+	}
+	p, err := s.repo.GetFloorPlan(ctx, floorID)
+	if err != nil {
+		return RoomPlan{}, err
+	}
+	p.Assets = nil
+	for i := range p.Rooms {
+		p.Rooms[i].Open = PriorityCounts{}
+	}
+	out := RoomPlan{Plan: p}
+	buildings, err := s.repo.OverviewBuildings(ctx)
+	if err != nil {
+		return RoomPlan{}, err
+	}
+	for _, b := range buildings {
+		if b.ID != p.Building.ID || !b.HasModel || b.ModelKey == nil || b.WidthM == nil || b.DepthM == nil {
+			continue
+		}
+		top := int32(0)
+		for _, f := range b.Floors {
+			top = max(top, f.Level)
+		}
+		out.Model = &PlanModel{Key: *b.ModelKey, WidthM: *b.WidthM, DepthM: *b.DepthM, Floors: top}
+	}
+	return out, nil
+}
+
 // SuggestAssetCode implements #34: the next free `{prefix}-{floor}-{nnn}` for the add dialog.
 func (s *Service) SuggestAssetCode(ctx context.Context, v Viewer, typeID, floorID uuid.UUID) (string, error) {
 	if !managesAssets(v) {

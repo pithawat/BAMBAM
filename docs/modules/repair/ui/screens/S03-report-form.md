@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19) · page layout changed by CR-019 (approved 2026-10-24) · duplicate card position, step-2 block and locked team mode changed by CR-021 (approved 2026-10-25) · room cards on every floor + steps at their own height by CR-022 (approved 2026-10-26) · place first + categories by building type by CR-025 (approved 2026-10-27) · CR-034 applied 2026-11-01 (block below)
 
+> **CR-038 (2026-11-03):** the room is picked on the floor plan (#36): desktop with WebGL + a building shape = 3D plan (click, hover highlight), otherwise a flat 2D plan (tap). "ห้องที่เลือก: …" under it; "เลือกจากรายชื่อ" toggles the room cards (also the fallback for floors without a plan). Floor chips unchanged.
+
 > **CR-034 (approved 2026-11-01):** `ถัดไป` and the final submit are disabled while the current step has an empty / invalid required field or an unresolved blocking duplicate; a one-line hint under the bar names what is missing (`aria-describedby`; the button uses `aria-disabled` so it stays focusable). The final button still re-checks every step.
 
 > **CR-025 (approved 2026-10-27) — place first, categories by building type (overrides every block below where they differ).** Read `../../changes/CR-025.md` first.

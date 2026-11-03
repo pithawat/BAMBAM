@@ -59,6 +59,25 @@ func (ctl *Controller) FloorPlan(c *gin.Context) {
 	httpx.OK(c, toFloorPlanDTO(p))
 }
 
+// RoomPlan handles #36 GET /repair/floors/{id}/room-plan (CR-038).
+func (ctl *Controller) RoomPlan(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		httpx.Error(c, ErrFloorNotFound)
+		return
+	}
+	p, err := ctl.svc.RoomPlan(c.Request.Context(), v, id)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	httpx.OK(c, toRoomPlanDTO(p))
+}
+
 // parseAsset maps the #31 / #32 body; a malformed id is a field error.
 func parseAsset(c *gin.Context, withType bool) (AssetInput, bool) {
 	var req AssetRequest

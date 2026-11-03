@@ -130,6 +130,27 @@ type FloorPlanDTO struct {
 	Assets   []PlacedAssetDTO `json:"assets"`
 }
 
+// RoomPlanDTO = #36 (CR-038): #30's shape without counts or equipment, plus `model`.
+type RoomPlanDTO struct {
+	FloorPlanDTO
+	Model *PlanModelDTO `json:"model"`
+}
+
+type PlanModelDTO struct {
+	Key    string  `json:"key"`
+	WidthM float64 `json:"widthM"`
+	DepthM float64 `json:"depthM"`
+	Floors int32   `json:"floors"`
+}
+
+func toRoomPlanDTO(p RoomPlan) RoomPlanDTO {
+	d := RoomPlanDTO{FloorPlanDTO: toFloorPlanDTO(p.Plan)}
+	if m := p.Model; m != nil {
+		d.Model = &PlanModelDTO{Key: m.Key, WidthM: m.WidthM, DepthM: m.DepthM, Floors: m.Floors}
+	}
+	return d
+}
+
 // AssetRequest = #31 / #32 body (assetTypeId is ignored on #32). Ids stay strings so a bad id becomes
 // a field error, not a bind error.
 type AssetRequest struct {

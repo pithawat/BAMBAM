@@ -323,6 +323,27 @@ func TestDashboardAndAssetPermissions(t *testing.T) {
 	}
 }
 
+// CR-038: every reporter (and a team lead) reads the room plan; it never carries counts or equipment.
+func TestRoomPlanForReporters(t *testing.T) {
+	a := newAssetFixture(t)
+	ctx := context.Background()
+	for _, role := range []string{users.RoleEmployee, users.RoleHousekeeperLead, users.RoleAdmin} {
+		p, err := a.svc.RoomPlan(ctx, viewerAs(role, uuid.New()), a.plan.floor)
+		if err != nil {
+			t.Fatalf("%s room plan: %v", role, err)
+		}
+		if p.Plan.Assets != nil || p.Model != nil {
+			t.Errorf("%s room plan: %+v", role, p)
+		}
+	}
+	if _, err := a.svc.RoomPlan(ctx, Viewer{ID: uuid.New()}, a.plan.floor); !forbidden(err) {
+		t.Errorf("no permission: %v", err)
+	}
+	if _, err := a.svc.RoomPlan(ctx, viewerAs(users.RoleEmployee, uuid.New()), uuid.New()); err != ErrFloorNotFound {
+		t.Errorf("unknown floor: %v", err)
+	}
+}
+
 func forbidden(err error) bool {
 	e, ok := apperr.As(err)
 	return ok && e.Kind == apperr.KindForbidden

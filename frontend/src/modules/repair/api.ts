@@ -13,6 +13,7 @@ import {
   mockErrors,
   mockFollowTicket,
   mockFloorPlan,
+  mockRoomPlan,
   mockGetAssetTypes,
   mockHandoverTicket,
   mockListMyTickets,
@@ -47,6 +48,7 @@ import type {
   DuplicatesQuery,
   DuplicateTicket,
   FloorPlan,
+  RoomPlan,
   FollowRequest,
   HandoverRequest,
   MyTicketPage,
@@ -345,6 +347,12 @@ export async function getAssetTypes(): Promise<AssetType[]> {
 export async function getFloorPlan(floorId: string): Promise<FloorPlan> {
   if (env.useMocks) return mock(() => mockFloorPlan(floorId, mockViewer()), { read: true, needsData: false });
   return http.get<FloorPlan>(`${BASE}/floors/${encodeURIComponent(floorId)}/plan`);
+}
+
+/** #36 (CR-038) S03 room picker: room outlines only + the building's 3D shape. 404 `FLOOR_NOT_FOUND`. */
+export async function getRoomPlan(floorId: string): Promise<RoomPlan> {
+  if (env.useMocks) return mock(() => mockRoomPlan(floorId, mockViewer()), { read: true, needsData: false });
+  return http.get<RoomPlan>(`${BASE}/floors/${encodeURIComponent(floorId)}/room-plan`);
 }
 
 /** #31 admin adds equipment. 409 `ASSET_CODE_TAKEN` · 422 `POINT_OUTSIDE_ROOM` / `MASTER_DATA_CHANGED` · 400 fields (assetFieldMessages). */

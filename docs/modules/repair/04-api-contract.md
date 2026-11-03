@@ -60,6 +60,7 @@ Status: APPROVED (2026-10-14) · CR-005 applied 2026-10-15 · CR-008 applied 202
 | 32 | PUT | `/api/v1/repair/assets/{id}` | edit code / name, move (room + position) (CR-016) | admin (+ super_admin) | 3D |
 | 33 | POST | `/api/v1/repair/assets/{id}/deactivate` | remove = deactivate (CR-016) | admin (+ super_admin) | 3D |
 | 34 | GET | `/api/v1/repair/assets/suggest-code?assetTypeId=&floorId=` | next free code for the add dialog (CR-016) | admin (+ super_admin) | 3D |
+| 36 | GET | `/api/v1/repair/floors/{id}/room-plan` | S03 room picker: room outlines + the building's 3D shape, no counts / equipment (CR-038) | `repair.ticket.report` or `repair.ticket.team_handle` | CR-038 |
 | 28 | GET | `/api/v1/repair/me/recent-places` | the caller's last 3 distinct places (building · floor · room · location detail) for "ที่เคยแจ้ง" (S03, CR-008, CR-014) | all | 2R (CR-014: 2M) |
 
 S12's floor ticket list reuses #6 (`scope=all&floorId=…&status=in_progress,resolved`).
@@ -594,6 +595,12 @@ Same body as #31 except `assetTypeId` (type never changes) → 200 `<Asset>`. Mo
 
 ### 34. GET /api/v1/repair/assets/suggest-code?assetTypeId=&floorId= → `{ "data": { "code": "AC-1-003" } }`
 `{codePrefix}-{floor name}-{lowest free 3-digit number}`; only a suggestion, the user may type any free code.
+
+### 36. GET /api/v1/repair/floors/{id}/room-plan (CR-038)
+Same body as #30 with `openCount: 0`, `highestPriority: null`, `assets: []`, plus
+`"model": { "key": "b1", "widthM": 32, "depthM": 15, "floors": 6 }` — the building's 3D shape (frontend registry key),
+footprint and top floor level; `null` when the building has no shape or plan footprint (S03 then draws the plan in 2D).
+For anyone who reports (`repair.ticket.report` / `repair.ticket.team_handle`), else 403. 404 `FLOOR_NOT_FOUND`.
 
 Every #31–#33 writes `platform.audit_log` (`asset.created` / `asset.updated` / `asset.deactivated`, data = before / after).
 

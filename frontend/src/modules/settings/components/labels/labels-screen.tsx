@@ -278,7 +278,7 @@ export function LabelsScreen() {
             {tree && building ? (
               <Select value={building.id} onValueChange={pickBuilding}>
                 <SelectTrigger aria-labelledby="labels-building" className="h-11 w-full bg-card data-[size=default]:h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>{tree.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+                <SelectContent position="popper" side="bottom" avoidCollisions={false}>{tree.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
               </Select>
             ) : (
               <Skeleton className="h-11 w-full" />
@@ -492,6 +492,7 @@ function PreviewDialog({ open, assets, onOpenChange, onPrint }: {
 }) {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const pages = pagesFor(assets.length);
+  const [mono, setMono] = useState(false); // CR-037: colour by default, black-on-white for any printer
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -504,12 +505,16 @@ function PreviewDialog({ open, assets, onOpenChange, onPrint }: {
               <DialogTitle className="font-heading text-lg font-semibold">ตัวอย่างป้าย QR</DialogTitle>
               <DialogDescription className="text-[13px]">{assets.length} ชิ้น · {pages} หน้า A4 · พิมพ์ที่ขนาดจริง 100 %</DialogDescription>
             </div>
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <input type="checkbox" className="size-4 accent-primary" checked={mono} onChange={(e) => setMono(e.target.checked)} />
+              พิมพ์แบบขาวดำ
+            </label>
             <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}><X aria-hidden />ปิด</Button>
             <Button className="h-11" onClick={onPrint}><Printer aria-hidden />พิมพ์</Button>
           </div>
           <div className="flex-1 overflow-auto bg-muted/60 px-3 py-5">
             <div className="flex flex-col items-center gap-4 [zoom:0.42] sm:[zoom:0.7] lg:[zoom:0.85]">
-              {open && <LabelPages assets={assets} origin={origin} pageClassName="shadow-lg" />}
+              {open && <LabelPages assets={assets} origin={origin} mono={mono} pageClassName="shadow-lg" />}
             </div>
           </div>
         </DialogContent>
@@ -518,7 +523,7 @@ function PreviewDialog({ open, assets, onOpenChange, onPrint }: {
       {open && typeof document !== "undefined" && createPortal(
         <div className="qr-print-root" aria-hidden>
           <style>{LABEL_PRINT_CSS}</style>
-          <LabelPages assets={assets} origin={origin} />
+          <LabelPages assets={assets} origin={origin} mono={mono} />
         </div>,
         document.body,
       )}
