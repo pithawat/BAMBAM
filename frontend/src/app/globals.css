@@ -197,7 +197,7 @@
 .mascot-panel [data-slot="button"][data-variant="outline"]:hover { background: color-mix(in srgb, var(--primary-foreground) 14%, transparent); }
 .mascot-panel [data-slot="button"][data-variant="link"] { color: var(--primary-foreground); text-decoration: underline; text-underline-offset: 4px; }
 
-/* S07 print report (A4). */
+/* S07 print report (A4); its page footer lives in ticket-report.tsx (CR-039). */
 @media print {
   @page {
     size: A4;

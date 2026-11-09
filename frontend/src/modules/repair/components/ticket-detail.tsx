@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Tabs } from "radix-ui";
 import {
-  ArrowLeft, CalendarClock, Camera, Check, ChevronRight, CircleCheck, CircleX, ClipboardList, Clock, Copy, FileText, FolderCheck, Hourglass,
-  Image as ImageIcon, List, MapPin, Printer, RotateCcw, Star, UserRound, Wrench, X, type LucideIcon,
+  CalendarClock, Camera, Check, ChevronRight, CircleCheck, CircleX, ClipboardList, Clock, Copy, FileDown, FileText, FolderCheck, Hourglass,
+  Image as ImageIcon, List, MapPin, RotateCcw, Star, UserRound, Wrench, X, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
@@ -24,6 +24,7 @@ import { useTicketActions } from "./ticket-actions";
 import { ticketReturnHref } from "./ticket-navigation";
 import { categoryName, dateTime, dayLabel, placeLine, PRIORITY_LABELS, RATING_LABELS, shortDate, STEP, stepLabel, ticketTitle, timeOf, workByText } from "./ticket-presentation";
 import { storyViewer, ticketStory, type Stage, type Story, type StoryViewer } from "./ticket-story";
+import { TicketReport } from "./ticket-report";
 import { TicketFailure, TicketSkeleton } from "./ticket-ui";
 import { usePriorityReason } from "./use-priority-reason";
 import { useTicket } from "./use-ticket";
@@ -45,7 +46,7 @@ export function TicketDetailScreen({ id }: { id: string }) {
   const [backHref] = useState(() => (technician ? "/repair/work" : ticketReturnHref(id, staff ? "/repair/admin/queue" : "/repair/my")));
   const { ticket, loading, error, reload, replace } = useTicket(id);
   const listLabel = technician ? "งานซ่อม" : backHref.startsWith("/repair/admin/queue") ? "งานทั้งหมด" : "ติดตามงานซ่อม";
-  // CR-019: one container as wide as the navbar (the shell is max-w-7xl), back link and print inside it.
+  // CR-019: one container as wide as the navbar (the shell is max-w-7xl); CR-039: prints the report, not this card.
   return <div className="w-full px-4 pt-4 pb-8 lg:px-0 lg:pt-1 print:p-0">
     {loading ? <TicketSkeleton /> : error ? <TicketFailure error={error} onRetry={reload} />
       : ticket && <TicketBody ticket={ticket} onChanged={replace} back={{ href: backHref, label: listLabel }} />}
@@ -64,32 +65,33 @@ function TicketBody({ ticket, onChanged, back }: { ticket: TicketDetail; onChang
   // Once there is a result to check, the result tab opens first (CR-019).
   const [tab, setTab] = useState<Tab>(() => ticket.step === "awaiting_rating" || (ticket.status === "closed" && ticket.result) ? "result" : "info");
   return <>
-    <article aria-labelledby="ticket-title" className="overflow-hidden rounded-xl border bg-card shadow-card print:overflow-visible print:border-0 print:shadow-none">
+    <article aria-labelledby="ticket-title" className="overflow-hidden rounded-xl border bg-card shadow-card print:hidden">
       <Heading ticket={ticket} back={back} />
       <div className="border-t">
         {review ? <ReviewBand ticket={ticket} actions={actions} />
           : <NextAction ticket={ticket} viewer={viewer} story={story} meId={me.id} actions={actions} />}
       </div>
-      <div className="grid border-t lg:grid-cols-[minmax(0,1fr)_22rem] print:block">
+      <div className="grid border-t lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)} className="min-w-0">
-          <Tabs.List aria-label="รายละเอียดงาน" className="flex gap-1 border-b px-4 sm:px-7 print:hidden">
+          <Tabs.List aria-label="รายละเอียดงาน" className="flex gap-1 border-b px-4 sm:px-7">
             {([["info", "ข้อมูลแจ้งซ่อม", FileText], ["result", "ผลการซ่อม", Wrench]] as const).map(([value, label, Icon]) => <Tabs.Trigger key={value} value={value}
               className="-mb-px flex min-h-12 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-2.5 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:text-primary sm:px-3">
               <Icon className="size-4" aria-hidden />{label}
             </Tabs.Trigger>)}
           </Tabs.List>
-          {/* Both panels stay mounted so print shows both (CR-019). */}
-          <Tabs.Content value="info" forceMount className="outline-none data-[state=inactive]:hidden print:block!">
+          {/* Both panels stay mounted (CR-019) so photo selection survives a tab switch. */}
+          <Tabs.Content value="info" forceMount className="outline-none data-[state=inactive]:hidden">
             <InfoTab ticket={ticket} viewer={viewer} story={story} />
           </Tabs.Content>
-          <Tabs.Content value="result" forceMount className="outline-none data-[state=inactive]:hidden print:block! print:border-t">
+          <Tabs.Content value="result" forceMount className="outline-none data-[state=inactive]:hidden">
             <ResultTab ticket={ticket} viewer={viewer} story={story} />
           </Tabs.Content>
         </Tabs.Root>
         <Progress ticket={ticket} story={story} />
       </div>
     </article>
-    <PrintHistory ticket={ticket} story={story} />
+    {/* CR-039: print / Save as PDF = the report template, not the screen. */}
+    <TicketReport ticket={ticket} viewer={viewer} story={story} />
     {actions.dialogs}
   </>;
 }
@@ -102,27 +104,39 @@ function Heading({ ticket, back }: { ticket: TicketDetail; back: { href: string;
     catch { toast.error(GENERIC_ERROR); }
   }
   return <header className="px-4 pt-3 pb-5 sm:px-7 sm:pb-6">
-    <div className="flex items-center gap-2 print:hidden">
-      <Link href={back.href} className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-        <ArrowLeft className="size-4" aria-hidden />กลับไป{back.label}
-      </Link>
-      <Button type="button" variant="outline" className="h-10 px-3" onClick={() => window.print()}><Printer aria-hidden />พิมพ์งานนี้</Button>
+    <div className="flex items-center gap-2">
+      <nav aria-label="เส้นทางหน้า" className="mr-auto">
+        <ol className="flex min-h-11 items-center gap-1.5 text-[13px] text-muted-foreground">
+          <li><Link href="/" className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">หน้าแรก</Link></li>
+          <li aria-hidden><ChevronRight className="size-3.5" /></li>
+          <li><Link href={back.href} className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">{back.label}</Link></li>
+        </ol>
+      </nav>
+      <Button type="button" variant="outline" className="h-10 px-3" onClick={() => savePdf(ticket.ticketNo)}><FileDown aria-hidden />บันทึก PDF</Button>
     </div>
     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="flex items-center text-[13.5px] font-medium tracking-wide text-muted-foreground">{ticket.ticketNo}
-        <button type="button" onClick={copy} aria-label="คัดลอกเลขงาน" className="grid size-10 place-items-center rounded-sm outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring print:hidden"><Copy className="size-4" aria-hidden /></button>
+        <button type="button" onClick={copy} aria-label="คัดลอกเลขงาน" className="grid size-10 place-items-center rounded-sm outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><Copy className="size-4" aria-hidden /></button>
       </span>
       <StatusBadge ticket={ticket} />
     </div>
     <div className="mt-1 flex items-start gap-3.5">
-      <CategoryTile icon={ticket.category?.icon} className="mt-1 size-12 rounded-xl print:hidden" iconClassName="size-6" />
+      <CategoryTile icon={ticket.category?.icon} className="mt-1 size-12 rounded-xl" iconClassName="size-6" />
       <div className="min-w-0">
         <p className="text-[13px] leading-5 text-muted-foreground">{categoryName(ticket)}</p>
-        <h1 id="ticket-title" className="text-2xl leading-9 font-semibold text-balance wrap-break-word sm:text-[28px] sm:leading-10 print:text-[23px]">{ticketTitle(ticket)}</h1>
+        <h1 id="ticket-title" className="text-2xl leading-9 font-semibold text-balance wrap-break-word sm:text-[28px] sm:leading-10">{ticketTitle(ticket)}</h1>
         <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">แจ้งเมื่อ {shortDate(ticket.createdAt, true)} เวลา {timeOf(ticket.createdAt)} น. · โดย {ticket.reporter.name}</p>
       </div>
     </div>
   </header>;
+}
+
+/** CR-039: the browser's print dialog ("Save as PDF"); the document title becomes the suggested file name. */
+function savePdf(ticketNo: string) {
+  const title = document.title;
+  document.title = `รายงานการดำเนินงาน ${ticketNo}`;
+  window.addEventListener("afterprint", () => { document.title = title; }, { once: true });
+  window.print();
 }
 
 function StatusBadge({ ticket }: { ticket: TicketDetail }) {
@@ -142,7 +156,7 @@ type Actions = ReturnType<typeof useTicketActions>;
 
 function ReviewBand({ ticket, actions }: { ticket: TicketDetail; actions: Actions }) {
   const autoClose = ticket.autoCloseAt ? `${shortDate(ticket.autoCloseAt, true)} เวลา ${timeOf(ticket.autoCloseAt)} น.` : "";
-  return <section aria-labelledby="review-title" className="mascot-panel bg-primary px-4 pt-4 text-primary-foreground sm:px-7 sm:pt-5 print:hidden">
+  return <section aria-labelledby="review-title" className="mascot-panel bg-primary px-4 pt-4 text-primary-foreground sm:px-7 sm:pt-5">
     <div className="grid gap-x-8 gap-y-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
       <div className="flex items-center gap-4">
         <Mascot pose="review" size={104} className="hidden shrink-0 sm:block" />
@@ -271,14 +285,14 @@ function NextAction({ ticket, viewer, story, meId, actions }: { ticket: TicketDe
   const tone = ticket.step === "closed" ? "closed" : ticket.step === "reworking" ? "rework" : "open";
   const Icon = icon;
   return <div aria-live="polite" role="region" aria-label="สิ่งที่เกิดขึ้นตอนนี้"
-    className="flex gap-3.5 bg-muted/40 px-4 py-4 sm:px-7 sm:py-5 print:break-inside-avoid print:bg-transparent">
+    className="flex gap-3.5 bg-muted/40 px-4 py-4 sm:px-7 sm:py-5">
     <span aria-hidden className={cn("grid size-11 shrink-0 place-items-center rounded-lg",
       tone === "closed" ? "bg-success/10 text-success" : tone === "rework" ? "bg-status-rework/10 text-status-rework" : "bg-secondary text-primary")}><Icon className="size-5" /></span>
     <div className="min-w-0 flex-1">
       <h2 className="text-base leading-6 font-semibold">{title}</h2>
       <p className="mt-0.5 max-w-160 text-sm leading-5.5 text-muted-foreground">{desc}</p>
       {note && <p className={cn("mt-1.5 text-[13px] leading-5", note === moved ? "font-medium text-status-rework" : "text-muted-foreground")}>{note}</p>}
-      {buttons.length > 0 && <div className="mt-3.5 flex flex-wrap items-center gap-2 print:hidden">{buttons}</div>}
+      {buttons.length > 0 && <div className="mt-3.5 flex flex-wrap items-center gap-2">{buttons}</div>}
     </div>
   </div>;
 }
@@ -420,7 +434,7 @@ function ResultTab({ ticket, viewer, story }: { ticket: TicketDetail; viewer: St
     {rework && story.sendBackReason && <div className="mx-4 mt-3 rounded-lg border border-status-rework/20 bg-status-rework/6 px-4 py-3 text-sm sm:mx-7">
       <b className="font-semibold text-status-rework">เหตุผลที่ส่งกลับให้แก้</b><p className="mt-1 wrap-break-word">{story.sendBackReason}</p>
     </div>}
-    <div className="grid gap-5 px-4 py-5 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-4 sm:px-7 print:grid-cols-2">
+    <div className="grid gap-5 px-4 py-5 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-4 sm:px-7">
       <PhotoSet title="ก่อนซ่อม" from={`จาก${you}`} photos={ticket.photos} empty="ไม่มีรูปแนบ" />
       <PhotoSet title={rework ? "หลังซ่อมครั้งก่อน" : "หลังซ่อม"} from="จากช่าง" photos={result?.photos ?? []}
         empty={result || closed ? "ไม่มีรูปหลังซ่อม" : "รอช่างบันทึกผลการซ่อม"} pending={!result && !closed} />
@@ -444,15 +458,15 @@ function PhotoSet({ title, from, photos, empty, pending }: { title: string; from
       <span className="text-xs text-muted-foreground">{from}</span>
     </header>
     {photos.length === 0
-      ? <p className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/40 p-4 text-center text-[13px] text-muted-foreground print:aspect-auto print:py-6">
+      ? <p className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/40 p-4 text-center text-[13px] text-muted-foreground">
         <EmptyIcon className="size-5" aria-hidden />{empty}</p>
       : <>
         <button type="button" onClick={() => setLightbox(i)} aria-label={`ขยายรูป${title} ${i + 1} จาก ${photos.length}`}
           className="group relative block aspect-[4/3] w-full cursor-zoom-in overflow-hidden rounded-lg border bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <img src={photos[i].thumbUrl} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
-          <span className="absolute right-2 bottom-2 rounded-[5px] border bg-card/95 px-1.5 text-xs leading-5 tabular-nums print:hidden">{photos.length > 1 ? `${i + 1} / ${photos.length} · ขยายรูป` : "ขยายรูป"}</span>
+          <span className="absolute right-2 bottom-2 rounded-[5px] border bg-card/95 px-1.5 text-xs leading-5 tabular-nums">{photos.length > 1 ? `${i + 1} / ${photos.length} · ขยายรูป` : "ขยายรูป"}</span>
         </button>
-        {photos.length > 1 && <div role="group" aria-label={`รูป${title}`} className="mt-2 flex flex-wrap gap-1.5 print:hidden">
+        {photos.length > 1 && <div role="group" aria-label={`รูป${title}`} className="mt-2 flex flex-wrap gap-1.5">
           {photos.map((p, k) => <button key={p.id} type="button" onClick={() => setSelected(k)} aria-pressed={k === i} aria-label={`เลือกรูป${title} ${k + 1}`}
             className={cn("size-11 overflow-hidden rounded-md border bg-card p-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring", k === i ? "border-primary ring-1 ring-primary" : "hover:border-primary/40")}>
             <img src={p.thumbUrl} alt="" className="size-full rounded-[4px] object-cover" />
@@ -469,7 +483,7 @@ function Progress({ ticket, story }: { ticket: TicketDetail; story: Story }) {
   const [history, setHistory] = useState(false);
   // A planned date on the next "เสร็จ" stage tells everyone when to expect it.
   const planned = (s: Stage) => s.key === "done" && s.state === "later" && ticket.expectedDoneOn && !story.awaitingReaccept ? `คาดว่า ${dayLabel(ticket.expectedDoneOn, true)}` : undefined;
-  return <section aria-labelledby="progress-title" className="min-w-0 border-t px-4 py-5 sm:px-7 lg:border-t-0 lg:border-l lg:px-6 print:hidden">
+  return <section aria-labelledby="progress-title" className="min-w-0 border-t px-4 py-5 sm:px-7 lg:border-t-0 lg:border-l lg:px-6">
     <h2 id="progress-title" className="text-lg leading-7 font-semibold">ความคืบหน้าของงาน</h2>
     <p className="text-[13px] text-muted-foreground">ตั้งแต่แจ้งเรื่อง จนถึงปิดงาน</p>
     <ol className="mt-5">{story.stages.map((s, i) => <StageItem key={s.key} stage={s} planned={planned(s)} next={story.stages[i + 1]} />)}</ol>
@@ -534,17 +548,4 @@ function HistoryTable({ story, ticketNo }: { story: Story; ticketNo: string }) {
     <td className="w-32 py-2.5 pr-3 text-xs text-muted-foreground tabular-nums">{dateTime(e.at, true)}</td>
     <td className="py-2.5"><b className="font-semibold">{e.title}</b>{e.detail && <small className="block text-[13px] text-muted-foreground">{e.detail}</small>}{e.photos && <EventPhotos photos={e.photos} />}</td>
   </tr>)}</tbody></table>;
-}
-
-// ---- print report (A4) ----
-
-function PrintHistory({ ticket, story }: { ticket: TicketDetail; story: Story }) {
-  return <section className="hidden print:mt-5 print:block">
-    <h2 className="mb-3 text-[15px] font-semibold">ประวัติการดำเนินงาน</h2>
-    <HistoryTable story={story} ticketNo={ticket.ticketNo} />
-    <div className="mt-12 mb-3 flex justify-around text-center text-[11px]">
-      {["ผู้แจ้ง", "ผู้ซ่อม", "ผู้อนุมัติ"].map((r) => <span key={r}>__________________<br />{r}</span>)}
-    </div>
-    <p className="text-[10px] text-muted-foreground">BAMBAM · CPAC สำนักงานใหญ่ · {ticket.ticketNo} · พิมพ์เมื่อ {dateTime(new Date().toISOString(), true)}</p>
-  </section>;
 }

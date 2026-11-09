@@ -2,9 +2,11 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 / 5B accepted 2026-11-02 · of 8   **Updated:** 2026-11-03 (CR-037 / CR-038 accepted)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 / 5B accepted 2026-11-02 · of 8   **Updated:** 2026-11-09 (CR-039 accepted, tag `repair-cr-039`)
 
 ## Now
+
+- **2026-11-09 CR-039 accepted by owner, tag `repair-cr-039` (M, D-144):** S07 `บันทึก PDF` (browser print dialog) prints only the new report from the owner's sample — logo · `รายงานการดำเนินงาน` · ticket no · QR → `/repair/tickets/{id}`, `ข้อมูลทั่วไป` + one table per step, photos, footer `หน้า n/total` (Chrome / Edge). Files: `ticket-report.tsx` (new), `ticket-detail.tsx`, shared `components/shared/qr-svg.tsx` (moved from settings label sheet). tsc / eslint pass; mock-mode PDFs checked (A4, 2 pages, no JS errors). **Not run:** e2e `F06-cr039-report-pdf.spec.ts` (Docker down), phone scan of a printed QR. Next: **Stage 6** — `/build-stage repair 6 prepare` in a fresh session; `/atlas sync repair` for CR-039.
 
 - **2026-11-03 CR-037 + CR-038 accepted by owner 2026-11-03:** S01 login = `login.html` (headline keeps Plex 650 + swoosh); S30 label = `label-v7.html`, text `สแกนแจ้งปัญหา`, mono toggle; S03 room picked on the floor plan (desktop 3D, phones 2D, list behind "เลือกจากรายชื่อ"), new #36 `floors/{id}/room-plan` (D-143). Go build / unit tests, tsc, eslint pass. **Not run:** e2e (Docker down), browser check (the dev server stopped on start to show a Next.js upgrade notice), paper print + phone scan of the v7 label. Proposal history: CR-037 v2–v7 in `output/qr-login-redesign/`.
 
@@ -62,6 +64,7 @@
 
 ## Open issues / questions
 
+- CR-039: PDF page numbers (`@page` margin boxes) show in Chrome / Edge only; Safari / Firefox print without them. Owner sample PDF not stored in the repo (attached in chat) — drop it into `changes/CR-039/` if it should be kept
 - Stage 5: plan AC1 names the old sample place (อาคารหลัก ชั้น 5 ห้องประชุม 5B); the real DB has no asset yet. Mocks keep `AC-05-012` in อาคารฝั่ง Office ชั้น 5 ห้องประชุม 5B; on the real API the e2e creates its own asset in a real room (อาคาร 1) — demo: add `AC-05-012` in S29 / S20 first. BR-F13B-1 asset list file still not received
 - e2e: F06 BR-F06-2 assumes the employee's only ticket awaiting rating is its own — flaky in a full parallel run (passes alone); make it pick by id
 - CR-036: is UAT / prod served over HTTPS? The in-app camera (S16) needs a secure context; the phone's own camera + `/q/{code}` works either way. Owner not sure (2026-11-01) — confirm before UAT

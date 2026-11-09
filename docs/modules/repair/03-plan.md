@@ -705,6 +705,14 @@ Status: done — accepted 2026-11-02 (prepare + wire in one session, UI by Claud
 
 ---
 
+## CR-039 rework — S07 report as PDF with a tracking QR (bounded, after Stage 5B; does not start Stage 6)
+
+- [x] S07 `บันทึก PDF` (browser print dialog) replaces `พิมพ์งานนี้`; print shows only the report (`ticket-report.tsx`)
+- [x] Report template from the owner's sample: header logo · title · ticket no · QR → S07; `ข้อมูลทั่วไป` + one table per step; photos; page footer
+- [x] Shared `components/shared/qr-svg.tsx` (moved from the settings S30 label sheet)
+- [x] e2e `F06-cr039-report-pdf.spec.ts` (written; run when the test stack is up)
+- [x] Owner accepted 2026-11-09, tag `repair-cr-039` (phone scan of a printed QR still open)
+
 ## Stage 6 — หน้าแรกตาม role ~~และแจ้งเตือน~~ (CR-024)
 
 > **CR-024 (2026-10-26):** no notification system. Every notification item below is struck; Stage 6 builds only the Home by role (S02, endpoint 26).

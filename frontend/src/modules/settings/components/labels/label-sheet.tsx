@@ -1,8 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- print sheet: a plain image keeps its mm size and loads before window.print(). */
 
-import { memo, useMemo } from "react";
-import QRCode from "qrcode";
+import { QrSvg } from "@/components/shared/qr-svg";
 import { labelQrUrl, LABELS_PER_PAGE, shortLocation } from "../../labels";
 import type { LabelAsset } from "../../types";
 
@@ -69,23 +68,6 @@ export const LABEL_PRINT_CSS = `
 .qr-mono .qr-brand img, .qr-mono .qr-mascot, .qr-mono .qr-paw { filter: grayscale(1); }
 .qr-mono .qr-cue { color: #000; }
 `;
-
-/** The QR of one code as an SVG path (synchronous; `qrcode` builds the matrix). */
-const QrSvg = memo(function QrSvg({ text }: { text: string }) {
-  const { size, path } = useMemo(() => {
-    const m = QRCode.create(text, { errorCorrectionLevel: "M" }).modules;
-    const quiet = 4;
-    let d = "";
-    for (let y = 0; y < m.size; y++) for (let x = 0; x < m.size; x++) if (m.get(y, x)) d += `M${x + quiet} ${y + quiet}h1v1h-1z`;
-    return { size: m.size + quiet * 2, path: d };
-  }, [text]);
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} shapeRendering="crispEdges" role="img" aria-label={`QR ${text}`} data-qr={text}>
-      <rect width={size} height={size} fill="#fff" />
-      <path d={path} fill="#000" />
-    </svg>
-  );
-});
 
 export function LabelCell({ asset, origin }: { asset: LabelAsset; origin: string }) {
   return (
