@@ -401,7 +401,7 @@ export function LabelsScreen() {
 
       {/* mobile sticky action */}
       {!loading && rows.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+        <div className="fixed inset-x-0 bottom-(--app-bottom) z-30 border-t bg-card/95 px-4 pt-3 pb-3 backdrop-blur group-data-typing/shell:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
           <p className="mb-2 text-[13px] text-muted-foreground">
             เลือกแล้ว <strong className="text-foreground tabular-nums">{count}</strong> ชิ้น · {pagesFor(count)} หน้า A4
             {hint && <span className={cn("ml-1", tooMany && "text-destructive")}>· {hint}</span>}

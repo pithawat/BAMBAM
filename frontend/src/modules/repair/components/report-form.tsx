@@ -9,6 +9,8 @@ import {
   QrCode, RotateCcw, Send, SquareParking, Upload, Wrench,
 } from "lucide-react";
 import { MascotPanel } from "@/components/shared/mascot";
+import { Picker, type PickerOption } from "@/components/shared/picker";
+import { useIsDesktop } from "@/components/shared/use-media-query";
 import { PriorityBadge } from "@/components/shared/priority-indicator";
 import { useCurrentUser } from "@/components/shared/me-provider";
 import { can, canReport, PERM, repairHome } from "@/lib/platform/permissions";
@@ -42,6 +44,8 @@ import { useDiscardGuard } from "@/components/shared/use-discard-guard";
 // cards grow with the floor's rooms). Phone / tablet: sticky footer. The system sets the priority (BR-F02-2).
 // CR-021: the mode is fixed by the entry point (/repair/new = repair, ?mode=team = team for leads). CR-025: the duplicate
 // card sits under the symptoms of step 2 with an inline extra spot; a blocking duplicate stops ถัดไป there.
+// CR-040: อาคาร is a searchable dropdown on every size; phones / tablets also pick ชั้น, the room list and หมวดงาน
+// from searchable dropdowns (bottom sheet), and the footer rides on the app's bottom tab bar.
 
 const MAX_OTHER = 100;
 const MAX_LOCATION = 100;
@@ -539,7 +543,7 @@ function ReportFormBody({ team, canTeam, asset }: { team: boolean; canTeam: bool
   // CR-019 heading (prototype v4): breadcrumb, guide mascot, title, ล้างแบบฟอร์ม (CR-035: on the primary mascot panel). Leaving stays guarded
   // (useDiscardGuard catches link clicks); the footer's ยกเลิก on step 1 replaces the old phone top bar.
   const header = <header className="px-4 pt-3 lg:px-0 lg:pt-0">
-    <nav aria-label="เส้นทางหน้า">
+    <nav aria-label="เส้นทางหน้า" className="hidden lg:block">
       <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted-foreground">
         <li><Link href="/" className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">หน้าแรก</Link></li>
         <li aria-hidden><ChevronRight className="size-3.5" /></li>
@@ -548,7 +552,7 @@ function ReportFormBody({ team, canTeam, asset }: { team: boolean; canTeam: bool
         <li aria-current="page" className="text-foreground">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</li>
       </ol>
     </nav>
-    <MascotPanel pose="guide" size={[84, 120]} priority className="mt-3 mb-4 lg:mb-5"
+    <MascotPanel pose="guide" size={[84, 120]} priority className="mb-4 lg:mt-3 lg:mb-5"
       aside={dirty && master && <Button type="button" variant="link" className="h-9 px-0" disabled={busy || following !== null} onClick={() => setResetOpen(true)}>ล้างแบบฟอร์ม</Button>}>
       <h1 className="text-2xl leading-9 font-semibold tracking-tight lg:text-[28px] lg:leading-10">{team ? "บันทึกงานที่ทีมแก้แล้ว" : "แจ้งซ่อมใหม่"}</h1>
       <p className="mt-0.5 text-sm leading-6 text-primary-foreground/88">{team ? "บันทึกปัญหาที่ทีมแก้ไขแล้ว พร้อมหลักฐานก่อนและหลังดำเนินการ งานจะปิดทันที ไม่ส่งถึงช่าง" : "กรอกทีละขั้น แล้วตรวจข้อมูลก่อนส่งให้ช่าง"} <span className="whitespace-nowrap">· ช่องที่มี <span className="rounded-[4px] bg-card px-1 font-semibold text-destructive">*</span> จำเป็นต้องกรอก</span></p>
@@ -634,7 +638,7 @@ function ReportFormBody({ team, canTeam, asset }: { team: boolean; canTeam: bool
           </>)}
         </fieldset>
 
-        <div className="sticky bottom-0 z-20 -mx-3 mt-3 border-t bg-background px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-4 sm:px-4 lg:static lg:mx-0 lg:mt-0 lg:bg-muted/40 lg:px-6 lg:py-3">
+        <div className="sticky bottom-(--app-bottom) z-20 -mx-3 mt-3 border-t bg-background/95 px-3 pt-3 pb-3 backdrop-blur group-data-typing/shell:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-4 sm:px-4 lg:static lg:mx-0 lg:mt-0 lg:bg-muted/40 lg:px-6 lg:py-3">
           <div className="flex items-center gap-3">
           <Button type="button" variant="outline" className="h-11 min-w-24 bg-card" disabled={busy || following !== null} onClick={() => index > 0 ? go(STEPS[index - 1].key) : guard.leave()}>
             <ArrowLeft aria-hidden />{index > 0 ? "ย้อนกลับ" : "ยกเลิก"}</Button>
@@ -719,10 +723,15 @@ function ProblemStep({ values, categories, category, errors, priority, onPickCat
   priority: { level: Category["defaultPriority"]; reason: string } | null;
   onPickCategory: (id: string) => void; onChange: (patch: Partial<Values>) => void;
 }) {
+  const desktop = useIsDesktop();
   return <div className="space-y-4">
     <div data-field="categoryId">
       <Label id="category-label" required>เลือกหมวดที่ตรงกับปัญหา</Label>
-      <div role="radiogroup" aria-labelledby="category-label" aria-describedby="categoryId-error" aria-invalid={!!errors.categoryId} className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      {!desktop ? <Picker id="categoryId" aria-labelledby="category-label" aria-describedby="categoryId-error" title="หมวดงาน" placeholder="เลือกหมวดงาน"
+        searchable searchPlaceholder="ค้นหาหมวดงาน" emptyText="ไม่พบหมวดงานที่ค้นหา" invalid={!!errors.categoryId}
+        value={values.categoryId} onValueChange={onPickCategory}
+        options={categories.map((c): PickerOption => ({ value: c.id, label: c.name, icon: categoryIcon(c) }))} />
+      : <div role="radiogroup" aria-labelledby="category-label" aria-describedby="categoryId-error" aria-invalid={!!errors.categoryId} className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {categories.map((c) => {
           const on = values.categoryId === c.id;
           const Icon = categoryIcon(c);
@@ -732,7 +741,7 @@ function ProblemStep({ values, categories, category, errors, priority, onPickCat
             <span className="min-w-0 flex-1">{c.name}</span>
           </label>;
         })}
-      </div>
+      </div>}
       <FieldError id="categoryId-error" message={errors.categoryId} />
     </div>
 
@@ -797,28 +806,27 @@ function LocationStep({ values, buildings, building, floor, errors, onChange, sp
   values: Values; buildings: Building[]; building?: Building; floor?: Floor; errors: Record<string, string>;
   onChange: (patch: Partial<Values>) => void; spotRequired: boolean;
 }) {
+  const desktop = useIsDesktop();
+  const parking = (b: Building) => b.floors.every((f) => f.rooms.every((r) => r.areaType === "parking"));
   return <div className="space-y-4">
     <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
       <div data-field="buildingId">
         <Label id="building-label" required>เลือกอาคาร</Label>
-        <div role="radiogroup" aria-labelledby="building-label" aria-describedby="buildingId-error" className="grid gap-2 sm:grid-cols-2">
-          {buildings.map((b) => {
-            const on = values.buildingId === b.id;
-            return <label key={b.id} className={cn(choiceCard(on, !!errors.buildingId), "min-h-14 py-2")}>
-              <input type="radio" name="building" value={b.id} checked={on} onChange={() => onChange({ buildingId: b.id, floorId: "", roomId: "" })} className="sr-only" />
-              <span className={cn("grid size-8.5 shrink-0 place-items-center rounded-md", on ? "bg-card text-primary" : "bg-muted text-muted-foreground")}>
-                {b.floors.every((f) => f.rooms.every((r) => r.areaType === "parking")) ? <SquareParking className="size-4.5" aria-hidden /> : <Building2 className="size-4.5" aria-hidden />}
-              </span>
-              <span className="min-w-0 flex-1">{b.name}</span>
-            </label>;
-          })}
-        </div>
+        <Picker id="buildingId" aria-labelledby="building-label" aria-describedby="buildingId-error" title="อาคาร" placeholder="เลือกอาคาร"
+          searchable searchPlaceholder="ค้นหาอาคาร" emptyText="ไม่พบอาคารที่ค้นหา" invalid={!!errors.buildingId}
+          value={values.buildingId} onValueChange={(id) => { if (id !== values.buildingId) onChange({ buildingId: id, floorId: "", roomId: "" }); }}
+          options={buildings.map((b): PickerOption => ({ value: b.id, label: b.name, icon: parking(b) ? SquareParking : Building2 }))} />
         <FieldError id="buildingId-error" message={errors.buildingId} />
       </div>
 
       <div data-field="floorId">
         <Label id="floor-label" required>เลือกชั้น</Label>
-        {building ? <div role="radiogroup" aria-labelledby="floor-label" aria-describedby="floorId-error" className="flex flex-wrap gap-2">
+        {!desktop ? <Picker id="floorId" aria-labelledby="floor-label" aria-describedby="floorId-error" title="ชั้น" context={building?.name}
+          placeholder={building ? "เลือกชั้น" : "เลือกอาคารก่อน"} disabled={!building}
+          searchable searchPlaceholder="ค้นหาชั้น" emptyText="ไม่พบชั้นที่ค้นหา" invalid={!!errors.floorId}
+          value={values.floorId} onValueChange={(id) => { if (id !== values.floorId) onChange({ floorId: id, roomId: "" }); }}
+          options={(building?.floors ?? []).map((f): PickerOption => ({ value: f.id, label: floorLabel(f.name) }))} />
+        : building ? <div role="radiogroup" aria-labelledby="floor-label" aria-describedby="floorId-error" className="flex flex-wrap gap-2">
           {building.floors.map((f) => {
             const on = values.floorId === f.id;
             return <label key={f.id} aria-label={floorLabel(f.name)} className={cn("grid min-h-11 min-w-12 cursor-pointer place-items-center rounded-sm border bg-card px-3 text-sm focus-within:ring-2 focus-within:ring-ring",
@@ -836,7 +844,11 @@ function LocationStep({ values, buildings, building, floor, errors, onChange, sp
       <Label id="room-label" required>ห้องหรือจุดที่เกิด</Label>
       <div>
         {floor ? <RoomPlanPicker floorId={floor.id} value={values.roomId} onPick={(roomId) => onChange({ roomId })}
-          list={<RoomChoice rooms={floor.rooms} value={values.roomId} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />} />
+          list={desktop ? <RoomChoice rooms={floor.rooms} value={values.roomId} invalid={!!errors.roomId} onPick={(roomId) => onChange({ roomId })} />
+            : <Picker id="roomId" aria-labelledby="room-label" aria-describedby="roomId-error" title="ห้องหรือจุดที่เกิด" context={building ? `${building.name} · ${floorLabel(floor.name)}` : undefined}
+              placeholder="เลือกห้องหรือจุดที่เกิด" searchable searchPlaceholder="ค้นหาห้อง" emptyText="ไม่พบห้องที่ค้นหา" invalid={!!errors.roomId}
+              value={values.roomId} onValueChange={(roomId) => onChange({ roomId })}
+              options={floor.rooms.map((r): PickerOption => ({ value: r.id, label: r.name, icon: DoorOpen }))} />} />
           : <p className="grid min-h-23 place-items-center rounded-sm border border-dashed bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground">เลือกอาคารและชั้น แล้วเลือกห้องหรือจุดที่เกิดได้ที่นี่</p>}
         <FieldError id="roomId-error" message={errors.roomId} />
       </div>

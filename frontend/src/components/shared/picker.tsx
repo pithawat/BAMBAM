@@ -12,7 +12,7 @@ import { useIsDesktop } from "./use-media-query";
 // Pickers (design-system.md → Patterns → Pickers, CR-002). Always use these instead of
 // components/ui/select: the shadcn default opens "item-aligned" over the field.
 
-export type PickerOption = { value: string; label: string; description?: ReactNode; disabled?: boolean };
+export type PickerOption = { value: string; label: string; description?: ReactNode; disabled?: boolean; icon?: LucideIcon };
 
 /** More options than this → a search field in the menu / sheet. */
 export const SEARCH_THRESHOLD = 10;
@@ -49,6 +49,7 @@ export function MenuContent({ children, className }: { children: ReactNode; clas
 export function MenuItem({ option }: { option: PickerOption }) {
   return <SelectPrimitive.Item value={option.value} disabled={option.disabled}
     className={cn(optionClass, option.description ? "min-h-14 py-2" : "min-h-11", "data-highlighted:bg-muted data-[state=checked]:bg-secondary data-[state=checked]:font-semibold data-[state=checked]:text-secondary-foreground")}>
+    {option.icon && <OptionIcon icon={option.icon} />}
     <span className="min-w-0 flex-1"><SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
       {option.description && <span className="block text-xs font-normal text-muted-foreground">{option.description}</span>}</span>
     <SelectPrimitive.ItemIndicator className="shrink-0 text-primary"><Check className="size-5" aria-hidden /></SelectPrimitive.ItemIndicator>
@@ -76,17 +77,19 @@ export type PickerProps = {
   searchPlaceholder?: string;
   /** "ไม่พบ{ชื่อช่อง}ที่ค้นหา" */
   emptyText?: string;
+  /** Always show the search field (repair CR-040); default: only above SEARCH_THRESHOLD options. */
+  searchable?: boolean;
 };
 
 /** Form picker: desktop menu under the field (search when long) · mobile bottom sheet. */
 export function Picker(props: PickerProps) {
   const desktop = useIsDesktop();
-  const searchable = props.options.length > SEARCH_THRESHOLD;
+  const searchable = props.searchable ?? props.options.length > SEARCH_THRESHOLD;
   return desktop && !searchable ? <SelectPicker {...props} /> : <ListPicker {...props} desktop={desktop} searchable={searchable} />;
 }
 
 function TriggerContent({ props, selected }: { props: PickerProps; selected?: PickerOption }) {
-  const Icon = props.icon;
+  const Icon = selected?.icon ?? props.icon;
   return <>
     {Icon && <Icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />}
     <span className="min-w-0 flex-1 truncate">{selected ? (props.renderValue?.(selected) ?? selected.label) : props.placeholder}</span>
@@ -96,7 +99,7 @@ function TriggerContent({ props, selected }: { props: PickerProps; selected?: Pi
 
 function SelectPicker(props: PickerProps) {
   const selected = props.options.find((o) => o.value === props.value);
-  const Icon = props.icon;
+  const Icon = selected?.icon ?? props.icon;
   return <SelectPrimitive.Root value={props.value} onValueChange={props.onValueChange} disabled={props.disabled}>
     <SelectPrimitive.Trigger id={props.id} aria-labelledby={props["aria-labelledby"]} aria-describedby={props["aria-describedby"]} aria-invalid={props.invalid || undefined} className={triggerClass}>
       {Icon && <Icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />}
@@ -141,6 +144,10 @@ function ListPicker({ desktop, searchable, ...props }: PickerProps & { desktop: 
   </>;
 }
 
+function OptionIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground"><Icon className="size-4.5" /></span>;
+}
+
 function nextEnabled(options: PickerOption[], from: number, step: 1 | -1) {
   for (let i = from + step; i >= 0 && i < options.length; i += step) if (!options[i].disabled) return i;
   return from;
@@ -174,7 +181,7 @@ function OptionList({ listId, options, value, onPick, searchable, size, label, s
     {searchable && <div className="relative mb-1.5 shrink-0">
       <Search aria-hidden className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-muted-foreground" />
       <input type="text" role="combobox" aria-expanded aria-controls={listId} aria-autocomplete="list" aria-activedescendant={filtered.length ? optionId(current) : undefined}
-        aria-label={searchPlaceholder ?? label} placeholder={searchPlaceholder} value={query} autoFocus
+        aria-label={searchPlaceholder ?? label} placeholder={searchPlaceholder} value={query} autoFocus={size === "menu"}
         onChange={(e) => { setQuery(e.target.value); setActive(0); }} onKeyDown={onKeyDown}
         className="h-11 w-full rounded-sm border border-input bg-card pr-3 pl-10 text-base outline-none focus:border-ring focus:ring-3 focus:ring-ring/20" />
     </div>}
@@ -186,6 +193,7 @@ function OptionList({ listId, options, value, onPick, searchable, size, label, s
         return <div key={o.value} id={optionId(i)} role="option" aria-selected={picked} aria-disabled={o.disabled || undefined} data-disabled={o.disabled ? "" : undefined}
           onClick={() => { if (!o.disabled) onPick(o.value); }} onPointerMove={() => setActive(i)}
           className={cn(optionClass, size === "sheet" ? "min-h-13" : o.description ? "min-h-14 py-2" : "min-h-11", "mt-0.5 first:mt-0", i === current && highlightedClass, picked && selectedClass)}>
+          {o.icon && <OptionIcon icon={o.icon} />}
           <span className="min-w-0 flex-1">{o.label}{o.description && <span className="block text-xs font-normal text-muted-foreground">{o.description}</span>}</span>
           {picked && <Check aria-hidden className="size-5 shrink-0 text-primary" />}
         </div>;

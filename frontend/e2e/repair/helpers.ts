@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, request as playwrightRequest, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
+import { expect, request as playwrightRequest, type APIRequestContext, type Locator, type Page, type TestInfo } from "@playwright/test";
 
 // Shared by the repair specs (F03–F07, F21, F24): demo-role API contexts and tickets reported and worked on
 // through the real API. Every report gets its own extra spot (`tag`) so runs and projects never duplicate each
@@ -72,15 +72,15 @@ export async function fillPlace(page: Page, spot: string, path = "/repair/new") 
   await expect(s.getByRole("heading", { name: "ปัญหาเกิดขึ้นที่ไหน" })).toBeVisible();
   const restart = page.getByRole("button", { name: "เริ่มใหม่" });
   if (await restart.isVisible()) await restart.click();
-  await s.getByText(PLACE.building, { exact: true }).click();
-  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText(PLACE.floor, { exact: true }).click();
-  await s.getByText(PLACE.room, { exact: true }).click();
+  await pickBuilding(page, PLACE.building);
+  await pickFloor(page, PLACE.floor);
+  await pickRoom(page, PLACE.room);
   await s.getByLabel("บอกจุดเพิ่มเติม").fill(spot);
   await page.getByRole("button", { name: "ถัดไป" }).click();
   const p = page.locator('[data-step="problem"]');
   const checked = page.waitForResponse((r) => r.url().includes(`${API}/tickets/duplicates`)
     && new URL(r.url()).searchParams.get("locationDetail")?.trim() === spot.trim(), { timeout: 15_000 });
-  await p.getByText(PLACE.category, { exact: true }).click();
+  await pickCategory(page, PLACE.category);
   await p.getByRole("group", { name: /อาการที่พบ/ }).getByText(PLACE.symptom, { exact: true }).click();
   await checked;
 }
@@ -160,4 +160,67 @@ export async function resolvedTicket(baseURL: string | undefined, spot: string, 
   await assess(technician, ticket.id, { contractorId });
   await resolve(technician, ticket.id, contractorId ? 4 : undefined);
   return ticket;
+}
+
+// ---- S03 pickers (CR-040) ----
+// อาคาร is a searchable dropdown on every size. Phones / tablets (below `lg`) also pick ชั้น, the room list and
+// หมวดงาน from searchable dropdowns (a bottom sheet); desktop keeps the floor chips, room cards and category tiles.
+
+/** The S03 layout follows the viewport (`lg` = 1024px), not `isMobile`. */
+export const phoneLayout = (page: Page) => (page.viewportSize()?.width ?? 1280) < 1024;
+const reportStep = (page: Page, key: string) => page.locator(`[data-step="${key}"]`);
+const floorLabelOf = (name: string) => (/^\p{Script=Thai}/u.test(name) ? name : `ชั้น ${name}`);
+
+async function pickOption(page: Page, trigger: Locator, name: string) {
+  await trigger.click();
+  await page.getByRole("option", { name, exact: true }).click();
+}
+
+export const pickBuilding = (page: Page, name: string) => pickOption(page, page.locator("#buildingId"), name);
+
+/** `floor` = the floor name as on the desktop chips ("4"); the dropdown reads "ชั้น 4". No floor → the first one. */
+export async function pickFloor(page: Page, floor?: string | null) {
+  if (phoneLayout(page)) {
+    await page.locator("#floorId").click();
+    await (floor ? page.getByRole("option", { name: floorLabelOf(floor), exact: true }) : page.getByRole("option").first()).click();
+    return;
+  }
+  const chips = reportStep(page, "location").getByRole("radiogroup", { name: "เลือกชั้น" });
+  await (floor ? chips.getByText(floor, { exact: true }) : chips.locator("label").first()).click();
+}
+
+/** A room from the name list (CR-038: behind "เลือกจากรายชื่อ" when the floor has a plan). */
+export async function pickRoom(page: Page, room: string) {
+  const s = reportStep(page, "location");
+  const toList = s.getByRole("button", { name: "เลือกจากรายชื่อ" });
+  const list = phoneLayout(page) ? page.locator("#roomId") : s.getByRole("radiogroup", { name: /ห้องหรือจุดที่เกิด/ });
+  await expect(toList.or(list).first()).toBeVisible();
+  if (await toList.isVisible()) await toList.click();
+  if (phoneLayout(page)) await pickOption(page, list, room);
+  else await list.getByText(room, { exact: true }).click();
+}
+
+export async function pickCategory(page: Page, name: string) {
+  if (phoneLayout(page)) await pickOption(page, page.locator("#categoryId"), name);
+  else await reportStep(page, "problem").getByRole("radiogroup", { name: "เลือกหมวดที่ตรงกับปัญหา" }).getByText(name, { exact: true }).click();
+}
+
+export async function expectCategory(page: Page, name: string) {
+  if (phoneLayout(page)) await expect(page.locator("#categoryId")).toContainText(name);
+  else await expect(reportStep(page, "problem").getByRole("radio", { name })).toBeChecked();
+}
+
+/** The category names in display order (phones: read from the dropdown, closed again). */
+export async function categoryNames(page: Page): Promise<string[]> {
+  if (phoneLayout(page)) {
+    await page.locator("#categoryId").click();
+    const options = page.getByRole("listbox").getByRole("option");
+    await expect(options.first()).toBeVisible();
+    const names = await options.allInnerTexts();
+    await page.keyboard.press("Escape");
+    return names.map((n) => n.trim());
+  }
+  const tiles = reportStep(page, "problem").getByRole("radiogroup", { name: "เลือกหมวดที่ตรงกับปัญหา" }).locator("label");
+  await expect(tiles.first()).toBeVisible();
+  return (await tiles.allInnerTexts()).map((n) => n.trim());
 }

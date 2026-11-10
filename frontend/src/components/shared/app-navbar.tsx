@@ -3,14 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, Home, LogOut, Settings, UserRound } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Check, ChevronDown, Home, LogOut, QrCode, Settings, UserRound, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { canAnySettings, repairHome, usesService, type ServiceKey } from "@/lib/platform/permissions";
+import { canAnySettings, canReport, repairHome, usesService, type ServiceKey } from "@/lib/platform/permissions";
 import { initials } from "@/lib/platform/roles";
 import type { Me } from "@/lib/platform/types";
 import { applyTheme, currentTheme, THEMES, type ThemeId } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { useCanScanInApp } from "@/modules/repair/qr";
 import { SettingsMenuDesktop, SettingsMenuMobile } from "@/modules/settings/components/settings-menu";
 import { LogoutDialog } from "./logout-dialog";
 import { SERVICES, type Service } from "./service-icon";
@@ -21,7 +22,8 @@ import { SERVICES, type Service } from "./service-icon";
 // services the user may use (`usesService`; a technician sees only แจ้งซ่อม) · on the right the "ตั้งค่าระบบ" gear
 // (option A, any `settings.*` permission) and the account menu (no bell, repair CR-024). Repair tracking and staff tools live in the repair
 // section nav (modules/repair/components/repair-nav.tsx). Desktop: sticky full-width bar. Phone / tablet: brand row
-// (+ settings sheet) and a row of the services; it scrolls away so route-local sticky bars keep the top edge.
+// (+ settings sheet, account) that scrolls away; repair CR-040 moved หน้าแรก and the services to a fixed bottom tab bar
+// (`AppBottomNav`), hidden while the keyboard is up. Route-local sticky / fixed bottom bars sit on `--app-bottom`.
 
 type ServiceLink = { service: Service & ServiceKey; href: string; match: string };
 
@@ -35,8 +37,8 @@ function serviceLinks(me: Me): ServiceLink[] {
   return links.filter((l) => usesService(me, l.service));
 }
 
-// phone service row: one column per visible service (static classes for Tailwind)
-const SERVICE_COLS = ["hidden", "grid-cols-1", "grid-cols-2", "grid-cols-3"];
+// bottom tab bar: หน้าแรก + one column per visible service (+ สแกน QR) (static classes for Tailwind)
+const TAB_COLS = ["grid-cols-1", "grid-cols-2", "grid-cols-3", "grid-cols-4", "grid-cols-5"];
 
 const within = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
@@ -90,28 +92,77 @@ export function AppNavbar({ me }: { me: Me }) {
         </div>
       </div>
 
-      <nav aria-label="บริการหลัก" className={cn("grid border-t lg:hidden", SERVICE_COLS[links.length])}>
-        {links.map(({ service, href, match }) => {
-          const s = SERVICES[service];
-          const active = within(pathname, match);
-          return (
-            <Link
-              key={service}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex min-h-12 items-center justify-center gap-1.5 border-b-2 px-1 text-center text-[13.5px] leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset",
-                active ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground",
-              )}
-            >
-              <s.icon className="size-4 shrink-0" aria-hidden />
-              {s.label}
-            </Link>
-          );
-        })}
-      </nav>
     </header>
   );
+}
+
+type Tab = { key: string; label: string; href: string; icon: LucideIcon; active: boolean; raised?: boolean };
+
+/**
+ * Phone / tablet tab bar (repair CR-040): icon in a pill over the label, like a native app. Fixed to the bottom.
+ * สแกน QR (F13-B, CR-036) is the raised round button in the middle, for whoever may report on a phone with a camera
+ * (`useCanScanInApp` + `repair.ticket.report`); it replaces the scan buttons on Home and S06.
+ */
+export function AppBottomNav({ me }: { me: Me }) {
+  const pathname = usePathname();
+  const scan = useCanScanInApp() && usesService(me, "repair") && canReport(me);
+  const tabs: Tab[] = [
+    { key: "home", label: "หน้าแรก", href: "/", icon: Home, active: pathname === "/" },
+    ...serviceLinks(me).map(({ service, href, match }) => ({
+      key: service, label: SERVICES[service].label, href, icon: SERVICES[service].icon,
+      active: within(pathname, match) && !(scan && within(pathname, "/repair/scan")),
+    })),
+  ];
+  if (scan) tabs.splice(Math.ceil(tabs.length / 2), 0, { key: "scan", label: "สแกน QR", href: "/repair/scan", icon: QrCode, active: within(pathname, "/repair/scan"), raised: true });
+  return (
+    <nav
+      aria-label="บริการหลัก"
+      data-testid="bottom-nav"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-nav backdrop-blur-md transition-transform duration-200 group-data-typing/shell:pointer-events-none group-data-typing/shell:translate-y-full lg:hidden print:hidden"
+    >
+      <ul className={cn("mx-auto grid h-16 max-w-140 px-1", TAB_COLS[tabs.length - 1])}>
+        {tabs.map(({ key, label, href, icon: Icon, active, raised }) => (
+          <li key={key} className="min-w-0">
+            <Link
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className="group/tab flex h-full min-w-0 flex-col items-center justify-center gap-1 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset"
+            >
+              {raised ? (
+                <span className="-mt-6 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-6px_color-mix(in_srgb,var(--primary)_70%,transparent)] ring-4 ring-card transition-transform group-active/tab:scale-95">
+                  <Icon className="size-6.5" strokeWidth={2} aria-hidden />
+                </span>
+              ) : (
+                <span className={cn("grid h-8 w-14 place-items-center rounded-full transition-colors", active ? "bg-secondary text-primary" : "text-muted-foreground")}>
+                  <Icon className="size-5.5" strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+                </span>
+              )}
+              <span className={cn("max-w-full truncate px-0.5 text-[11.5px] leading-4", active || raised ? "font-semibold text-primary" : "font-medium text-muted-foreground")}>{label}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+const TYPING = 'input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]), textarea, [contenteditable="true"]';
+
+/** True while a text field has focus (the on-screen keyboard is up on phones): the tab bar steps aside. */
+export function useTyping() {
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const update = () => setTyping(document.activeElement instanceof HTMLElement && document.activeElement.matches(TYPING));
+    // focusout fires before the next element gets focus: read the new focus on the next tick
+    const later = () => window.setTimeout(update, 0);
+    document.addEventListener("focusin", update);
+    document.addEventListener("focusout", later);
+    return () => {
+      document.removeEventListener("focusin", update);
+      document.removeEventListener("focusout", later);
+    };
+  }, []);
+  return typing;
 }
 
 function desktopItem(active: boolean) {

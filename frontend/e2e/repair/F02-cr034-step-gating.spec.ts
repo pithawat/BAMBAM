@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { as, auth, fillPlace, PLACE, report, tag } from "./helpers";
+import { as, auth, fillPlace, pickBuilding, pickFloor, pickRoom, PLACE, report, tag } from "./helpers";
 
 // CR-034 (Stage 5P) on F02 / F03: ถัดไป cannot be pressed while the step misses a required field or a blocking
 // duplicate has no other spot — the hint under the bar says what is missing (BR-F02-1a); once a blocking duplicate
@@ -24,10 +24,10 @@ test("AC1: ถัดไป is disabled with a hint until the step is complete", 
   await nextButton(page).click({ force: true });
   await expect(s).toBeVisible(); // still on step 1
 
-  await s.getByText(PLACE.building, { exact: true }).click();
-  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText(PLACE.floor, { exact: true }).click();
+  await pickBuilding(page, PLACE.building);
+  await pickFloor(page, PLACE.floor);
   await expect(hint(page)).toHaveText("เลือกห้องหรือจุดที่เกิด");
-  await s.getByText(PLACE.room, { exact: true }).click();
+  await pickRoom(page, PLACE.room);
   await expect(hint(page)).toHaveCount(0);
   await expect(nextButton(page)).not.toHaveAttribute("aria-disabled", "true");
   await nextButton(page).click();

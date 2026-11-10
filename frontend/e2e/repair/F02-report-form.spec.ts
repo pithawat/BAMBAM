@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { API, as, attachVia, auth, countUploads, uploadPhoto } from "./helpers";
+import { API, as, attachVia, auth, categoryNames, countUploads, expectCategory, pickBuilding, pickCategory, pickFloor, pickRoom, uploadPhoto } from "./helpers";
 
 // F02 report form (CR-014, Stage 2M; CR-022; CR-025 place first + categories by building type, Stage 4P;
 // CR-026 photos kept in the form until submit). Runs against the real API; อาคาร 1, the car park and the mock
@@ -21,21 +21,13 @@ async function open(page: Page) {
 
 const step = (page: Page, key: string) => page.locator(`[data-step="${key}"]`);
 const next = (page: Page) => page.getByRole("button", { name: "ถัดไป" }).click();
-const categoryNames = (page: Page) => step(page, "problem").getByRole("radiogroup", { name: "เลือกหมวดที่ตรงกับปัญหา" }).locator("label");
 
 /** Step 1: building, floor (the only floor when there is one) and room, then the optional extra spot. */
 async function pickPlace(page: Page, building: string, floor: string | null, room: string, spot?: string) {
-  const s = step(page, "location");
-  await s.getByText(building, { exact: true }).click();
-  if (floor) await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText(floor, { exact: true }).click();
-  else await s.getByRole("radiogroup", { name: "เลือกชั้น" }).locator("label").first().click();
-  // CR-038: a floor with a plan shows the plan first; the name list sits behind "เลือกจากรายชื่อ"
-  const toList = s.getByRole("button", { name: "เลือกจากรายชื่อ" });
-  const list = s.getByRole("radiogroup", { name: /ห้องหรือจุดที่เกิด/ });
-  await expect(toList.or(list).first()).toBeVisible();
-  if (await toList.isVisible()) await toList.click();
-  await list.getByText(room, { exact: true }).click();
-  if (spot) await s.getByLabel("บอกจุดเพิ่มเติม").fill(spot);
+  await pickBuilding(page, building);
+  await pickFloor(page, floor);
+  await pickRoom(page, room);
+  if (spot) await step(page, "location").getByLabel("บอกจุดเพิ่มเติม").fill(spot);
 }
 
 /** A unique extra spot: reports of other runs / projects in the same room stay "similar", not duplicates (CR-020). */
@@ -51,8 +43,8 @@ test("AC1 (CR-025): opens on สถานที่; a room is required; step 2 n
   await open(page);
   await expect(page.getByRole("navigation", { name: "ขั้นตอนแจ้งซ่อม" }).getByRole("button", { name: /สถานที่/ })).toHaveAttribute("aria-current", "step");
   const s = step(page, "location");
-  await s.getByText("อาคาร 1", { exact: true }).click();
-  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("4", { exact: true }).click();
+  await pickBuilding(page, "อาคาร 1");
+  await pickFloor(page, "4");
   // CR-034: ถัดไป cannot be pressed; the hint names the missing room
   await expect(page.getByRole("button", { name: "ถัดไป" })).toBeDisabled();
   await expect(page.locator("#step-missing")).toHaveText("เลือกห้องหรือจุดที่เกิด");
@@ -69,24 +61,24 @@ test("AC2 (CR-025): categories follow the building type; no อื่นๆ symp
   await open(page);
   await pickPlace(page, "อาคาร 1", "4", "อ.1 ห้อง 401");
   await next(page);
-  await expect(categoryNames(page)).toHaveText(["ไฟฟ้าและแสงสว่าง", "ระบบปรับอากาศ", "ประปาและสุขาภิบาล", "ห้องประชุมและโสตทัศนูปกรณ์", "อาคารและพื้นที่ส่วนกลาง", "อื่น ๆ"]);
+  expect(await categoryNames(page)).toEqual(["ไฟฟ้าและแสงสว่าง", "ระบบปรับอากาศ", "ประปาและสุขาภิบาล", "ห้องประชุมและโสตทัศนูปกรณ์", "อาคารและพื้นที่ส่วนกลาง", "อื่น ๆ"]);
   const p = step(page, "problem");
-  await p.getByText("ระบบปรับอากาศ", { exact: true }).click();
+  await pickCategory(page, "ระบบปรับอากาศ");
   await expect(p.getByRole("group", { name: /อาการที่พบ/ }).locator("label")).toHaveText(["แอร์ไม่เย็น", "น้ำหยด/รั่วซึม", "มีเสียงดัง", "มีกลิ่น", "เปิดไม่ติด", "รีโมทเสีย", "อาการอื่นๆ"]);
   await p.getByRole("group", { name: /อาการที่พบ/ }).getByText("น้ำหยด/รั่วซึม", { exact: true }).click();
   await expect(p.getByText("ความเร่งด่วนของงานนี้:")).toBeVisible();
-  await p.getByText("อื่น ๆ", { exact: true }).click();
+  await pickCategory(page, "อื่น ๆ");
   await expect(p.getByRole("checkbox", { checked: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "ย้อนกลับ" }).click();
   await pickPlace(page, WAREHOUSE, null, "พื้นที่เก็บสินค้า");
   await next(page);
-  await expect(categoryNames(page)).toHaveText(["ไฟฟ้าและแสงสว่าง", "ประปาและสุขาภิบาล", "อาคารและพื้นที่ส่วนกลาง", "อื่น ๆ"]);
+  expect(await categoryNames(page)).toEqual(["ไฟฟ้าและแสงสว่าง", "ประปาและสุขาภิบาล", "อาคารและพื้นที่ส่วนกลาง", "อื่น ๆ"]);
 
   await page.getByRole("button", { name: "ย้อนกลับ" }).click();
   await pickPlace(page, OUTDOOR, null, "ลานจอดรถ");
   await next(page);
-  await expect(categoryNames(page)).toHaveText(["ไฟฟ้าและแสงสว่าง", "ประปาและสุขาภิบาล", "ลานจอด / ไม้กั้น", "อื่น ๆ"]);
+  expect(await categoryNames(page)).toEqual(["ไฟฟ้าและแสงสว่าง", "ประปาและสุขาภิบาล", "ลานจอด / ไม้กั้น", "อื่น ๆ"]);
 });
 
 test("AC3 (CR-025): another building type clears the category with a note; the API refuses ระบบปรับอากาศ in the warehouse", async ({ page, baseURL }) => {
@@ -94,21 +86,21 @@ test("AC3 (CR-025): another building type clears the category with a note; the A
   await pickPlace(page, "อาคาร 1", "4", "อ.1 ห้อง 401");
   await next(page);
   const p = step(page, "problem");
-  await p.getByText("ระบบปรับอากาศ", { exact: true }).click();
+  await pickCategory(page, "ระบบปรับอากาศ");
   await p.getByRole("group", { name: /อาการที่พบ/ }).getByText("แอร์ไม่เย็น", { exact: true }).click();
   await page.getByRole("button", { name: "ย้อนกลับ" }).click();
   // same type: the category stays
-  await step(page, "location").getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("5", { exact: true }).click();
-  await step(page, "location").getByText("RMC Network 1", { exact: true }).click();
+  await pickFloor(page, "5");
+  await pickRoom(page, "RMC Network 1");
   await next(page);
-  await expect(p.getByRole("radio", { name: /ระบบปรับอากาศ/ })).toBeChecked();
+  await expectCategory(page, "ระบบปรับอากาศ");
   await page.getByRole("button", { name: "ย้อนกลับ" }).click();
   await pickPlace(page, WAREHOUSE, null, "พื้นที่เก็บสินค้า");
   await next(page);
   await expect(p.getByText("หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้ เลือกใหม่อีกครั้ง")).toBeVisible();
   await expect(p.getByRole("radio", { checked: true })).toHaveCount(0);
   await expect(p.getByRole("checkbox", { checked: true })).toHaveCount(0);
-  await p.getByText("ไฟฟ้าและแสงสว่าง", { exact: true }).click();
+  await pickCategory(page, "ไฟฟ้าและแสงสว่าง");
   await expect(p.getByText("หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้")).toHaveCount(0);
 
   const api = await as("employee", baseURL);
@@ -130,7 +122,7 @@ test("AC5 + demo 1: review in step order, ticket shows the room", async ({ page 
   await pickPlace(page, "อาคาร 1", "4", "อ.1 ห้อง 401", spot);
   await next(page);
   const p = step(page, "problem");
-  await p.getByText("ห้องประชุมและโสตทัศนูปกรณ์", { exact: true }).click();
+  await pickCategory(page, "ห้องประชุมและโสตทัศนูปกรณ์");
   await p.getByRole("group", { name: /อาการที่พบ/ }).getByText("จอไม่แสดงผล/ไม่ติด", { exact: true }).click();
   await next(page);
 
@@ -151,7 +143,7 @@ test("AC2 (CR-014): อื่น ๆ + ใช้งานไม่ได้ + ty
   await pickPlace(page, "อาคาร 1", "4", "พื้นที่ส่วนกลางชั้น 4", uniqueSpot(info, "หน้าลิฟต์"));
   await next(page);
   const p = step(page, "problem");
-  await p.getByText("อื่น ๆ", { exact: true }).click();
+  await pickCategory(page, "อื่น ๆ");
   await p.getByRole("group", { name: /อาการที่พบ/ }).getByText("ใช้งานไม่ได้", { exact: true }).click();
   await p.getByLabel("ระบุหมวดงาน").fill("ลิฟต์");
   await expect(p.getByText("ปกติ", { exact: true })).toBeVisible();
@@ -166,7 +158,7 @@ test("AC7 (CR-026 A1): picking sends nothing; a failed upload keeps form + photo
   await open(page);
   await pickPlace(page, "อาคาร 1", "4", "อ.1 ห้อง 401", spot);
   await next(page);
-  await step(page, "problem").getByText("ระบบปรับอากาศ", { exact: true }).click();
+  await pickCategory(page, "ระบบปรับอากาศ");
   await step(page, "problem").getByRole("group", { name: /อาการที่พบ/ }).getByText("แอร์ไม่เย็น", { exact: true }).click();
   await next(page);
   await attachVia(page, step(page, "send").locator("input[type=file]").first());
@@ -193,7 +185,7 @@ test("AC6 (CR-026): a 4000×3000 photo goes up as a 1920px JPEG at quality 0.25"
   await open(page);
   await pickPlace(page, "อาคาร 1", "4", "อ.1 ห้อง 401", uniqueSpot(info, "รูปใหญ่"));
   await next(page);
-  await step(page, "problem").getByText("ไฟฟ้าและแสงสว่าง", { exact: true }).click();
+  await pickCategory(page, "ไฟฟ้าและแสงสว่าง");
   await step(page, "problem").getByRole("group", { name: /อาการที่พบ/ }).getByText("ไฟไม่ติด/ไฟกะพริบ", { exact: true }).click();
   await next(page);
   // A detailed 4000×3000 photo, and what 0.85 (the old quality) would have sent at 1920px.
@@ -227,7 +219,7 @@ test("2R AC2 + CR-026 A1: an unfinished report comes back after a reload with it
   await open(page);
   await pickPlace(page, "อาคาร 1", "4", "อ.1 ห้อง 401", spot);
   await next(page);
-  await step(page, "problem").getByText("ระบบปรับอากาศ", { exact: true }).click();
+  await pickCategory(page, "ระบบปรับอากาศ");
   await step(page, "problem").getByRole("group", { name: /อาการที่พบ/ }).getByText("แอร์ไม่เย็น", { exact: true }).click();
   await next(page);
   await attachVia(page, step(page, "send").locator("input[type=file]").first());
@@ -252,7 +244,7 @@ test("CR-026 A1: draft photos older than 24 h are gone; the banner asks to attac
   await open(page);
   await pickPlace(page, "อาคาร 1", "4", "อ.1 ห้อง 401", uniqueSpot(info, "ร่างเก่า"));
   await next(page);
-  await step(page, "problem").getByText("ระบบปรับอากาศ", { exact: true }).click();
+  await pickCategory(page, "ระบบปรับอากาศ");
   await step(page, "problem").getByRole("group", { name: /อาการที่พบ/ }).getByText("แอร์ไม่เย็น", { exact: true }).click();
   await next(page);
   await attachVia(page, step(page, "send").locator("input[type=file]").first());
@@ -289,7 +281,7 @@ test("AC4 (CR-022): the frame keeps its width; room cards leave no reserved gap 
   expect(gap).toBeLessThan(30);
   await next(page);
   await width();
-  await step(page, "problem").getByText("ระบบปรับอากาศ", { exact: true }).click();
+  await pickCategory(page, "ระบบปรับอากาศ");
   await step(page, "problem").getByRole("group", { name: /อาการที่พบ/ }).getByText("แอร์ไม่เย็น", { exact: true }).click();
   await next(page);
   await width();
@@ -300,8 +292,8 @@ test("AC4 (CR-022): the frame keeps its width; room cards leave no reserved gap 
 test("CR-038: the room is picked on the floor plan (3D on desktop, flat plan on phones)", async ({ page, isMobile }) => {
   await open(page);
   const s = step(page, "location");
-  await s.getByText("อาคาร 1", { exact: true }).click();
-  await s.getByRole("radiogroup", { name: "เลือกชั้น" }).getByText("4", { exact: true }).click();
+  await pickBuilding(page, "อาคาร 1");
+  await pickFloor(page, "4");
   await expect(s.getByRole("button", { name: "เลือกจากรายชื่อ" })).toBeVisible();
   if (isMobile) {
     await s.getByRole("radiogroup", { name: /แปลนชั้น/ }).getByRole("radio", { name: "WPS ห้องกาแฟ" }).click();

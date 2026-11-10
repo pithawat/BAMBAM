@@ -2,9 +2,15 @@
 
 <!-- The module's memory. Agents update it at the end of every task. Keep under ~60 lines. -->
 
-**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 / 5B accepted 2026-11-02 · of 8   **Updated:** 2026-11-09 (CR-039 accepted, tag `repair-cr-039`)
+**Phase:** P5 Build   **Stage:** 1 / 2 / 2R / 2N / 3 / 4 accepted (2026-10-26); 5P 2026-11-01; 4P / 4R / 3D-2 / 3D-3 accepted 2026-10-29, 3D-4 2026-10-30, 3D-5 2026-11-01; 5 / 5B accepted 2026-11-02 · of 8   **Updated:** 2026-11-10 (CR-040 / 041 / 042 accepted)
 
 ## Now
+
+- **2026-11-10 CR-042 accepted by owner, tag `repair-cr-042` (S, D-147):** S09 + S18 lists = 5 per page, numbered pager (shared `components/shared/pager.tsx`, from S06), `page` / `pageSize=5` + filters sent to #6 / #15 (API already pages in SQL, no backend change). tsc / eslint pass; mock / stubbed checks 390 + 1440 OK; F21 range regex updated; e2e not run. Commit with CR-040 / 041.
+
+- **2026-11-10 CR-041 accepted by owner, tag `repair-cr-041` (S, D-146):** S09 phones: step filter = 3 tiles (count + dot, wrapping label) instead of overlapping segmented tabs; S09 header `ช่างภายนอก` button removed (S18 via section nav). tsc / eslint pass; mock screenshots 360–1440 OK; e2e not run. Commit together with CR-040.
+
+- **2026-11-10 CR-040 accepted by owner, tag `repair-cr-040` (M, D-145):** phones / tablets get a bottom tab bar (หน้าแรก + services, hidden while typing; route bottom bars on `--app-bottom`); S03 pickers = searchable dropdowns (อาคาร on every size; ชั้น / room list / หมวดงาน below `lg`, bottom sheet + search); employee Home from the owner reference `App (1).tsx` / `index (1).css` (IBM Plex Sans Thai scoped to Home, sub-line removed, `รายการของฉัน` strip on the repair card replaces the 3-row list; phones: repair card full row). สแกน QR = raised button in the middle of the tab bar, Home / S06 scan buttons removed (owner follow-up). UI by Claude (owner). tsc / eslint pass; mock screenshots 360–1440 px OK. e2e helpers updated (`pickBuilding` / `pickFloor` / `pickRoom` / `pickCategory`), **not run** (Docker down); no real-phone check yet. Next: owner review → commit + tag `repair-cr-040`, `/atlas sync repair`; then **Stage 6**.
 
 - **2026-11-09 CR-039 accepted by owner, tag `repair-cr-039` (M, D-144):** S07 `บันทึก PDF` (browser print dialog) prints only the new report from the owner's sample — logo · `รายงานการดำเนินงาน` · ticket no · QR → `/repair/tickets/{id}`, `ข้อมูลทั่วไป` + one table per step, photos, footer `หน้า n/total` (Chrome / Edge). Files: `ticket-report.tsx` (new), `ticket-detail.tsx`, shared `components/shared/qr-svg.tsx` (moved from settings label sheet). tsc / eslint pass; mock-mode PDFs checked (A4, 2 pages, no JS errors). **Not run:** e2e `F06-cr039-report-pdf.spec.ts` (Docker down), phone scan of a printed QR. Next: **Stage 6** — `/build-stage repair 6 prepare` in a fresh session; `/atlas sync repair` for CR-039.
 
@@ -64,6 +70,7 @@
 
 ## Open issues / questions
 
+- Atlas: F02 tour step "เลือกห้อง + บอกจุดเพิ่มเติม" clicks the room card directly; since CR-038 the list sits behind "เลือกจากรายชื่อ" → add that click once the updated F02 e2e passes, then `atlas verify repair/F02`. Atlas synced 2026-11-09 (CR-037 / 038 / 039 on the timeline; F02-3 / F06-2 texts)
 - CR-039: PDF page numbers (`@page` margin boxes) show in Chrome / Edge only; Safari / Firefox print without them. Owner sample PDF not stored in the repo (attached in chat) — drop it into `changes/CR-039/` if it should be kept
 - Stage 5: plan AC1 names the old sample place (อาคารหลัก ชั้น 5 ห้องประชุม 5B); the real DB has no asset yet. Mocks keep `AC-05-012` in อาคารฝั่ง Office ชั้น 5 ห้องประชุม 5B; on the real API the e2e creates its own asset in a real room (อาคาร 1) — demo: add `AC-05-012` in S29 / S20 first. BR-F13B-1 asset list file still not received
 - e2e: F06 BR-F06-2 assumes the employee's only ticket awaiting rating is its own — flaky in a full parallel run (passes alone); make it pick by id

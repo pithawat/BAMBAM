@@ -2,6 +2,8 @@
 
 Status: built by Claude 2026-10-15 (CR-005, no separate mockup) — waiting for acceptance · CR-024 applied 2026-10-26 (block below)
 
+> **CR-042 (2026-11-10, owner):** the list shows **5 contractors per page** with numbered pages (the S06 pager); search, แสดงที่ปิดใช้งาน and page are in the URL (`?q=&inactive=1&page=`) and go to #15 (`page`, `pageSize=5`), the API pages. Footer `แสดง {from}–{to} จาก {total} ร้าน`. CR-041: no S09 header button — S18 is reached from the repair section nav.
+
 > **CR-024 (approved 2026-10-26):** technician (add / edit) and admin (view) only — no executive; description "ข้อมูลนี้เห็นเฉพาะช่างและ Admin".
 
 - **Who:** technician (add / edit), admin + executive (view). Others → forbidden state. Nav: sidebar "งานช่าง → ช่างภายนอก" (technician) and "จัดการงานซ่อม → ช่างภายนอก" (admin / executive); S09 header button.

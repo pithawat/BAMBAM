@@ -2,101 +2,79 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, ChevronRight, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronRight, RotateCcw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getMyTickets } from "../api";
-import type { MyTicket } from "../types";
-import { CategoryTile } from "./category-icon";
-import { placeLine, STEP, stepLabel, ticketHref } from "./ticket-presentation";
-import { TicketLink } from "./ticket-navigation";
 
-// Home "รายการของฉัน" (CR-035, layout from output/home-user-redesign/index.html): the newest three rows of #35 —
-// the API puts the reporter's tickets awaiting the rating first (BR-F06-2) — and how many still wait for the viewer.
-// Only rendered for `repair.ticket.report` (tracking follows the report key, CR-034).
+// Home "รายการของฉัน" strip under the repair card (CR-040, layout from the owner's `App (1).tsx` reference; replaces
+// the CR-035 three-row list). Totals from #35 (`pageSize=1`, read `meta.total`): everything the viewer reported or
+// follows, how many are still being worked on, and the reporter's tickets waiting for their rating (BR-F06-2).
+// The first non-empty state is named, the rest are counted. Rendered only for `repair.ticket.report`.
 
-const SHOWN = 3;
+type Counts = { total: number; awaiting: number; inProgress: number };
+type Data = Counts | "error";
 
-type Data = { items: MyTicket[]; total: number; awaiting: number } | "error";
+const page = { page: 1, pageSize: 1 } as const;
 
-export function HomeTickets() {
+export function HomeTicketsStrip({ className }: { className?: string }) {
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState<{ revision: number; value: Data }>();
   const retry = useCallback(() => setRevision((r) => r + 1), []);
   useEffect(() => {
     let active = true;
     Promise.all([
-      getMyTickets({ relation: "all", page: 1, pageSize: SHOWN }),
-      getMyTickets({ relation: "reported", status: ["resolved"], page: 1, pageSize: 1 }),
+      getMyTickets({ relation: "all", ...page }),
+      getMyTickets({ relation: "reported", status: ["resolved"], ...page }),
+      getMyTickets({ relation: "all", status: ["in_progress"], ...page }),
     ]).then(
-      ([list, awaiting]) => { if (active) setData({ revision, value: { items: list.items, total: list.meta.total, awaiting: awaiting.meta.total } }); },
+      ([all, awaiting, inProgress]) => {
+        if (active) setData({ revision, value: { total: all.meta.total, awaiting: awaiting.meta.total, inProgress: inProgress.meta.total } });
+      },
       () => { if (active) setData({ revision, value: "error" }); },
     );
     return () => { active = false; };
   }, [revision]);
-  const loading = !data || data.revision !== revision;
-  const value = data?.value;
 
-  return <section aria-labelledby="personal-title" className="pb-10">
-    <div className="mb-4 flex items-end justify-between gap-4">
-      <div>
-        <h2 id="personal-title" className="text-lg leading-7 font-semibold tracking-tight lg:text-[19px]">รายการของฉัน</h2>
-        <p className="text-[13px] text-muted-foreground">ติดตามเรื่องที่แจ้งไว้ และงานที่รอคุณตรวจ</p>
-      </div>
-      <Link href="/repair/my" className="hidden shrink-0 items-center gap-1.5 rounded-sm text-[13px] font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex">
-        ดูงานซ่อมทั้งหมด<ArrowRight className="size-4" aria-hidden />
-      </Link>
-    </div>
-    <div aria-busy={loading} className="overflow-hidden rounded-2xl border bg-card">
-      {loading ? <div aria-label="กำลังโหลดรายการของฉัน" className="divide-y">
-        {[0, 1].map((i) => <div key={i} className="flex items-center gap-4 px-4 py-4.5 sm:px-5.5">
-          <Skeleton className="size-10 rounded-lg" />
-          <div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>
-          <Skeleton className="hidden h-6 w-32 rounded-md sm:block" />
-        </div>)}
-      </div>
-        : value === "error" ? <div role="alert" className="flex flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-5.5">
-          <div>
-            <p className="font-semibold">โหลดรายการของคุณไม่สำเร็จ</p>
-            <p className="text-[13px] text-muted-foreground">ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง ยังแจ้งซ่อมใหม่ได้ตามปกติ</p>
-          </div>
-          <Button variant="outline" onClick={retry}><RotateCcw aria-hidden />ลองอีกครั้ง</Button>
-        </div>
-        : value && value.items.length === 0 ? <div className="px-4 py-6 sm:px-5.5">
-          <p className="font-semibold">ยังไม่มีงานที่คุณแจ้งหรือติดตาม</p>
-          <p className="text-[13px] text-muted-foreground">เจออะไรเสีย กดแจ้งซ่อมใหม่ที่การ์ดด้านบนได้เลย</p>
-        </div>
-        : value && <>
-          <ul className="divide-y">{value.items.map((t) => <Row key={t.id} ticket={t} />)}</ul>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t px-4 py-2.5 text-[13px] text-muted-foreground sm:px-5.5">
-            <span>{value.awaiting > 0 ? `มี ${value.awaiting} งานรอคุณประเมินตรวจงาน` : `ทั้งหมด ${value.total} งาน`}</span>
-            <Link href="/repair/my" className="inline-flex min-h-11 items-center gap-1.5 rounded-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:hidden">
-              ดูงานซ่อมทั้งหมด<ArrowRight className="size-4" aria-hidden />
-            </Link>
-          </div>
-        </>}
-    </div>
-  </section>;
-}
+  const frame = cn("block w-full border-t border-primary-foreground/15 bg-primary-foreground/7 px-4 py-3 text-left sm:px-5.5 lg:px-6", className);
+  if (!data || data.revision !== revision) {
+    return <div aria-busy="true" aria-label="กำลังโหลดรายการของฉัน" className={frame}>
+      <Skeleton className="h-4 w-24 bg-primary-foreground/20" />
+      <Skeleton className="mt-2 h-3 w-32 max-w-full bg-primary-foreground/15" />
+    </div>;
+  }
+  const value = data.value;
+  if (value === "error") {
+    return <div role="alert" className={cn(frame, "text-[13px] leading-5 text-primary-foreground/85")}>
+      โหลดรายการของฉันไม่สำเร็จ
+      <button type="button" onClick={retry} className="mt-1 flex min-h-8 items-center gap-1.5 rounded-sm font-medium text-primary-foreground underline underline-offset-4 outline-none">
+        <RotateCcw className="size-3.5" aria-hidden />ลองอีกครั้ง
+      </button>
+    </div>;
+  }
+  if (!value.total) return null;
 
-function Row({ ticket }: { ticket: MyTicket }) {
-  const mine = ticket.awaitingMyConfirmation;
-  return <li className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-4 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] sm:gap-x-4 sm:px-5.5">
-    <CategoryTile icon={ticket.category?.icon} className="size-9 sm:size-10" />
-    <div className="col-span-2 min-w-0 sm:col-span-1">
-      <TicketLink href={ticketHref(ticket.id)} className="block truncate text-[15px] leading-6 font-medium outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">{ticket.title}</TicketLink>
-      <p className="truncate text-xs leading-5 text-muted-foreground">
-        <span className="tracking-wide">{ticket.ticketNo}</span> · {ticket.building.name} {placeLine(ticket)}{ticket.viewerRelation === "subscriber" && " · คุณติดตามเคสนี้"}
-      </p>
-    </div>
-    <span className={cn("col-start-2 inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-md px-2 py-0.5 text-xs leading-5 font-semibold sm:col-start-auto", mine ? "bg-attention/10 text-attention" : STEP[ticket.step].color)}>
-      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" /><span className="truncate">{stepLabel(ticket)}</span>
+  const done = Math.max(0, value.total - value.awaiting - value.inProgress);
+  const states = [
+    { key: "awaiting", label: "รอคุณให้คะแนน", count: value.awaiting, dot: "bg-gold" },
+    { key: "progress", label: "กำลังดำเนินการ", count: value.inProgress, dot: "bg-primary-foreground" },
+    { key: "done", label: "เสร็จสิ้น", count: done, dot: "bg-[#8FE0C2]" },
+  ].filter((s) => s.count > 0);
+  const first = states[0];
+  const rest = value.total - first.count;
+
+  return <Link href="/repair/my" aria-label={`รายการของฉัน ${value.total} รายการ · ${first.label} ${first.count}`}
+    className={cn(frame, "group/strip outline-none transition-colors hover:bg-primary-foreground/12 focus-visible:bg-primary-foreground/12")}>
+    <span className="flex items-center gap-2 text-[13px] leading-5 font-medium text-primary-foreground">
+      รายการของฉัน
+      <span className="grid h-5 min-w-5 place-items-center rounded-[5px] bg-primary-foreground/18 px-1 text-xs tabular-nums">{value.total}</span>
+      <ChevronRight className="ml-auto size-4 text-primary-foreground/75 transition-transform group-hover/strip:translate-x-0.5" aria-hidden />
     </span>
-    <TicketLink href={ticketHref(ticket.id)} aria-label={`${mine ? "ตรวจงาน" : "ดูงาน"} ${ticket.ticketNo}`}
-      className={cn("inline-flex min-h-11 items-center justify-end gap-0.5 rounded-md text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        mine ? "bg-attention/10 px-3 text-attention hover:bg-attention/15" : "min-w-11 text-primary hover:underline")}>
-      {mine ? "ตรวจงาน" : "ดูงาน"}<ChevronRight className="size-4" aria-hidden />
-    </TicketLink>
-  </li>;
+    <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs leading-5 text-primary-foreground/78">
+      <i aria-hidden className={cn("size-1.5 shrink-0 rounded-full", first.dot)} />
+      {first.label} <span className="tabular-nums">{first.count}</span>
+      {rest > 0 && <span className="text-primary-foreground/60">· อีก <span className="tabular-nums">{rest}</span> รายการ</span>}
+    </span>
+  </Link>;
 }
+

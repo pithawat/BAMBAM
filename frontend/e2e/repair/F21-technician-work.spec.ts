@@ -26,7 +26,7 @@ test.describe("technician", () => {
     await expect(page.getByRole("heading", { name: "งานซ่อม", level: 1 })).toBeVisible();
     await expect(page.getByRole("radio", { name: /^รับเรื่อง \d+$/ })).toBeChecked();
     await expect(page.getByRole("link", { name: /.+/ }).filter({ hasText: queue[0].ticketNo }).first()).toBeVisible();
-    await expect(page.getByText(/แสดง \d+ จาก \d+ งาน/)).toBeVisible();
+    await expect(page.getByText(/แสดง \d+–\d+ จาก \d+ งาน/)).toBeVisible(); // CR-042: 5 per page
 
     // Not assessed yet: no บันทึกผลซ่อม, the S10 link is blocked, the API refuses (BR-F21-4)
     const early = await technician.post(`${API}/tickets/${ticket.id}/resolve`, { data: { note: "ซ่อมแล้ว", photoIds: [await uploadPhoto(technician)] } });

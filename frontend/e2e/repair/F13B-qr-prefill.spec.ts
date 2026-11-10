@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { API, as, attachVia, auth, PLACE, placeIds } from "./helpers";
+import { API, as, attachVia, auth, expectCategory, PLACE, placeIds } from "./helpers";
 
 // F13-B (Stage 5, CR-036): a printed QR holds `{origin}/q/{code}` → S03 prefilled from #25. Logged out it goes
 // through login first (real SSO cannot be automated: the redirect keeps `next`). The asset is created per run in
@@ -72,7 +72,7 @@ test.describe("employee", () => {
     await expect(banner(page)).toContainText(`${NAME} · ${code}`);
     await expect(step(page, "problem").getByRole("heading", { name: "ปัญหาที่พบ" })).toBeVisible();
     await expect(step(page, "problem").getByText(new RegExp(`${PLACE.building} · ชั้น ${PLACE.floor} · ${PLACE.room}`))).toBeVisible();
-    await expect(step(page, "problem").getByRole("radio", { name: PLACE.category })).toBeChecked();
+    await expectCategory(page, PLACE.category);
 
     const id = await finishReport(page, `QR ${info.project.name} ${Date.now()}`);
     const api = await as("employee", baseURL);
@@ -88,7 +88,7 @@ test.describe("employee", () => {
     await banner(page).getByRole("button", { name: "ไม่ใช่อุปกรณ์นี้" }).click();
     await expect(banner(page)).toHaveCount(0);
     await expect(page).toHaveURL(/\/repair\/new$/);
-    await expect(step(page, "problem").getByRole("radio", { name: PLACE.category })).toBeChecked();
+    await expectCategory(page, PLACE.category);
     const id = await finishReport(page, `QR no ${info.project.name} ${Date.now()}`);
     const api = await as("employee", baseURL);
     expect(await ticketAsset(api, id)).toBeNull();
@@ -148,9 +148,9 @@ test.describe("phone camera", () => {
     });
   });
 
-  test("AC3 + AC5: S06 สแกน QR → camera; a foreign QR toasts and keeps scanning; our /q/{code} opens the form and stops the camera", async ({ page }) => {
+  test("AC3 + AC5: tab bar สแกน QR (CR-040) → camera; a foreign QR toasts and keeps scanning; our /q/{code} opens the form and stops the camera", async ({ page }) => {
     await page.goto("/repair/my");
-    await page.getByRole("link", { name: "สแกน QR" }).click();
+    await page.getByTestId("bottom-nav").getByRole("link", { name: "สแกน QR" }).click();
     await expect(page).toHaveURL(/\/repair\/scan$/);
     await expect(page.getByTestId("qr-scan-line")).toBeAttached({ timeout: 15_000 });
 

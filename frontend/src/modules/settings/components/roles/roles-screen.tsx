@@ -266,7 +266,7 @@ export function RolesScreen() {
       </div>
 
       {count > 0 && matrix && (
-        <div className="sticky bottom-3 z-20 mt-5 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-float lg:bottom-6 lg:gap-3 lg:pl-5">
+        <div className="sticky bottom-[calc(var(--app-bottom)+0.75rem)] z-20 mt-5 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-float lg:bottom-6 lg:gap-3 lg:pl-5">
           <p className="min-w-0 flex-1 text-sm font-semibold" aria-live="polite">
             เปลี่ยนสิทธิ์ {count} รายการ
           </p>

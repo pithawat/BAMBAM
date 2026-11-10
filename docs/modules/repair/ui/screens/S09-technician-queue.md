@@ -2,6 +2,10 @@
 
 Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
 
+> **CR-042 (2026-11-10, owner):** the list shows **5 tickets per page** with numbered pages (`?page=`, the S06 pager) instead of โหลดเพิ่ม; tab, อาคาร and page go to #6 (`page`, `pageSize=5`), the API pages. Footer `แสดง {from}–{to} จาก {total} งาน`. New tab / building → page 1.
+
+> **CR-041 (2026-11-10, owner):** phones / tablets pick the step from **three equal tiles** (count + step colour dot on top, label below, may wrap; selected = filled `foreground`) instead of the segmented tabs; the อาคาร filter sits under them. Desktop keeps the toolbar card. The header action "ช่างภายนอก" is **removed** (S18 via the repair section nav).
+
 > **CR-024 (approved 2026-10-26):** empty copy per `_common.md` §9; there is no bell (the admin-close case simply disappears on the next refetch).
 
 > **CR-015 (approved 2026-10-19):** the list is ordered **oldest report first** (`sort=createdAt:asc`), not by priority; the priority chip on each row stays as information. Replaces 'most urgent first' below.
