@@ -541,6 +541,10 @@ npm run lint && npm run typecheck
 
 ## Open questions (Codex fills — never guess)
 
+- 2026-11-02 CR-037 revision 2: owner requested the existing mascot face for QR, stronger reference-2 styling, the current login font and centered CTA; review `output/qr-login-redesign/{index-v2,login-v2}.html`. V1 preserved; font / layout / QR / PDF checks pass. No production files or accepted-stage ownership changed.
+
+- 2026-11-02 CR-037 PROPOSED: QR / login standalone designs are ready at `output/qr-login-redesign/{index,login}.html` with printable PDF examples; see `changes/CR-037.md` for impact / checks. Await owner approval before changing approved S01 / S30 / print rules; then prepare bounded ownership for login and label printing. The existing Stage 5B accepted status is unchanged, and this proposal does not begin Stage 6.
+
 - CR-013 preview revision 2 (2026-10-19): owner requested less blue. Evaluation card now uses warm orange (existing attention colour) for its CTA, top border and icon with a pale warm background. Proposal includes a bounded exception to the blue-action convention; production remains unchanged.
 
 - CR-013 preview ready (2026-10-19): `output/repair-evaluation-preview/index.html`, desktop/mobile captures in the same directory. Responsive and simulated evaluation-entry checks pass. No production edits; awaiting owner's design approval.

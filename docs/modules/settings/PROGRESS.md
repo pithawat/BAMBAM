@@ -6,6 +6,16 @@
 
 ## Now
 
+- 2026-11-03 CR-037 v7: owner's combination is v5 tilted head + curved arrow, no starburst; `output/qr-login-redesign/label-v7.html`. Left branding / 3 footer lines / 40 mm QR retained; responsive / QR / print checks pass. Paper scan and production integration pending.
+
+- 2026-11-03 CR-037 v4: compact-label branding / invitation on the upper right, partial tiger face peeking over the card, three separate footer lines; `output/qr-login-redesign/label-v4.html`. QR / layout / print checks pass. Owner review and paper scan pending; production unchanged.
+
+- 2026-11-03 CR-037 v3: actual output is compact equipment labels only, per owner. `output/qr-login-redesign/label-v3.html` balances a larger head with smaller hands; 40 mm QR / 12 cells retained. Browser / QR / text-fit checks pass. Revised proportions await review; production and existing files unchanged.
+
+- 2026-11-02 CR-037 v2: `output/qr-login-redesign/index-v2.html` uses the original mascot identity in a new QR-holding pose and adds the reference's yellow / black graphic accents. V1 preserved; 12-cell A4 PDFs and 40 mm compact QR checks pass. Still a proposed design; production / physical print checks pending.
+
+- 2026-11-02: repair CR-037 PROPOSED covers S30 QR-label visual rework; review `output/qr-login-redesign/index.html` and the colour / monochrome A4 samples. Existing 12-cell / 40 mm QR geometry retained; new colour, flat tiger and smaller print text require approval. Preview checks pass; physical printing remains pending. No settings production files changed; next for this request is owner review and a bounded handoff.
+
 - Stage R1 accepted 2026-11-01 (tag `settings-stage-R1`). Nothing in progress; next is R2.
 - 2026-11-01 CR-007 APPROVED (mirror of repair CR-036, D-140): new S30 พิมพ์ป้าย QR, S20 print actions / label badge / code lock, #56 / #57 — built in **repair Stage 5B**, not a settings stage. R2 and repair 5B both touch S20: the later one keeps the other's changes.
 
