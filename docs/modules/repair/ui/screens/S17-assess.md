@@ -1,6 +1,10 @@
 # S17 — ประเมินงาน (CR-005)
 
-Status: built by Claude 2026-10-15 (CR-005, no separate mockup) — waiting for acceptance
+Status: built by Claude 2026-10-15 (CR-005, no separate mockup) — waiting for acceptance · CR-024 applied 2026-10-26 (block below) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-034 (approved 2026-11-01):** `ใครซ่อม` → `ประเภทผู้ดำเนินการซ่อม` (label, error `เลือกประเภทผู้ดำเนินการซ่อม`, description `กำหนดวันที่คาดว่าจะเสร็จและผู้ดำเนินการซ่อม …`). `ช่างของบริษัท` → required picker `ช่างผู้รับผิดชอบ *` (#36, search when > 10, default = me if listed; error `เลือกช่างผู้รับผิดชอบ`). `เหตุผลที่เลื่อน` is required (`*`, `ผู้แจ้งเห็นข้อความนี้`, error `กรุณาใส่เหตุผลที่เลื่อน`) when rescheduling; in `รับแก้ไขและกำหนดวันเสร็จใหม่` it stays `ไม่บังคับ`.
+
+> **CR-024 (approved 2026-10-26):** toasts and dialog descriptions per `_common.md` §9.
 
 > **CR-009 (approved 2026-10-18):** title `เริ่มดำเนินการ` (`กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม`) · after a send back `รับแก้ไขและกำหนดวันเสร็จใหม่` · change `เลื่อนวันที่คาดว่าจะเสร็จ` · buttons `เริ่มดำเนินการ` / `บันทึกวันใหม่` · toast `เริ่มดำเนินการแล้ว ผู้แจ้งจะได้รับแจ้งเตือนวันที่คาดว่าจะเสร็จ`.
 

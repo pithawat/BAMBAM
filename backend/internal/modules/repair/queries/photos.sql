@@ -3,9 +3,11 @@ INSERT INTO repair.photos (id, uploader_id, content_type, size_bytes, storage_ke
 VALUES (@id, @uploader_id, @content_type, @size_bytes, @storage_key, @thumb_key, @thumb_content_type);
 
 -- name: GetPhoto :one
-SELECT p.id, p.uploader_id, p.content_type, p.storage_key, p.thumb_key, p.thumb_content_type, tp.ticket_id
+SELECT p.id, p.uploader_id, p.content_type, p.storage_key, p.thumb_key, p.thumb_content_type, tp.ticket_id,
+       tp.kind, t.status AS ticket_status
 FROM repair.photos p
 LEFT JOIN repair.ticket_photos tp ON tp.photo_id = p.id
+LEFT JOIN repair.tickets t ON t.id = tp.ticket_id
 WHERE p.id = @id;
 
 -- name: LockAttachablePhotos :many

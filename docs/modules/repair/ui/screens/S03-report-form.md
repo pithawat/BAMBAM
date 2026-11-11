@@ -1,6 +1,26 @@
 # S03 — ฟอร์มแจ้งซ่อม
 
-Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19)
+Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR-002 (approved 2026-10-14) · steps, master data and room changed by CR-014 (approved 2026-10-19) · page layout changed by CR-019 (approved 2026-10-24) · duplicate card position, step-2 block and locked team mode changed by CR-021 (approved 2026-10-25) · room cards on every floor + steps at their own height by CR-022 (approved 2026-10-26) · place first + categories by building type by CR-025 (approved 2026-10-27) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-040 (2026-11-10):** อาคาร = searchable dropdown on every size (shared `Picker`, `searchable`). Phones / tablets: ชั้น, the room name list and หมวดงาน (with icons) are searchable dropdowns too (bottom sheet + search); symptoms stay a checklist; breadcrumb hidden; the footer sits on the app's bottom tab bar. Desktop keeps floor chips, room cards, category tiles. (CR-040)
+
+> **CR-038 (2026-11-03):** the room is picked on the floor plan (#36): desktop with WebGL + a building shape = 3D plan (click, hover highlight), otherwise a flat 2D plan (tap). "ห้องที่เลือก: …" under it; "เลือกจากรายชื่อ" toggles the room cards (also the fallback for floors without a plan). Floor chips unchanged.
+
+> **CR-034 (approved 2026-11-01):** `ถัดไป` and the final submit are disabled while the current step has an empty / invalid required field or an unresolved blocking duplicate; a one-line hint under the bar names what is missing (`aria-describedby`; the button uses `aria-disabled` so it stays focusable). The final button still re-checks every step.
+
+> **CR-025 (approved 2026-10-27) — place first, categories by building type (overrides every block below where they differ).** Read `../../changes/CR-025.md` first.
+> - **Step order:** `สถานที่ → ปัญหาที่พบ → รูปภาพและส่ง` (step strip, footer `ขั้นตอน n จาก 3`, summary column and the phone review card list สถานที่ · ปัญหาที่พบ · ความเร่งด่วน in that order; each `แก้ไข` → its step).
+> - **Step 1 สถานที่:** heading row + `ที่เคยแจ้ง ▾` · อาคาร + ชั้น · `ห้องหรือจุดที่เกิด *` room cards in their normal order (**no** `ห้องที่ตรงกับปัญหา` / `ห้องอื่นบนชั้นนี้` groups) · `บอกจุดเพิ่มเติม (ไม่บังคับ)`. No duplicate card here any more. `ถัดไป` needs a room.
+> - **Step 2 ปัญหาที่พบ:** a place line above the grid `สถานที่: {อาคาร} · ชั้น {n} · {ห้อง}` with a text button `เปลี่ยน` (→ step 1) · category cards = only categories whose `buildingTypeIds` contain the building's type, plus `อื่น ๆ` (same order as #1) · symptoms, `อาการอื่นๆ`, priority explanation as before · **duplicate card (S04 inline)** under the symptoms once a category is picked, with the CR-021 block and an inline `บอกจุดเพิ่มเติม` field (S04 CR-025).
+> - **Building change:** choosing a building whose type does not use the picked category clears category, symptoms and `อาการอื่นๆ` text; step 2 then shows the inline note (info tone, not error) `หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้ เลือกใหม่อีกครั้ง` until a category is picked. Same note after a draft restore that hits this case.
+> - **Submit error** 422 `CATEGORY_NOT_FOR_BUILDING`: banner `หมวดงานนี้ไม่มีในอาคารที่เลือก กรุณาเลือกใหม่` + go to step 2 with the category cleared and master data refetched.
+> - Team mode (`?mode=team`) keeps the same order; its fields stay in step 3.
+
+> **CR-022 (approved 2026-10-26):** `ห้องหรือจุดที่เกิด` is always room cards (no searchable picker for big floors — replaces the CR-014 "> 10 rooms" rule); no reserved heights (rooms, symptoms and their placeholders grow with their content); desktop renders only the current step and the frame follows its height (replaces CR-014 "body height = the tallest step"), width unchanged.
+
+> **CR-021 (approved 2026-10-25) — layout from `maintenance-demo.html` (layout only; copy CR-020).** (1) **Location step order:** อาคาร / ชั้น → `ห้องหรือจุดที่เกิด` → **duplicate card (S04 inline)** → `บอกจุดเพิ่มเติม`. (2) **Block at step 2 (BR-F03-2):** while #22 has a case with `blocksReport`, the spot label adds `* จำเป็นเมื่อพบงานที่ตรงกัน`; `ถัดไป` shows `กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ` under the spot field and focuses it (button stays enabled). A similar-only result (another spot) lets the user go on. (3) **Locked mode (BR-F04-1):** no `เรียกช่าง | ทีมแก้เองแล้ว` switch — `/repair/new` = repair, `/repair/new?mode=team` = team (leads; others get repair). Team mode: breadcrumb / H1 `บันทึกงานที่ทีมแก้แล้ว`, intro `บันทึกปัญหาที่ทีมแก้ไขแล้ว พร้อมหลักฐานก่อนและหลังดำเนินการ`, summary shows the mode. Note under the form (both modes, leads only): `ต้องการเปลี่ยนประเภทงาน? ปิดฟอร์มนี้แล้วเริ่มใหม่ ข้อมูลที่กรอกจะไม่ถูกบันทึก`. Drafts are kept per mode.
+
+> **CR-019 (approved 2026-10-24) — page layout only; steps, fields and rules unchanged.** Heading: breadcrumb `หน้าแรก › แจ้งซ่อม › แจ้งซ่อมใหม่` · `guide` mascot · eyebrow `NEW REQUEST` · H1 · intro line · `ล้างแบบฟอร์ม` (when dirty). The phone top bar is removed. Step strip = numbered circles with `ขั้นตอนที่ n` + label (done = check). Footer: `ยกเลิก` (step 1, guarded leave) / `ย้อนกลับ` · `ขั้นตอน n จาก 3` · `ถัดไป` / `ยืนยันส่งแจ้งซ่อม`. Desktop: a right column `สรุปการแจ้งซ่อม` (ปัญหาที่พบ · ความเร่งด่วน (once known) · สถานที่ · ผู้แจ้ง; `แก้ไข` → step) + note `ส่งแล้วติดตามได้ตลอด`; step 3's `ตรวจสอบก่อนส่ง` shows on phone / tablet only. The frame keeps one size on every step; its width follows the shell (no longer fixed 880 px).
 
 > **CR-014 (approved 2026-10-19) — replaces the step list, category, location and frame parts of CR-008 below.** Visual reference: `../../changes/CR-014/form-steps.html` (sample data).
 > - **3 steps, one frame:** `ปัญหาที่พบ → สถานที่ → รูปภาพและส่ง`. Desktop frame 880px wide on every step, body height = the tallest step, fixed for all steps (progress strip, card edge and footer never move). Phone / tablet: one column, frame = viewport between header and sticky footer.
@@ -9,6 +29,8 @@ Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR
 > - **รูปภาพและส่ง** (heading `รูปภาพและตรวจสอบก่อนส่ง`): desktop two columns — left `รูปภาพ *` (drop zone / camera + gallery, thumbnails, tips); right `เล่ารายละเอียดเพิ่ม (ไม่บังคับ)` textarea (≤ 500) + `ตรวจสอบก่อนส่ง` card (ปัญหา · ความเร่งด่วน (staff wording as today) · สถานที่ `{อาคาร} · ชั้น {n}` / `{ห้อง}` (+ จุดเพิ่มเติม), `แก้ไข` per row; photos not repeated). Phone: photos → รายละเอียด → ตรวจสอบก่อนส่ง. Final button `ยืนยันส่งแจ้งซ่อม`. Team mode (Stage 4): `สิ่งที่ทีมทำ *` + `รูปหลังทำ *` take the รายละเอียด slot.
 > - **Validation:** `ห้องหรือจุดที่เกิด` → required → `เลือกห้องหรือจุดที่เกิด`; `บอกจุดเพิ่มเติม` → max 100; room inactive on submit → `MASTER_DATA_CHANGED` alert + reload master. Draft and ที่เคยแจ้ง store / fill the room id.
 > - Loading skeleton matches the 3-step frame.
+
+> **CR-020 (approved 2026-10-24):** the duplicate card follows the spot rule — send the extra spot to #22 and refetch when it changes; any `blocksReport` = duplicate card (`มีคนแจ้งเรื่องนี้ไว้แล้ว`, sending refused), none = similar card (`มีงานคล้ายกันในห้องนี้`, sending allowed). Copy: `../../changes/CR-020.md` "Copy". Own ticket awaiting ประเมินตรวจงาน → `ไปประเมินตรวจงาน` (not `ไปที่งานของคุณ`).
 
 > **CR-009 (approved 2026-10-18):** leads choose `เรียกช่าง | ทีมแก้เองแล้ว` at the top as soon as the form opens (others never see it; team steps per BR-F04). Duplicate card in สถานที่ once category + floor + spot are known; on submit a match opens a blocking dialog with only `ติดตามเคสเดิม` / `ยกเลิกการแจ้ง`; the reporter's own ticket waiting for ประเมินตรวจงาน → `ไปที่งานของคุณ` (no new ticket). Built in Stage 4. ที่เคยแจ้ง, QR banner and draft restore stay.
 
@@ -26,7 +48,7 @@ Status: APPROVED (2026-10-14) · desktop layout + location pickers changed by CR
 - **Flows:** F02 (all steps), F04 (team handled option), F13-B (prefill from QR) (see ../../02-flows.md)
 - **Persona:** every role, mobile first (employee standing at the broken thing); desktop usable (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** report a problem with category, symptoms, place, photos and urgency in under a minute — or, for team leads, record a job the team already fixed.
-- **Route:** `/repair/new` · with QR: `/repair/new?asset={asset_code}`
+- **Route:** `/repair/new` · with QR: `/repair/new?asset={asset_code}` (printed QR = `/q/{code}`, which redirects here; the asset code is never required — CR-036)
 - **Mockup:** `../mockups/S03-report-form.html` (wizard steps, QR prefill, validation errors, team-handled option; also S04 and S05 frames — its desktop frame is superseded) · desktop: `../mockups/S03-report-form-desktop.html` (CR-002)
 - **Data:** categories + symptoms, buildings + floors, asset lookup by code, photo upload, create ticket (returns either the new ticket or a list of open duplicates → S04) → `modules/repair/api.ts` (names fixed in 04-api-contract.md)
 

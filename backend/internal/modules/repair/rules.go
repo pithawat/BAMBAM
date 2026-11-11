@@ -2,13 +2,14 @@ package repair
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 
-	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
 )
 
 // bangkok is Asia/Bangkok (no DST), used for the ticket-number year and dates.
@@ -53,22 +54,49 @@ type ticketAccess struct {
 	ViewerSubscribed bool
 }
 
-// canView implements BR-F06-1 for one ticket: reporter, subscribers, the technician
-// (every ticket, CR-005: one in-house technician), admin and executive.
+// canView implements BR-F06-1 for one ticket: reporter, subscribers and whoever sees every ticket
+// (`repair.ticket.view_all`: technician and admin by default, CR-005 / CR-007).
 func canView(v Viewer, t ticketAccess) bool {
-	if seesAllTickets(v.Role) {
+	if seesAllTickets(v) {
 		return true
 	}
 	return viewerRelation(v, t) != RelationNone
 }
 
-func seesAllTickets(role string) bool {
-	return role == users.RoleAdmin || role == users.RoleExecutive || role == users.RoleTechnician
+func seesAllTickets(v Viewer) bool { return v.Can(PermViewAll) }
+
+// reports: may report a new ticket, scan a QR to report and follow an existing one (F02, F03,
+// F13-B) — `repair.ticket.report`, every seeded role but technician (settings CR-006).
+func reports(v Viewer) bool { return v.Can(PermReport) }
+
+// isLead: may record a team-handled job (BR-F04-1) and hand their own over (BR-F05-2) —
+// `repair.ticket.team_handle`, the team leads by default (CR-007).
+func isLead(v Viewer) bool { return v.Can(PermTeamHandle) }
+
+// canHandOver implements BR-F05-1/2: a team-handled ticket, by the lead who recorded it or by
+// whoever hands over any (`repair.ticket.handover_any`, admin by default).
+func canHandOver(v Viewer, status string, closedReason *string, reporterID uuid.UUID) bool {
+	if status != StatusClosed || closedReason == nil || *closedReason != ClosedReasonTeamHandled {
+		return false
+	}
+	return v.Can(PermHandoverAny) || (isLead(v) && reporterID == v.ID)
+}
+
+// isOpenReportPhoto: a report photo of a ticket that is still open — the S04 duplicate cards show it
+// to every reporter before they follow (F03, D-098). Result, send-back, follow and team photos stay private.
+func isOpenReportPhoto(p Photo) bool {
+	return p.Kind != nil && *p.Kind == PhotoKindReport && p.TicketStatus != nil && *p.TicketStatus != StatusClosed
+}
+
+// normalizeSpot is the extra spot as the duplicate check compares it (CR-020): trimmed, inner spaces
+// collapsed, lower case. Keep in step with ListDuplicateTickets.
+func normalizeSpot(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
 // isStaff: who sees contractor names, contractor ratings and send-back counts.
-func isStaff(role string) bool {
-	return seesAllTickets(role)
+func isStaff(v Viewer) bool {
+	return seesAllTickets(v)
 }
 
 func viewerRelation(v Viewer, t ticketAccess) string {
@@ -77,7 +105,7 @@ func viewerRelation(v Viewer, t ticketAccess) string {
 		return RelationReporter
 	case t.ViewerSubscribed:
 		return RelationSubscriber
-	case v.Role == users.RoleTechnician:
+	case v.Can(PermWork):
 		return RelationTechnician
 	default:
 		return RelationNone
@@ -92,7 +120,7 @@ func decorate(v Viewer, s *TicketSummary) {
 	}
 	s.ViewerRelation = viewerRelation(v, ticketAccess{ReporterID: s.Reporter.ID, HolderID: holder, ViewerSubscribed: s.ViewerSubscribed})
 	s.AwaitingMyConfirmation = s.Status == StatusResolved && s.Reporter.ID == v.ID
-	if !isStaff(v.Role) {
+	if !isStaff(v) {
 		// Reporters see "ดำเนินการโดยช่างภายนอก · {types}" only (CR-005).
 		s.Contractor = nil
 	}
@@ -104,7 +132,7 @@ func allowedActions(v Viewer, d TicketDetail) ([]string, map[string]string) {
 	blocked := map[string]string{}
 	switch d.Status {
 	case StatusInProgress:
-		if v.Role == users.RoleTechnician {
+		if v.Can(PermWork) {
 			actions = append(actions, ActionAssess)
 			if d.ExpectedDoneOn == nil || d.WorkBy == nil {
 				blocked[ActionResolve] = "ASSESSMENT_REQUIRED"
@@ -116,6 +144,13 @@ func allowedActions(v Viewer, d TicketDetail) ([]string, map[string]string) {
 		if d.Reporter.ID == v.ID {
 			actions = append(actions, ActionConfirm, ActionSendBack)
 		}
+	}
+	// F08-B: `repair.ticket.close_any` (admin by default) closes any open ticket.
+	if v.Can(PermCloseAny) && d.Status != StatusClosed {
+		actions = append(actions, ActionClose)
+	}
+	if canHandOver(v, d.Status, d.ClosedReason, d.Reporter.ID) {
+		actions = append(actions, ActionHandover)
 	}
 	return actions, blocked
 }
@@ -166,7 +201,28 @@ func validateCreate(in CreateTicketInput) (CreateTicketInput, map[string]string)
 	if len(in.AssetCode) > MaxAssetCodeLen {
 		fields["assetCode"] = "TOO_LONG"
 	}
+	if in.TeamHandled != nil {
+		// BR-F04-2: what the team did + >= 1 after photo; a photo belongs to one place only.
+		th := TeamHandledInput{Note: strings.TrimSpace(in.TeamHandled.Note), PhotoIDs: uniqueIDs(in.TeamHandled.PhotoIDs)}
+		checkText(fields, "teamHandled.note", th.Note, MaxNoteChars, true)
+		checkPhotos(fields, "teamHandled.photoIds", th.PhotoIDs, 1)
+		for _, id := range th.PhotoIDs {
+			if containsID(in.PhotoIDs, id) {
+				fields["teamHandled.photoIds"] = "INVALID"
+			}
+		}
+		in.TeamHandled = &th
+	}
 	return in, fields
+}
+
+func containsID(ids []uuid.UUID, id uuid.UUID) bool {
+	for _, x := range ids {
+		if x == id {
+			return true
+		}
+	}
+	return false
 }
 
 // ticketPriority applies BR-F02-2 (CR-008, CR-014): the most urgent picked symptom; with only a
@@ -199,6 +255,9 @@ func validateAssess(in AssessInput, today time.Time) map[string]string {
 	case "":
 		fields["workBy"] = "REQUIRED"
 	case WorkByInHouse:
+		if in.AssigneeID == nil {
+			fields["assigneeId"] = "REQUIRED" // CR-034
+		}
 	case WorkByContractor:
 		if in.ContractorID == nil {
 			fields["contractorId"] = "REQUIRED"
@@ -210,6 +269,12 @@ func validateAssess(in AssessInput, today time.Time) map[string]string {
 		fields["reason"] = "TOO_LONG"
 	}
 	return fields
+}
+
+// rescheduleNeedsReason: CR-034 — moving the expected date of an assessed ticket needs a reason the
+// reporter sees; the re-accept after a send back (reworking) does not.
+func rescheduleNeedsReason(t LockedTicket, newDate time.Time) bool {
+	return t.Assessed && t.SendBackCount == 0 && t.ExpectedDoneOn != nil && !t.ExpectedDoneOn.Equal(newDate)
 }
 
 // validateResolve checks BR-F21-4 / BR-F24-3 for endpoint #10. needRating = the ticket is a
@@ -238,7 +303,7 @@ func validateResolve(in ResolveInput, contractorJob, needRating bool) (ResolveIn
 // validateContractor checks a contractor create / update (F24).
 func validateContractor(in ContractorInput) (ContractorInput, map[string]string) {
 	fields := map[string]string{}
-	in.Name = strings.TrimSpace(in.Name)
+	in.Name = strings.Join(strings.Fields(in.Name), " ") // CR-023: names compare ignoring repeated spaces
 	in.ContactName = strings.TrimSpace(in.ContactName)
 	in.Phone = strings.TrimSpace(in.Phone)
 	in.Note = strings.TrimSpace(in.Note)
@@ -293,4 +358,163 @@ func optional(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// ---- CR-016: dashboard and equipment ----
+
+// seesDashboard: the S29 dashboard and floor plans (#27, #29, #30) need `repair.overview.view`
+// (admin and super_admin by default, BR-F23-2, D-079).
+func seesDashboard(v Viewer) bool { return v.Can(PermOverviewView) }
+
+// sees3D: the S29 3D building models and the site view also need `repair.building3d.view` (admin by
+// default, settings CR-006); without it S29 shows the floor list only.
+func sees3D(v Viewer) bool { return seesDashboard(v) && v.Can(PermBuilding3D) }
+
+// without3D drops what only the 3D card uses: the site blocks and each building's model.
+func without3D(o Overview) Overview {
+	o.Site = []SiteBlock{}
+	for i := range o.Buildings {
+		o.Buildings[i].HasModel, o.Buildings[i].ModelKey = false, nil
+	}
+	return o
+}
+
+// managesAssets: add / move / edit / deactivate equipment (#31–#34) needs `settings.assets.manage`
+// (fixed: admin and super_admin, settings CR-001).
+func managesAssets(v Viewer) bool { return v.Can(permAssetsManage) }
+
+// validateAsset trims the input and returns field codes (BR-F31-1, contract #31).
+func validateAsset(in AssetInput) (AssetInput, map[string]string) {
+	in.Code = strings.TrimSpace(in.Code)
+	in.Name = strings.Join(strings.Fields(in.Name), " ")
+	fields := map[string]string{}
+	checkText(fields, "code", in.Code, MaxAssetCodeChars, true)
+	if _, bad := fields["code"]; !bad && !validAssetCode(in.Code) {
+		fields["code"] = "INVALID"
+	}
+	checkText(fields, "name", in.Name, MaxAssetNameChars, true)
+	if in.RoomID == uuid.Nil {
+		fields["roomId"] = "REQUIRED"
+	}
+	// A position is both coordinates or none (none = in the room, not placed on the plan yet).
+	if (in.X == nil) != (in.Z == nil) {
+		if in.X == nil {
+			fields["x"] = "REQUIRED"
+		} else {
+			fields["z"] = "REQUIRED"
+		}
+	}
+	if in.RotationDeg != nil && (*in.RotationDeg < 0 || *in.RotationDeg > 359) {
+		fields["rotationDeg"] = "INVALID"
+	}
+	return in, fields
+}
+
+// validAssetCode: letters, digits, "-" and "_" only (it goes into the QR URL, D-024).
+func validAssetCode(code string) bool {
+	for _, r := range code {
+		ok := r == '-' || r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		if !ok {
+			return false
+		}
+	}
+	return code != ""
+}
+
+// checkPlacement applies BR-F31-3: a placed asset must be on its floor's plan and inside the room it
+// is saved in. A point belongs to the smallest room around it (ห้องน้ำ lies inside the common area).
+func checkPlacement(in AssetInput, room PlacementRoom, rooms []RoomShape) error {
+	if in.X == nil {
+		return nil
+	}
+	x, z := *in.X, *in.Z
+	if !room.HasPlan || x < 0 || z < 0 || x > room.WidthM || z > room.DepthM {
+		return invalidPoint()
+	}
+	if at, ok := roomAt(x, z, rooms); !ok || at != room.ID {
+		return ErrPointOutsideRoom
+	}
+	return nil
+}
+
+func invalidPoint() error {
+	return apperr.Validation(map[string]string{"x": "INVALID", "z": "INVALID"})
+}
+
+// roomAt returns the smallest room whose outline contains the point (edges count as inside).
+func roomAt(x, z float64, rooms []RoomShape) (uuid.UUID, bool) {
+	best, bestArea := uuid.Nil, math.Inf(1)
+	for _, r := range rooms {
+		if len(r.Shape) < 3 || !pointInShape(x, z, r.Shape) {
+			continue
+		}
+		if a := shapeArea(r.Shape); a < bestArea {
+			best, bestArea = r.ID, a
+		}
+	}
+	return best, best != uuid.Nil
+}
+
+// pointInShape: ray casting; a point on an edge is inside.
+func pointInShape(x, z float64, s Shape) bool {
+	const eps = 1e-9
+	inside := false
+	for i, j := 0, len(s)-1; i < len(s); j, i = i, i+1 {
+		xi, zi, xj, zj := s[i][0], s[i][1], s[j][0], s[j][1]
+		// on the segment j → i
+		cross := (x-xj)*(zi-zj) - (z-zj)*(xi-xj)
+		if math.Abs(cross) < eps && x >= math.Min(xi, xj)-eps && x <= math.Max(xi, xj)+eps &&
+			z >= math.Min(zi, zj)-eps && z <= math.Max(zi, zj)+eps {
+			return true
+		}
+		if (zi > z) != (zj > z) && x < (xj-xi)*(z-zi)/(zj-zi)+xi {
+			inside = !inside
+		}
+	}
+	return inside
+}
+
+// shapeArea: shoelace formula, m².
+func shapeArea(s Shape) float64 {
+	sum := 0.0
+	for i := range s {
+		j := (i + 1) % len(s)
+		sum += s[i][0]*s[j][1] - s[j][0]*s[i][1]
+	}
+	return math.Abs(sum) / 2
+}
+
+// nextAssetCode implements #34: {prefix}-{floor name}-{lowest free 3-digit number}, compared ignoring
+// case against every code in use (inactive ones too, BR-F31-4).
+func nextAssetCode(prefix, floorName string, taken []string) string {
+	used := make(map[string]bool, len(taken))
+	for _, c := range taken {
+		used[strings.ToLower(c)] = true
+	}
+	base := prefix + "-" + floorName + "-"
+	for n := 1; ; n++ {
+		code := fmt.Sprintf("%s%03d", base, n)
+		if !used[strings.ToLower(code)] {
+			return code
+		}
+	}
+}
+
+// bangkokDayStart is midnight Asia/Bangkok of the day t falls on.
+func bangkokDayStart(t time.Time) time.Time {
+	b := t.In(bangkok)
+	return time.Date(b.Year(), b.Month(), b.Day(), 0, 0, 0, 0, bangkok)
+}
+
+// prefillCategory picks the #25 category (F13-B, CR-025): the first category of the asset type that
+// the building's type uses ("อื่น ๆ" is used everywhere); none when the building uses none of them,
+// so S03 never prefills a category it would not offer (BR-F02-8).
+func prefillCategory(cats []AssetCategory) *Ref {
+	for _, c := range cats {
+		if c.IsOther || c.UsedInBuilding {
+			r := c.Ref
+			return &r
+		}
+	}
+	return nil
 }

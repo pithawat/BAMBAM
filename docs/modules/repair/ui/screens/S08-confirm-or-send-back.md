@@ -1,6 +1,8 @@
 # S08 — ตรวจรับ / ส่งกลับให้แก้
 
-Status: APPROVED (2026-10-14) · rating dialog refined by CR-012 (approved 2026-10-19)
+Status: APPROVED (2026-10-14) · rating dialog refined by CR-012 (approved 2026-10-19) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** send-back toast and dialog description per `_common.md` §9.
 
 > **CR-012 (approved 2026-10-19, D-067) — rating dialog:** title `ประเมินงานซ่อม` · context box (wrench, ticket title, `{จุดที่เกิด or อาคาร} · ชั้น {n} · ซ่อมเสร็จ {date}`) · `คุณพอใจกับงานซ่อมครั้งนี้แค่ไหน?` / `เลือกคะแนนที่ตรงกับประสบการณ์ของคุณ` · five star options with their number (radio group, arrows / Home / End), empty unless opened from a star on S07 · feedback `{n} / 5 · {label}` or `ยังไม่ได้เลือกคะแนน` · 1–2 stars keep the send-back hint · `มีอะไรอยากบอกเราเพิ่มเติม?` `ไม่บังคับ` · `เมื่อยืนยันผลประเมิน งานนี้จะถูกปิด` · full-width primary `ยืนยันผลประเมิน →`, disabled until a score is picked. Picking a star never submits. Toast unchanged. Send-back dialog unchanged.
 

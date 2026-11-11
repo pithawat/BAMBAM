@@ -1,6 +1,400 @@
-# UI handoff — ระบบแจ้งซ่อม — Stages 1–2 + 2R (CR-008)
+# UI handoff — ระบบแจ้งซ่อม — Stages 1–5
 
-Status: BUILT BY CLAUDE — Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+Status: BUILT BY CLAUDE — Stage 5B (2026-11-02, owner asked for prepare + wire in one go, so Claude built the UI instead of Codex: settings S30 พิมพ์ป้าย QR `/settings/buildings/labels`, S20 row menu `พิมพ์ป้าย QR` + room button `พิมพ์ป้ายทั้งห้อง` + label badge + code read-only after print, repair S29 asset dialog shows `ASSET_CODE_LOCKED`; wired + e2e `e2e/settings/F13A-qr-labels.spec.ts`; ACCEPTED 2026-11-02, tag `repair-stage-5B`). Codex has nothing to build; `modules/settings/components/labels/**`, `modules/settings/labels.ts`, `places/places-screen.tsx`, `places/asset-dialog.tsx` were Claude-owned during 5B. Before: BUILT BY CLAUDE — Stage 5 (2026-11-01, owner asked Claude to build the UI with the Impeccable skill instead of Codex; S16 scan page, S03 QR banner + prefill, สแกน QR on S06 / Home; wired + e2e F13B; ACCEPTED 2026-11-02, tag `repair-stage-5`). Codex has nothing to build until Stage 5B prepare. Before: READY FOR CODEX — Stage 5 (2026-11-01, F13-B QR scan → prefilled S03; CR-036: `/q/{code}`, scan button on phones only). Before: BUILT BY CLAUDE — Stage 5P (2026-11-01, CR-034 page polish: S03 / S04 step gating + sticky spot `*`, navbar gear right + stacked lock-up (D-138), S17 assignee + required reschedule reason, S10 responsible card, S07 copy, tracking needs `report`; wired + e2e; ACCEPTED 2026-11-01, tag `repair-stage-5P`). Codex has nothing to build until Stage 5 prepare; `components/shared/app-navbar.tsx`, `modules/settings/components/settings-menu.tsx` and `modules/repair/components/**` are Claude-owned until 5P is accepted. Before: BUILT BY CLAUDE — Stage 3D-5 (2026-11-01, CR-033: ground from the site plan / OSM, อาคาร 4 turned, in-map side button; wired + e2e; waiting for acceptance). Codex has nothing to build. Before: PREPARED — Stage 3D-5. Before: BUILT BY CLAUDE — Stage 4R (2026-10-29, CR-024: no executive, no bell / notification copy; no new UI, Codex has nothing to build; waiting for acceptance). Before: BUILT BY CLAUDE — Stage 4P (2026-10-29, owner asked Claude to build the UI instead of Codex; wired + e2e; waiting for acceptance). Codex has nothing to build. Before: READY FOR CODEX — Stage 4P. Before: ACCEPTED — Stage 4 (2026-10-26, tag `repair-stage-4`; incl. CR-021 / CR-022 built by Claude). Codex has nothing to build until Stage 5 prepare. Before: BUILT BY CLAUDE — Stage 4 CR-021 rework (2026-10-25, waiting for user acceptance with Stage 4: S03 / S04 / S06 relayout, built by Claude with the Impeccable skill — Codex has nothing to build; files below are Claude-owned until this note changes). Before: WIRED — Stage 4 (2026-10-25, Claude: real API + e2e F03 / F04 / F05), waiting for user acceptance. Earlier: UI DONE — Stage 4 by Codex (2026-10-24: S03 team mode + duplicate card, S04, S05 team variant, S07 / S11 hand over — section "Stage 4" below). Earlier: BUILT BY CLAUDE — Stage 3D (owner asked Claude to build the S29 UI and wire it, 2026-10-20, D-085); waiting for user acceptance; Codex has nothing to build. Earlier: BUILT BY CLAUDE — Stage 3 (S11 งานทั้งหมด + S07 admin close, CR-015 S09 order), waiting for user acceptance; Codex has nothing to build. Earlier: Stage 2M (CR-014 S03 + location line) on top of Stage 2N (CR-010 navbar + CR-011 S06 / S07 + CR-012 S07 / S08 + S06 polish D-068) on top of Stage 2R (CR-008 + CR-009), waiting for user acceptance; Codex has nothing to build. Visual sources: `output/navbar-redesign/` (CR-010 / CR-011), docs/modules/repair/changes/CR-008/ (design demo 06)
+
+> **CR-024 (approved 2026-10-26):** no `executive` role and no notifications. Stage 4R (`03-plan.md`) is built by Claude — Codex has nothing to build for it; the files it touches (incl. `components/shared/app-navbar.tsx`, `bell-button.tsx`, `modules/repair/components/**`) are Claude-owned until Stage 4R is accepted. Copy changes: `screens/_common.md` §9.
+
+> **CR-025 (approved 2026-10-27):** S03 place-first with categories filtered by building type, S04 inline card in step 2 — **Stage 4P, ready for Codex (section below)**. CR-026 (quality 0.25 + A1 upload on submit) is already built by Claude. 4P runs before 4R (D-121).
+
+## Stage 5 (2026-11-01) — READY FOR CODEX: S16 สแกน QR, S03 QR banner + prefill, "สแกน QR" on S06 / Home (F13-B, CR-036)
+
+Goal: `../03-plan.md` Stage 5 "Frontend UI (Codex)" + AC1–AC6. Done by Claude: backend #25 + the asset link on #5 + the S07 asset line (already rendered by `ticket-detail.tsx`), `types.ts` (`AssetLookup`), `api.ts` (`lookupAsset`), `mocks.ts`, `qr.ts` (URL rule, phone check, decoder), the route `/q/{code}` (`src/app/q/[code]/page.tsx`, redirect only) and the `jsqr` package.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md`
+2. `../02-flows.md` F13-B (BR-F13B-1…5) · `../03-plan.md` Stage 5 · `../changes/CR-036.md`
+3. Screens — the **CR-036 box at the top of each first**: `S16-scan-qr.md`, `S03-report-form.md` (QR banner rows + "QR prefill"; the CR-025 box: place first, 3 steps), `S06-my-tickets.md`, `S02-home.md`. Visual reference: `mockups/S03-report-form.html` (top bar, QR banner, sheet).
+
+### What to build
+
+| Screen | Where | What |
+|---|---|---|
+| S16 page | `src/app/(app)/repair/scan/page.tsx` (+ `loading.tsx` if needed; delete `.gitkeep`) → `components/scan-qr.tsx` (new) | Route `/repair/scan`. Without `canReport(me)` → `ForbiddenState` like S03 (`report-form.tsx` line ~172). **Camera view only when `useCanScanInApp()`** (`qr.ts`, the CR-036 phone rule) — otherwise the S16 "Desktop" card (manual code inline + `แจ้งซ่อมโดยไม่สแกน`), at every width |
+| S16 camera | `components/scan-qr.tsx` (`QrScanner`) | `navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })` into a muted `playsInline` `<video>`; `const decode = await createQrDecoder()` once, then decode about every 200 ms. Text → `assetCodeFromQr(text)`: a code → `navigator.vibrate?.(50)`, stop the camera, `router.push(assetFormPath(code))` (**no lookup here** — S03 handles not found); `null` → toast `QR นี้ไม่ใช่ของ BAMBAM` and keep scanning (do not repeat the toast for the same text within ~3 s). Stop every track on unmount / back / navigation. `NotAllowedError` / `NotFoundError` / no camera / insecure context → blocked card (`เปิดกล้องไม่ได้` …; `ลองอีกครั้ง` restarts the camera). Scanning line hidden with reduced motion |
+| S16 manual code | same (bottom `Sheet` on the camera view, inline on the desktop card) | Trim + uppercase, max 30; empty → `กรุณากรอกรหัสอุปกรณ์`. `lookupAsset(code)`: found → `router.push(assetFormPath(found.code))` · 404 `ASSET_NOT_FOUND` → `ไม่พบอุปกรณ์รหัสนี้` under the field (stay) · any other error → toast `ทำรายการไม่สำเร็จ ลองอีกครั้ง` (`GENERIC_ERROR`). Spinner in `ค้นหา` while waiting |
+| S03 prefill | `components/report-form.tsx` | With `?asset={code}` (not with `?mode=team`): after #1 / #2 load, call `lookupAsset(code)` once; the banner shows a skeleton line meanwhile. **Found** → building / floor / room from the result (the ids are in #2); category = `result.category` when it is not `null` and `categoryUsedIn(category, building)`; symptoms and extra spot empty; open on step 2 **ปัญหาที่พบ** (CR-025) — or on step 1 when the room is not in #2 (master data changed meanwhile). Every field stays editable (BR-F13B-2). `category: null` (e.g. `AC-W1-001` in the warehouse) → step 2 with no category picked, no extra note. Send `assetCode: result.code` with #5 while the banner is kept. **Not found or any error** → Alert `ไม่พบอุปกรณ์นี้` / `กรอกข้อมูลเองได้เลย`, empty form on step 1, no `assetCode`. The step-2 duplicate card works as today once category + room are set |
+| S03 banner | same | Phone: above the step content; desktop: above the first section. Found: `เติมข้อมูลจาก QR แล้ว` · `{name} · {code}` · `แก้ไขได้ถ้าไม่ตรง` + link button `ไม่ใช่อุปกรณ์นี้` → removes the banner and `assetCode`, keeps the field values, and drops `asset` from the URL (`router.replace`) so a reload does not prefill again. Review card (phone) / summary (desktop): the สถานที่ row adds `อุปกรณ์ {code} {name}` while the banner is kept |
+| S03 draft + QR | same | Proposal (owner confirms at wire — see Open questions): with `?asset=` the saved draft is **not** restored; the QR prefill starts a new report and the autosave replaces the draft; no restored-draft banner |
+| S06 button | `components/my-tickets.tsx` | Report card: under `แจ้งซ่อมใหม่` (leads: after `บันทึกงานที่ทีมแก้แล้ว`) a secondary outlined-on-navy button `สแกน QR` (`QrCode` icon) → `/repair/scan`, only when `reports && useCanScanInApp()` |
+| S02 Home button | `src/app/(app)/page.tsx` (repair card) | Under `แจ้งซ่อมใหม่` a small secondary link-button `สแกน QR` (`QrCode`) → `/repair/scan`, only with the report key and `useCanScanInApp()`. Desktop never shows it |
+
+### Data and helpers (Claude-owned — use, do not edit)
+
+| Function | # / file | Notes |
+|---|---|---|
+| `lookupAsset(code)` → `AssetLookup` | #25, `api.ts` | `{ code, name, category: Ref or null, building, floor, room, locationDetail: null }`; 404 `ASSET_NOT_FOUND`; 403 without the report key |
+| `createTicket(req)` with `assetCode` | #5 | links the asset; S05 / S07 then show `ticket.asset` |
+| `assetCodeFromQr(text, origin?)` | `qr.ts` | the code of a `/q/{code}` URL of this origin, else `null` (other host, `/repair/new?asset=`, plain text …) |
+| `assetFormPath(code)` | `qr.ts` | `/repair/new?asset={code}` (encoded) |
+| `useCanScanInApp()` / `canScanInApp()` | `qr.ts` | `(pointer: coarse)` + `getUserMedia`; `false` on the server and the first paint |
+| `createQrDecoder()` → `(video) => Promise<string or null>` | `qr.ts` | `BarcodeDetector` when it supports `qr_code` (Android Chrome), else `jsqr` (iOS Safari; loaded lazily) |
+| `categoryUsedIn(category, building)` | `types.ts` | the CR-025 filter the form already uses |
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`)
+
+- `AC-05-012` → เครื่องปรับอากาศ ห้องประชุม 5B · อาคารฝั่ง Office ชั้น 5 · ระบบปรับอากาศ. As พนักงาน (วรรณา) that room + category already has her open case → the step-2 duplicate card shows (same as the server); type an extra spot to send. `AC-W1-001` → โกดังเก็บของ 1 (ตัวอย่าง), `category: null`. The 3D codes (`AC-1-003`, `TV-4-001` …) are found too; anything else (`XX-99`) → 404. Codes match ignoring case.
+- Scenarios: `empty` → every code 404 · `error` → network error (S03 → not-found alert, S16 manual → toast) · `slow` → 3 s · `forbidden` (or technician in the role switcher) → 403.
+- A created ticket with a found `assetCode` shows the asset line in S05 / S07; sample ticket 160 shows `AC-1-003`.
+- Camera on a laptop: Chrome DevTools device mode (touch → `pointer: coarse`) on `localhost`; show a QR of `http://localhost:3000/q/AC-05-012` on another screen or phone (any QR generator). Without device mode the page shows the desktop card — that is correct.
+- Deep link without a camera: open `http://localhost:3000/q/AC-05-012` → `/repair/new?asset=AC-05-012` (mock mode skips login).
+
+### You may edit (Stage 5)
+
+- `frontend/src/app/(app)/repair/scan/**` (new), `frontend/src/modules/repair/components/scan-qr.tsx` (new)
+- `frontend/src/modules/repair/components/report-form.tsx`, `components/my-tickets.tsx`
+- `frontend/src/app/(app)/page.tsx` — only the "สแกน QR" button in the repair card
+- This file: Stage 5 checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,priority,plan-geometry,qr}.ts`, `src/app/q/**`, `src/proxy.ts`, `src/lib/**`, `components/shared/**`, `components/ui/**`, `package.json`, backend, other docs.
+
+### Done when (Codex fills the Stage 5 checklist below)
+
+- [ ] AC1: `/q/AC-05-012` → S03 with the banner; อาคารฝั่ง Office ชั้น 5 ห้องประชุม 5B + ระบบปรับอากาศ prefilled and editable; opens on ปัญหาที่พบ
+- [ ] AC2: `/repair/new?asset=XX-99` → `ไม่พบอุปกรณ์นี้` + an empty form on สถานที่ that still submits (no `assetCode`)
+- [ ] AC3: phone (device mode): camera view; a `/q/AC-05-012` QR opens the prefilled form; denying the camera shows `เปิดกล้องไม่ได้` with manual entry; manual empty / not found / found with the exact copy
+- [ ] AC4: submitting with the banner kept → S05 / S07 show the asset line; after `ไม่ใช่อุปกรณ์นี้` the ticket has no asset
+- [ ] AC5: desktop: no `สแกน QR` on S06 / Home; `/repair/scan` shows the manual card; a QR of another site or of `/repair/new?asset=` → toast `QR นี้ไม่ใช่ของ BAMBAM`, scanning continues
+- [ ] `AC-W1-001` → place prefilled, no category; the camera stops when leaving S16; reduced motion hides the scanning line
+- [ ] 375 px and 1280 px, no horizontal scroll; keyboard / screen reader can use the manual entry
+- [ ] `npm run lint && npm run typecheck` pass
+
+### Stage 5 checklist results (built by Claude, 2026-11-01)
+
+| Screen | All items pass? | Notes |
+|---|---|---|
+| S16 | ✅ | `components/scan-qr.tsx`: camera (window scrim, corner marks, scan line hidden with reduced motion, spinner while starting), blocked card (`MascotPanel` per CR-035 instead of a bust card), manual `Sheet` / desktop card; camera stops on leave (checked: no live `srcObject` after navigation); same foreign QR toasts once per 3 s; e2e F13B on mobile (fake camera + stub `BarcodeDetector`) and desktop |
+| S03 (QR) | ✅ | banner skeleton → found / not found; opens on ปัญหาที่พบ; `ไม่ใช่อุปกรณ์นี้` → `router.replace("/repair/new")`; `อุปกรณ์ {code} {name}` in the review card and the desktop summary; `assetCode` sent only while the banner is kept; ล้างแบบฟอร์ม also drops the banner |
+| S06 / S02 button | ✅ | S06: outlined-on-navy `สแกน QR` under the report buttons (the primary drops to h-12 when it shows); Home: small `glass` button under `แจ้งซ่อมใหม่` (card height is now `min-h` so the extra button fits on phones). Hidden on desktop (e2e) |
+
+### Differences from spec — Stage 5 (Claude)
+
+- S16 blocked state uses the CR-035 `MascotPanel` (pose `review`) — the spec's "mascot bust card" predates CR-035 (one mascot panel app-wide).
+- `/q/{code}` is a route handler (`src/app/q/[code]/route.ts`, 307 with a relative `Location`) instead of `page.tsx`: with `cacheComponents` the page logged "runtime data during prerendering" on every hit. Same behaviour.
+
+### Open questions — Stage 5 (Codex fills — never guess)
+
+- (answered 2026-11-02, owner) S03 with `?asset=` and a saved draft: the QR wins, the draft is replaced.
+
+## Stage 4P (2026-10-29) — READY FOR CODEX: S03 place first + categories by building type, S04 card in step 2 (CR-025)
+
+Goal: `../03-plan.md` Stage 4P "Frontend UI (Codex)" + AC1–AC5. The backend (#1 `buildingTypeIds`, #2 `buildingType`, #5 422 `CATEGORY_NOT_FOR_BUILDING`), `types.ts` / `mocks.ts` / `api.ts` / `errors.ts` and the CR-026 photo work (PhotoPicker keeps photos in the form, upload on submit, S03 draft photos in IndexedDB) are done. Build the UI against the mocks.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md` §5 (PhotoPicker, CR-026 A1)
+2. `../changes/CR-025.md` "S03 behaviour" · `../03-plan.md` Stage 4P · `../02-flows.md` F02 (BR-F02-1, BR-F02-8), F03 BR-F03-2
+3. Screens — the **CR-025 box at the top first** (it overrides every older box where they differ): `S03-report-form.md`, `S04-duplicate-found.md`. The CR-021 / CR-022 boxes still give the frame, block rule, locked team mode and step heights.
+
+### Already done by Claude in `components/report-form.tsx` (keep it)
+
+- Step 1 room cards are a plain list in their normal order (`RoomChoice`; the `ห้องที่ตรงกับปัญหา` groups and `AREA_LABELS` are gone).
+- CR-026 A1 photos: `usePhotoList` / `photoBlocker` / `uploadKeptPhotos` / `forgetUploads` (`components/photo-picker.tsx`); `submit()` checks #22 for a blocking duplicate, then uploads the kept photos (button label `กำลังส่งรูป {n}/{m}…` from `sending`), then calls #5; `follow()` uploads then calls #23; draft photos in IndexedDB (`lib/draft-photos.ts`, `photoCount` in the draft, `photosLost` → `รูปที่เลือกไว้กู้คืนไม่ได้ แนบรูปอีกครั้ง` in the restored banner); `dropDraft()` instead of `clearDraft`. Move this code with the step swap; do not change its behaviour. S08 / S10 (`ticket-actions.tsx`, `resolve-form.tsx`) are done too.
+
+### What to build
+
+| Screen | Where | What |
+|---|---|---|
+| S03 order | `components/report-form.tsx` | `STEPS` = `location` (สถานที่) → `problem` (ปัญหาที่พบ) → `send` (รูปภาพและส่ง); the form opens on สถานที่; `FIELD_STEP`, `draftStep` (old drafts: map their step to the new order, a restored draft opens on the first step that is not complete), step strip, footer `ขั้นตอน n จาก 3`, reset / unmount (`setStep("location")`), `go(...)` after `MASTER_DATA_CHANGED`. Review card (phone) and the desktop summary column list **สถานที่ · ปัญหาที่พบ · ความเร่งด่วน** (+ team row as today), each `แก้ไข` → its step |
+| S03 step 1 | same | Heading + `ที่เคยแจ้ง ▾` · อาคาร + ชั้น · `ห้องหรือจุดที่เกิด *` · `บอกจุดเพิ่มเติม (ไม่บังคับ)`. **No duplicate card here.** `ถัดไป` without a room → `เลือกห้องหรือจุดที่เกิด` (validation already exists) |
+| S03 step 2 | same | Place line above the grid `สถานที่: {อาคาร} · ชั้น {n} · {ห้อง}` + text button `เปลี่ยน` (→ step 1). Category cards = `categories.filter((c) => categoryUsedIn(c, building))` (`types.ts`; keeps #1 order, `อื่น ๆ` always last). Symptoms / `อาการอื่นๆ` / priority explanation unchanged. The **S04 inline card** under the symptoms once a category is picked (same `DuplicateCard`, same #22 call and CR-021 block); when it blocks, the card contains the spot field `บอกจุดเพิ่มเติม * จำเป็นเมื่อพบงานที่ตรงกัน` bound to `values.locationDetail` (same value as step 1 — one state, two inputs with different ids), `ถัดไป` puts `กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ` under it and focuses it. So `locationDetail` / the block error now belongs to step `problem` while the card shows (FIELD_STEP / focus) |
+| S03 building change | same | Picking a building (step 1, `ที่เคยแจ้ง`, or draft restore) whose type does not use the picked category → clear `categoryId`, `symptomIds`, `symptomOtherOn`, `symptomOther`, `categoryOther`, and show in step 2 the info-tone note `หมวดงานที่เลือกไว้ไม่มีในอาคารประเภทนี้ เลือกใหม่อีกครั้ง` until a category is picked. A category that is still used stays selected. `sanitizeValues` must apply the same rule (draft restore, master reload) |
+| S03 submit error | same | 422 `CATEGORY_NOT_FOR_BUILDING`: banner `errorMessage(err)` (= `หมวดงานนี้ไม่มีในอาคารที่เลือก กรุณาเลือกใหม่`, already set by `submit()`) + refetch #1 / #2 (as for `MASTER_DATA_CHANGED`), clear the category and go to step 2 |
+| S03 team mode | same | `?mode=team`: same order; team fields stay in step 3 |
+| S04 | `components/duplicate-dialog.tsx` (card) + report-form | The inline card moves to step 2 with the inline spot field above; the CR-021 block message moves with it. Summary column shows the card on steps 2–3 (not on step 1). The submit-time dialog is unchanged |
+
+### Data — `modules/repair/api.ts` / `types.ts`
+
+| Function / field | # | Notes |
+|---|---|---|
+| `getCategories()` → `Category.buildingTypeIds: string[]` | 1 | empty for `isOther` = every type; `areaTypes` is gone |
+| `getBuildings()` → `Building.buildingType: Ref` | 2 | always set |
+| `categoryUsedIn(category, building)` | — | the filter (same rule as the server) |
+| `createTicket(req)` | 5 | new 422 `CATEGORY_NOT_FOR_BUILDING` (`errorMessage` copy in `errors.ts`) |
+| `getDuplicates(...)`, `followTicket(...)` | 22, 23 | unchanged |
+| `preparePhoto` / `uploadPhoto` | 3 | used only through `photo-picker.tsx` helpers — never call `uploadPhoto` on pick |
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`)
+
+- อาคาร 1 (and the sample office buildings): every category except ลานจอด / ไม้กั้น · `โกดังเก็บของ 1 (ตัวอย่าง)` ชั้น 1 (`พื้นที่เก็บสินค้า`, `พื้นที่ส่วนกลางชั้น 1`): ไฟฟ้าและแสงสว่าง · ประปาและสุขาภิบาล · อาคารและพื้นที่ส่วนกลาง · อื่น ๆ · พื้นที่ภายนอกอาคาร: ไฟฟ้าและแสงสว่าง · ประปาและสุขาภิบาล · ลานจอด / ไม้กั้น · อื่น ๆ.
+- Clear-note case: อาคาร 1 → ระบบปรับอากาศ → back to step 1 → โกดังเก็บของ 1 (ตัวอย่าง). `createTicket` in mock mode refuses a category the building type does not use (422), after the master checks and before the duplicate check.
+- Duplicate cases from Stage 4 still work (pick the place first, then the category): อาคารฝั่ง Office ชั้น 5 `ห้องประชุม 5A` + ระบบปรับอากาศ → blocking card in step 2.
+- Mock photos are `blob:` URLs: after a full reload in mock mode they come back from IndexedDB as local files.
+
+### You may edit (Stage 4P)
+
+- `frontend/src/modules/repair/components/report-form.tsx`, `components/duplicate-dialog.tsx`
+- This file: Stage 4P checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,priority,plan-geometry}.ts`, `components/photo-picker.tsx`, `components/resolve-form.tsx`, `components/ticket-actions.tsx`, `src/lib/**`, `components/shared/**`, backend, other docs.
+
+### Done when (Codex fills the Stage 4P checklist below)
+
+- [ ] AC1: S03 opens on สถานที่; ถัดไป without a room shows `เลือกห้องหรือจุดที่เกิด`; step 2 shows the place line + `เปลี่ยน`
+- [ ] AC2: the three mock building types show exactly the categories listed above
+- [ ] AC3: building change clears category + symptoms with the note; a mock 422 shows the banner and goes to step 2
+- [ ] AC4: blocking duplicate card in step 2; ถัดไป blocked until the inline `บอกจุดเพิ่มเติม` differs (or ติดตามเคส); the value shows in step 1, the summary and the review
+- [ ] AC5: draft restore (values + photos), ที่เคยแจ้ง and team mode work in the new order; desktop frame (CR-022) and phone 375 px, no horizontal scroll
+- [ ] Photos still send only on `ยืนยันส่งแจ้งซ่อม` (no #3 call on pick) and the label `กำลังส่งรูป n/m…` shows
+- [ ] `npm run lint && npm run typecheck` pass
+
+### Stage 4P checklist results (Codex fills)
+
+| Screen | All items pass? | Notes |
+|---|---|---|
+| S03 | Yes (Claude, real API) | e2e F02 AC1–AC7 + draft photos 24 h, desktop + mobile |
+| S04 | Yes (Claude, real API) | e2e F03 card in step 2 + inline spot, value shared with step 1 / review |
+
+### Differences from spec — Stage 4P (Claude)
+
+- The step-2 inline `บอกจุดเพิ่มเติม` stays in the card while the card shows (also after it turns "similar"), so it does not vanish while typing; required only while a case blocks.
+- Desktop summary column shows the duplicate card on step 3 only (step 2 already shows it in the panel).
+
+### Open questions — Stage 4P (Codex fills — never guess)
+
+
+## Stage 4 (2026-10-24) — UI DONE: duplicate check + follow (F03), team mode (F04), hand over (F05)
+
+Goal: `../03-plan.md` Stage 4, AC1–AC5 (AC2 reworded by **CR-020**, approved 2026-10-24 — read `../changes/CR-020.md` first: spot rule + all card / dialog copy). The backend (#5 duplicate refusal + `teamHandled`, #22, #23, #24) and `types.ts` / `api.ts` / `errors.ts` / `mocks.ts` are done; build the UI against the mocks.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md` (§7 hand-over dialog, §7 discard confirm)
+2. `../03-plan.md` Stage 4 · `../02-flows.md` F03, F04, F05 (BR-F03-1…4, BR-F04-1…3, BR-F05-1…3)
+3. Screens — read each **CR box at the top first**; a later CR overrides the body and older boxes:
+   - `S04-duplicate-found.md` (CR-020 box, then CR-009 box: only `ติดตามเคสเดิม` / `ยกเลิกการแจ้ง` in the dialog; no `ไม่ใช่เรื่องเดียวกัน …` anywhere)
+   - `S03-report-form.md` (CR-019 box = current page layout; CR-009 box = mode switch + duplicate card; CR-008 box = team fields in the รายละเอียด slot)
+   - `S05-report-success.md` (team variant), `S07-ticket-detail.md` (hand over row, timeline rows), `S11-admin-queue.md` (closed tab), `S06-my-tickets.md` (followed tag)
+4. Visual reference: `../changes/CR-008/style-and-form.html` (team section, duplicate card, mode switch) and `mockups/S03-report-form.html` frame "พบงานซ้ำ". Where they differ from CR-009: switch labels are **`เรียกช่าง | ทีมแก้เองแล้ว`**, and drop every `ไม่ใช่เรื่องเดียวกัน …` / `ส่งแจ้งใหม่` button. Keep the current CR-019 look of S03 / S07.
+5. `frontend/src/modules/repair/{types,api,errors,mocks}.ts` — data and errors (do not change)
+
+### Rules the UI must follow (the server enforces all of them)
+
+- **Duplicate** = an open ticket (`in_progress` / `resolved`) with the same category + floor + room **and** the reporter gave no extra spot (`บอกจุดเพิ่มเติม`) or the same one (BR-F03-1, CR-020). The server refuses such a report (`createTicket` → 409), so the UI can never create it. **Similar** = same room, another extra spot (`blocksReport: false`): show the card, sending is allowed. Never compare spots in the UI — use `blocksReport`.
+- **Team mode** is shown only to `housekeeper_lead` / `security_lead` (`useCurrentUser()`, BR-F04-1). The server still answers 403 `TEAM_HANDLED_NOT_ALLOWED` for anyone else.
+- **Hand over** button: S07 only when `allowedActions` includes `handover`. S11 rows have no `allowedActions`: show `ส่งต่อให้ช่าง` on `closedReason === "team_handled"` rows **for admin only** (S11 is admin / executive; the executive never gets it). The server re-checks (403 / 422).
+
+### What to build
+
+| Screen | Where | What |
+|---|---|---|
+| S03 mode switch | `components/report-form.tsx` | Leads only: `SegmentedControl` `เรียกช่าง \| ทีมแก้เองแล้ว` above step 1 (default `เรียกช่าง`) + hint `งานจะปิดทันทีและนับเป็นผลงานของทีม ไม่ส่งถึงช่าง`. Team mode: step 3 shows `สิ่งที่ทีมทำ *` (Textarea ≤ 500, placeholder `เช่น เช็ดพื้นและวางป้ายระวังลื่นแล้ว`) + `รูปหลังทำ *` (a second `PhotoPicker`, 1–5) in the รายละเอียด slot; the summary column / ตรวจสอบก่อนส่ง gets a row `งานที่ทีมทำ` with `แก้ไข`; heading / final button `บันทึกงานทีม` / `ยืนยันบันทึกงานทีม`. Send `teamHandled: { note, photoIds }` in team mode, `teamHandled: null` otherwise (switching back keeps the team fields in the draft but does not send them). Draft restore keeps the mode for leads. Field errors: `createTicketFieldErrors(err)` already maps `teamHandled.note` / `teamHandled.photoIds` |
+| S03 duplicate card | `components/report-form.tsx` | As soon as category + floor + room are known (สถานที่ step; also in the summary / ตรวจสอบ): `getDuplicates({ categoryId, floorId, roomId, locationDetail })`, refetch when one of them changes (debounce ~300 ms, ignore stale answers); a failed call shows no card (the server still checks on send). **Any `blocksReport: true` → duplicate card**, else **similar card** — headings, texts, hint and buttons exactly as `../changes/CR-020.md` "Copy". One row per ticket (thumb, ticket no, step badge, title, location line incl. its extra spot, `แจ้งเมื่อ {date} · ผู้ติดตาม {n} คน` — omit when 0). Row action by `viewerRelation` / `status`: others → `ติดตามเคสนี้` (same follow as S04) · `reporter` + `resolved` → `ไปประเมินตรวจงาน` · `reporter` other → `ดูงานของคุณ` · `subscriber` → badge `คุณติดตามเคสนี้อยู่แล้ว` + `ดูเคสนี้`. On the duplicate card show only the blocking rows; on the similar card all rows. Leaving to S07 uses the discard confirm (`_common.md` §7) |
+| S03 send | `components/report-form.tsx` | `createTicket(req)`: `duplicateMatches(err)` not null → open S04 with those tickets (nothing was created) · `ownTicketAwaitingRating(err)` not null → toast `errorMessage(err)` + go to `/repair/tickets/{id}` (draft discarded) · `TEAM_HANDLED_NOT_ALLOWED` → toast · other errors as today |
+| S04 | new `components/duplicate-dialog.tsx` (used by S03) | Opened only by a 409 `DUPLICATE_FOUND` on send. `Sheet` bottom (< 1024 px) / `Dialog` 560 px (desktop); title, text and note from `../changes/CR-020.md` "Copy" (S04 rows); case cards (the 409 tickets, newest first; tap thumb → lightbox); per case `ติดตามเคสนี้` (others) or the own / following variants above; footer **`ยกเลิกการแจ้ง`** only (outline) → discard confirm (`_common.md` §7) → `router.back()` (Home `/` when there is no history). Follow → `followTicket(id, { note: draft details, photoIds: draft report photo ids })` (team fields are not sent; nothing is closed) → toast `คุณติดตามเคส {ticket_no} แล้ว` → the normal S07 `/repair/tickets/{id}` (the follower sees progress, no rating buttons), draft discarded. Errors: `TICKET_CLOSED` → toast `errorMessage(err, { ticketClosed: "follow" })`, remove that card; no card left → `ไม่มีเคสที่ยังเปิดอยู่แล้ว` + the S03 final button (sending again is now allowed) · `ALREADY_FOLLOWING` → toast + go to S07 · others → toast `ติดตามเคสไม่สำเร็จ ลองอีกครั้ง`. Spinner on the pressed button, others disabled. ✕ / Esc / backdrop → back to S03 with all data (so the reporter can add an extra spot) |
+| S05 team variant | `components/report-success.tsx` | When the ticket has `closedReason === "team_handled"`: title `บันทึกงานทีมเรียบร้อย`, badge `ปิดงานแล้ว` + caption `ทีมดำเนินการเอง`, summary label `สถานะ` instead of ความเร่งด่วน, next-step copy `งานนี้ปิดแล้วและนับเป็นผลงานของทีม หากต้องใช้ช่างภายหลัง กด "ส่งต่อให้ช่าง" ในหน้ารายละเอียดงาน`, mini progress all done (S05 spec "Content") |
+| S07 hand over | `components/ticket-detail.tsx`, `components/ticket-actions.tsx` | `handover` in `allowedActions` → `ส่งต่อให้ช่าง` in the closed (team) next-action panel → new exported `HandoverDialog` (next to `CloseTicketDialog`; `_common.md` §7: title `ส่งต่องานนี้ให้ช่าง?`, `เหตุผลที่ส่งต่อ *` Textarea ≤ 500 with the placeholder, buttons `ยกเลิก` · `ส่งต่อให้ช่าง`; body `งานเดิม เลขเดิม จะส่งกลับไปที่ช่าง รอช่างกำหนดวันเสร็จ` (CR-020)) → `handoverTicket(id, { reason })` → toast `ส่งต่อให้ช่างแล้ว` → show the returned ticket (now รับเรื่อง). Errors: `fieldErrors(err, handoverFieldMessages)` under the field · `NOT_TEAM_HANDLED` → toast + refetch · others → toast `errorMessage(err)`. Timeline: `subscribed` / `team_handled` / `handed_over` already have labels in `ticket-story.ts` — make sure their photos show (team after photos, follower photos) |
+| S06 | `components/my-tickets.tsx` | Followed rows already say `คุณติดตามงานนี้`; spec copy is **`คุณติดตามเคสนี้`** — align it |
+| S11 closed tab | `components/admin-tickets.tsx` | Toggle pill `เฉพาะงานทีมทำเอง` (= `closedReason: "team_handled"`, kept in sync with the reason filter); `ส่งต่อให้ช่าง` outline sm on `team_handled` rows (admin only) → the same `HandoverDialog` → toast → refetch list + counts (the ticket leaves ปิดแล้ว and shows under รับเรื่อง) |
+
+### Data — `modules/repair/api.ts`
+
+| Function | # | Used for |
+|---|---|---|
+| `createTicket(req)` | 5 | S03 send; 409s via `duplicateMatches(err)` / `ownTicketAwaitingRating(err)` (`errors.ts`) |
+| `getDuplicates({ categoryId, floorId, roomId, locationDetail })` | 22 | S03 card → `DuplicateTicket[]` (`TicketSummary` + `subscriberCount` + `blocksReport`) |
+| `followTicket(id, { note?, photoIds })` | 23 | S03 card / S04 follow → `TicketDetail` |
+| `handoverTicket(id, { reason })` | 24 | S07 / S11 hand over → `TicketDetail` |
+| `getTicket(id)` | 8 | S05 team variant, S07 |
+| `getTickets({ scope: "all", status: ["closed"], closedReason: "team_handled", … })` | 6 | S11 toggle |
+
+Field copy: `createTicketFieldErrors` (team fields), `followFieldMessages`, `handoverFieldMessages` in `errors.ts`.
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`) — same rules as the backend in every scenario
+
+- Employee (วรรณา), leave `บอกจุดเพิ่มเติม` empty: ระบบปรับอากาศ · อาคารฝั่ง Office ชั้น 5 · `ห้องประชุม 5A` → someone else's case (follow); type any extra spot → similar card, sending creates a ticket (CR-020) · `ห้องประชุม 5B` → own open case (`ดูงานของคุณ`) · ประปาและสุขาภิบาล · ชั้น 2 · `ห้องน้ำหญิง` → own ticket awaiting rating (409 `OWN_TICKET_AWAITING_RATING`) · ไฟฟ้าและแสงสว่าง · ชั้น 6 · `สำนักงานชั้น 6` → already following.
+- หัวหน้าแม่บ้าน (มาลี) / หัวหน้ารปภ. see the switch; ticket 166 (ประปา ชั้น 3 ห้องน้ำหญิง) is มาลี's team record → `ส่งต่อให้ช่าง` for her and for admin (ปวีณา), not for หัวหน้ารปภ.
+- Scenarios: `normal`, `empty` (no duplicates), `error` (reads fail; follow / hand over fail with network), `slow`, `validation`, `follow_closed` (follow → 409 `TICKET_CLOSED`).
+
+### You may edit (Stage 4)
+
+- `frontend/src/modules/repair/components/**` (report-form, duplicate-dialog (new), report-success, ticket-detail, ticket-actions, ticket-story, my-tickets, admin-tickets)
+- `frontend/src/app/(app)/repair/**` only if a page needs to pass something new
+- `frontend/src/components/ui/**` only via `npx shadcn@latest add`
+- This file: Stage 4 checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,priority,plan-geometry}.ts`, `src/lib/**`, `components/shared/**` (use its `SegmentedControl`, `ChoiceField`, `FilterPill`, `PhotoPicker`), backend, other docs.
+
+### Done when (Codex fills the Stage 4 checklist below)
+
+- [x] S03: switch only for the two lead roles; team mode fields, summary row, button labels; `teamHandled` sent only in team mode
+- [x] S03: card appears / updates / disappears with category + floor + room + extra spot; duplicate vs similar card (CR-020 copy); all four row variants
+- [x] S03 send → S04 on a duplicate; own resolved ticket → S07; a similar (other spot) report is created; no way to create a duplicate
+- [x] S04: follow → toast + S07 (timeline shows the note + photos, S06 shows the case); `follow_closed` → card removed + empty state; `ยกเลิกการแจ้ง`; Esc / ✕ keep the draft; focus trap, title announced
+- [x] S05 team variant copy; S07 `ส่งต่อให้ช่าง` for มาลี and admin only → back to รับเรื่อง; S11 toggle + row button (admin, not executive)
+- [x] 390 px and 1280 px, no horizontal scroll; loading / empty / error / forbidden states
+- [x] `npm run lint && npm run typecheck` pass
+
+### Stage 4 checklist results (Codex fills)
+
+| Screen | All items pass? | Notes |
+|---|---|---|
+| S03 | Yes (UI with mocks) | Lead-only modes, retained team note/photos when toggling, separate uploads, server-driven duplicate/similar checks and four relation variants. Mock browser checks: similar creation, duplicate refusal, own/resolved/subscriber cards, 375/390/1280 px. |
+| S04 | Yes (UI with mocks) | Responsive Sheet/Dialog; follow note/photo visible in S07, Esc and discard-confirm cancellation retain the draft; follow_closed removes the row and enables retry. Radix supplies focus trapping and accessible titles. |
+| S05 | Yes (UI with mocks) | Team success variant verified at 375 and 1280 px; completed progress and closed status. |
+| S06 | Yes (UI with mocks) | Followed-case label verified in the following filter. |
+| S07 | Yes (UI with mocks) | Event photos/lightbox; handover allowed for the reporting lead/admin, absent for another lead/executive. Required reason and successful return to received verified. |
+| S11 | Yes (UI with mocks) | Team-only filter and admin-only row action verified at 390/1280 px; network retry preserves reason and success reloads list/counts. |
+
+### Verification and differences from mockup — Stage 4
+
+- Lint, typecheck and production build passed. Browser checks used an isolated mock dev server; no real API or database writes.
+- Kept the current CR-019 page layout; applied CR-020 copy instead of obsolete mockup buttons. No intentional visual deviations beyond those approved overrides.
+- Browser screenshots used fallback fonts because the sandbox could not fetch Google Fonts. The production build fetched fonts successfully outside the sandbox.
+- Fixed team-photo preview disposal when switching modes; the picker now stays mounted while hidden and uses its own field/error IDs.
+- Existing Next.js 16.4.0 emitted a security upgrade warning during build. Dependency upgrades are outside this handoff's permitted edit scope.
+- Shared code touched: none. Only repair components and this handoff were changed for Stage 4. Backend, API, types and mocks remain owned by Claude.
+- Claude wire must verify real-server concurrency/error branches (including ALREADY_FOLLOWING, NOT_TEAM_HANDLED and own-ticket redirect), durable photo URLs after reload, and end-to-end permissions. Mock blob URLs cannot survive a full reload.
+- Demo: run the frontend with NEXT_PUBLIC_USE_MOCKS=true; use /repair/new, /repair/my?scope=following and /repair/admin/queue?tab=closed. Switch mock roles via the existing DEV role selector; team fixture ticket ends in 166.
+
+### Wire review (Claude, 2026-10-25)
+
+Reviewed S03 / S04 / S05 / S06 / S07 / S11 against the specs and CR-020: no wiring or contract fixes needed, no visual differences to send back. Real API checks and e2e: see `../PROGRESS.md` "Stage 4 report".
+
+### Open questions — Stage 4 (answered by the owner 2026-10-24 → CR-020, D-100)
+
+All five are settled in `../changes/CR-020.md`: AC2 reworded (spot rule) · `ไปประเมินตรวจงาน` · `ยกเลิกการแจ้ง` → back · follow → S07 without rating, no S05 follow variant · hand-over text without queue. D-098 (report photos on the cards) confirmed. Codex: add new questions below.
+
+## Stage 3D-5 (2026-11-01) — BUILT BY CLAUDE, WIRED: S29 site view from the site plans (CR-033)
+
+Codex has nothing to build (like 3D-2…3D-4). Files (Claude owns): `components/dashboard/scene/{site-ground,site,engine}.ts`, `components/dashboard/{building-card,dashboard-ui}.tsx`, e2e `F23-dashboard`.
+
+Done in prepare: migration `20261101000001_repair_cr033_site_plan.sql` (office blocks re-placed from the plan, อาคาร 4 rot −83.9 → 96.1; applied on local `bambam` / `bambam_e2e` / `bambam_test`), Pg test, mocks. API #27 unchanged.
+
+Plan fit for the wire step (office side): render `5-…pdf` page 4 at 200 dpi, rotate 90° clockwise (north up, 2339 × 1653 px); then site `(x, z)` m = 0.1625 · R(−8.13°) · (px − (1144, 499.9)), R(θ) = [[cos θ, −sin θ], [sin θ, cos θ]]. Measured block centres (px): อาคาร 1 (1144, 499.9) · 2 (766.3, 557.7) · 3 (1547.3, 930) · 4 (1738.8, 740.9) · โรงอาหาร (922, 398) · ห้องประชุม 60 ปี (1017.8, 408.5). TrialMix kept at (65.8, −44.2): the plan draws a different "new building" complex there. Riverside: not re-placed yet — check blocks 6–13 / 18 against OpenStreetMap in wire and amend the same migration if one is > ~3 m off (it is not applied outside local DBs).
+
+Wire (2026-11-01): `site-ground.ts` re-traced (office: plan px with the fit above; Riverside: OSM in site metres, aligned on Warehouse 1 — D-136, no block moved), `SIDE_CROSSING` button on Phiboonsongkram Road (`building-card.tsx` `CrossingButton`), site markers of taller buildings drawn last + hover / focus brings a marker to the front. Differences from the spec: none known; Riverside block positions vs OSM are owner checks (PROGRESS Open issues).
+
+## Stage 3D (2026-10-19 / 20) — BUILT BY CLAUDE (D-085): S29 dashboard Home for admin / executive + 3D อาคาร 1 + equipment (CR-016)
+
+> Written as a Codex brief; the owner then asked Claude to build it. Files (Claude owns): `app/(app)/page.tsx` (role switch), `modules/repair/components/dashboard/{admin-dashboard,building-card,asset-dialog,floor-list,dashboard-ui}.tsx`, `dashboard/scene/{kit,building-one,floor-plan,engine}.ts`, e2e `F23-dashboard` / `F31-assets`. Results in "Stage 3D checklist results" below.
+
+Goal: admin and executive open `/` and see the key numbers, a 3D model of อาคาร 1 in the centre (building → floor → rooms, open-ticket pins, equipment), and admin can place equipment by drag and drop (`../03-plan.md` Stage 3D, AC1–AC6). Every other role keeps the current Home.
+
+### Read in this order
+
+1. `frontend/AGENTS.md`, `docs/shared/design-system.md`, `ui/screens/_common.md`
+2. **`ui/screens/S29-admin-dashboard.md`** (APPROVED; read the "Approved sources" box first) and `../02-flows.md` F23 + F31
+3. **Layout / look:** `ui/mockups/S29-admin-dashboard-modern.html` (open in a browser). Use its layout, panels, colours, copy, edit-mode bar, palette, dialog and phone layout. **Do not port its 3D code** (lines from `<script type="module">` on) — that was only a placeholder.
+4. **3D model:** `แผนผังงานซ่อมอาคาร.html` (repo root, the owner's model) — port **อาคาร 1 only** + its floor-plan renderer, as listed below
+5. `frontend/src/modules/repair/{types,api,mocks,plan-geometry,service-samples}.ts` (data — do not change)
+
+### What to build
+
+| Piece | Where | Notes |
+|---|---|---|
+| Home switch | `app/(app)/page.tsx` (**this stage only**) | `useCurrentUser()`: role `admin` / `executive` → render `<AdminDashboard />`; every other role → the current Home JSX unchanged (move it into a local `EmployeeHome` component in the same file, no other change) |
+| S29 page | `modules/repair/components/dashboard/admin-dashboard.tsx` (+ small parts in the same folder) | greeting row (สวัสดีตอนเช้า < 12:00 · ตอนบ่าย < 17:00 · ตอนเย็น, Bangkok time; `formatLongDate`), building `ChoiceField`/`FilterPill` (only buildings from #27; `hasModel` → 3D, else floor list), admin-only `จัดวางอุปกรณ์` toggle (`aria-pressed`, label `เสร็จสิ้น` while on); band ภาพรวมวันนี้; แจ้งซ่อม column + งานที่ควรติดตาม; 3D card; บริการอื่น column; states |
+| 3D scene | `modules/repair/components/dashboard/building-scene.tsx` + `components/dashboard/scene/*.ts` | client only, loaded with `next/dynamic(..., { ssr: false })` **only** when the viewport is ≥ 1024 px **and** WebGL is available; otherwise the floor list. Dispose renderer, geometries, materials, textures and listeners on unmount |
+| Asset dialog, deactivate confirm, popovers, toast with undo | `components/dashboard/*` | shadcn `Dialog` / `AlertDialog` / `Popover` + `sonner` (already in the app) |
+| Phone / tablet (< 1024 px) | same page | no 3D: band as 2 columns, แจ้งซ่อม counts, งานที่ควรติดตาม, floor list (`ชั้น {n}` · open count · priority dot · `›` → bottom sheet with that floor's rooms from #30: open count + equipment count, and its open tickets), บริการอื่น, caption `จัดวางอุปกรณ์ได้บนคอมพิวเตอร์` |
+
+### Port from `แผนผังงานซ่อมอาคาร.html` (line numbers of that file)
+
+Keep (convert to TypeScript modules; `three` **0.160.1** is installed, same as the model's import map; addons from `three/examples/jsm/...`):
+
+- Helpers 653–697 (`canvasTex`, `rng`, `noise`, `bg`, `worldUV`, `mesh`, `merged`, `planeUV`) and the textures 699–877 (+ environment / fog 878–886) that อาคาร 1 and the plan use (sky / env, concrete, interior, poster, portrait, sign, fan, tile, wetTile, carpet, leaves for the plan's potted plants).
+- Building config **B1 only** (228–251) **without `plans`**: `floors 6, width 32, depth 15, floorHeight 3.5, overhang 1.2, style 'balcony', entrance 'main', roofSign, cladding, frame, rows [6,3,6], bay 4, core [...]`.
+- Building: `addLights`, `floorMats`, `glassBox`, `mullionGrid`, `makeShell`, `finishFloor`, `groundFloor`, `balconyFloor`, `roofOf` (887–1092); the stacking loop 1188–1205 for B1 only; `setOpacity`.
+- Plan: `buildPlan` 1247–1446 — floor slab + tile, low walls cut at 1.2 m with door gaps, core (ห้องน้ำ / บันได / A.H.U. / ลิฟต์ — drawn on every floor), facade sill + glass + entrance gap (floor 1 only: `entrance { x: 14, w: 6 }`, `reception` → floor 1 only), columns on the grid, dimension ticks + labels, instanced desks / chairs, potted plants.
+- HTML labels projected from 3D (1451–1479), camera poses / tweens / `fitSphere` / `focusBuilding` / `enterFloor` / `showPlan` / `backFromPlan` (1521–1612), picking (1631–1688), resize with `ResizeObserver` (1703–1717).
+
+Change:
+
+- **Rooms come from #30, not from `plans[f].zones`.** For every room with a `shape` (polygon, metres, origin top-left): `common_area` = not drawn as a tile (it is the floor); `restroom` = no tile (the core draws ห้องน้ำ) but still a hit area / pin place; every other room = a tinted tile from the polygon (`THREE.Shape` → `ShapeGeometry`), outline line, walls along its edges (skip edges on the outer boundary, draw a shared edge once, door gap on edges ≥ 2.6 m as in `edgeWithDoor`), label `{name}` + `{area} ตร.ม.` (`shapeArea` from `plan-geometry.ts`; 2 decimals when not whole). Tint by `areaType` with the modern mockup tints (office `#DCE3FF`, meeting_room `#D9F0E4`, pantry / other `#FDE5D4`; floor `#F3F5F9`); no purple (D-070). Desks only in 4-point rectangular rooms with the size rule in 1360–1366.
+- `floor 1` uses the same room data (its rooms equal the model's zones), so the floor-1 look stays the owner's.
+- A floor with `widthM === null` or no room shapes → slab outline + `ยังไม่มีผังห้องของชั้นนี้`.
+- **Pins = open tickets per room**, not per job: one pin per room with `openCount > 0` at `roomCenter(room, rooms)` (`plan-geometry.ts`), colour by `highestPriority` (critical / high / medium tokens; low uses the medium colour — legend `ปกติ / ต่ำ`), label = count, `aria-label="{room} งานค้าง {n}"`. Click → popover listing that room's open tickets (`getTickets({ scope: "all", floorId, status: ["in_progress", "resolved"], pageSize: 100 })`, keep `t.room?.id === room.id`) → S07.
+- **Building view:** floor highlight colour from #27 `floors[].highestPriority` (no status colours from the model); a pin per floor with `openCount > 0`; hover = highlight + tooltip `ชั้น {n} · งานค้าง {n}`; click = floor view.
+- **Equipment = round icon chips** (HTML overlay, like the model's labels) at `(x, z)`; icon by `type.key` (`aircon` → lucide `AirVent`, `microphone` → `Mic`, `speaker` → `Speaker`, `tv` → `Tv`, unknown → `Box`), badge = `openTickets` when > 0, `aria-label="{type.name} {code} {name}"`. `x === null` (not placed) → at `roomCenter` with a dashed ring and tooltip `ยังไม่ได้วางจุด`. Click → popover (code, name, room, open tickets; admin: `แก้ไข` · `ปิดใช้งาน`).
+- **Render on demand**: no permanent `requestAnimationFrame` loop and no pulsing. Render on: controls `change`, tweens running, resize, data change. Drop `EffectComposer` / `GTAOPass` / the quality button / the HUD. Shadows static (`shadowMap.autoUpdate = false`, `needsUpdate` after a rebuild). Respect `prefers-reduced-motion` for camera tweens.
+- Drop: B2 / B3, `curtainFloor`, site props (trees, cars, parking, hedges — keep only a plain ground + paving under อาคาร 1), `STATUS` / `JOBS` / filters / KPI / charts / table / CSV / drawers / asset localStorage, `window.facility` / `window.dashboard`.
+- Controls: drag = rotate, wheel + `+` `−` = zoom, `⟲` = reset (S29). Floor picker chips `6 … 1` on the left (roving tabindex, ↑ ↓ keys), `‹ ภาพอาคาร` back.
+
+### Edit mode (admin only; `executive` never sees the toggle, palette or edit actions)
+
+- Building view + edit mode → hint `เลือกชั้นก่อนจัดวางอุปกรณ์`.
+- Palette (from #29, order as returned): drag a type over the plan → raycast to the floor plane → plan coords (`x = p.x + W/2`, `z = p.z + D/2`) → `roomAt(x, z, rooms)` (`plan-geometry.ts`, the same rule as the server) → highlight that room; outside every room = red outline + `วางในห้องเท่านั้น`, drop refused. Drop → dialog `เพิ่มอุปกรณ์` with the type chip, code from `suggestAssetCode(typeId, floorId)` (editable), name, room (prefilled; changing the room puts the point at `roomCenter`), then `createAsset({ assetTypeId, code, name, roomId, x, z })`. Round x / z to 2 decimals.
+- `เพิ่มอุปกรณ์` button (no pointer): same dialog with a type `ChoiceField` and the room list; saves without `x` / `z` (F31 step 5).
+- Drag an existing chip → move at once (optimistic), `updateAsset(id, { code, name, roomId: roomAt(...), x, z })`; toast `ย้าย {code} ไป{ห้อง}แล้ว` + `เลิกทำ` (sends the previous room / x / z back); on error roll back + `errorMessage(err)`.
+- `แก้ไข` → same dialog (title `แก้ไขอุปกรณ์`, no type change) → `updateAsset`. `ปิดใช้งาน` → `AlertDialog` (S29 copy) → `deactivateAsset` → toast `ปิดใช้งาน {code} แล้ว`.
+- Errors: field errors via `fieldErrors(err, assetFieldMessages)` from `errors.ts` (code / name / room / x / z); `ASSET_CODE_TAKEN` → under รหัสอุปกรณ์ `รหัสนี้มีอุปกรณ์อื่นใช้แล้ว`; `POINT_OUTSIDE_ROOM` / `MASTER_DATA_CHANGED` → toast + reload the plan. Toasts `เพิ่ม {code} แล้ว` / `บันทึกแล้ว`. After every write reload #30 (and #27 for counts).
+
+### Data — `modules/repair/api.ts`
+
+| Function | # | Used for |
+|---|---|---|
+| `getOverview()` | 27 | band, แจ้งซ่อม rows + sub-lines, attention (≤ 4 shown), buildings → floors (pins, floor list) |
+| `getAssetTypes()` | 29 | palette, add dialog |
+| `getFloorPlan(floorId)` | 30 | floor view, phone floor sheet |
+| `createAsset` · `updateAsset` · `deactivateAsset` · `suggestAssetCode` | 31–34 | edit mode |
+| `getTickets(...)` | 6 | room pin popover / phone floor sheet ticket list |
+| `SAMPLE_SERVICES` (`service-samples.ts`) | — | รถออกวันนี้ / ห้องประชุมใช้อยู่ tiles and the บริการอื่น blocks, always with `ข้อมูลตัวอย่าง` |
+
+- Number → copy / link mapping: S29 spec "Content" rows "Row sub-lines" and "Row / tile links" (S11 tabs `assess` · `repair` · `rating` · `closed`).
+- Attention row: title + place with the existing helpers in `ticket-presentation.ts` (`placeLine` / ticket title as S06 / S11), chip `เลยกำหนด` (in progress, `expectedDoneOn` before today), `ส่งกลับ` (`step === "reworking"`), `ฉุกเฉิน` (`priority === "critical"`); a high-priority row without one of these shows the existing `PriorityIndicator`. Empty → `ไม่มีงานที่ต้องติดตาม` + mascot `face` 64 px.
+- Geometry helpers (`plan-geometry.ts`): `roomAt`, `pointInShape`, `shapeArea`, `roomCenter` — use them; do not re-implement.
+- Errors: `errorMessage(err)`; #27 fails → inline Alert `โหลดภาพรวมไม่สำเร็จ` + retry; #30 fails → inside the 3D card + retry.
+
+### Mocks (`NEXT_PUBLIC_USE_MOCKS=true`)
+
+- อาคาร 1 uses the migration ids and the real outlines of floors 1–6; tickets 160–165 sit in its rooms (floor 1 HR 3 overdue + high, floor 4 อ.1 ห้อง 401 critical, floor 5 บัญชี reworking, floor 3 / 6 …). Equipment: 5 on floor 1, 2 on floor 4, 1 on floor 6; `AC-1-004` is inactive (code taken).
+- Roles via the role switcher: ปวีณา (admin) edits, ผู้บริหาร reads, พนักงาน / ช่าง get the normal Home.
+- Scenarios (`?mock=`): `normal`, `empty` (zeros, no pins, no equipment), `error` (reads fail, writes fail with network), `forbidden` (#27 / #30 → 403), `slow` (skeletons).
+
+### You may edit (Stage 3D)
+
+- `frontend/src/app/(app)/page.tsx` — the role switch only (this stage)
+- `frontend/src/modules/repair/components/dashboard/**` (new)
+- `frontend/src/components/ui/**` only via `npx shadcn@latest add`
+- This file: Stage 3D checklist and "Open questions" only
+
+Do not edit `modules/repair/{types,mocks,api,errors,plan-geometry,service-samples}.ts`, `package.json` (need another package → Open questions), `components/shared/**`, `src/lib/**`, backend, other docs.
+
+### Done when (Codex fills the Stage 3D checklist below)
+
+- [ ] S29 acceptance checklist (spec) at 1440 and 390 px; no horizontal scroll at 390
+- [ ] อาคาร 1 looks like the owner's model (building + floor 1 plan); floors 2–6 show their rooms from #30
+- [ ] Building → floor → room pin popover → S07 → back; floor picker with the keyboard
+- [ ] Edit mode: drag-add, drop outside a room refused, drag-move + undo, edit, deactivate, add without dragging, duplicate code message
+- [ ] Executive: no edit controls; employee / technician: old Home unchanged
+- [ ] Mock scenarios normal / empty / error / forbidden / slow
+- [ ] three.js only in the dashboard chunk (not in other routes), no render loop when idle, nothing left after unmount
+- [ ] `npm run lint && npm run typecheck` pass
+
+### Stage 3D checklist results (Claude, 2026-10-20 — real API on a scratch Postgres)
+
+| Item | Pass? | Notes |
+|---|---|---|
+| S29 at 1440 / 390, no horizontal scroll at 390 | Yes | screenshots checked; phone = floor list + bottom sheet, 16 px gutter |
+| อาคาร 1 = owner's model; floors 2–6 rooms from #30 | Yes | building, ground floor, balconies, roof + billboard, site around อาคาร 1 (other buildings dropped); floor 1 and 5 plans checked |
+| building → floor → room pin popover → S07 → back; keyboard floor picker | Yes | e2e F23 AC2 (↑ ↓) |
+| edit mode: drag-add, drop outside refused, drag-move + undo, edit, deactivate, add without dragging, duplicate code | Yes | e2e F31 (3 / 3 runs) + manual probes |
+| executive read-only; employee / technician keep the old Home | Yes | e2e F23 AC5 |
+| three.js only in the dashboard chunk; no loop when idle; disposed on unmount | Yes | one lazy 570 KB chunk (~150 KB gz), not referenced by any prerendered page; render on demand |
+| lint + typecheck + build | Yes | |
+
+### Differences from the brief / mockup (Claude)
+
+- Site props around อาคาร 1 (lawns, hedges, parking + cars, trees) were kept from the owner's model (only the other buildings were dropped) — they are cheap and make the model read as the real place
+- The 3D card is sticky and fits the viewport (`100dvh − 7.5rem`, min 560 px) instead of stretching to the right column, so the palette and the whole plan are on screen together on 800 px-tall laptops
+- Room pins show a wrench + count (the room name is already the plan label; the full name is in the aria-label); the move toast stays 8 s so `เลิกทำ` can be reached
+- After an equipment write only the HTML overlays reload; the 3D floor is rebuilt only when the floor changes
+
+
+## Stage 3 (2026-10-19) — built by Claude
+
+S11 re-spec (banner at the top of `screens/S11-admin-queue.md`), S07 admin `ปิดงาน`, S09 oldest first. Files (Claude owns): `app/(app)/repair/admin/queue/page.tsx`, `modules/repair/components/{admin-tickets,ticket-actions,ticket-detail,ticket-navigation,technician-work}.tsx`, `modules/repair/{types,api,mocks,priority}.ts`, `e2e/repair/F22-admin-tickets.spec.ts`. Codex has nothing to build.
 
 ## CR-014 (approved 2026-10-19) — Stage 2M, built by Claude 2026-10-19
 
@@ -99,7 +493,9 @@ Empty route folders exist (with `.gitkeep`; delete it when you add the page). Pu
 | S13 แจ้งเตือน | `screens/S13-notifications.md` | — (`option-a.html` notification rows) | `/notifications` | 7 |
 | S14 โปรไฟล์ | `screens/S14-profile.md` | — (`option-a.html`) | `/profile` | 0 (platform) |
 | S15 ตัวสลับบทบาท | `screens/S15-role-switcher.md` | — (pill in `option-a.html`) | — (component) | 0 (platform) |
-| S16 สแกน QR | `screens/S16-scan-qr.md` | — (`mockups/S03-report-form.html`) | `/repair/scan` | 6 |
+| S16 สแกน QR | `screens/S16-scan-qr.md` (+ CR-036 block: `/q/{code}`, phones only) | — (`mockups/S03-report-form.html`) | `/repair/scan` | 5 |
+| S06 / S02 "สแกน QR" button, phones only (CR-036) | S06 / S02 CR-036 blocks | — | `/repair/my`, `/` | 5 |
+| S30 พิมพ์ป้าย QR + S20 print actions (settings CR-007, CR-036) | `../../settings/ui/screens/S30-qr-labels.md`, S20 CR-007 block | — (S20 CR-006 frame) | `/settings/buildings/labels` | 5B |
 
 **Shared / platform screens:** S01, S02, S13, S14 and S15 live outside `app/(app)/repair` (routes `/login`, `/signed-out`, `/`, `/notifications`, `/profile`, and `components/shared/RoleSwitcher`). S01, S14, S15 and the AppShell are built in Stage 0 (`docs/shared/00-platform.md`); S02 and S13 in repair Stage 7, when "You may edit" is widened to `app/(app)/page.tsx` and `app/(app)/notifications/**` for that stage only.
 
@@ -144,6 +540,10 @@ npm run lint && npm run typecheck
 - Mockups show the UAT strip; dev shows the DEV role strip (platform, expected).
 
 ## Open questions (Codex fills — never guess)
+
+- 2026-11-02 CR-037 revision 2: owner requested the existing mascot face for QR, stronger reference-2 styling, the current login font and centered CTA; review `output/qr-login-redesign/{index-v2,login-v2}.html`. V1 preserved; font / layout / QR / PDF checks pass. No production files or accepted-stage ownership changed.
+
+- 2026-11-02 CR-037 PROPOSED: QR / login standalone designs are ready at `output/qr-login-redesign/{index,login}.html` with printable PDF examples; see `changes/CR-037.md` for impact / checks. Await owner approval before changing approved S01 / S30 / print rules; then prepare bounded ownership for login and label printing. The existing Stage 5B accepted status is unchanged, and this proposal does not begin Stage 6.
 
 - CR-013 preview revision 2 (2026-10-19): owner requested less blue. Evaluation card now uses warm orange (existing attention colour) for its CTA, top border and icon with a pale warm background. Proposal includes a bounded exception to the blue-action convention; production remains unchanged.
 

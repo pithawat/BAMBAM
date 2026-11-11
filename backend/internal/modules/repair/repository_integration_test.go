@@ -2,8 +2,12 @@ package repair
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -24,6 +28,9 @@ type pgFixture struct {
 	cat      Category
 	other    Category // the "อื่น ๆ" category (CR-014)
 	building Building
+
+	mu    sync.Mutex
+	rooms []uuid.UUID // throwaway rooms made by createWith, removed after the test
 }
 
 func newPgFixture(t *testing.T) *pgFixture {
@@ -39,9 +46,6 @@ func newPgFixture(t *testing.T) *pgFixture {
 	}
 	t.Cleanup(pool.Close)
 	svc := NewService(NewRepository(pool), newMemStore())
-	if err := svc.EnsureSampleData(ctx); err != nil {
-		t.Fatal(err)
-	}
 	cats, err := svc.Categories(ctx)
 	if err != nil || len(cats) < 2 || !cats[len(cats)-1].IsOther {
 		t.Fatalf("categories: %v", err)
@@ -50,7 +54,28 @@ func newPgFixture(t *testing.T) *pgFixture {
 	if err != nil || len(blds) == 0 || len(blds[0].Floors) == 0 || len(blds[0].Floors[0].Rooms) == 0 {
 		t.Fatalf("buildings: %v", err)
 	}
-	return &pgFixture{pool: pool, png: pngBytes(t, 32, 32), svc: svc, cat: cats[0], other: cats[len(cats)-1], building: blds[0]}
+	p := &pgFixture{pool: pool, png: pngBytes(t, 32, 32), svc: svc, cat: cats[0], other: cats[len(cats)-1], building: blds[0]}
+	// Registered before any user, so it runs after their tickets are deleted.
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM platform.rooms WHERE id = ANY($1)`, p.rooms); err != nil {
+			t.Errorf("cleanup rooms: %v", err)
+		}
+	})
+	return p
+}
+
+// room adds an active room on the first floor, so tickets of one test are not duplicates of each other (F03).
+func (p *pgFixture) room() (uuid.UUID, error) {
+	var id uuid.UUID
+	err := p.pool.QueryRow(context.Background(),
+		`INSERT INTO platform.rooms (floor_id, name, area_type) VALUES ($1, $2, 'other') RETURNING id`,
+		p.building.Floors[0].ID, "ห้องทดสอบ "+uuid.NewString()[:8]).Scan(&id)
+	if err == nil {
+		p.mu.Lock()
+		p.rooms = append(p.rooms, id)
+		p.mu.Unlock()
+	}
+	return id, err
 }
 
 // user inserts a throwaway platform user; its tickets and photos are removed after the test.
@@ -66,6 +91,8 @@ func (p *pgFixture) user(t *testing.T, role string) Viewer {
 	}
 	t.Cleanup(func() {
 		for _, q := range []string{
+			`DELETE FROM repair.ticket_subscribers WHERE user_id = $1`,
+			`DELETE FROM repair.ticket_events WHERE actor_id = $1`,
 			`DELETE FROM repair.tickets WHERE reporter_id = $1`,
 			`DELETE FROM repair.photos WHERE uploader_id = $1`,
 			`DELETE FROM platform.users WHERE id = $1`,
@@ -75,7 +102,7 @@ func (p *pgFixture) user(t *testing.T, role string) Viewer {
 			}
 		}
 	})
-	return Viewer{ID: id, Role: role}
+	return viewerAs(role, id)
 }
 
 // create is safe to call from goroutines (no t.Fatal).
@@ -83,7 +110,7 @@ func (p *pgFixture) create(v Viewer, location string) (TicketDetail, error) {
 	return p.createWith(v, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID}, LocationDetail: location})
 }
 
-// createWith fills the place (first room of the first floor unless set) and a fresh photo; the
+// createWith fills the place (a new room on the first floor unless set) and a fresh photo; the
 // caller sets category, symptoms and the extra spot.
 func (p *pgFixture) createWith(v Viewer, in CreateTicketInput) (TicketDetail, error) {
 	ctx := context.Background()
@@ -94,7 +121,11 @@ func (p *pgFixture) createWith(v Viewer, in CreateTicketInput) (TicketDetail, er
 	floor := p.building.Floors[0]
 	in.BuildingID, in.FloorID, in.PhotoIDs = &p.building.ID, &floor.ID, []uuid.UUID{photo}
 	if in.RoomID == nil {
-		in.RoomID = &floor.Rooms[0].ID
+		room, err := p.room()
+		if err != nil {
+			return TicketDetail{}, err
+		}
+		in.RoomID = &room
 	}
 	return p.svc.CreateTicket(ctx, v, in)
 }
@@ -180,6 +211,15 @@ func TestPgListCountsAndVisibility(t *testing.T) {
 		t.Fatalf("search by ticket number: total=%d", total)
 	}
 
+	// #35 (CR-019): the S06 page — slim rows, same total, page size honoured, title joined in SQL.
+	rows, total, err := p.svc.MyTickets(ctx, reporter, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 1})
+	if err != nil || total != 2 || len(rows) != 1 || rows[0].Title != mine[0].Symptoms[0].Name || !rows[0].IsReporter || rows[0].Step() != StepAwaitingAssessment {
+		t.Fatalf("my tickets page 1: total=%d rows=%+v err=%v", total, rows, err)
+	}
+	if rows, total, _ := p.svc.MyTickets(ctx, other, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 10}); total != 0 || len(rows) != 0 {
+		t.Fatalf("other user sees %d of my tickets", total)
+	}
+
 	counts, err := p.svc.TicketCounts(ctx, reporter, TicketFilter{Relation: "all", Q: &q})
 	if err != nil || counts.AwaitingAssessment != 2 || counts.InProgress != 2 {
 		t.Fatalf("counts: %+v err=%v", counts, err)
@@ -190,6 +230,10 @@ func TestPgListCountsAndVisibility(t *testing.T) {
 	}
 	if _, err := p.svc.Ticket(ctx, admin, high.ID); err != nil {
 		t.Fatalf("admin: %v", err)
+	}
+	// Report photos of open tickets are shown on S04 (D-098); once closed they follow the ticket again.
+	if _, err := p.svc.Close(ctx, admin, high.ID, "ทดสอบ"); err != nil {
+		t.Fatal(err)
 	}
 	if _, _, err := p.svc.OpenPhoto(ctx, other, high.Photos[0], true); err == nil {
 		t.Fatal("unrelated lead can open the photo")
@@ -242,16 +286,16 @@ func TestPgPriorityAndOther(t *testing.T) {
 		t.Fatalf("typed name on a normal category: %v", err)
 	}
 
-	// #28: one room → one place, with the room and the newest extra spot.
+	// #28: one place per room, newest first, with the room and its extra spot.
 	places, err := p.svc.RecentPlaces(ctx, reporter)
-	if err != nil || len(places) != 1 || places[0].Building.ID != p.building.ID || places[0].Room.ID != p.building.Floors[0].Rooms[0].ID ||
+	if err != nil || len(places) != 3 || places[0].Building.ID != p.building.ID || places[0].Room.ID != other.Room.ID ||
 		places[0].LocationDetail == nil || *places[0].LocationDetail != "ฝั่งหน้าต่าง" {
 		t.Fatalf("recent places: %+v err=%v", places, err)
 	}
 
 	// #6 q matches the room name.
-	q := escapeLike(p.building.Floors[0].Rooms[0].Name)
-	if _, total, err := p.svc.Tickets(ctx, reporter, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 20}); err != nil || total != 3 {
+	q := escapeLike(other.Room.Name)
+	if _, total, err := p.svc.Tickets(ctx, reporter, TicketFilter{Relation: "all", Q: &q, Sort: "updatedAt:desc", Page: 1, PageSize: 20}); err != nil || total != 1 {
 		t.Fatalf("search by room: total=%d err=%v", total, err)
 	}
 }
@@ -308,8 +352,8 @@ func TestPgMasterData(t *testing.T) {
 				}
 			}
 		}
-		if symptoms != 38 || len(cats[5].AreaTypes) != 1 || cats[5].AreaTypes[0] != AreaParking || len(cats[6].AreaTypes) != 0 {
-			t.Fatalf("symptoms=%d parking areas=%v other areas=%v", symptoms, cats[5].AreaTypes, cats[6].AreaTypes)
+		if symptoms != 38 || len(cats[5].BuildingTypeIDs) != 1 || cats[5].BuildingTypeIDs[0] != btOutdoor || len(cats[6].BuildingTypeIDs) != 0 {
+			t.Fatalf("symptoms=%d parking types=%v other types=%v", symptoms, cats[5].BuildingTypeIDs, cats[6].BuildingTypeIDs)
 		}
 	}
 	check()
@@ -318,8 +362,16 @@ func TestPgMasterData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := string(up)
+	// buildings and floors moved to `platform` later (settings Stage 4, 20261026000003_platform_locations.sql)
+	// and every building needs a type since CR-025 (20261029000001)
+	body := strings.NewReplacer("repair.buildings", "platform.buildings", "repair.floors", "platform.floors",
+		"(id, name, sort_order) VALUES", "(id, name, sort_order, building_type_id) VALUES",
+		"'พื้นที่ภายนอกอาคาร', 900)", "'พื้นที่ภายนอกอาคาร', 900, '"+btOutdoor.String()+"')").Replace(string(up))
 	start, end := strings.Index(body, "-- ---- master data"), strings.Index(body, "-- +goose Down")
+	// the area type hints were dropped by CR-025 (20261029000001)
+	hints, hintsEnd := strings.Index(body, "-- Area type hints"), strings.Index(body, "-- Every other (sample)")
+	body = body[:hints] + body[hintsEnd:]
+	end -= hintsEnd - hints
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -358,5 +410,579 @@ func TestPgMasterData(t *testing.T) {
 	}
 	if !parking {
 		t.Fatal("no parking room")
+	}
+}
+
+// CR-025 ids from migration 20261029000001.
+var (
+	btOffice    = uuid.MustParse("c025b700-0000-4000-8000-000000000001")
+	btWarehouse = uuid.MustParse("c025b700-0000-4000-8000-000000000002")
+	btOutdoor   = uuid.MustParse("c025b700-0000-4000-8000-000000000003")
+	whBuilding  = uuid.MustParse("c025b1d0-0000-4000-8000-000000000001")
+	whFloor     = uuid.MustParse("c025f100-0000-4000-8000-000000000001")
+	whStore     = uuid.MustParse("c025e000-0000-4000-8000-000000000001")
+	outdoorBld  = uuid.MustParse("c014b1d0-0000-4000-8000-000000000001")
+	catAircon   = uuid.MustParse("c014ca70-0000-4000-8000-000000000002")
+	catElectric = uuid.MustParse("c014ca70-0000-4000-8000-000000000001")
+)
+
+// CR-025: every building has a type (backfill: car park → outdoor, the rest → office, NOT NULL), #1 carries
+// the approved category ↔ type table, the mock warehouse exists, and #5 refuses a category the type has not.
+func TestPgBuildingTypes(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+
+	var nullTypes int
+	if err := p.pool.QueryRow(ctx, `SELECT count(*) FROM platform.buildings WHERE building_type_id IS NULL`).Scan(&nullTypes); err != nil || nullTypes != 0 {
+		t.Fatalf("buildings without type: %d (%v)", nullTypes, err)
+	}
+	if _, err := p.pool.Exec(ctx, `INSERT INTO platform.buildings (name) VALUES ('ไม่มีประเภท')`); err == nil {
+		t.Fatal("a building without a type was accepted")
+	}
+
+	blds, err := p.svc.Buildings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	types := map[uuid.UUID]uuid.UUID{}
+	for _, b := range blds {
+		types[b.ID] = b.BuildingType.ID
+		if b.BuildingType.Name == "" {
+			t.Fatalf("%s: building type without name", b.Name)
+		}
+		if b.ID == whBuilding && (b.Name != "โกดังเก็บของ 1 (ตัวอย่าง)" || len(b.Floors) != 1 || len(b.Floors[0].Rooms) != 2) {
+			t.Fatalf("mock warehouse = %+v", b)
+		}
+	}
+	if types[b1Building] != btOffice || types[outdoorBld] != btOutdoor || types[whBuilding] != btWarehouse {
+		t.Fatalf("types: อาคาร 1=%v outdoor=%v warehouse=%v", types[b1Building], types[outdoorBld], types[whBuilding])
+	}
+
+	cats, err := p.svc.Categories(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]uuid.UUID{
+		"ไฟฟ้าและแสงสว่าง":           {btOffice, btWarehouse, btOutdoor},
+		"ระบบปรับอากาศ":              {btOffice},
+		"ประปาและสุขาภิบาล":          {btOffice, btWarehouse, btOutdoor},
+		"ห้องประชุมและโสตทัศนูปกรณ์": {btOffice},
+		"อาคารและพื้นที่ส่วนกลาง":    {btOffice, btWarehouse},
+		"ลานจอด / ไม้กั้น":           {btOutdoor},
+		"อื่น ๆ": {},
+	}
+	for _, c := range cats {
+		if w, ok := want[c.Name]; ok && !slices.Equal(c.BuildingTypeIDs, w) {
+			t.Errorf("%s: types = %v, want %v", c.Name, c.BuildingTypeIDs, w)
+		}
+	}
+
+	reporter := p.user(t, users.RoleEmployee)
+	report := func(cat uuid.UUID) error {
+		photo, err := p.svc.UploadPhoto(ctx, reporter, p.png)
+		if err != nil {
+			return err
+		}
+		b, f, r := whBuilding, whFloor, whStore
+		_, err = p.svc.CreateTicket(ctx, reporter, CreateTicketInput{CategoryID: &cat, SymptomOther: "ทดสอบ", BuildingID: &b, FloorID: &f, RoomID: &r,
+			LocationDetail: "จุดทดสอบ " + uuid.NewString()[:8], PhotoIDs: []uuid.UUID{photo}})
+		return err
+	}
+	if err := report(catAircon); code(err) != "CATEGORY_NOT_FOR_BUILDING" {
+		t.Fatalf("aircon in the warehouse: %v", err)
+	}
+	if err := report(catElectric); err != nil {
+		t.Fatalf("electric in the warehouse: %v", err)
+	}
+	if err := report(p.other.ID); err != nil {
+		t.Fatalf("อื่น ๆ in the warehouse: %v", err)
+	}
+}
+
+// CR-016 ids from migration 20261020000001.
+var (
+	b1Building = uuid.MustParse("c016b1d0-0000-4000-8000-000000000001")
+	b1Floor1   = uuid.MustParse("c016f100-0000-4000-8000-000000000001")
+	b1HR3      = uuid.MustParse("c016e001-0000-4000-8000-000000000006")
+	b1WC       = uuid.MustParse("c016e001-0000-4000-8000-000000000007")
+	b1DD       = uuid.MustParse("c016e001-0000-4000-8000-000000000001")
+	acType     = uuid.MustParse("c016a700-0000-4000-8000-000000000001")
+)
+
+// CR-016: #27 numbers equal S11 (BR-F23-1), อาคาร 1 has 6 traced floors, and the asset rules hold
+// against the real SQL (unique code ignoring case, point in polygon, deactivate, audit log).
+func TestPgDashboardAndAssets(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	admin := p.user(t, users.RoleAdmin)
+	reporter := p.user(t, users.RoleEmployee)
+	t.Cleanup(func() {
+		for _, q := range []string{
+			`DELETE FROM platform.audit_log WHERE actor_user_id = $1`,
+			`DELETE FROM platform.assets WHERE created_by = $1`,
+		} {
+			if _, err := p.pool.Exec(context.Background(), q, admin.ID); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
+		}
+	})
+
+	photo, err := p.svc.UploadPhoto(ctx, reporter, p.png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, f, r := b1Building, b1Floor1, b1HR3
+	if _, err := p.svc.CreateTicket(ctx, reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID},
+		BuildingID: &b, FloorID: &f, RoomID: &r, PhotoIDs: []uuid.UUID{photo}}); err != nil {
+		t.Fatal(err)
+	}
+
+	o, err := p.svc.Overview(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s11, err := p.svc.TicketCounts(ctx, admin, TicketFilter{ScopeAll: true, Relation: "all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.Counts.AwaitingAssessment != s11.AwaitingAssessment || o.Counts.InRepair != s11.InRepair ||
+		o.Counts.AwaitingRating != s11.Resolved || o.Counts.Open != s11.InProgress+s11.Resolved {
+		t.Fatalf("#27 %+v ≠ S11 %+v", o.Counts, s11)
+	}
+	if o.Counts.ReportedToday < 1 {
+		t.Errorf("reportedToday = %d", o.Counts.ReportedToday)
+	}
+	var b1 *OverviewBuilding
+	for i := range o.Buildings {
+		if o.Buildings[i].ID == b1Building {
+			b1 = &o.Buildings[i]
+		}
+	}
+	if b1 == nil || !b1.HasModel || len(b1.Floors) != 6 || b1.Floors[0].Open.Total() < 1 {
+		t.Fatalf("อาคาร 1 = %+v", b1)
+	}
+	if b1.WidthM == nil || *b1.WidthM != 32 || b1.DepthM == nil || *b1.DepthM != 15 {
+		t.Errorf("อาคาร 1 footprint = %v × %v, want 32 × 15", b1.WidthM, b1.DepthM)
+	}
+	// CR-027: อาคาร 2 with its 3D key, 4 floors of 24 × 15 m, and the site blocks of the map.
+	b2Building := uuid.MustParse("c027b1d0-0000-4000-8000-000000000002")
+	var b2 *OverviewBuilding
+	for i := range o.Buildings {
+		if o.Buildings[i].ID == b2Building {
+			b2 = &o.Buildings[i]
+		}
+	}
+	if b2 == nil || !b2.HasModel || b2.ModelKey == nil || *b2.ModelKey != "b2" || len(b2.Floors) != 4 ||
+		b2.WidthM == nil || *b2.WidthM != 24 || b2.DepthM == nil || *b2.DepthM != 15 {
+		t.Fatalf("อาคาร 2 = %+v", b2)
+	}
+	if b1.ModelKey == nil || *b1.ModelKey != "b1" {
+		t.Errorf("อาคาร 1 model key = %v", b1.ModelKey)
+	}
+	if len(o.Site) != 16 || o.Site[1].MapNo != 2 || o.Site[1].BuildingID == nil || *o.Site[1].BuildingID != b2Building || o.Site[1].Side != 1 || o.Site[5].Side != 2 {
+		t.Errorf("site = %+v", o.Site)
+	}
+	for _, s := range o.Site { // CR-031: every map block is a real building now
+		if s.BuildingID == nil {
+			t.Errorf("site block %d has no building", s.MapNo)
+		}
+	}
+	// CR-033: office side re-placed from the site plan, อาคาร 4 turned 180°.
+	for _, w := range []struct {
+		no        int16
+		x, z, rot float64
+	}{{1, 0, 0, 17.1}, {3, 74.8, 59.9, 7.6}, {4, 101.2, 25.1, 96.1}, {17, -22.4, -11.8, -75.7}} {
+		for _, s := range o.Site {
+			if s.MapNo == w.no && (math.Abs(s.X-w.x) > 1e-9 || math.Abs(s.Z-w.z) > 1e-9 || math.Abs(s.RotDeg-w.rot) > 1e-9) {
+				t.Errorf("site block %d at (%v, %v) %v°, want (%v, %v) %v°", w.no, s.X, s.Z, s.RotDeg, w.x, w.z, w.rot)
+			}
+		}
+	}
+	for n := 1; n <= 4; n++ {
+		fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c027f200-0000-4000-8000-00000000000%d", n)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		area := 0.0 // every floor adds up to 360 m² (ห้องน้ำ lies inside the common area)
+		for _, r := range fp.Rooms {
+			if r.AreaType != "restroom" {
+				area += shapeArea(r.Shape)
+			}
+		}
+		if math.Abs(area-360) > 1e-6 {
+			t.Errorf("อาคาร 2 floor %d rooms add up to %.2f m², want 360", n, area)
+		}
+	}
+	// CR-030: the office-side buildings 3, 4, 5, 16, 17 with their 3D keys, floors, room areas and site links.
+	for _, w := range []struct {
+		no     int
+		key    string
+		floors []float64 // rooms per floor add up to (m², ห้องน้ำ excepted)
+	}{{3, "b3", []float64{1224}}, {4, "b4", []float64{349.5, 342}}, {5, "b5", []float64{629.3775}}, {16, "b16", []float64{233.64}}, {17, "b17", []float64{90}}} {
+		id := uuid.MustParse(fmt.Sprintf("c030b1d0-0000-4000-8000-%012d", w.no))
+		var ob *OverviewBuilding
+		for i := range o.Buildings {
+			if o.Buildings[i].ID == id {
+				ob = &o.Buildings[i]
+			}
+		}
+		if ob == nil || !ob.HasModel || ob.ModelKey == nil || *ob.ModelKey != w.key || len(ob.Floors) != len(w.floors) {
+			t.Fatalf("map no. %d = %+v", w.no, ob)
+		}
+		linked := false
+		for _, s := range o.Site {
+			if int(s.MapNo) == w.no {
+				linked = s.BuildingID != nil && *s.BuildingID == id && s.Side == 1
+			}
+		}
+		if !linked {
+			t.Errorf("site block %d not linked to its building", w.no)
+		}
+		for n, want := range w.floors {
+			fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c030f200-0000-4000-8000-%012d", w.no*100+n+1)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			area := 0.0
+			for _, r := range fp.Rooms {
+				if r.AreaType != "restroom" {
+					area += shapeArea(r.Shape)
+				}
+			}
+			if math.Abs(area-want) > 1e-6 {
+				t.Errorf("map no. %d floor %d rooms add up to %.4f m², want %v", w.no, n+1, area, want)
+			}
+		}
+	}
+	// CR-031: the Riverside buildings 6–13 and 18 — 3D keys, floors, office / tenant room areas per floor (one common
+	// area per floor, it and ห้องน้ำ excepted) and site links on side 2.
+	for _, w := range []struct {
+		no     int
+		floors []float64
+	}{{6, []float64{448}}, {7, []float64{204, 204}}, {8, []float64{265.2, 196.05}}, {9, []float64{150, 100}}, {10, []float64{537.03, 592.46}},
+		{11, []float64{1027.5}}, {12, []float64{600}}, {13, []float64{3100}}, {18, []float64{347.9281}}} {
+		id := uuid.MustParse(fmt.Sprintf("c031b1d0-0000-4000-8000-%012d", w.no))
+		var ob *OverviewBuilding
+		for i := range o.Buildings {
+			if o.Buildings[i].ID == id {
+				ob = &o.Buildings[i]
+			}
+		}
+		if ob == nil || !ob.HasModel || ob.ModelKey == nil || *ob.ModelKey != fmt.Sprintf("b%d", w.no) || len(ob.Floors) != len(w.floors) {
+			t.Fatalf("map no. %d = %+v", w.no, ob)
+		}
+		linked := false
+		for _, s := range o.Site {
+			if int(s.MapNo) == w.no {
+				linked = s.BuildingID != nil && *s.BuildingID == id && s.Side == 2 && int(s.Storeys) == len(w.floors)
+			}
+		}
+		if !linked {
+			t.Errorf("site block %d not linked to its building", w.no)
+		}
+		for n, want := range w.floors {
+			fp, err := p.svc.FloorPlan(ctx, admin, uuid.MustParse(fmt.Sprintf("c031f200-0000-4000-8000-%012d", w.no*100+n+1)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			area, common := 0.0, 0
+			for _, r := range fp.Rooms {
+				switch r.AreaType {
+				case "common_area":
+					common++
+				case "restroom":
+				default:
+					area += shapeArea(r.Shape)
+				}
+			}
+			if math.Abs(area-want) > 1e-6 || common != 1 {
+				t.Errorf("map no. %d floor %d rooms add up to %.4f m² (want %v), %d common areas", w.no, n+1, area, want, common)
+			}
+		}
+	}
+	for _, f := range b1.Floors { // CR-017: steps split the same open tickets
+		if st := f.Steps; st.AwaitingAssessment+st.InRepair+st.AwaitingRating != f.Open.Total() {
+			t.Errorf("floor %s steps %+v ≠ open %d", f.Name, st, f.Open.Total())
+		}
+	}
+
+	plan, err := p.svc.FloorPlan(ctx, admin, b1Floor1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.WidthM == nil || *plan.WidthM != 32 || len(plan.Rooms) != 8 {
+		t.Fatalf("plan = %+v", plan)
+	}
+	area := 0.0
+	for _, rm := range plan.Rooms {
+		if rm.AreaType != AreaRestroom {
+			area += shapeArea(rm.Shape)
+		}
+	}
+	if area < 479.99 || area > 480.01 {
+		t.Errorf("floor 1 rooms add up to %v m², want 480", area)
+	}
+
+	code1 := "TST-" + uuid.NewString()[:6]
+	x, z := 28.0, 12.0
+	a, err := p.svc.CreateAsset(ctx, admin, AssetInput{AssetTypeID: acType, Code: code1, Name: "แอร์ทดสอบ", RoomID: b1HR3, X: &x, Z: &z})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.X == nil || *a.X != 28 || a.Type.Key != "aircon" || a.Room.ID != b1HR3 {
+		t.Fatalf("asset = %+v", a)
+	}
+	if _, err := p.svc.CreateAsset(ctx, admin, AssetInput{AssetTypeID: acType, Code: strings.ToLower(code1), Name: "x", RoomID: b1DD}); code(err) != "ASSET_CODE_TAKEN" {
+		t.Errorf("duplicate code: %v", err)
+	}
+	if _, err := p.svc.UpdateAsset(ctx, admin, a.ID, AssetInput{Code: code1, Name: "แอร์ทดสอบ", RoomID: b1HR3, X: &[]float64{6}[0], Z: &[]float64{3}[0]}); code(err) != "POINT_OUTSIDE_ROOM" {
+		t.Errorf("point in another room: %v", err)
+	}
+	wx, wz := 13.0, 3.0
+	moved, err := p.svc.UpdateAsset(ctx, admin, a.ID, AssetInput{Code: code1, Name: "แอร์ทดสอบ", RoomID: b1WC, X: &wx, Z: &wz})
+	if err != nil || moved.Room.ID != b1WC {
+		t.Fatalf("move into ห้องน้ำ: %+v %v", moved, err)
+	}
+	if err := p.svc.DeactivateAsset(ctx, admin, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = p.svc.FloorPlan(ctx, admin, b1Floor1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, as := range plan.Assets {
+		if as.ID == a.ID {
+			t.Error("deactivated asset still on the plan")
+		}
+	}
+	var audits int
+	if err := p.pool.QueryRow(ctx, `SELECT count(*) FROM platform.audit_log WHERE target_type = 'asset' AND target_id = $1`, a.ID.String()).Scan(&audits); err != nil || audits != 3 {
+		t.Errorf("audit rows = %d, %v (created, updated, deactivated)", audits, err)
+	}
+	if suggested, err := p.svc.SuggestAssetCode(ctx, admin, acType, b1Floor1); err != nil || !strings.HasPrefix(suggested, "AC-1-") {
+		t.Errorf("suggest = %s, %v", suggested, err)
+	}
+}
+
+// Stage 4: F03 duplicate check (incl. old tickets without a room and two reports at once), follow,
+// F04 team handled, F05 hand over — on the real SQL.
+func TestPgDuplicatesFollowTeamHandOver(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	reporter := p.user(t, users.RoleEmployee)
+	follower := p.user(t, users.RoleEmployee)
+	stranger := p.user(t, users.RoleEmployee)
+	lead := p.user(t, users.RoleHousekeeperLead)
+	otherLead := p.user(t, users.RoleHousekeeperLead)
+	technician := p.user(t, users.RoleTechnician)
+	floor := p.building.Floors[0]
+
+	room, err := p.room()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomIDs: []uuid.UUID{p.cat.Symptoms[0].ID}, RoomID: &room})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.createWith(follower, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "อีกอาการ", RoomID: &room})
+	var dup *DuplicateFoundError
+	if !errors.As(err, &dup) || len(dup.Tickets) != 1 || dup.Tickets[0].ID != first.ID || dup.Tickets[0].ViewerRelation != RelationNone {
+		t.Fatalf("duplicate: err = %v", err)
+	}
+	k := DuplicateKey{CategoryID: p.cat.ID, FloorID: floor.ID, RoomID: room}
+	if list, err := p.svc.Duplicates(ctx, reporter, k); err != nil || len(list) != 1 || list[0].ViewerRelation != RelationReporter {
+		t.Fatalf("#22: %v err=%v", list, err)
+	}
+	if _, err := p.createWith(follower, CreateTicketInput{CategoryID: &p.other.ID, SymptomIDs: []uuid.UUID{p.other.Symptoms[0].ID}, RoomID: &room}); err != nil {
+		t.Fatalf("other category in the same room: %v", err)
+	}
+
+	// CR-014: a ticket from before rooms matches when its spot text is the room name (trimmed, any case).
+	var roomName string
+	if err := p.pool.QueryRow(ctx, `SELECT name FROM platform.rooms WHERE id = $1`, room).Scan(&roomName); err != nil {
+		t.Fatal(err)
+	}
+	legacy := uuid.New()
+	if _, err := p.pool.Exec(ctx, `INSERT INTO repair.tickets (id, ticket_no, status, priority, priority_source, category_id,
+		building_id, floor_id, location_detail, reporter_id) VALUES ($1, $2, 'in_progress', 'medium', 'reporter', $3, $4, $5, $6, $7)`,
+		legacy, "TEST-"+legacy.String()[:8], p.cat.ID, p.building.ID, floor.ID, "  "+strings.ToUpper(roomName)+" ", reporter.ID); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := p.svc.Duplicates(ctx, stranger, k); len(list) != 2 || list[0].ID != legacy || !list[0].BlocksReport {
+		t.Fatalf("legacy match: %v", list)
+	}
+	// CR-020: another extra spot in the same room is similar, not a duplicate (SQL normalisation too).
+	k.Spot = "  แอร์ตัว   หน้าห้อง "
+	if list, _ := p.svc.Duplicates(ctx, stranger, k); len(list) != 2 || list[0].BlocksReport || list[1].BlocksReport {
+		t.Fatalf("other spot: %+v", list)
+	}
+	spotted, err := p.createWith(stranger, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "อีกตัว", RoomID: &room, LocationDetail: "แอร์ตัว หน้าห้อง"})
+	if err != nil {
+		t.Fatalf("other spot must be allowed: %v", err)
+	}
+	k.Spot = "แอร์ตัว หน้าห้อง"
+	if list, _ := p.svc.Duplicates(ctx, stranger, k); len(list) != 3 || list[0].ID != spotted.ID || !list[0].BlocksReport || list[1].BlocksReport {
+		t.Fatalf("same spot again: %+v", list)
+	}
+	k.Spot = ""
+
+	// Two reports of the same new problem at once: exactly one ticket (advisory lock).
+	race, err := p.room()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, v := range []Viewer{follower, stranger} {
+		wg.Add(1)
+		go func(v Viewer) {
+			defer wg.Done()
+			_, err := p.createWith(v, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "พร้อมกัน", RoomID: &race})
+			errs <- err
+		}(v)
+	}
+	wg.Wait()
+	close(errs)
+	created, refused := 0, 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			created++
+		case errors.As(err, &dup):
+			refused++
+		default:
+			t.Fatalf("race: %v", err)
+		}
+	}
+	if created != 1 || refused != 1 {
+		t.Fatalf("race: created=%d refused=%d", created, refused)
+	}
+
+	// F03 follow: note + photo in the old case's timeline; the follower sees it in S06.
+	photo, err := p.svc.UploadPhoto(ctx, follower, p.png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := p.svc.Follow(ctx, follower, first.ID, "น้ำหยดใส่โต๊ะประชุม", []uuid.UUID{photo})
+	if err != nil || d.ViewerRelation != RelationSubscriber || d.SubscriberCount != 1 ||
+		d.Timeline[0].Type != EventSubscribed || len(d.Timeline[0].Photos) != 1 || *d.Timeline[0].Note != "น้ำหยดใส่โต๊ะประชุม" {
+		t.Fatalf("follow: %+v err=%v", d.Timeline, err)
+	}
+	if _, err := p.svc.Follow(ctx, follower, first.ID, "", nil); code(err) != "ALREADY_FOLLOWING" {
+		t.Fatalf("follow again: %v", err)
+	}
+	rows, total, err := p.svc.MyTickets(ctx, follower, TicketFilter{Relation: "following", Sort: "updatedAt:desc", Page: 1, PageSize: 10})
+	if err != nil || total != 1 || rows[0].ID != first.ID || rows[0].IsReporter {
+		t.Fatalf("following in S06: total=%d err=%v", total, err)
+	}
+	// D-098: the report photo of an open match is visible to anyone; the follow photo is not.
+	if _, _, err := p.svc.OpenPhoto(ctx, stranger, first.Photos[0], true); err != nil {
+		t.Fatalf("report photo of an open duplicate: %v", err)
+	}
+	if _, _, err := p.svc.OpenPhoto(ctx, stranger, photo, true); code(err) != "FORBIDDEN" {
+		t.Fatalf("follow photo: %v", err)
+	}
+
+	// F04: a lead's team record is closed at once with its own event and after photo.
+	after, err := p.svc.UploadPhoto(ctx, lead, p.png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	team, err := p.createWith(lead, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "พื้นเปียก",
+		TeamHandled: &TeamHandledInput{Note: "เช็ดพื้นและวางป้ายระวังลื่นแล้ว", PhotoIDs: []uuid.UUID{after}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if team.Status != StatusClosed || team.ClosedReason == nil || *team.ClosedReason != ClosedReasonTeamHandled || team.ClosedAt == nil ||
+		len(team.Timeline) != 2 || team.Timeline[0].Type != EventTeamHandled || len(team.Timeline[0].Photos) != 1 || len(team.Photos) != 1 ||
+		!slicesContain(team.AllowedActions, ActionHandover) {
+		t.Fatalf("team handled: %+v actions=%v", team.TicketSummary, team.AllowedActions)
+	}
+	if _, err := p.createWith(reporter, CreateTicketInput{CategoryID: &p.cat.ID, SymptomOther: "x",
+		TeamHandled: &TeamHandledInput{Note: "x", PhotoIDs: []uuid.UUID{uuid.New()}}}); code(err) != "TEAM_HANDLED_NOT_ALLOWED" {
+		t.Fatalf("employee team record: %v", err)
+	}
+
+	// CR-021: the lead's S06 tab `ทีมแก้เอง` (#35 relation=reported + closedReason=team_handled).
+	teamReason := ClosedReasonTeamHandled
+	teamOnly := TicketFilter{Relation: "reported", ClosedReason: &teamReason, Sort: "updatedAt:desc", Page: 1, PageSize: 10}
+	if rows, total, err := p.svc.MyTickets(ctx, lead, teamOnly); err != nil || total != 1 || len(rows) != 1 || rows[0].ID != team.ID {
+		t.Fatalf("team tab: total=%d err=%v", total, err)
+	}
+
+	// F05: another lead cannot; the recording lead hands the same ticket back to the technician.
+	if _, err := p.svc.HandOver(ctx, otherLead, team.ID, "x"); code(err) != "FORBIDDEN" {
+		t.Fatalf("other lead: %v", err)
+	}
+	back, err := p.svc.HandOver(ctx, lead, team.ID, "ทีมเช็ดแล้วแต่ยังมีน้ำซึมจากฝ้า")
+	if err != nil || back.TicketNo != team.TicketNo || back.Status != StatusInProgress || back.ClosedReason != nil || back.ClosedAt != nil ||
+		back.Step() != StepAwaitingAssessment || back.Timeline[0].Type != EventHandedOver {
+		t.Fatalf("hand over: %+v err=%v", back.TicketSummary, err)
+	}
+	if _, total, err := p.svc.MyTickets(ctx, lead, teamOnly); err != nil || total != 0 {
+		t.Fatalf("handed over still in the team tab: total=%d err=%v", total, err)
+	}
+	queue, _, err := p.svc.Tickets(ctx, technician, TicketFilter{ScopeAll: true, Relation: "all", Steps: []string{StepAwaitingAssessment},
+		Sort: "createdAt:asc", Page: 1, PageSize: 100})
+	if err != nil || !containsTicket(queue, team.ID) {
+		t.Fatalf("handed-over ticket not in รอประเมิน: err=%v", err)
+	}
+	if _, err := p.svc.HandOver(ctx, lead, team.ID, "อีกครั้ง"); code(err) != "NOT_TEAM_HANDLED" {
+		t.Fatalf("second hand over: %v", err)
+	}
+}
+
+func slicesContain(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+func containsTicket(list []TicketSummary, id uuid.UUID) bool {
+	for _, t := range list {
+		if t.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// CR-023 (BR-F24-6): the unique index on lower(name) backs the service check, also when two saves race.
+func TestPgContractorNameUnique(t *testing.T) {
+	p := newPgFixture(t)
+	ctx := context.Background()
+	tech := p.user(t, users.RoleTechnician)
+	t.Cleanup(func() {
+		for _, q := range []string{
+			`DELETE FROM repair.contractors WHERE created_by_id = $1`,
+			`DELETE FROM repair.contractor_types WHERE created_by_id = $1`,
+		} {
+			if _, err := p.pool.Exec(context.Background(), q, tech.ID); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
+		}
+	})
+	typ, err := p.svc.CreateContractorType(ctx, tech, "แอร์")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "Pg Cool Air " + uuid.NewString()[:8]
+	first, err := p.svc.CreateContractor(ctx, tech, ContractorInput{Name: name, TypeIDs: []uuid.UUID{typ.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.svc.CreateContractor(ctx, tech, ContractorInput{Name: "  " + strings.ToUpper(name) + " ", TypeIDs: []uuid.UUID{typ.ID}})
+	assertNameTaken(t, err, first.ID, true)
+
+	// Past the service check (a racing save): the index refuses it with the same code.
+	err = NewRepository(p.pool).InTx(ctx, func(tx TxRepository) error {
+		return tx.InsertContractor(ctx, uuid.New(), ContractorInput{Name: strings.ToLower(name)}, tech.ID)
+	})
+	if !errors.Is(err, ErrContractorNameTaken) {
+		t.Fatalf("index: err = %v, want ErrContractorNameTaken", err)
 	}
 }

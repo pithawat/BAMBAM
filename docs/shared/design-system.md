@@ -10,7 +10,7 @@ Status: APPROVED (2026-10-14) · pickers / filters updated by CR-002 (repair, ap
 
 - **Clean workplace app**: light gray canvas, white panels with thin borders, blue `#2741FA` as the one action colour, violet for highlights, strong solid colours only where a status needs attention. Calm, readable, no decoration that repeats information.
 - **Read from top to bottom.** One column of content per screen on phones, and on desktop for forms and detail pages (max 800–1040px). Sections are stacked; no "left column then right column" reading order inside a form or a detail page. Dashboards and lists may use grids.
-- Light mode only. No gradient headers, no 3D service icons. The BAMBAM logo and the mascot stay (mascot only on success, empty and forbidden screens, plus the white leopard bust beside the S06 heading — CR-011, D-066; never in the navbar).
+- Light mode only. No gradient headers, no 3D service icons. The BAMBAM logo and the mascot stay. Mascot = the BAM tiger, 5 poses (D-094, CR-019): page headings of S06 / S03 / S29, the S07 review band, login / signed-out, Home / S05 cards, empty / error / forbidden states; never in the navbar. **Repair CR-035:** wherever it appears, the white tiger sits on a solid primary panel beside white copy (`MascotPanel`, the S06 tracking treatment) — no blob backdrops, no eyebrow labels; buttons inside the panel turn white.
 - Navigation (CR-010, D-064): one white top navbar (floating on desktop), three services with equal weight, no sidebar, no bottom nav — `docs/modules/repair/ui/screens/_common.md` §1.
 - Never ship third-party images, icons or logos from the references.
 
@@ -74,7 +74,7 @@ Two themes, chosen per browser in the account menu → `ธีมสี` (stored
 | Action, in progress | `#2741FA` | `#2741FA` (unchanged) |
 | Needs you (`--attention`, `--status-resolved`; badge, banner edge — buttons stay blue) | tangerine `#B93D0A` (4.9:1 on its tint) | deep mustard `#8A5A12` (5.9:1) |
 | Done (`--success`, `--status-closed`) | emerald `#0B7A5E` | deep sage `#2C6B67` (6.2:1) |
-| Waiting (`--status-new`) · sent back (`--status-rework`) | slate `#5B6676` · red `#B42318` | slate `#566273` |
+| Waiting (`--status-new`) · sent back (`--status-rework`) | deep yellow `#8C6600` (CR-018, was slate) · red `#B42318` | olive yellow `#7F6A00` (CR-018) |
 | Warning / stars | `#B54708` / `#E09B0C` | `#94600F` / `#C08A2E` (3:1) |
 | Field border (`--input`) | `#D0D6E2` | `#B0B8C3` |
 
@@ -83,7 +83,7 @@ Two themes, chosen per browser in the account menu → `ธีมสี` (stored
 ## Layout and spacing
 
 - **Adaptive (D-008):** phones `< 600px` (Tailwind `sm` and below) and tablets use the mobile layout; desktop from `lg` (1024px) adds the sidebar. Breakpoint-specific differences are listed per screen.
-- **Phone:** page padding 12–16px; white top bar (back · title · action); bottom nav (หน้าแรก · ติดตามงาน · **สแกน** solid blue raised circle · แจ้งเตือน · โปรไฟล์); primary actions in a sticky bottom footer.
+- **Phone:** page padding 12–16px; white top bar (back · title · action); bottom nav (หน้าแรก · ติดตามงาน · **สแกน** solid blue raised circle · ~~แจ้งเตือน~~ (repair CR-024: no notifications) · โปรไฟล์); primary actions in a sticky bottom footer.
 - **Desktop:** sidebar 216–240px (logo, groups, active item `bg-secondary text-primary`), top bar 60–68px (breadcrumb, env tag, bell, user), content centred.
 - **Spacing:** 4px base. Panel padding 20–24px (phone 15–16px). Gap between stacked panels 12–16px.
 - **Touch targets ≥ 44px**, buttons 44–52px (primary actions at the bottom of a step 52–56px).

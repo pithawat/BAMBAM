@@ -13,4 +13,5 @@ Module `$0`, stage `$1` accepted by the user.
    - `03-plan.md` — stage status `done`
    - `PROGRESS.md` — compress this stage into one "Stage log" line; set Next to the next stage (or "module complete")
    - `docs/PROJECT.md` — the module row
+   - System Atlas — follow `/atlas sync $0` (stage `accepted` + today's date); list flows that became runnable so a tour can be written (`/atlas tour`)
 4. Reply in Thai, ≤4 lines: what was tagged, what comes next, and to start a fresh session (`/clear`) before `/build-stage $0 <next> prepare`.

@@ -1,6 +1,14 @@
 # S02 — หน้าแรก
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below) · **employee variant replaced by CR-035 (2026-11-01)**
+
+> **CR-040 (2026-11-10, replaces the CR-035 employee layout):** layout + IBM Plex Sans Thai from the owner reference `App (1).tsx` / `index (1).css`; greeting + H1 kept, **sub-line removed**; desktop three cards side by side (car −4°, repair middle on the mascot panel, room +4°); the repair card carries a `รายการของฉัน` strip (#35 total · first non-empty state · `อีก {n} รายการ` → S06) that replaces the 3-row list; phones / tablets: repair card full row, car + room tilted under it. **สแกน QR moved to the bottom tab bar; the Home has no scan button** (replaces the CR-036 line below). Details: `../../changes/CR-040.md`. (CR-040)
+> **CR-035 (approved 2026-11-01) — replaces variant A below for every role without `repair.overview.view`; visual source `output/home-user-redesign/index.html` (layout only).** Centred greeting + H1 `เรื่องในที่ทำงาน / จัดการง่าย ในที่เดียว`; three overlapping service cards (repair in the middle on the primary mascot panel → `แจ้งซ่อมใหม่`, or `งานซ่อมของคุณ` → `ไปที่งานซ่อม` without the report key; car / room tilted "เร็วๆ นี้" cards, disabled); `รายการของฉัน` (report key only): 3 newest #35 rows + `มี {n} งานรอคุณประเมินตรวจงาน` + `ดูงานซ่อมทั้งหมด`. No QR button, no brand hero. Details: `../../changes/CR-035.md`.
+> **CR-036 (approved 2026-11-01, Stage 5):** the repair card gets a small secondary link-button `สแกน QR` (`QrCode` icon) → S16 `/repair/scan` under `แจ้งซ่อมใหม่`, **phones only** (`(pointer: coarse)` + camera API) and only with the report key. Desktop keeps no QR button.
+
+> **CR-024 (approved 2026-10-26):** no executive role — variant C / S29 is for `admin` only; no bell in the hero, no "แจ้งเตือนล่าสุด" desktop card, no notification preview; empty technician list copy per `_common.md` §9.
+
+> **CR-016 (approved 2026-10-19):** admin and executive no longer get variant C — their Home is **S29** (`S29-admin-dashboard.md`, dashboard + 3D อาคาร 1), built in Stage 3D. Variants A / B (other roles) stay for Stage 6.
 
 - **Flows:** F01 step 3 (land on Home by role), F06 (my open tickets, BR-F06-2), F21 (technician: current job + queue), F22/F23 entry for admin and executive (see ../../02-flows.md)
 - **Persona:** employee, housekeeper_lead, security_lead, technician on mobile; admin, executive on desktop (see ../../01-users.md)
@@ -135,7 +143,7 @@ Desktop (≥1024px):
 | Desktop banner buttons | A: แจ้งซ่อม / ติดตามงานซ่อม (CR-003) · B: ดูคิวงาน / แจ้งซ่อม · C: เปิดคิวงาน / ภาพรวมอาคาร |
 | Desktop cards | งานซ่อมที่ยังไม่ปิด (CR-003) · แจ้งเตือนล่าสุด (link ทั้งหมด) · งานฉุกเฉินและสูงที่รอช่างรับ |
 | Empty — my tickets | ยังไม่มีงานที่คุณแจ้ง / เจออะไรเสีย ถ่ายรูปแล้วแจ้ง BAMBAM ได้เลย หรือสแกน QR ที่ติดบนอุปกรณ์ / button แจ้งซ่อม |
-| Empty — technician queue | ยังไม่มีงานในหมวดของคุณ / งานใหม่จะแจ้งเตือนที่กระดิ่ง |
+| Empty — technician queue | ยังไม่มีงานในหมวดของคุณ / ~~งานใหม่จะแจ้งเตือนที่กระดิ่ง~~ งานใหม่จะแสดงที่หน้านี้ (CR-024) |
 | Technician without categories | ยังไม่ได้กำหนดหมวดงาน ติดต่อ Admin |
 | Empty — admin urgent table | ไม่มีงานฉุกเฉินหรือสูงที่รอช่างรับ |
 | Error — my tickets block | Alert: โหลดงานของคุณไม่สำเร็จ / ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง ยังแจ้งซ่อมใหม่ได้ตามปกติ · button ลองอีกครั้ง |

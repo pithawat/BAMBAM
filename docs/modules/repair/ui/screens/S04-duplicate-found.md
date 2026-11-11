@@ -1,6 +1,14 @@
 # S04 — พบงานซ้ำ
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · card layout changed by CR-021 (approved 2026-10-25) · position changed by CR-025 (approved 2026-10-27) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-034 (approved 2026-11-01):** once a blocking duplicate was found for this room + category, `บอกจุดเพิ่มเติม` keeps `*` and the help `จำเป็นเมื่อพบงานที่ตรงกัน` after the spot is typed (never `ไม่บังคับ`), until the room or category changes.
+
+> **CR-025 (approved 2026-10-27):** the inline card moves from S03 step สถานที่ to step **ปัญหาที่พบ** (step 2), under the symptoms, and shows once a category is picked (room is already known). When a case `blocksReport`, the card contains the spot field `บอกจุดเพิ่มเติม * จำเป็นเมื่อพบงานที่ตรงกัน` (same value as S03 step 1 — editing either updates both; ≤ 100); `ถัดไป` shows `กรุณาระบุจุดที่ต่างจากงานเดิม ก่อนดำเนินการต่อ` under it and focuses it. Card copy, actions and the submit-time dialog are unchanged (CR-020 / CR-021).
+
+> **CR-021 (approved 2026-10-25) — layout from `maintenance-demo.html` (copy and actions stay CR-020).** Card frame: info icon + heading + sub-line on the left, badge `พบ {n} งาน` on the right; one **horizontal row per case** — report photo (or category icon tile) left · ticket no, title, location, step badge middle · action button right (sm and up; phone: button full width under the row); CR-020 spot hint as a note at the bottom of the card. In S03 the card sits between `ห้องหรือจุดที่เกิด` and `บอกจุดเพิ่มเติม`, and a blocking case stops `ถัดไป` at the location step (see S03 CR-021). The submit-time sheet / dialog stays as the fallback and uses the same case rows.
+
+> **CR-020 (approved 2026-10-24):** a match with **no extra spot or the same spot** (`บอกจุดเพิ่มเติม`) is a duplicate (follow or cancel); **another spot** in the room is only similar — the S03 card says `มีงานคล้ายกันในห้องนี้` and sending is allowed (#22 `blocksReport`). Copy for every case, the S04 dialog text and note: `../../changes/CR-020.md` "Copy" (replaces the copy below). Own ticket awaiting ประเมินตรวจงาน → `ไปประเมินตรวจงาน`. `ยกเลิกการแจ้ง` → discard confirm → back to where the form was opened (Home without history). Follow → toast + the normal S07 (the follower cannot rate). Report photos of the matching open cases are shown (D-098).
 
 > **CR-009 (approved 2026-10-18):** match = category + floor + room / spot (BR-F03-1). Actions: `ติดตามเคสเดิม` (others' ticket) · own ticket → `ดูงานของคุณ`; own ticket waiting for ประเมินตรวจงาน → `ไปประเมินตรวจงาน` (blocks a new ticket). The submit-time dialog has `ติดตามเคสเดิม` and `ยกเลิกการแจ้ง` only — `ไม่ใช่เรื่องเดียวกัน ส่งแจ้งใหม่` is removed. Hint: `ถ้าเป็นคนละจุด แก้ห้องหรือจุดที่เกิดในขั้นสถานที่`.
 

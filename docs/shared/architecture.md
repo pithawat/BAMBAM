@@ -30,12 +30,15 @@
 - `APP_ENV`: `development` · `uat` · `production` (D-027). `.env` is loaded only in `development`.
 - Permissions are checked in the **service** layer. The role set is global (below); each module's `01-users.md` holds its permission matrix against these roles.
 
-### Roles (D-003, D-004)
+### Roles and permissions (D-003, D-004, D-049, D-111; rewritten in settings Stage 6)
 
-- SSO gives identity only. Roles live in `platform.user_roles`, one row per user, keyed by `employee_code` (SSO claim `USER`).
-- Exactly one role per user, shared by all modules: `employee` · `housekeeper_lead` · `security_lead` · `technician` · `admin` · `executive`.
-- First SSO login creates the user as `employee`. Phase 1: other roles come from a seed file (employee code → role). Later: admin edits roles in the user management screen (repair F15).
-- `GET /api/v1/me` returns the user and role; the FE builds menus from it but never relies on it for security.
+- SSO gives identity only. A person's role is their row in `platform.user_roles` (keyed by `employee_code`, SSO claim `USER`); no row = `employee` (first login creates the user as `employee`). One role per person, shared by every module.
+- **Roles are data** (`platform.roles`): stable `key` (`employee` · `housekeeper_lead` · `security_lead` · `technician` · `admin` · `super_admin`, custom roles `r_` + 8 hex), editable Thai `name`. `employee` and `super_admin` are system roles (cannot be deleted); `super_admin` is locked (cannot be edited, has every permission). A role with real users cannot be deleted (demo users go with it). Superadmin manages roles, the matrix and people's roles in ตั้งค่าระบบ (settings S24 / S25).
+- **Permissions are keys** registered in Go by each module (`repair.Permissions`, `settings.Permissions`, aggregated by `permissions.MustRegistry`). Stored per role in `platform.role_permissions` (the matrix, version row `platform.permission_matrix` for `VERSION_CONFLICT`). The seven `settings.*` keys are **fixed**: granted from the role key (`admin`: locations · assets · categories; `super_admin`: all), never stored, never copied to custom roles.
+- **Checks use keys, never role names**: backend `RequirePermission(...)` on routes + `Viewer.Can` / `Principal.Can` in services; FE `can(me, PERM.x)` for menus only (never for security). Permissions load on **every request** (one query with the user, `GetUserWithRole`), so matrix and role changes apply on the next request without logging out.
+- `GET /api/v1/me` returns the user, `role`, `roleName` and the effective `permissions`.
+- `SUPER_ADMIN_EMPLOYEE_CODES` (comma-separated employee codes, per environment): those people are `super_admin` at API start and at every login, and their role cannot be changed on screen (`ROLE_LOCKED`). At least one code per environment before UAT; without any, the API logs a warning when no user has `super_admin`.
+- Every settings write appends to `platform.audit_log` in the same transaction with `data = { entityName, parentName?, changes }` (settings F30); the dev role switch writes `dev.role_switch` rows that ประวัติการเปลี่ยนแปลง does not list.
 
 ### Role switcher — dev/UAT only (D-005)
 
@@ -65,5 +68,6 @@ How dev → production switching works: **code is identical; only env vars diffe
 | `APP_SESSION_SECRET` | backend | random, `.env` only | secret from platform (not the SSO client secret) |
 | `APP_SESSION_TTL` | backend | `12h` | from platform (default `12h`) |
 | `PHOTO_STORAGE_DIR` | backend | optional, default `data/photos` (gitignored) | required: persistent volume, backed up (D-022) |
+| `SUPER_ADMIN_EMPLOYEE_CODES` | backend | optional, comma-separated employee codes (empty → warning at start) | the first Superadmin code(s) per environment (settings BR-F25-2) |
 
 Add new variables to this table, to `backend/.env.example` or `frontend/.env.*`, and to `lib/env.ts` / `platform/config` in the same change.

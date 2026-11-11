@@ -16,6 +16,13 @@ type RefDTO struct {
 	Name string    `json:"name"`
 }
 
+// CategoryRefDTO is a ticket's category with its lucide icon (CR-019), so lists draw the tile without the master.
+type CategoryRefDTO struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Icon string    `json:"icon"`
+}
+
 type PersonRefDTO struct {
 	ID         uuid.UUID `json:"id"`
 	Name       string    `json:"name"`
@@ -34,8 +41,8 @@ type CategoryDTO struct {
 	Name            string       `json:"name"`
 	Icon            string       `json:"icon"`
 	DefaultPriority string       `json:"defaultPriority"`
-	IsOther         bool         `json:"isOther"`   // CR-014
-	AreaTypes       []string     `json:"areaTypes"` // CR-014
+	IsOther         bool         `json:"isOther"`         // CR-014
+	BuildingTypeIDs []uuid.UUID  `json:"buildingTypeIds"` // CR-025; empty for "อื่น ๆ" = every type
 	Symptoms        []SymptomDTO `json:"symptoms"`
 }
 
@@ -70,9 +77,10 @@ type RoomDTO struct {
 }
 
 type BuildingDTO struct {
-	ID     uuid.UUID  `json:"id"`
-	Name   string     `json:"name"`
-	Floors []FloorDTO `json:"floors"`
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	BuildingType RefDTO     `json:"buildingType"` // CR-025
+	Floors       []FloorDTO `json:"floors"`
 }
 
 // CreateTicketRequest = #5 request. Ids stay strings so a bad id becomes a field error, not a bind error.
@@ -88,47 +96,75 @@ type CreateTicketRequest struct {
 	SymptomOther   string          `json:"symptomOther"`
 	PhotoIDs       []string        `json:"photoIds"`
 	AssetCode      string          `json:"assetCode"`
-	TeamHandled    json.RawMessage `json:"teamHandled"`
+	TeamHandled    json.RawMessage `json:"teamHandled"` // TeamHandledRequest or null (F04)
+}
+
+// TeamHandledRequest = #5 `teamHandled` (leads only, BR-F04-1/2).
+type TeamHandledRequest struct {
+	Note     string   `json:"note"`
+	PhotoIDs []string `json:"photoIds"`
 }
 
 type TicketSummaryDTO struct {
-	ID                     uuid.UUID     `json:"id"`
-	TicketNo               string        `json:"ticketNo"`
-	Status                 string        `json:"status"`
-	Step                   string        `json:"step"`
-	ClosedReason           *string       `json:"closedReason"`
-	Priority               string        `json:"priority"`
-	PrioritySource         string        `json:"prioritySource"`
-	Category               *RefDTO       `json:"category"`
-	CategoryOther          *string       `json:"categoryOther"`
-	Symptoms               []RefDTO      `json:"symptoms"`
-	SymptomOther           *string       `json:"symptomOther"`
-	Building               RefDTO        `json:"building"`
-	Floor                  RefDTO        `json:"floor"`
-	Room                   *RefDTO       `json:"room"` // CR-014; null on older tickets
-	LocationDetail         *string       `json:"locationDetail"`
-	ThumbURL               *string       `json:"thumbUrl"`
-	Reporter               PersonRefDTO  `json:"reporter"`
-	Technician             *PersonRefDTO `json:"technician"`
-	ViewerRelation         string        `json:"viewerRelation"`
-	AwaitingMyConfirmation bool          `json:"awaitingMyConfirmation"`
-	ExpectedDoneOn         *string       `json:"expectedDoneOn"`
-	WorkBy                 *string       `json:"workBy"`
-	Contractor             *RefDTO       `json:"contractor"`
-	ContractorTypes        []string      `json:"contractorTypes"`
-	AutoCloseAt            *time.Time    `json:"autoCloseAt"`
-	SendBackCount          int32         `json:"sendBackCount"`
-	Rating                 *int16        `json:"rating"`
-	CreatedAt              time.Time     `json:"createdAt"`
-	AssessedAt             *time.Time    `json:"assessedAt"`
-	ResolvedAt             *time.Time    `json:"resolvedAt"`
-	ClosedAt               *time.Time    `json:"closedAt"`
-	UpdatedAt              time.Time     `json:"updatedAt"`
+	ID                     uuid.UUID       `json:"id"`
+	TicketNo               string          `json:"ticketNo"`
+	Status                 string          `json:"status"`
+	Step                   string          `json:"step"`
+	ClosedReason           *string         `json:"closedReason"`
+	Priority               string          `json:"priority"`
+	PrioritySource         string          `json:"prioritySource"`
+	Category               *CategoryRefDTO `json:"category"`
+	CategoryOther          *string         `json:"categoryOther"`
+	Symptoms               []RefDTO        `json:"symptoms"`
+	SymptomOther           *string         `json:"symptomOther"`
+	Building               RefDTO          `json:"building"`
+	Floor                  RefDTO          `json:"floor"`
+	Room                   *RefDTO         `json:"room"` // CR-014; null on older tickets
+	LocationDetail         *string         `json:"locationDetail"`
+	ThumbURL               *string         `json:"thumbUrl"`
+	Reporter               PersonRefDTO    `json:"reporter"`
+	Technician             *PersonRefDTO   `json:"technician"`
+	ViewerRelation         string          `json:"viewerRelation"`
+	AwaitingMyConfirmation bool            `json:"awaitingMyConfirmation"`
+	ExpectedDoneOn         *string         `json:"expectedDoneOn"`
+	WorkBy                 *string         `json:"workBy"`
+	Contractor             *RefDTO         `json:"contractor"`
+	ContractorTypes        []string        `json:"contractorTypes"`
+	Assignee               *StaffDTO       `json:"assignee"` // CR-034
+	AutoCloseAt            *time.Time      `json:"autoCloseAt"`
+	SendBackCount          int32           `json:"sendBackCount"`
+	Rating                 *int16          `json:"rating"`
+	CreatedAt              time.Time       `json:"createdAt"`
+	AssessedAt             *time.Time      `json:"assessedAt"`
+	ResolvedAt             *time.Time      `json:"resolvedAt"`
+	ClosedAt               *time.Time      `json:"closedAt"`
+	UpdatedAt              time.Time       `json:"updatedAt"`
 }
 
 type AssetDTO struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
+}
+
+// AssetLookupDTO = #25 (F13-B). `category` is null when the building's type uses no category of the
+// asset type (CR-025); `locationDetail` stays null — an asset is linked to a room only (CR-014).
+type AssetLookupDTO struct {
+	Code           string  `json:"code"`
+	Name           string  `json:"name"`
+	Category       *RefDTO `json:"category"`
+	Building       RefDTO  `json:"building"`
+	Floor          RefDTO  `json:"floor"`
+	Room           RefDTO  `json:"room"`
+	LocationDetail *string `json:"locationDetail"`
+}
+
+func toAssetLookupDTO(a AssetLookup) AssetLookupDTO {
+	d := AssetLookupDTO{Code: a.Code, Name: a.Name, Building: RefDTO(a.Building), Floor: RefDTO(a.Floor), Room: RefDTO(a.Room)}
+	if a.Category != nil {
+		c := RefDTO(*a.Category)
+		d.Category = &c
+	}
+	return d
 }
 
 type TicketResultDTO struct {
@@ -179,7 +215,8 @@ type AssessRequest struct {
 	ExpectedDoneOn string `json:"expectedDoneOn"`
 	WorkBy         string `json:"workBy"`
 	ContractorID   string `json:"contractorId"`
-	Reason         string `json:"reason"` // CR-008, optional on a change
+	AssigneeID     string `json:"assigneeId"` // CR-034, required for in_house
+	Reason         string `json:"reason"`     // CR-008; required on a reschedule (CR-034)
 }
 
 // #10
@@ -200,6 +237,22 @@ type ConfirmRequest struct {
 type SendBackRequest struct {
 	Reason   string   `json:"reason"`
 	PhotoIDs []string `json:"photoIds"`
+}
+
+// #21
+type CloseRequest struct {
+	Reason string `json:"reason"`
+}
+
+// #23 (F03)
+type FollowRequest struct {
+	Note     string   `json:"note"`
+	PhotoIDs []string `json:"photoIds"`
+}
+
+// #24 (F05)
+type HandoverRequest struct {
+	Reason string `json:"reason"`
 }
 
 // #14
@@ -253,7 +306,7 @@ func toCategoryDTOs(cats []Category) []CategoryDTO {
 		}
 		out = append(out, CategoryDTO{
 			ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, IsOther: c.IsOther,
-			AreaTypes: nonNil(c.AreaTypes), Symptoms: syms,
+			BuildingTypeIDs: nonNil(c.BuildingTypeIDs), Symptoms: syms,
 		})
 	}
 	return out
@@ -281,7 +334,7 @@ func toBuildingDTOs(blds []Building) []BuildingDTO {
 			}
 			floors = append(floors, FloorDTO{ID: f.ID, Name: f.Name, Level: f.Level, Rooms: rooms})
 		}
-		out = append(out, BuildingDTO{ID: b.ID, Name: b.Name, Floors: floors})
+		out = append(out, BuildingDTO{ID: b.ID, Name: b.Name, BuildingType: RefDTO(b.BuildingType), Floors: floors})
 	}
 	return out
 }
@@ -323,7 +376,7 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 		Reporter:       *toPersonDTO(&s.Reporter),
 		Technician:     toPersonDTO(s.Technician),
 		ViewerRelation: s.ViewerRelation, AwaitingMyConfirmation: s.AwaitingMyConfirmation,
-		WorkBy: s.WorkBy, ContractorTypes: nonNil(s.ContractorTypes),
+		WorkBy: s.WorkBy, ContractorTypes: nonNil(s.ContractorTypes), Assignee: toStaffDTO(s.Assignee),
 		AutoCloseAt: utcPtr(s.AutoCloseAt), SendBackCount: s.SendBackCount, Rating: s.Rating,
 		CreatedAt: s.CreatedAt.UTC(), AssessedAt: utcPtr(s.AssessedAt), ResolvedAt: utcPtr(s.ResolvedAt), ClosedAt: utcPtr(s.ClosedAt),
 		UpdatedAt: s.UpdatedAt.UTC(),
@@ -333,7 +386,10 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 		d.ExpectedDoneOn = &day
 	}
 	if s.Category != nil {
-		c := RefDTO(*s.Category)
+		c := CategoryRefDTO{ID: s.Category.ID, Name: s.Category.Name, Icon: "wrench"}
+		if s.CategoryIcon != nil {
+			c.Icon = *s.CategoryIcon
+		}
 		d.Category = &c
 	}
 	if s.Room != nil {
@@ -351,10 +407,116 @@ func toSummaryDTO(s TicketSummary) TicketSummaryDTO {
 	return d
 }
 
+// DuplicateTicketDTO is one #22 / #5 409 match: TicketSummary + subscriberCount (S04) + blocksReport (CR-020).
+type DuplicateTicketDTO struct {
+	TicketSummaryDTO
+	SubscriberCount int64 `json:"subscriberCount"`
+	BlocksReport    bool  `json:"blocksReport"`
+}
+
+func toDuplicateDTOs(list []Duplicate) []DuplicateTicketDTO {
+	out := make([]DuplicateTicketDTO, 0, len(list))
+	for _, d := range list {
+		out = append(out, DuplicateTicketDTO{TicketSummaryDTO: toSummaryDTO(d.TicketSummary), SubscriberCount: d.SubscriberCount,
+			BlocksReport: d.BlocksReport})
+	}
+	return out
+}
+
+// blockingDuplicates: the #5 409 lists only matches that block the report.
+func blockingDuplicates(list []TicketDetail) []Duplicate {
+	out := make([]Duplicate, 0, len(list))
+	for _, d := range list {
+		out = append(out, Duplicate{TicketDetail: d, BlocksReport: true})
+	}
+	return out
+}
+
 func toSummaryDTOs(list []TicketSummary) []TicketSummaryDTO {
 	out := make([]TicketSummaryDTO, 0, len(list))
 	for _, s := range list {
 		out = append(out, toSummaryDTO(s))
+	}
+	return out
+}
+
+// MyTicketDTO is one S06 row (#35, CR-019).
+type MyTicketDTO struct {
+	ID                     uuid.UUID       `json:"id"`
+	TicketNo               string          `json:"ticketNo"`
+	Status                 string          `json:"status"`
+	Step                   string          `json:"step"`
+	ClosedReason           *string         `json:"closedReason"`
+	Category               *CategoryRefDTO `json:"category"`
+	CategoryOther          *string         `json:"categoryOther"`
+	Title                  string          `json:"title"`
+	Building               RefDTO          `json:"building"`
+	Floor                  RefDTO          `json:"floor"`
+	Room                   *RefDTO         `json:"room"`
+	LocationDetail         *string         `json:"locationDetail"`
+	ViewerRelation         string          `json:"viewerRelation"`
+	AwaitingMyConfirmation bool            `json:"awaitingMyConfirmation"`
+	ExpectedDoneOn         *string         `json:"expectedDoneOn"`
+	Assignee               *StaffDTO       `json:"assignee"` // CR-034
+	AutoCloseAt            *time.Time      `json:"autoCloseAt"`
+	Rating                 *int16          `json:"rating"`
+	ResolvedAt             *time.Time      `json:"resolvedAt"`
+	UpdatedAt              time.Time       `json:"updatedAt"`
+}
+
+// StaffDTO is the ticket `assignee` and a #36 row (CR-034).
+type StaffDTO struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	RoleName string    `json:"roleName"`
+}
+
+func toStaffDTO(s *Staff) *StaffDTO {
+	if s == nil {
+		return nil
+	}
+	d := StaffDTO(*s)
+	return &d
+}
+
+func toStaffDTOs(list []Staff) []StaffDTO {
+	out := make([]StaffDTO, 0, len(list))
+	for _, s := range list {
+		out = append(out, StaffDTO(s))
+	}
+	return out
+}
+
+func toMyTicketDTOs(list []MyTicket) []MyTicketDTO {
+	out := make([]MyTicketDTO, 0, len(list))
+	for _, t := range list {
+		d := MyTicketDTO{
+			ID: t.ID, TicketNo: t.TicketNo, Status: t.Status, Step: t.Step(), ClosedReason: t.ClosedReason,
+			CategoryOther: t.CategoryOther, Title: t.Title,
+			Building: RefDTO(t.Building), Floor: RefDTO(t.Floor), LocationDetail: t.LocationDetail,
+			ViewerRelation: RelationSubscriber, AwaitingMyConfirmation: t.IsReporter && t.Status == StatusResolved,
+			AutoCloseAt: utcPtr(t.AutoCloseAt), Rating: t.Rating, ResolvedAt: utcPtr(t.ResolvedAt), UpdatedAt: t.UpdatedAt.UTC(),
+			Assignee: toStaffDTO(t.Assignee),
+		}
+		if t.IsReporter {
+			d.ViewerRelation = RelationReporter
+		}
+		if t.ExpectedDoneOn != nil {
+			day := t.ExpectedDoneOn.Format(time.DateOnly)
+			d.ExpectedDoneOn = &day
+		}
+		if t.Category != nil {
+			c := CategoryRefDTO{ID: t.Category.ID, Name: t.Category.Name, Icon: "wrench"}
+			if t.CategoryIcon != nil {
+				c.Icon = *t.CategoryIcon
+			}
+			d.Category = &c
+		}
+		if t.Room != nil {
+			r := RefDTO(*t.Room)
+			d.Room = &r
+		}
+		out = append(out, d)
 	}
 	return out
 }
@@ -366,7 +528,9 @@ func toDetailDTO(t TicketDetail) TicketDetailDTO {
 		SubscriberCount: t.SubscriberCount, RatingComment: t.RatingComment,
 		AllowedActions: t.AllowedActions, BlockedActions: t.BlockedActions,
 	}
-	// `asset` is filled from the asset register in Stage 6 (F13-B); until then it stays null.
+	if t.Asset != nil {
+		d.Asset = &AssetDTO{Code: t.Asset.Code, Name: t.Asset.Name}
+	}
 	if t.Result != nil {
 		d.Result = &TicketResultDTO{
 			Note: t.Result.Note, Photos: toPhotoDTOs(t.Result.Photos), By: toPersonDTO(t.Result.By), At: utcPtr(t.Result.At),

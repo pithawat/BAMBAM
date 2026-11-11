@@ -1,2 +1,4 @@
+import { Suspense } from "react";
 import { ContractorsScreen } from "@/modules/repair/components/contractors";
-export default function ContractorsPage() { return <ContractorsScreen />; }
+import { TicketSkeleton } from "@/modules/repair/components/ticket-ui";
+export default function ContractorsPage() { return <Suspense fallback={<TicketSkeleton />}><ContractorsScreen /></Suspense>; }

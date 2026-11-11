@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { purgeExpiredDraftPhotos } from "@/lib/draft-photos";
 import { getMe } from "@/lib/platform/api";
 import type { Me } from "@/lib/platform/types";
 
@@ -28,6 +29,8 @@ export function MeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(fetchMe, [fetchMe]);
+  // App start: draft photos older than 24 h are deleted (repair CR-026 A1).
+  useEffect(() => { void purgeExpiredDraftPhotos(); }, []);
 
   const reload = useCallback(() => {
     setState({ status: "loading", me: null });

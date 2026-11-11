@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowRight, HardHat, Info, Loader2, Plus, Star, Wrench } from "lucide-react";
+import { AlertCircle, ArrowRight, HardHat, Info, Loader2, Plus, Star, UserRound, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/components/shared/me-provider";
 import { Picker } from "@/components/shared/picker";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { Button } from "@/components/ui/button";
@@ -11,19 +12,20 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { assessTicket, confirmTicket, getContractors, sendBackTicket } from "../api";
-import { assessFieldMessages, errorCode, errorMessage, fieldErrors, reviewFieldMessages } from "../errors";
-import type { Contractor, TicketDetail, WorkBy } from "../types";
+import { assessTicket, closeTicket, confirmTicket, getContractors, getTechnicians, getTicket, handoverTicket, sendBackTicket } from "../api";
+import { assessFieldMessages, errorCode, errorMessage, fieldErrors, handoverFieldMessages, reviewFieldMessages } from "../errors";
+import type { Contractor, StaffRef, TicketDetail, WorkBy } from "../types";
 import { ContractorFormDialog } from "./contractors";
-import { PhotoPicker, type PhotoItem } from "./photo-picker";
+import { forgetUploads, photoBlocker, PhotoPicker, uploadKeptPhotos, type PhotoItem } from "./photo-picker";
 import { RESOLVED_TOAST, ResolveFields } from "./resolve-form";
 import { addDays, dayLabel, RATING_LABELS, shortDate, ticketLocation, ticketTitle, todayBangkok } from "./ticket-presentation";
 
 // S07 dialogs (CR-005, CR-008, wording CR-009). The server decides the actions (`allowedActions`); the S07
 // next-action card opens these: technician → เริ่มดำเนินการ / เลื่อนวันเสร็จ (S17), บันทึกผลซ่อม (S10 sheet)
 //                               reporter   → ประเมินตรวจงาน (S08, empty stars or the star tapped) / ส่งกลับให้แก้
+//                               admin      → ปิดงาน (F08-B, Stage 3; also on S11)
 
-type Open = { kind: "assess" } | { kind: "confirm"; score: number } | { kind: "send_back" } | { kind: "resolve" } | null;
+type Open = { kind: "assess" } | { kind: "confirm"; score: number } | { kind: "send_back" } | { kind: "resolve" } | { kind: "close" } | { kind: "handover" } | null;
 
 export function useTicketActions(ticket: TicketDetail, onChanged: (t: TicketDetail) => void, opts: { awaitingReaccept: boolean }) {
   const [open, setOpen] = useState<Open>(null);
@@ -45,11 +47,14 @@ export function useTicketActions(ticket: TicketDetail, onChanged: (t: TicketDeta
   const firstAssess = !ticket.expectedDoneOn || !ticket.workBy;
   const dialogs = <>
     {allowed.has("assess") && <AssessDialog ticket={ticket} open={open?.kind === "assess"} onOpenChange={close} reaccept={opts.awaitingReaccept}
-      onDone={(t) => done(t, firstAssess ? "เริ่มดำเนินการแล้ว ผู้แจ้งจะได้รับแจ้งเตือนวันที่คาดว่าจะเสร็จ" : "บันทึกวันใหม่แล้ว ผู้แจ้งจะได้รับแจ้งเตือน")} />}
+      onDone={(t) => done(t, firstAssess ? "เริ่มดำเนินการแล้ว ผู้แจ้งจะเห็นวันที่คาดว่าจะเสร็จในหน้างาน" : "บันทึกวันใหม่แล้ว ผู้แจ้งจะเห็นวันใหม่ในหน้างาน")} />}
     {allowed.has("resolve") && <ResolveDialog ticket={ticket} open={open?.kind === "resolve"} onOpenChange={close} onDone={(t) => done(t, RESOLVED_TOAST)} />}
     {allowed.has("confirm") && <ConfirmDialog ticket={ticket} open={open?.kind === "confirm"} initial={open?.kind === "confirm" ? open.score : 0} onOpenChange={close}
       onSendBack={() => setOpen({ kind: "send_back" })} onDone={(t) => done(t, "ขอบคุณที่ประเมินตรวจงาน งานนี้ปิดแล้ว")} />}
-    {allowed.has("send_back") && <SendBackDialog ticket={ticket} open={open?.kind === "send_back"} onOpenChange={close} onDone={(t) => done(t, "ส่งกลับให้ช่างแล้ว ช่างจะได้รับแจ้งเตือน")} />}
+    {allowed.has("send_back") && <SendBackDialog ticket={ticket} open={open?.kind === "send_back"} onOpenChange={close} onDone={(t) => done(t, "ส่งกลับให้ช่างแล้ว")} />}
+    {allowed.has("close") && <CloseTicketDialog ticket={ticket} open={open?.kind === "close"} onOpenChange={close} onDone={(t) => done(t, CLOSED_TOAST)} />}
+    {allowed.has("handover") && open?.kind === "handover" && <HandoverDialog ticket={ticket} open onOpenChange={close}
+      onDone={t => done(t, "ส่งต่อให้ช่างแล้ว")} onStale={() => { setOpen(null); getTicket(ticket.id).then(onChanged, err => toast.error(errorMessage(err))); }} />}
   </>;
   return {
     allowed,
@@ -57,6 +62,8 @@ export function useTicketActions(ticket: TicketDetail, onChanged: (t: TicketDeta
     resolve: () => setOpen({ kind: "resolve" }),
     confirm: (score = 0) => setOpen({ kind: "confirm", score }),
     sendBack: () => setOpen({ kind: "send_back" }),
+    close: () => setOpen({ kind: "close" }),
+    handover: () => setOpen({ kind: "handover" }),
     dialogs,
   };
 }
@@ -81,13 +88,17 @@ function handleError(err: unknown, onStale: () => void): Record<string, string> 
   return {};
 }
 
-// ---- S17 เริ่มดำเนินการ / เลื่อนวันเสร็จ (CR-005, CR-006, CR-008 date chips + reason, CR-009 wording) ----
+// ---- S17 เริ่มดำเนินการ / เลื่อนวันเสร็จ (CR-005, CR-006, CR-008 date chips + reason, CR-009 wording; CR-034:
+// ประเภทผู้ดำเนินการซ่อม, required ช่างผู้รับผิดชอบ for in-house, required reason when the date moves outside a rework) ----
 
 const WORK_BY = [{ value: "in_house", label: "ช่างของบริษัท" }, { value: "contractor", label: "ช่างภายนอก" }];
 
 function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogProps & { reaccept: boolean }) {
+  const me = useCurrentUser();
   const today = todayBangkok();
   const first = !ticket.expectedDoneOn || !ticket.workBy;
+  // Same rule as #9: a reason is required when the date moves, except while reworking after a send back.
+  const reasonRequired = !first && !reaccept && ticket.sendBackCount === 0;
   const chips = [
     { key: "today", label: "วันนี้", day: today },
     { key: "tomorrow", label: "พรุ่งนี้", day: addDays(today, 1) },
@@ -97,15 +108,22 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
   const [picked, setPicked] = useState("");
   const [workBy, setWorkBy] = useState<WorkBy>(ticket.workBy ?? "in_house");
   const [contractorId, setContractorId] = useState(ticket.contractor?.id ?? "");
+  const [assigneeId, setAssigneeId] = useState("");
   const [reason, setReason] = useState("");
   const [contractors, setContractors] = useState<Contractor[]>();
+  const [technicians, setTechnicians] = useState<StaffRef[]>();
   const [adding, setAdding] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
     getContractors({ pageSize: 100 }).then((p) => setContractors(p.items), () => setContractors([]));
-  }, [open]);
+    // Default = the ticket's assignee, else me, when listed (CR-034).
+    getTechnicians().then((list) => {
+      setTechnicians(list);
+      setAssigneeId((cur) => cur || [ticket.assignee?.id, me.id].find((id) => id && list.some((t) => t.id === id)) || "");
+    }, () => setTechnicians([]));
+  }, [open, ticket.assignee?.id, me.id]);
   const day = chip === "pick" ? picked : chips.find((c) => c.key === chip)?.day ?? "";
   const clear = (name: string) => setErrors((e) => { const n = { ...e }; delete n[name]; return n; });
   async function submit(e: React.FormEvent) {
@@ -115,25 +133,35 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
     if (!day) local.expectedDoneOn = "เลือกวันที่คาดว่าจะเสร็จ";
     else if (day < today) local.expectedDoneOn = "เลือกวันนี้หรือหลังจากนี้";
     if (workBy === "contractor" && !contractorId) local.contractorId = "เลือกช่างภายนอก";
+    if (workBy === "in_house" && !assigneeId) local.assigneeId = "เลือกช่างผู้รับผิดชอบ";
+    if (reasonRequired && day && day !== ticket.expectedDoneOn && !reason.trim()) local.reason = "กรุณาใส่เหตุผลที่เลื่อน";
     if (Object.keys(local).length) { setErrors(local); return; }
     setBusy(true); setErrors({});
     try {
       onDone(await assessTicket(ticket.id, {
-        expectedDoneOn: day, workBy, ...(workBy === "contractor" ? { contractorId } : {}),
+        expectedDoneOn: day, workBy, ...(workBy === "contractor" ? { contractorId } : { assigneeId }),
         ...(!first && reason.trim() ? { reason: reason.trim() } : {}),
       }));
-    } catch (err) { setErrors(handleError(err, () => onOpenChange(false))); if (errorCode(err) === "CONTRACTOR_NOT_FOUND") setContractorId(""); }
+    } catch (err) {
+      if (errorCode(err) === "ASSIGNEE_INVALID") {
+        setAssigneeId(""); setErrors({ assigneeId: errorMessage(err) });
+        getTechnicians().then(setTechnicians, () => undefined);
+        return;
+      }
+      setErrors(handleError(err, () => onOpenChange(false))); if (errorCode(err) === "CONTRACTOR_NOT_FOUND") setContractorId("");
+    }
     finally { setBusy(false); }
   }
   const options = (contractors ?? []).filter((c) => c.isActive).map((c) => ({ value: c.id, label: c.name, description: c.types.map((t) => t.name).join(", ") }));
+  const techOptions = (technicians ?? []).map((t) => ({ value: t.id, label: t.id === me.id ? `${t.name} (ฉัน)` : t.name, description: t.roleName }));
   const title = first ? "เริ่มดำเนินการ" : reaccept ? "รับแก้ไขและกำหนดวันเสร็จใหม่" : "เลื่อนวันที่คาดว่าจะเสร็จ";
   // The contractor form is a sibling of this dialog (not inside its <form>): submit events bubble through portals.
   return <>
-    <Dialog open={open} onOpenChange={(o) => { if (o) { setChip(""); setPicked(""); setReason(""); setWorkBy(ticket.workBy ?? "in_house"); setContractorId(ticket.contractor?.id ?? ""); setErrors({}); } onOpenChange(o); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (o) { setChip(""); setPicked(""); setReason(""); setWorkBy(ticket.workBy ?? "in_house"); setContractorId(ticket.contractor?.id ?? ""); setAssigneeId(""); setTechnicians(undefined); setErrors({}); } onOpenChange(o); }}>
       <DialogContent className={sheetLike}>
         <form onSubmit={submit} noValidate className="space-y-5">
           <DialogHeader><DialogTitle className="text-lg">{title}</DialogTitle>
-            <DialogDescription>{first ? "กำหนดวันที่คาดว่าจะเสร็จและใครซ่อม ผู้แจ้งจะเห็นวันที่นี้และได้รับแจ้งเตือนทันที" : `เดิม ${ticket.expectedDoneOn ? dayLabel(ticket.expectedDoneOn, true) : "—"} · ผู้แจ้งจะได้รับแจ้งเตือนวันใหม่`}</DialogDescription></DialogHeader>
+            <DialogDescription>{first ? "กำหนดวันที่คาดว่าจะเสร็จและผู้ดำเนินการซ่อม ผู้แจ้งจะเห็นวันที่นี้ในหน้างานทันที" : `เดิม ${ticket.expectedDoneOn ? dayLabel(ticket.expectedDoneOn, true) : "—"} · ผู้แจ้งจะเห็นวันใหม่ในหน้างาน`}</DialogDescription></DialogHeader>
           <div className="space-y-2">
             <p id="expectedDoneOn-label" className="text-[15px] font-semibold">คาดว่าจะเสร็จ <span className="text-destructive">*</span></p>
             <div role="radiogroup" aria-labelledby="expectedDoneOn-label" aria-describedby="expectedDoneOn-error" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -148,9 +176,14 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
             {chip === "pick" && <Input id="expectedDoneOn" type="date" min={today} value={picked} onChange={(e) => { setPicked(e.target.value); clear("expectedDoneOn"); }} aria-label="เลือกวันที่คาดว่าจะเสร็จ" aria-invalid={!!errors.expectedDoneOn} className="h-12 rounded-sm bg-card text-base" />}
             <FieldError id="expectedDoneOn-error" message={errors.expectedDoneOn} />
           </div>
-          <div className="space-y-2"><p className="text-[15px] font-semibold">ใครซ่อม <span className="text-destructive">*</span></p>
-            <SegmentedControl label="ใครซ่อม" value={workBy} options={WORK_BY} onValueChange={(v) => { setWorkBy(v as WorkBy); clear("workBy"); clear("contractorId"); }} />
+          <div className="space-y-2"><p className="text-[15px] font-semibold">ประเภทผู้ดำเนินการซ่อม <span className="text-destructive">*</span></p>
+            <SegmentedControl label="ประเภทผู้ดำเนินการซ่อม" value={workBy} options={WORK_BY} onValueChange={(v) => { setWorkBy(v as WorkBy); clear("workBy"); clear("contractorId"); clear("assigneeId"); }} />
             <FieldError id="workBy-error" message={errors.workBy} />
+            {workBy === "in_house" && <div className="space-y-2 pt-1"><label id="assigneeId-label" className="text-sm font-medium">ช่างผู้รับผิดชอบ <span className="text-destructive">*</span></label>
+              <Picker id="assigneeId" title="ช่างผู้รับผิดชอบ" placeholder={technicians ? "เลือกช่างผู้รับผิดชอบ" : "กำลังโหลด…"} icon={UserRound} value={assigneeId}
+                onValueChange={(v) => { setAssigneeId(v); clear("assigneeId"); }} options={techOptions} invalid={!!errors.assigneeId} disabled={!technicians}
+                searchPlaceholder="ค้นหาชื่อช่าง" emptyText="ไม่มีผู้ใช้ที่รับงานซ่อมได้" aria-labelledby="assigneeId-label" aria-describedby="assigneeId-error" />
+              <FieldError id="assigneeId-error" message={errors.assigneeId} /></div>}
             {workBy === "contractor" && <div className="space-y-2 pt-1"><label id="contractorId-label" className="text-sm font-medium">ช่างภายนอก <span className="text-destructive">*</span></label>
               <Picker id="contractorId" title="ช่างภายนอก" placeholder={contractors ? "เลือกช่างภายนอก" : "กำลังโหลด…"} icon={HardHat} value={contractorId}
                 onValueChange={(v) => { setContractorId(v); clear("contractorId"); }} options={options} invalid={!!errors.contractorId} disabled={!contractors}
@@ -158,8 +191,10 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
               <Button type="button" variant="link" className="h-10 px-0" onClick={() => setAdding(true)}><Plus aria-hidden />เพิ่มช่างภายนอกใหม่</Button>
               <FieldError id="contractorId-error" message={errors.contractorId} /></div>}
           </div>
-          {!first && <div className="space-y-2"><label htmlFor="assess-reason" className="text-[15px] font-semibold">เหตุผลที่เลื่อน <span className="text-xs font-normal text-muted-foreground">ไม่บังคับ · ผู้แจ้งเห็นข้อความนี้</span></label>
-            <Input id="assess-reason" value={reason} onChange={(e) => { setReason(e.target.value); clear("reason"); }} maxLength={100} placeholder="เช่น รออะไหล่" aria-describedby="reason-error" className="h-12 rounded-sm bg-card text-base" />
+          {!first && <div className="space-y-2"><label htmlFor="assess-reason" className="text-[15px] font-semibold">เหตุผลที่เลื่อน{" "}
+            {reasonRequired ? <><span className="text-destructive">*</span> <span className="text-xs font-normal text-muted-foreground">ผู้แจ้งเห็นข้อความนี้</span></>
+              : <span className="text-xs font-normal text-muted-foreground">ไม่บังคับ · ผู้แจ้งเห็นข้อความนี้</span>}</label>
+            <Input id="assess-reason" value={reason} onChange={(e) => { setReason(e.target.value); clear("reason"); }} maxLength={100} placeholder="เช่น รออะไหล่" aria-invalid={!!errors.reason} aria-describedby="reason-error" className="h-12 rounded-sm bg-card text-base" />
             <FieldError id="reason-error" message={errors.reason} /></div>}
           <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>ยกเลิก</Button>
             <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}{first ? "เริ่มดำเนินการ" : "บันทึกวันใหม่"}</Button></DialogFooter>
@@ -168,6 +203,8 @@ function AssessDialog({ ticket, open, onOpenChange, onDone, reaccept }: DialogPr
     </Dialog>
     <ContractorFormDialog open={adding} onOpenChange={setAdding} onSaved={(c) => {
       setAdding(false); setContractors((old) => [c, ...(old ?? [])]); setContractorId(c.id); clear("contractorId"); toast.success("เพิ่มช่างภายนอกแล้ว");
+    }} onPickExisting={(c) => {
+      setAdding(false); setContractors((old) => old?.some((x) => x.id === c.id) ? old : [c, ...(old ?? [])]); setContractorId(c.id); clear("contractorId"); toast.success(`เลือก ${c.name} แล้ว`);
     }} />
   </>;
 }
@@ -275,14 +312,27 @@ function SendBackDialog({ ticket, open, onOpenChange, onDone }: DialogProps) {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  /** `กำลังส่งรูป {n}/{m}…` while the submit uploads the kept photos (CR-026 A1). */
+  const [sending, setSending] = useState("");
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) { setErrors({ reason: "กรุณาบอกสิ่งที่ยังไม่เรียบร้อย" }); return; }
-    if (photos.some((p) => p.status === "uploading")) { setErrors({ photoIds: "รอให้รูปอัปโหลดเสร็จก่อน" }); return; }
-    if (photos.some((p) => p.status === "failed")) { setErrors({ photoIds: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" }); return; }
+    const wait = photoBlocker(photos);
+    if (wait) { setErrors({ photoIds: wait }); return; }
     setBusy(true); setErrors({});
-    try { onDone(await sendBackTicket(ticket.id, { reason: reason.trim(), photoIds: photos.map((p) => p.photo!.id) })); setPhotos([]); }
-    catch (err) { setErrors(handleError(err, () => onOpenChange(false))); }
+    let photoIds: string[];
+    try {
+      // CR-026 A1: the photos go up only now (#3), then #9 attaches them.
+      [photoIds] = await uploadKeptPhotos([{ items: photos, onChange: setPhotos }], (n, m) => setSending(`กำลังส่งรูป ${n}/${m}…`));
+    } catch {
+      setErrors({ photoIds: "ส่งไม่สำเร็จ ลองอีกครั้ง" }); setSending(""); setBusy(false); return;
+    }
+    setSending("");
+    try { onDone(await sendBackTicket(ticket.id, { reason: reason.trim(), photoIds })); setPhotos([]); }
+    catch (err) {
+      if (errorCode(err) === "PHOTO_NOT_FOUND") setPhotos(forgetUploads);
+      setErrors(handleError(err, () => onOpenChange(false)));
+    }
     finally { setBusy(false); }
   }
   const tech = ticket.technician?.name;
@@ -290,7 +340,7 @@ function SendBackDialog({ ticket, open, onOpenChange, onDone }: DialogProps) {
     <DialogContent className={sheetLike}>
       <form onSubmit={submit} noValidate className="space-y-4">
         <DialogHeader><DialogTitle className="text-lg">ส่งกลับให้ช่างแก้ไข</DialogTitle>
-          <DialogDescription>{tech ? `ช่าง${tech}` : "ช่าง"}จะได้รับแจ้งเตือน และกลับมาแก้ในงานเดิม ไม่ต้องแจ้งใหม่</DialogDescription></DialogHeader>
+          <DialogDescription>งานจะกลับไปให้{tech ? `ช่าง${tech}` : "ช่าง"}แก้ในงานเดิม ไม่ต้องแจ้งใหม่</DialogDescription></DialogHeader>
         <div className="space-y-2"><label htmlFor="reason" className="text-[15px] font-semibold">ยังพบปัญหาอะไร <span className="text-destructive">*</span></label>
           <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} placeholder="เช่น ยังมีน้ำหยดเมื่อเปิดแอร์นานๆ" aria-invalid={!!errors.reason} aria-describedby="reason-error" className="rounded-sm bg-card px-3.5 py-2.5 text-base" />
           <FieldError id="reason-error" message={errors.reason} /></div>
@@ -298,7 +348,84 @@ function SendBackDialog({ ticket, open, onOpenChange, onDone }: DialogProps) {
           <PhotoPicker value={photos} onChange={setPhotos} disabled={busy} invalid={!!errors.photoIds} />
           <FieldError id="photoIds-error" message={errors.photoIds} /></div>
         <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>ยกเลิก</Button>
-          <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}ส่งกลับให้แก้</Button></DialogFooter>
+          <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}{sending || "ส่งกลับให้แก้"}</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
+
+// ---- ปิดงาน (F08-B, _common.md §7) — admin, from S07 and S11 ----
+
+export const CLOSED_TOAST = "ปิดงานแล้ว";
+
+/** F05: the same team ticket returns to the technician, with its history intact. */
+export function HandoverDialog({ ticket, open, onOpenChange, onDone, onStale }: {
+  ticket: { id: string; ticketNo: string }; open: boolean; onOpenChange: (open: boolean) => void;
+  onDone: (ticket: TicketDetail) => void; onStale: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); event.stopPropagation();
+    if (sending.current) return;
+    if (!reason.trim()) { setError("กรุณาใส่เหตุผล"); field.current?.focus(); return; }
+    sending.current = true; setBusy(true); setError("");
+    try { onDone(await handoverTicket(ticket.id, { reason: reason.trim() })); }
+    catch (err) {
+      const errors = fieldErrors(err, handoverFieldMessages);
+      if (errors.reason) { setError(errors.reason); field.current?.focus(); }
+      else { toast.error(errorMessage(err)); if (errorCode(err) === "NOT_TEAM_HANDLED") onStale(); }
+    } finally { sending.current = false; setBusy(false); }
+  }
+  return <Dialog open={open} onOpenChange={value => { if (!sending.current) onOpenChange(value); }}>
+    <DialogContent className={sheetLike}>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <DialogHeader><DialogTitle>ส่งต่องานนี้ให้ช่าง?</DialogTitle><DialogDescription>งานเดิม เลขเดิม จะส่งกลับไปที่ช่าง รอช่างกำหนดวันเสร็จ</DialogDescription></DialogHeader>
+        <p className="text-sm text-muted-foreground">{ticket.ticketNo}</p>
+        <div className="space-y-2">
+          <label htmlFor="handover-reason" className="text-sm font-semibold">เหตุผลที่ส่งต่อ <span className="text-destructive">*</span></label>
+          <Textarea ref={field} id="handover-reason" value={reason} disabled={busy} onChange={event => { setReason(event.target.value); setError(""); }} maxLength={500} rows={4}
+            placeholder="เช่น ทีมเช็ดแล้วแต่ยังมีน้ำซึมจากฝ้า" aria-invalid={!!error} aria-describedby="handover-reason-error" />
+          <FieldError id="handover-reason-error" message={error} />
+        </div>
+        <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+          <Button type="submit" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}ส่งต่อให้ช่าง</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
+
+/** Admin closes any open ticket with a reason (1–500). Stale ticket (already closed) → toast + close the dialog. */
+export function CloseTicketDialog({ ticket, open, onOpenChange, onDone }: { ticket: { id: string; ticketNo: string }; open: boolean; onOpenChange: (open: boolean) => void; onDone: (t: TicketDetail) => void }) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!reason.trim()) { setError("กรุณาใส่เหตุผล"); return; }
+    setBusy(true); setError("");
+    try { onDone(await closeTicket(ticket.id, { reason: reason.trim() })); }
+    catch (err) {
+      const fields = fieldErrors(err, { reason: { REQUIRED: "กรุณาใส่เหตุผล", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" } });
+      if (fields.reason) setError(fields.reason);
+      else { toast.error(errorMessage(err)); if (errorCode(err) === "TICKET_CLOSED") onOpenChange(false); }
+    } finally { setBusy(false); }
+  }
+  return <Dialog open={open} onOpenChange={(o) => { if (o) { setReason(""); setError(""); } if (!busy) onOpenChange(o); }}>
+    <DialogContent className={sheetLike}>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <DialogHeader><DialogTitle className="text-lg">ปิดงาน {ticket.ticketNo}?</DialogTitle>
+          <DialogDescription>งานจะปิดทันทีโดยไม่ต้องรอตรวจรับ ผู้แจ้ง ผู้ติดตาม และช่างจะเห็นสถานะปิดแล้วในหน้างาน</DialogDescription></DialogHeader>
+        <div className="space-y-2"><label htmlFor="close-reason" className="text-[15px] font-semibold">เหตุผลที่ปิดงาน <span className="text-destructive">*</span></label>
+          <Textarea id="close-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} placeholder="เช่น ส่งเรื่องเปลี่ยนเครื่องใหม่ผ่านฝ่ายจัดซื้อแล้ว"
+            aria-invalid={!!error} aria-describedby="close-reason-error" className="rounded-sm bg-card px-3.5 py-2.5 text-base" />
+          <FieldError id="close-reason-error" message={error} /></div>
+        <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>ยกเลิก</Button>
+          <Button type="submit" variant="destructive" disabled={busy}>{busy && <Loader2 className="animate-spin" aria-hidden />}ปิดงาน</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;

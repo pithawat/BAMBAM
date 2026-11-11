@@ -1,11 +1,15 @@
 # S05 — แจ้งสำเร็จ
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · team-variant link changed by CR-021 · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** next-step line per `_common.md` §9 (no "เราจะแจ้งเตือน…").
+
+> **CR-021 (approved 2026-10-25):** team variant — `แจ้งเรื่องอื่น` opens `/repair/new?mode=team` (team mode is locked per entry point).
 
 > **CR-009 (approved 2026-10-18):** title `รับเรื่องแล้ว` · mini progress 5 steps `แจ้งงาน` (done) · `รับเรื่อง` (current) · `กำลังดำเนินการ` · `เสร็จ` · `ประเมินตรวจงาน` · next box `ช่างจะกำหนดวันที่คาดว่าจะเสร็จ แล้วเริ่มดำเนินการ เราจะแจ้งเตือนคุณที่กระดิ่งทันที`.
 
 
-> **CR-008 (approved 2026-10-16):** white success card in the new style (no gradient): mascot 120px · `ส่งเรื่องถึงช่างแล้ว` · `เลขงานของคุณ` + ticket no + copy · 4-step mini progress (แจ้งซ่อม done, ช่างรับเรื่อง current, ซ่อม, ให้คะแนน) · box `ต่อไป ช่างจะรับเรื่องและกำหนดวันที่คาดว่าจะเสร็จ เราจะแจ้งเตือนคุณที่กระดิ่งทันที` + `ความเร่งด่วนของงานนี้: {ระดับ} · {เหตุผล}` · summary (เรื่อง, สถานที่, รูป) · `ดูงานนี้` (primary) · `แจ้งเรื่องอื่น`. Variants team (`บันทึกงานทีมแล้ว`) and follow (`ติดตามงานแล้ว`) in Stage 4. Mockup: `../../changes/CR-008/style-and-form.html`.
+> **CR-008 (approved 2026-10-16):** white success card in the new style (no gradient): mascot 120px · `ส่งเรื่องถึงช่างแล้ว` · `เลขงานของคุณ` + ticket no + copy · 4-step mini progress (แจ้งซ่อม done, ช่างรับเรื่อง current, ซ่อม, ให้คะแนน) · box `ต่อไป ช่างจะรับเรื่องและกำหนดวันที่คาดว่าจะเสร็จ เราจะแจ้งเตือนคุณที่กระดิ่งทันที` + `ความเร่งด่วนของงานนี้: {ระดับ} · {เหตุผล}` · summary (เรื่อง, สถานที่, รูป) · `ดูงานนี้` (primary) · `แจ้งเรื่องอื่น`. Variants team (`บันทึกงานทีมแล้ว`) and follow (`ติดตามงานแล้ว`) in Stage 4. (CR-020: no follow variant — a follow goes to S07 with a toast; the team variant uses the copy table below.) Mockup: `../../changes/CR-008/style-and-form.html`.
 
 
 > **CR-005 (2026-10-15):** info box copy → "ส่งเรื่องถึงช่างแล้ว ช่างจะประเมินงานและแจ้งวันที่คาดว่าจะเสร็จ ติดตามได้ที่หน้าติดตามงานซ่อม" (no category queue).
@@ -65,7 +69,7 @@ Desktop (≥1024px): sidebar + top bar (title "แจ้งซ่อม"); cente
 | Title | แจ้งซ่อมเรียบร้อย · team: บันทึกงานทีมเรียบร้อย |
 | Ticket label | เลขงานของคุณ |
 | Summary labels | หมวดงาน · อาการ · สถานที่ · ความเร่งด่วน · team: สถานะ |
-| Next step | งานเข้าคิวช่างหมวด{หมวดงาน}แล้ว เราจะแจ้งเตือนเมื่อช่างรับงาน |
+| Next step | งานเข้าคิวช่างหมวด{หมวดงาน}แล้ว ~~เราจะแจ้งเตือนเมื่อช่างรับงาน~~ ติดตามได้ที่ "ติดตามงาน" (CR-024) |
 | Next step (team) | งานนี้ปิดแล้วและนับเป็นผลงานของทีม หากต้องใช้ช่างภายหลัง กด "ส่งต่อให้ช่าง" ในหน้ารายละเอียดงาน |
 | Buttons | ดูงานนี้ · กลับหน้าแรก |
 | Copy toast | คัดลอกเลขงานแล้ว |

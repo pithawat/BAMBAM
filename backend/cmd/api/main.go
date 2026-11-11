@@ -15,11 +15,17 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/pithawat/BAMBAM/backend/internal/modules/repair"
+	"github.com/pithawat/BAMBAM/backend/internal/modules/settings"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/assets"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/audit"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/auth"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/config"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/db"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/httpx"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/locations"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/middleware"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/permissions"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/roles"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
@@ -47,8 +53,13 @@ func run() error {
 	}
 	defer pool.Close()
 
-	// platform
-	userSvc := users.NewService(users.NewRepository(pool))
+	// platform: one permission catalog from every module (settings F29, D-049)
+	catalog := permissions.MustRegistry(repair.Permissions, permissions.Services, settings.Permissions)
+	roleSvc := roles.NewService(roles.NewRepository(pool), catalog)
+	userSvc := users.NewService(users.NewRepository(pool), roleSvc, catalog, cfg.SuperAdminEmployeeCodes)
+	if err := userSvc.EnsureEnvSuperAdmins(ctx); err != nil {
+		return err
+	}
 	userCtl := users.NewController(userSvc, cfg.EnvironmentLabel())
 	sessions := auth.NewSessionStore(pool, userSvc, cfg.SessionTTL)
 	authH := auth.NewHandler(cfg, sessions, userSvc, userCtl, func(ctx context.Context) error { return pool.Ping(ctx) })
@@ -60,16 +71,23 @@ func run() error {
 	}
 	repairSvc := repair.NewService(repair.NewRepository(pool), photoStore)
 	repairCtl := repair.NewController(repairSvc)
+	locationSvc := locations.NewService(locations.NewRepository(pool))
+	repairAdmin := repair.NewSettingsAdmin(pool)
+	settingsCtl := settings.NewController(settings.NewService(settings.Deps{
+		Roles:     roleSvc,
+		Users:     users.NewAdmin(users.NewAdminRepository(pool), userSvc),
+		Audit:     audit.NewReader(pool),
+		Locations: locationSvc,
+		Assets:    assets.NewService(assets.NewRepository(pool), locationSvc),
+		Repair:    repairAdmin,
+		Master:    repairAdmin,
+	}))
 
 	if cfg.RoleSwitcherEnabled {
 		if err := userSvc.EnsureDemoUsers(ctx); err != nil {
 			return err
 		}
 		slog.Info("role switcher enabled, demo users seeded")
-		// dev/UAT: sample master data until the real seed files arrive (D-032)
-		if err := repairSvc.EnsureSampleData(ctx); err != nil {
-			return err
-		}
 	}
 
 	r := gin.New()
@@ -88,6 +106,7 @@ func run() error {
 		auth.RegisterDevRoutes(dev, authH)
 	}
 	repair.RegisterRoutes(authed.Group("/repair"), repairCtl)
+	settings.RegisterRoutes(authed.Group("/settings"), settingsCtl)
 
 	go purgeSessions(ctx, sessions)
 	go purgePhotos(ctx, repairSvc)

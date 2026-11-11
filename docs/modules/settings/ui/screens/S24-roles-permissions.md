@@ -1,6 +1,6 @@
 # S24 — Role และสิทธิ์
 
-Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
+Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending) · CR-001 applied 2026-10-26 (block below)
 
 - **Flows:** F29 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop (see ../../01-users.md)
@@ -18,12 +18,25 @@ Keys and defaults: `../../01-users.md` → Permission catalog. The API returns g
 |---|---|---|---|---|
 | ระบบแจ้งซ่อม | งานซ่อม | ดูทุกงาน | `repair.ticket.view_all` | เห็นงานซ่อมทุกงาน รวมชื่อและคะแนนช่างภายนอก |
 | | | ประเมินและบันทึกผล | `repair.ticket.work` | งานซ่อมทุกงานส่งถึง role นี้ ประเมินวันคาดว่าเสร็จ และบันทึกผลซ่อม |
-| | | ปรับความเร่งด่วน | `repair.ticket.set_priority` | เปลี่ยนความเร่งด่วนของงานใดก็ได้ |
+| | | ~~ปรับความเร่งด่วน~~ | ~~`repair.ticket.set_priority`~~ | removed (repair CR-015) |
 | | | ปิดงานใดก็ได้ | `repair.ticket.close_any` | ปิดงานได้ทันทีโดยไม่ต้องรอตรวจรับ |
 | | งานที่ทีมทำเอง | บันทึกงานทีมทำเอง | `repair.ticket.team_handle` | บันทึกงานที่ทีมแก้เองแล้วปิดทันที และส่งต่องานที่ตัวเองบันทึกให้ช่าง |
 | | | ส่งต่องานทีมทุกงาน | `repair.ticket.handover_any` | ส่งต่องานทีมทำเองของใครก็ได้ให้ช่าง |
 | | ช่างภายนอกและภาพรวม | จัดการช่างภายนอก | `repair.contractor.manage` | เพิ่มและแก้ไขข้อมูลช่างภายนอก |
 | | | ดูภาพรวมอาคาร | `repair.overview.view` | เปิดภาพรวมอาคารและงานที่ยังไม่ปิดในแต่ละชั้น |
+
+
+> **CR-001 (2026-10-26, design `../mockups/CR-001-admin-settings.html#roles`, screenshots `roles-*.png`) — overrides Layout / copy below where they differ:**
+> - Superadmin only (`settings.roles.manage`). Heading: H1 "Role และสิทธิ์", subtitle "กำหนดว่าแต่ละบทบาททำอะไรได้ใน BAMBAM", mascot, primary "เพิ่ม Role".
+> - Tabs: **ตารางสิทธิ์** · **รายการ Role {n}**. Info strip: "ทุก Role แจ้งซ่อมและติดตามงานตัวเองได้เสมอ / (repair CR-024: no notifications) Superadmin มีทุกสิทธิ์ · สิทธิ์ตั้งค่าระบบล็อกตามขอบเขตของผู้ดูแล".
+> - Matrix cards (icon + group name, right note "ติ๊กเพื่อให้สิทธิ์" or `Lock` "กำหนดโดยระบบ"): **งานแจ้งซ่อม** (ดูทุกงาน · ดำเนินการและบันทึกผลซ่อม · ปิดงานใดก็ได้) · **งานทีมและช่างภายนอก** (บันทึกงานทีมทำเอง · ส่งต่องานทีมทุกงาน · จัดการช่างภายนอก · ดูภาพรวมอาคาร) · **ตั้งค่าระบบ** — fixed, every cell disabled (อาคารและห้อง · อุปกรณ์และประเภทอุปกรณ์ · หมวดงานและอาการ · ประเภทผู้รับเหมา · ผู้ใช้ · Role และสิทธิ์ · ประวัติการเปลี่ยนแปลง). Column ⓘ tooltips = the permission descriptions from #6. The "ปรับความเร่งด่วน" column is gone (repair CR-015). Note under the matrix: "ความเร่งด่วนกำหนดจากอาการที่เลือกตอนแจ้งซ่อม ตั้งค่าได้ที่ “หมวดงานและอาการ”".
+> - Row header: role name + "{n} คน" (Superadmin with `Lock`). Changed cells soft-blue. Sticky save bar: "เปลี่ยนสิทธิ์ {n} รายการ" · ยกเลิกการเปลี่ยนแปลง · **บันทึกสิทธิ์**; save dialog "บันทึกการเปลี่ยนสิทธิ์?" per role "{role} · ผู้ใช้ {n} คน / เพิ่ม: … / ถอด: …", footer "มีผลในการใช้งานครั้งถัดไป โดยไม่ต้องออกจากระบบ", toast "บันทึกสิทธิ์แล้ว".
+> - Role list tab: table Role (+ `Lock` "Role ระบบ") · คำอธิบาย · ผู้ใช้ (link "{n} คน" → S25 filtered) · menu (แก้ไข Role · ลบ Role). Add-role dialog "เริ่มต้นสิทธิ์" select: สิทธิ์พื้นฐานเท่านั้น / คัดลอกจาก {role}, hint "คัดลอกเฉพาะสิทธิ์งานซ่อม สิทธิ์ตั้งค่าระบบสงวนตามบทบาทผู้ดูแล".
+> - Mobile: role `Select` "เลือก Role ที่ต้องการตั้งค่า" + switches per permission (fixed ones disabled with "· กำหนดโดยระบบ").
+> - Spelling in the CR-001 design is "Role" (capital R) in labels; keep it consistently.
+
+> **CR-006 (2026-10-29):** new rows (service access, `repair.building3d.view`, `settings.users.view`); the "ตั้งค่าระบบ" group is tickable (no longer locked) except for `super_admin`. Locked cells with a reason tooltip: the editor's own role ("แก้สิทธิ์ของ role ตัวเองไม่ได้"), keys the editor does not hold ("ให้ได้เฉพาะสิทธิ์ที่คุณมี"); the `super_admin` column is always locked; ดูโมเดล 3D อาคาร is disabled until ดูภาพรวมอาคาร is ticked. Restyle to the CR-006 frame. (CR-006)
+> **D-134 (2026-11-01, owner):** one card / table per system — ระบบแจ้งซ่อม has a two-level column header (การใช้บริการแจ้งซ่อม · งานแจ้งซ่อม · **งานทีม ช่างภายนอก และภาพรวมอาคาร**, renamed from "งานทีมและช่างภายนอก"); phones: one card per system with group sub-headings. (CR-006)
 
 ## Layout — mobile first
 
@@ -60,7 +73,7 @@ Desktop (≥1024px) — tab "สิทธิ์":
 Role และสิทธิ์                                          [+ เพิ่ม role]
 กำหนดว่าแต่ละ role ทำอะไรได้ในแต่ละระบบ
 [ สิทธิ์ | Role 7 ]
-ⓘ ทุก role แจ้งซ่อม ติดตามงานของตัวเอง และรับแจ้งเตือนได้เสมอ · Superadmin มีทุกสิทธิ์ แก้ไม่ได้
+ⓘ ทุก role แจ้งซ่อม ติดตามงานของตัวเอง ~~และรับแจ้งเตือน~~ได้เสมอ (CR-024) · Superadmin มีทุกสิทธิ์ แก้ไม่ได้
 (🔧) ระบบแจ้งซ่อม
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ งานซ่อม                 ดูทุกงาน ⓘ  ประเมินและบันทึกผล ⓘ  ปรับความเร่งด่วน ⓘ  ปิดงานใดก็ได้ ⓘ │ ← header row bg-muted
@@ -70,7 +83,6 @@ Role และสิทธิ์                                          [+ เ
 │ หัวหน้ารปภ. · 1 คน         ☐            ☐               ☐               ☐      │
 │ ช่างเทคนิค · 1 คน           ☑            ☑              [☑•]              ☐      │ ← changed cell: bg-secondary + dot
 │ Admin · 2 คน               ☑            ☐               ☑               ☑      │
-│ ผู้บริหาร · 3 คน            ☑            ☐               ☐               ☐      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ┌ งานที่ทีมทำเอง          บันทึกงานทีมทำเอง ⓘ   ส่งต่องานทีมทุกงาน ⓘ ┐ …
 ┌ ช่างภายนอกและภาพรวม     จัดการช่างภายนอก ⓘ    ดูภาพรวมอาคาร ⓘ    ┐ …
@@ -108,7 +120,7 @@ Desktop — tab "Role": `Card` + `Table`: Role (name + "role ระบบ" badge
 |---|---|
 | Title / subtitle | Role และสิทธิ์ / กำหนดว่าแต่ละ role ทำอะไรได้ในแต่ละระบบ |
 | Tabs | สิทธิ์ · Role {n} |
-| Info line | ทุก role แจ้งซ่อม ติดตามงานของตัวเอง และรับแจ้งเตือนได้เสมอ · Superadmin มีทุกสิทธิ์ แก้ไม่ได้ |
+| Info line | ทุก role แจ้งซ่อม ~~ติดตามงานของตัวเอง และรับแจ้งเตือน~~ และติดตามงานของตัวเองได้เสมอ (repair CR-024) · Superadmin มีทุกสิทธิ์ แก้ไม่ได้ |
 | Row header | {role} · {n} คน |
 | Locked row tooltip | Superadmin มีทุกสิทธิ์เสมอ |
 | Future systems line | ระบบจองรถ · ระบบจองห้องประชุม — จะมีสิทธิ์ให้ตั้งเมื่อระบบเปิดใช้งาน |

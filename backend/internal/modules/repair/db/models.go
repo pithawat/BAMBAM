@@ -11,6 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type PlatformAsset struct {
+	ID             uuid.UUID
+	Code           string
+	Name           string
+	AssetTypeID    uuid.UUID
+	RoomID         uuid.UUID
+	PosX           pgtype.Numeric
+	PosZ           pgtype.Numeric
+	RotationDeg    int16
+	IsActive       bool
+	CreatedBy      *uuid.UUID
+	UpdatedBy      *uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	LabelPrintedAt *time.Time
+	LabelPrintedBy *uuid.UUID
+	LabelSnapshot  []byte
+}
+
+type PlatformAssetType struct {
+	ID          uuid.UUID
+	Key         string
+	Name        string
+	CodePrefix  string
+	Icon        string
+	Mount       string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	UpdatedByID *uuid.UUID
+}
+
 type PlatformAuditLog struct {
 	ID          uuid.UUID
 	ActorUserID *uuid.UUID
@@ -22,15 +55,84 @@ type PlatformAuditLog struct {
 	UpdatedAt   time.Time
 }
 
-type PlatformRoom struct {
-	ID        uuid.UUID
+type PlatformBuilding struct {
+	ID             uuid.UUID
+	Name           string
+	SortOrder      int32
+	IsActive       bool
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	UpdatedByID    *uuid.UUID
+	BuildingTypeID uuid.UUID
+	ModelKey       *string
+}
+
+type PlatformBuildingType struct {
+	ID          uuid.UUID
+	Name        string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	UpdatedByID *uuid.UUID
+}
+
+type PlatformFloor struct {
+	ID         uuid.UUID
+	BuildingID uuid.UUID
+	Name       string
+	Level      int32
+	IsActive   bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+type PlatformFloorPlan struct {
 	FloorID   uuid.UUID
-	Name      string
-	AreaType  string
-	SortOrder int32
-	IsActive  bool
-	CreatedAt time.Time
+	WidthM    pgtype.Numeric
+	DepthM    pgtype.Numeric
+	ModelFile *string
 	UpdatedAt time.Time
+}
+
+type PlatformPermissionMatrix struct {
+	ID          bool
+	Version     int32
+	UpdatedByID *uuid.UUID
+	UpdatedAt   time.Time
+}
+
+type PlatformRole struct {
+	ID          uuid.UUID
+	Key         string
+	Name        string
+	Description string
+	IsSystem    bool
+	IsLocked    bool
+	SortOrder   int32
+	CreatedByID *uuid.UUID
+	UpdatedByID *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type PlatformRolePermission struct {
+	RoleID     uuid.UUID
+	Permission string
+	CreatedAt  time.Time
+}
+
+type PlatformRoom struct {
+	ID          uuid.UUID
+	FloorID     uuid.UUID
+	Name        string
+	AreaType    string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	PlanShape   []byte
+	UpdatedByID *uuid.UUID
 }
 
 type PlatformSession struct {
@@ -41,6 +143,22 @@ type PlatformSession struct {
 	ExpiresAt    time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type PlatformSiteBlock struct {
+	ID         uuid.UUID
+	MapNo      int16
+	Name       string
+	BuildingID *uuid.UUID
+	XM         pgtype.Numeric
+	ZM         pgtype.Numeric
+	RotDeg     pgtype.Numeric
+	WidthM     pgtype.Numeric
+	DepthM     pgtype.Numeric
+	Storeys    int16
+	Side       int16
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type PlatformUser struct {
@@ -63,18 +181,14 @@ type PlatformUser struct {
 
 type PlatformUserRole struct {
 	EmployeeCode string
-	Role         string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	RoleID       uuid.UUID
 }
 
-type RepairBuilding struct {
-	ID        uuid.UUID
-	Name      string
-	SortOrder int32
-	IsActive  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+type RepairAssetTypeCategory struct {
+	AssetTypeID uuid.UUID
+	CategoryID  uuid.UUID
 }
 
 type RepairCategory struct {
@@ -87,11 +201,12 @@ type RepairCategory struct {
 	UpdatedAt       time.Time
 	DefaultPriority string
 	IsOther         bool
+	UpdatedByID     *uuid.UUID
 }
 
-type RepairCategoryAreaType struct {
-	CategoryID uuid.UUID
-	AreaType   string
+type RepairCategoryBuildingType struct {
+	CategoryID     uuid.UUID
+	BuildingTypeID uuid.UUID
 }
 
 type RepairContractor struct {
@@ -112,6 +227,8 @@ type RepairContractorType struct {
 	CreatedByID *uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	IsActive    bool
+	UpdatedByID *uuid.UUID
 }
 
 type RepairContractorTypeLink struct {
@@ -119,16 +236,6 @@ type RepairContractorTypeLink struct {
 	TypeID       uuid.UUID
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
-}
-
-type RepairFloor struct {
-	ID         uuid.UUID
-	BuildingID uuid.UUID
-	Name       string
-	Level      int32
-	IsActive   bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
 }
 
 type RepairPerson struct {
@@ -159,15 +266,23 @@ type RepairSetting struct {
 	UpdatedAt        time.Time
 }
 
+type RepairStaff struct {
+	ID       uuid.UUID
+	Name     string
+	RoleKey  string
+	RoleName string
+}
+
 type RepairSymptom struct {
-	ID         uuid.UUID
-	CategoryID uuid.UUID
-	Name       string
-	SortOrder  int32
-	IsActive   bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Priority   string
+	ID          uuid.UUID
+	CategoryID  uuid.UUID
+	Name        string
+	SortOrder   int32
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Priority    string
+	UpdatedByID *uuid.UUID
 }
 
 type RepairTicket struct {
@@ -204,6 +319,8 @@ type RepairTicket struct {
 	SymptomOther            *string
 	PrioritySource          string
 	RoomID                  *uuid.UUID
+	AssetID                 *uuid.UUID
+	AssigneeID              *uuid.UUID
 }
 
 type RepairTicketCounter struct {

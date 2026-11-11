@@ -22,6 +22,7 @@ type errorBody struct {
 	Code    string            `json:"code"`
 	Message string            `json:"message"`
 	Fields  map[string]string `json:"fields,omitempty"`
+	Details any               `json:"details,omitempty"`
 }
 
 func OK(c *gin.Context, data any) {
@@ -40,7 +41,7 @@ func Error(c *gin.Context, err error) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": errorBody{Code: "INTERNAL", Message: "internal error"}})
 		return
 	}
-	c.AbortWithStatusJSON(status(e.Kind), gin.H{"error": errorBody{Code: e.Code, Message: e.Message, Fields: e.Fields}})
+	c.AbortWithStatusJSON(status(e.Kind), gin.H{"error": errorBody{Code: e.Code, Message: e.Message, Fields: e.Fields, Details: e.Details}})
 }
 
 func status(k apperr.Kind) int {
@@ -57,6 +58,8 @@ func status(k apperr.Kind) int {
 		return http.StatusConflict
 	case apperr.KindBusinessRule:
 		return http.StatusUnprocessableEntity
+	case apperr.KindNotImplemented:
+		return http.StatusNotImplemented
 	default:
 		return http.StatusInternalServerError
 	}

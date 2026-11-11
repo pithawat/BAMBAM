@@ -11,18 +11,116 @@ import (
 	"github.com/google/uuid"
 )
 
-const getUserWithRole = `-- name: GetUserWithRole :one
-SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, COALESCE(r.role, 'employee')::text AS role
+const countUsers = `-- name: CountUsers :one
+SELECT count(*)::bigint
 FROM platform.users u
-LEFT JOIN platform.user_roles r ON r.employee_code = u.employee_code
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+JOIN platform.roles r ON r.id = ur.role_id OR (ur.role_id IS NULL AND r.key = 'employee')
+WHERE NOT u.is_demo
+  AND ($1::uuid IS NULL OR r.id = $1::uuid)
+  AND ($2::text IS NULL
+       OR concat_ws(' ', u.first_name_th, u.last_name_th) ILIKE '%' || $2::text || '%'
+       OR concat_ws(' ', u.first_name_en, u.last_name_en) ILIKE '%' || $2::text || '%'
+       OR u.employee_code ILIKE '%' || $2::text || '%'
+       OR u.email ILIKE '%' || $2::text || '%')
+`
+
+type CountUsersParams struct {
+	RoleID *uuid.UUID
+	Q      *string
+}
+
+func (q *Queries) CountUsers(ctx context.Context, arg CountUsersParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countUsers, arg.RoleID, arg.Q)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getRoleForUpdate = `-- name: GetRoleForUpdate :one
+SELECT id, key, name, description, is_system, is_locked, sort_order, created_by_id, updated_by_id, created_at, updated_at FROM platform.roles WHERE id = $1 FOR SHARE
+`
+
+func (q *Queries) GetRoleForUpdate(ctx context.Context, id uuid.UUID) (PlatformRole, error) {
+	row := q.db.QueryRow(ctx, getRoleForUpdate, id)
+	var i PlatformRole
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.IsSystem,
+		&i.IsLocked,
+		&i.SortOrder,
+		&i.CreatedByID,
+		&i.UpdatedByID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserAdmin = `-- name: GetUserAdmin :one
+SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, r.id AS role_id, r.key AS role_key, r.name AS role_name
+FROM platform.users u
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+JOIN platform.roles r ON r.id = ur.role_id OR (ur.role_id IS NULL AND r.key = 'employee')
+WHERE u.id = $1 AND NOT u.is_demo
+`
+
+type GetUserAdminRow struct {
+	PlatformUser PlatformUser
+	RoleID       uuid.UUID
+	RoleKey      string
+	RoleName     string
+}
+
+// #9 / #10: one real user with the role id, key and name.
+func (q *Queries) GetUserAdmin(ctx context.Context, id uuid.UUID) (GetUserAdminRow, error) {
+	row := q.db.QueryRow(ctx, getUserAdmin, id)
+	var i GetUserAdminRow
+	err := row.Scan(
+		&i.PlatformUser.ID,
+		&i.PlatformUser.EmployeeCode,
+		&i.PlatformUser.SsoSubject,
+		&i.PlatformUser.FirstNameTh,
+		&i.PlatformUser.LastNameTh,
+		&i.PlatformUser.FirstNameEn,
+		&i.PlatformUser.LastNameEn,
+		&i.PlatformUser.Email,
+		&i.PlatformUser.Department,
+		&i.PlatformUser.Division,
+		&i.PlatformUser.PositionTh,
+		&i.PlatformUser.IsDemo,
+		&i.PlatformUser.LastLoginAt,
+		&i.PlatformUser.CreatedAt,
+		&i.PlatformUser.UpdatedAt,
+		&i.RoleID,
+		&i.RoleKey,
+		&i.RoleName,
+	)
+	return i, err
+}
+
+const getUserWithRole = `-- name: GetUserWithRole :one
+
+SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, r.key AS role, r.name AS role_name,
+       ARRAY(SELECT rp.permission FROM platform.role_permissions rp WHERE rp.role_id = r.id ORDER BY rp.permission)::text[] AS permissions
+FROM platform.users u
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+JOIN platform.roles r ON r.id = ur.role_id OR (ur.role_id IS NULL AND r.key = 'employee')
 WHERE u.id = $1
 `
 
 type GetUserWithRoleRow struct {
 	PlatformUser PlatformUser
 	Role         string
+	RoleName     string
+	Permissions  []string
 }
 
+// The user's role is their user_roles row, or `employee` when there is none (D-003).
+// Stored permissions are loaded on every request so matrix changes apply at once (D-049, BR-F29-7).
 func (q *Queries) GetUserWithRole(ctx context.Context, id uuid.UUID) (GetUserWithRoleRow, error) {
 	row := q.db.QueryRow(ctx, getUserWithRole, id)
 	var i GetUserWithRoleRow
@@ -43,6 +141,8 @@ func (q *Queries) GetUserWithRole(ctx context.Context, id uuid.UUID) (GetUserWit
 		&i.PlatformUser.CreatedAt,
 		&i.PlatformUser.UpdatedAt,
 		&i.Role,
+		&i.RoleName,
+		&i.Permissions,
 	)
 	return i, err
 }
@@ -72,9 +172,10 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 }
 
 const listDemoUsers = `-- name: ListDemoUsers :many
-SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, COALESCE(r.role, 'employee')::text AS role
+SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, r.key AS role
 FROM platform.users u
-LEFT JOIN platform.user_roles r ON r.employee_code = u.employee_code
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+JOIN platform.roles r ON r.id = ur.role_id OR (ur.role_id IS NULL AND r.key = 'employee')
 WHERE u.is_demo
 ORDER BY u.employee_code
 `
@@ -119,6 +220,101 @@ func (q *Queries) ListDemoUsers(ctx context.Context) ([]ListDemoUsersRow, error)
 		return nil, err
 	}
 	return items, nil
+}
+
+const searchUsers = `-- name: SearchUsers :many
+
+SELECT u.id, u.employee_code, u.sso_subject, u.first_name_th, u.last_name_th, u.first_name_en, u.last_name_en, u.email, u.department, u.division, u.position_th, u.is_demo, u.last_login_at, u.created_at, u.updated_at, r.id AS role_id, r.key AS role_key, r.name AS role_name
+FROM platform.users u
+LEFT JOIN platform.user_roles ur ON ur.employee_code = u.employee_code
+JOIN platform.roles r ON r.id = ur.role_id OR (ur.role_id IS NULL AND r.key = 'employee')
+WHERE NOT u.is_demo
+  AND ($1::uuid IS NULL OR r.id = $1::uuid)
+  AND ($2::text IS NULL
+       OR concat_ws(' ', u.first_name_th, u.last_name_th) ILIKE '%' || $2::text || '%'
+       OR concat_ws(' ', u.first_name_en, u.last_name_en) ILIKE '%' || $2::text || '%'
+       OR u.employee_code ILIKE '%' || $2::text || '%'
+       OR u.email ILIKE '%' || $2::text || '%')
+ORDER BY concat_ws(' ', u.first_name_th, u.last_name_th) COLLATE "th-x-icu", u.employee_code
+LIMIT $4 OFFSET $3
+`
+
+type SearchUsersParams struct {
+	RoleID *uuid.UUID
+	Q      *string
+	Off    int32
+	Lim    int32
+}
+
+type SearchUsersRow struct {
+	PlatformUser PlatformUser
+	RoleID       uuid.UUID
+	RoleKey      string
+	RoleName     string
+}
+
+// ---- settings Stage 3: users admin (#8–#10) ----
+// A person's role = their user_roles row, or `employee` without one (D-003). Demo users are never listed.
+// #8: q matches Thai / English name, employee code, email (case-insensitive); Thai name order.
+func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
+	rows, err := q.db.Query(ctx, searchUsers,
+		arg.RoleID,
+		arg.Q,
+		arg.Off,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchUsersRow
+	for rows.Next() {
+		var i SearchUsersRow
+		if err := rows.Scan(
+			&i.PlatformUser.ID,
+			&i.PlatformUser.EmployeeCode,
+			&i.PlatformUser.SsoSubject,
+			&i.PlatformUser.FirstNameTh,
+			&i.PlatformUser.LastNameTh,
+			&i.PlatformUser.FirstNameEn,
+			&i.PlatformUser.LastNameEn,
+			&i.PlatformUser.Email,
+			&i.PlatformUser.Department,
+			&i.PlatformUser.Division,
+			&i.PlatformUser.PositionTh,
+			&i.PlatformUser.IsDemo,
+			&i.PlatformUser.LastLoginAt,
+			&i.PlatformUser.CreatedAt,
+			&i.PlatformUser.UpdatedAt,
+			&i.RoleID,
+			&i.RoleKey,
+			&i.RoleName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setUserRole = `-- name: SetUserRole :exec
+INSERT INTO platform.user_roles (employee_code, role_id)
+VALUES ($1, $2)
+ON CONFLICT (employee_code) DO UPDATE SET role_id = EXCLUDED.role_id, updated_at = now()
+`
+
+type SetUserRoleParams struct {
+	EmployeeCode string
+	RoleID       uuid.UUID
+}
+
+// #10: the role by id (the service checked it exists).
+func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) error {
+	_, err := q.db.Exec(ctx, setUserRole, arg.EmployeeCode, arg.RoleID)
+	return err
 }
 
 const upsertDemoUser = `-- name: UpsertDemoUser :one
@@ -241,18 +437,22 @@ func (q *Queries) UpsertSSOUser(ctx context.Context, arg UpsertSSOUserParams) (P
 	return i, err
 }
 
-const upsertUserRole = `-- name: UpsertUserRole :exec
-INSERT INTO platform.user_roles (employee_code, role)
-VALUES ($1, $2)
-ON CONFLICT (employee_code) DO UPDATE SET role = EXCLUDED.role, updated_at = now()
+const upsertUserRole = `-- name: UpsertUserRole :execrows
+INSERT INTO platform.user_roles (employee_code, role_id)
+SELECT $1, r.id FROM platform.roles r WHERE r.key = $2
+ON CONFLICT (employee_code) DO UPDATE SET role_id = EXCLUDED.role_id, updated_at = now()
 `
 
 type UpsertUserRoleParams struct {
 	EmployeeCode string
-	Role         string
+	RoleKey      string
 }
 
-func (q *Queries) UpsertUserRole(ctx context.Context, arg UpsertUserRoleParams) error {
-	_, err := q.db.Exec(ctx, upsertUserRole, arg.EmployeeCode, arg.Role)
-	return err
+// Assigns a role by key; 0 rows = unknown role key.
+func (q *Queries) UpsertUserRole(ctx context.Context, arg UpsertUserRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertUserRole, arg.EmployeeCode, arg.RoleKey)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

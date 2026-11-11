@@ -1,4 +1,6 @@
-import type { TicketDetail, TimelineEvent, WorkBy } from "../types";
+import { can, PERM } from "@/lib/platform/permissions";
+import type { Me } from "@/lib/platform/types";
+import type { Photo, TicketDetail, TimelineEvent, WorkBy } from "../types";
 import { CLOSED_LABELS, dateTime, dayLabel, PRIORITY_LABELS, RATING_LABELS } from "./ticket-presentation";
 
 // S07 (CR-009 / D-060) reads the ticket as stages — แจ้งงาน · รับเรื่อง · กำลังดำเนินการ · (ส่งกลับให้แก้) · เสร็จ ·
@@ -8,15 +10,15 @@ import { CLOSED_LABELS, dateTime, dayLabel, PRIORITY_LABELS, RATING_LABELS } fro
 /** Who is looking: drives the wording ("คุณ" vs "ผู้แจ้ง") and the next-action card. */
 export type StoryViewer = "reporter" | "follower" | "technician" | "staff";
 
-export function storyViewer(ticket: Pick<TicketDetail, "viewerRelation">, role: string): StoryViewer {
+export function storyViewer(ticket: Pick<TicketDetail, "viewerRelation">, me: Pick<Me, "permissions">): StoryViewer {
   if (ticket.viewerRelation === "reporter") return "reporter";
   if (ticket.viewerRelation === "subscriber") return "follower";
-  if (role === "technician") return "technician";
+  if (can(me, PERM.ticketWork)) return "technician";
   return "staff";
 }
 
-export type StoryItem = { id: string; at: string; title: string; detail: string; warn?: boolean };
-export type Stage = { key: string; state: "done" | "now" | "later"; title: string; time?: string; desc: string; sub: StoryItem[] };
+export type StoryItem = { id: string; at: string; title: string; detail: string; warn?: boolean; photos?: Photo[] };
+export type Stage = { key: string; state: "done" | "now" | "later"; title: string; time?: string; desc: string; sub: StoryItem[]; photos?: Photo[] };
 
 export type Story = {
   stages: Stage[];
@@ -107,7 +109,7 @@ export function ticketStory(ticket: TicketDetail, viewer: StoryViewer, meId: str
         detail = e.data.from && e.data.to ? `จาก ${PRIORITY_LABELS[e.data.from]} เป็น ${PRIORITY_LABELS[e.data.to]}` : "";
         break;
     }
-    items.set(e.id, { id: e.id, at: e.at, title, detail, warn });
+    items.set(e.id, { id: e.id, at: e.at, title, detail, warn, photos: e.photos });
   }
   const item = (e: TimelineEvent) => items.get(e.id)!;
   const of = (...types: TimelineEvent["type"][]) => events.filter((e) => types.includes(e.type));
@@ -129,12 +131,12 @@ export function ticketStory(ticket: TicketDetail, viewer: StoryViewer, meId: str
 
   // รับเรื่อง happens on send (D-060); the technician then sets the date (เริ่มดำเนินการ).
   stages.push(ticket.step === "awaiting_assessment"
-    ? { key: "received", state: "now", title: "รับเรื่อง", time: dateTime(ticket.createdAt), desc: viewer === "technician" ? "รอคุณกำหนดวันเสร็จและกดเริ่มดำเนินการ" : "รอช่างกำหนดวันที่คาดว่าจะเสร็จ", sub: [] }
+    ? { key: "received", state: "now", title: "รับเรื่อง", time: dateTime(ticket.createdAt), desc: viewer === "technician" ? "รอคุณกำหนดวันเสร็จและกดเริ่มดำเนินการ" : "รอช่างกำหนดวันที่คาดว่าจะเสร็จ", sub: of("team_handled", "handed_over").map(item) }
     : { key: "received", state: "done", title: "รับเรื่อง", time: dateTime(ticket.createdAt), desc: "งานถึงช่างแล้ว", sub: [] });
 
   const workSub = of("assessment_changed", "priority_changed", "handed_over").filter((e) => !reaccepts.has(e.id) && (!sentBacks.length || e.at < sentBacks[0].at)).map(item);
   if (ticket.step === "awaiting_assessment") {
-    stages.push({ key: "work", state: "later", title: "กำลังดำเนินการ", desc: "ช่างกำหนดวันเสร็จและใครซ่อม แล้วเริ่มซ่อม", sub: [] });
+    stages.push({ key: "work", state: "later", title: "กำลังดำเนินการ", desc: "ช่างกำหนดวันเสร็จและผู้ดำเนินการซ่อม แล้วเริ่มซ่อม", sub: [] });
   } else if (ticket.step === "in_repair") {
     stages.push({ key: "work", state: "now", title: "กำลังดำเนินการ", desc: [`คาดว่าจะเสร็จ ${expected}`, ticket.technician?.name].filter(Boolean).join(" · "), sub: workSub });
   } else if (firstAssess || ticket.assessedAt) {
@@ -144,7 +146,7 @@ export function ticketStory(ticket: TicketDetail, viewer: StoryViewer, meId: str
       sub: workSub,
     });
   } else if (closedNoRepair) {
-    stages.push({ key: "work", state: "done", title: ticket.closedReason ? CLOSED_LABELS[ticket.closedReason] : "ปิดงานแล้ว", time: teamOrAdmin ? dateTime(teamOrAdmin.at) : undefined, desc: teamOrAdmin?.note ?? "", sub: [] });
+    stages.push({ key: "work", state: "done", title: ticket.closedReason ? CLOSED_LABELS[ticket.closedReason] : "ปิดงานแล้ว", time: teamOrAdmin ? dateTime(teamOrAdmin.at) : undefined, desc: teamOrAdmin?.note ?? "", sub: [], photos: teamOrAdmin?.photos });
   }
 
   // ส่งกลับให้แก้ appears only after a send back (CR-009).
@@ -166,7 +168,7 @@ export function ticketStory(ticket: TicketDetail, viewer: StoryViewer, meId: str
     const desc = ticket.closedReason === "confirmed" && ticket.rating
       ? `${you}ให้ ${ticket.rating} ดาว · ${RATING_LABELS[ticket.rating]}`
       : ticket.closedReason === "auto_closed" ? "ไม่ได้ประเมินภายใน 3 วัน ระบบจึงปิดงานให้" : ticket.closedReason ? CLOSED_LABELS[ticket.closedReason] : "";
-    stages.push({ key: "review", state: "done", title: ticket.closedReason === "auto_closed" ? "ปิดงานอัตโนมัติ" : "ประเมินตรวจงาน", time: closing ? dateTime(closing.at) : ticket.closedAt ? dateTime(ticket.closedAt) : undefined, desc, sub: [] });
+    stages.push({ key: "review", state: "done", title: ticket.closedReason === "team_handled" ? "ปิดงานแล้ว" : ticket.closedReason === "auto_closed" ? "ปิดงานอัตโนมัติ" : "ประเมินตรวจงาน", time: closing ? dateTime(closing.at) : ticket.closedAt ? dateTime(ticket.closedAt) : undefined, desc, sub: [] });
   } else if (ticket.step === "awaiting_rating") {
     stages.push({
       key: "review", state: "now", title: viewer === "reporter" ? "รอคุณประเมินตรวจงาน" : "รอผู้แจ้งประเมินตรวจงาน",

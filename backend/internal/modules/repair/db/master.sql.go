@@ -13,8 +13,8 @@ import (
 
 const activeFloorInBuilding = `-- name: ActiveFloorInBuilding :one
 SELECT EXISTS (
-    SELECT 1 FROM repair.floors f
-    JOIN repair.buildings b ON b.id = f.building_id
+    SELECT 1 FROM platform.floors f
+    JOIN platform.buildings b ON b.id = f.building_id
     WHERE f.id = $1 AND f.building_id = $2 AND f.is_active AND b.is_active
 )
 `
@@ -82,6 +82,27 @@ func (q *Queries) ActiveSymptomPriorities(ctx context.Context, arg ActiveSymptom
 	return items, nil
 }
 
+const categoryUsedInBuilding = `-- name: CategoryUsedInBuilding :one
+SELECT EXISTS (
+    SELECT 1 FROM platform.buildings b
+    JOIN repair.category_building_types cbt ON cbt.building_type_id = b.building_type_id
+    WHERE b.id = $1 AND cbt.category_id = $2
+)
+`
+
+type CategoryUsedInBuildingParams struct {
+	BuildingID uuid.UUID
+	CategoryID uuid.UUID
+}
+
+// CR-025 (BR-F02-8): the category is used in the building's type. The caller skips "อื่น ๆ".
+func (q *Queries) CategoryUsedInBuilding(ctx context.Context, arg CategoryUsedInBuildingParams) (bool, error) {
+	row := q.db.QueryRow(ctx, categoryUsedInBuilding, arg.BuildingID, arg.CategoryID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getSettings = `-- name: GetSettings :one
 SELECT ticket_prefix, ticket_year_format, ticket_digits FROM repair.settings WHERE id
 `
@@ -99,78 +120,20 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 	return i, err
 }
 
-const insertSampleBuilding = `-- name: InsertSampleBuilding :exec
-INSERT INTO repair.buildings (id, name, sort_order) VALUES ($1, $2, $3)
-ON CONFLICT DO NOTHING
-`
-
-type InsertSampleBuildingParams struct {
-	ID        uuid.UUID
-	Name      string
-	SortOrder int32
-}
-
-// Sample locations (dev / UAT only, D-032): inserted by id, existing rows are left as they are.
-func (q *Queries) InsertSampleBuilding(ctx context.Context, arg InsertSampleBuildingParams) error {
-	_, err := q.db.Exec(ctx, insertSampleBuilding, arg.ID, arg.Name, arg.SortOrder)
-	return err
-}
-
-const insertSampleFloor = `-- name: InsertSampleFloor :exec
-INSERT INTO repair.floors (id, building_id, name, level) VALUES ($1, $2, $3, $4)
-ON CONFLICT DO NOTHING
-`
-
-type InsertSampleFloorParams struct {
-	ID         uuid.UUID
-	BuildingID uuid.UUID
-	Name       string
-	Level      int32
-}
-
-func (q *Queries) InsertSampleFloor(ctx context.Context, arg InsertSampleFloorParams) error {
-	_, err := q.db.Exec(ctx, insertSampleFloor,
-		arg.ID,
-		arg.BuildingID,
-		arg.Name,
-		arg.Level,
-	)
-	return err
-}
-
-const insertSampleRoom = `-- name: InsertSampleRoom :exec
-INSERT INTO platform.rooms (id, floor_id, name, area_type, sort_order) VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT DO NOTHING
-`
-
-type InsertSampleRoomParams struct {
-	ID        uuid.UUID
-	FloorID   uuid.UUID
-	Name      string
-	AreaType  string
-	SortOrder int32
-}
-
-func (q *Queries) InsertSampleRoom(ctx context.Context, arg InsertSampleRoomParams) error {
-	_, err := q.db.Exec(ctx, insertSampleRoom,
-		arg.ID,
-		arg.FloorID,
-		arg.Name,
-		arg.AreaType,
-		arg.SortOrder,
-	)
-	return err
-}
-
 const listActiveBuildings = `-- name: ListActiveBuildings :many
-SELECT id, name FROM repair.buildings
-WHERE is_active
-ORDER BY sort_order, name
+SELECT b.id, b.name, bt.id AS building_type_id, bt.name AS building_type_name, b.model_key
+FROM platform.buildings b
+JOIN platform.building_types bt ON bt.id = b.building_type_id
+WHERE b.is_active
+ORDER BY b.sort_order, b.name
 `
 
 type ListActiveBuildingsRow struct {
-	ID   uuid.UUID
-	Name string
+	ID               uuid.UUID
+	Name             string
+	BuildingTypeID   uuid.UUID
+	BuildingTypeName string
+	ModelKey         *string
 }
 
 func (q *Queries) ListActiveBuildings(ctx context.Context) ([]ListActiveBuildingsRow, error) {
@@ -182,7 +145,13 @@ func (q *Queries) ListActiveBuildings(ctx context.Context) ([]ListActiveBuilding
 	var items []ListActiveBuildingsRow
 	for rows.Next() {
 		var i ListActiveBuildingsRow
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.BuildingTypeID,
+			&i.BuildingTypeName,
+			&i.ModelKey,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -235,8 +204,8 @@ func (q *Queries) ListActiveCategories(ctx context.Context) ([]ListActiveCategor
 }
 
 const listActiveFloors = `-- name: ListActiveFloors :many
-SELECT f.id, f.building_id, f.name, f.level FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+SELECT f.id, f.building_id, f.name, f.level FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 WHERE f.is_active AND b.is_active
 ORDER BY f.level
 `
@@ -351,21 +320,23 @@ func (q *Queries) ListActiveSymptoms(ctx context.Context) ([]ListActiveSymptomsR
 	return items, nil
 }
 
-const listCategoryAreaTypes = `-- name: ListCategoryAreaTypes :many
-SELECT category_id, area_type FROM repair.category_area_types
-ORDER BY category_id, area_type
+const listCategoryBuildingTypes = `-- name: ListCategoryBuildingTypes :many
+SELECT cbt.category_id, cbt.building_type_id FROM repair.category_building_types cbt
+JOIN platform.building_types bt ON bt.id = cbt.building_type_id AND bt.is_active
+ORDER BY cbt.category_id, bt.sort_order, bt.name
 `
 
-func (q *Queries) ListCategoryAreaTypes(ctx context.Context) ([]RepairCategoryAreaType, error) {
-	rows, err := q.db.Query(ctx, listCategoryAreaTypes)
+// CR-025: the active building types each category is used in (none for "อื่น ๆ" = every type).
+func (q *Queries) ListCategoryBuildingTypes(ctx context.Context) ([]RepairCategoryBuildingType, error) {
+	rows, err := q.db.Query(ctx, listCategoryBuildingTypes)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []RepairCategoryAreaType
+	var items []RepairCategoryBuildingType
 	for rows.Next() {
-		var i RepairCategoryAreaType
-		if err := rows.Scan(&i.CategoryID, &i.AreaType); err != nil {
+		var i RepairCategoryBuildingType
+		if err := rows.Scan(&i.CategoryID, &i.BuildingTypeID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -408,20 +379,4 @@ func (q *Queries) NextTicketCounter(ctx context.Context, year int32) (int64, err
 	var last_no int64
 	err := row.Scan(&last_no)
 	return last_no, err
-}
-
-const renameSampleBuilding = `-- name: RenameSampleBuilding :exec
-UPDATE repair.buildings SET name = $1, updated_at = now() WHERE id = $2 AND name = $3
-`
-
-type RenameSampleBuildingParams struct {
-	NewName string
-	ID      uuid.UUID
-	OldName string
-}
-
-// Sample data refresh (dev / UAT only, D-032, CR-008): applied by id so existing databases keep their ids.
-func (q *Queries) RenameSampleBuilding(ctx context.Context, arg RenameSampleBuildingParams) error {
-	_, err := q.db.Exec(ctx, renameSampleBuilding, arg.NewName, arg.ID, arg.OldName)
-	return err
 }

@@ -1,6 +1,10 @@
 # S12 — ภาพรวมอาคาร 3D
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** no executive role (replaced screen; history only).
+
+> **CR-016 (approved 2026-10-19): S12 and S27 are replaced by S29** (admin / executive Home with the three.js model of อาคาร 1). D-025 (SVG, no 3D library) no longer applies.
 
 > **CR-008 (approved 2026-10-16): replaced by S27 ภาพรวมองค์กร** — mockup `../../changes/CR-008/dashboard.html`; the S27 spec is written when Stage 7 is prepared.
 

@@ -7,6 +7,9 @@ import type { NextConfig } from "next";
 const apiInternalUrl = (process.env.API_INTERNAL_URL ?? "http://localhost:8080").replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
+  // NEXT_DIST_DIR: the e2e / Atlas test stack runs `next dev` beside the dev server, so it needs its own
+  // folder (`next dev` locks <distDir>/dev). Unset = the default .next (frontend/e2e/test-stack.cjs).
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {

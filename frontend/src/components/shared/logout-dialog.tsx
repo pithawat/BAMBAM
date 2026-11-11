@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { clearAllDraftPhotos } from "@/lib/draft-photos";
 import { clearAllDrafts } from "@/lib/drafts";
 import { env } from "@/lib/env";
 import { LOGOUT_URL } from "@/lib/platform/api";
@@ -45,13 +46,16 @@ export function LogoutDialog({ trigger, open, onOpenChange, onCloseAutoFocus }: 
             method="post"
             action={env.useMocks ? "/signed-out" : LOGOUT_URL}
             onSubmit={(e) => {
+              // Draft photos live in IndexedDB (async): clear them first, then submit for real.
+              e.preventDefault();
+              const form = e.currentTarget;
               setBusy(true);
               clearAllDrafts();
-              if (env.useMocks) {
-                e.preventDefault();
+              void clearAllDraftPhotos().finally(() => {
                 // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard navigation on purpose: drop all client state
-                window.location.assign("/signed-out");
-              }
+                if (env.useMocks) window.location.assign("/signed-out");
+                else form.submit();
+              });
             }}
           >
             <Button type="submit" disabled={busy} className="w-full sm:w-auto">

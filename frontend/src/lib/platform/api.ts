@@ -1,7 +1,7 @@
 import { env } from "@/lib/env";
 import { http } from "@/lib/http";
 import { mockDemoUsers, mockMeByRole } from "./mocks";
-import { ROLES, type DemoUser, type Me, type Role } from "./types";
+import type { DemoUser, Me, Role } from "./types";
 
 // Platform API (P1–P3). Returns mocks when NEXT_PUBLIC_USE_MOCKS=true so the UI
 // can be built without the backend; the mock role is kept in localStorage.
@@ -12,7 +12,7 @@ const MOCK_ROLE_KEY = "bambam.mockRole";
 export function mockRole(): Role {
   try {
     const r = window.localStorage.getItem(MOCK_ROLE_KEY);
-    if (r && (ROLES as readonly string[]).includes(r)) return r as Role;
+    if (r && r in mockMeByRole) return r;
   } catch {
     // storage unavailable — fall back to employee
   }
@@ -40,6 +40,7 @@ export async function getDemoUsers(): Promise<DemoUser[]> {
 export async function switchRole(role: Role): Promise<Me> {
   if (env.useMocks) {
     await delay(400);
+    if (!(role in mockMeByRole)) throw new Error("unknown role");
     try {
       window.localStorage.setItem(MOCK_ROLE_KEY, role);
     } catch {

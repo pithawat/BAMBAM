@@ -13,6 +13,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adminCloseTicket = `-- name: AdminCloseTicket :exec
+UPDATE repair.tickets
+SET status = 'closed', closed_reason = 'admin_closed', closed_at = $1, auto_close_at = NULL, updated_at = $1
+WHERE id = $2
+`
+
+type AdminCloseTicketParams struct {
+	Now *time.Time
+	ID  uuid.UUID
+}
+
+// F08-B: admin closes an open ticket from any status (BR-F08B-1).
+func (q *Queries) AdminCloseTicket(ctx context.Context, arg AdminCloseTicketParams) error {
+	_, err := q.db.Exec(ctx, adminCloseTicket, arg.Now, arg.ID)
+	return err
+}
+
 const assessTicket = `-- name: AssessTicket :exec
 UPDATE repair.tickets
 SET expected_done_on = $1, holder_id = $2,
@@ -20,8 +37,9 @@ SET expected_done_on = $1, holder_id = $2,
     contractor_rating = CASE WHEN contractor_id IS NOT DISTINCT FROM $4::uuid THEN contractor_rating END,
     contractor_rating_comment = CASE WHEN contractor_id IS NOT DISTINCT FROM $4::uuid THEN contractor_rating_comment END,
     contractor_id = $4::uuid,
-    assessed_at = COALESCE(assessed_at, $5), updated_at = $5
-WHERE id = $6
+    assignee_id = $5::uuid,
+    assessed_at = COALESCE(assessed_at, $6), updated_at = $6
+WHERE id = $7
 `
 
 type AssessTicketParams struct {
@@ -29,11 +47,12 @@ type AssessTicketParams struct {
 	TechnicianID   *uuid.UUID
 	WorkBy         *string
 	ContractorID   *uuid.UUID
+	AssigneeID     *uuid.UUID
 	Now            time.Time
 	ID             uuid.UUID
 }
 
-// CR-006: the assessment = expected finish date + who does the work. Changing the contractor drops
+// CR-006: the assessment = expected finish date + who does the work. CR-034: + the responsible in-house technician. Changing the contractor drops
 // the old contractor's rating (it belonged to the previous one).
 func (q *Queries) AssessTicket(ctx context.Context, arg AssessTicketParams) error {
 	_, err := q.db.Exec(ctx, assessTicket,
@@ -41,6 +60,7 @@ func (q *Queries) AssessTicket(ctx context.Context, arg AssessTicketParams) erro
 		arg.TechnicianID,
 		arg.WorkBy,
 		arg.ContractorID,
+		arg.AssigneeID,
 		arg.Now,
 		arg.ID,
 	)
@@ -271,11 +291,11 @@ func (q *Queries) FirstReportPhotos(ctx context.Context, ticketIds []uuid.UUID) 
 const getTicket = `-- name: GetTicket :one
 SELECT
     t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
-    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
+    t.category_id, c.name AS category_name, c.icon AS category_icon, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.room_id, rm.name AS room_name,
-    t.location_detail, t.details, t.asset_code,
+    t.location_detail, t.details, t.asset_code, ast.code AS linked_asset_code, ast.name AS linked_asset_name,
     t.reporter_id, rp.name AS reporter_name, rp.department AS reporter_department,
     t.holder_id, hp.name AS holder_name, hp.department AS holder_department,
     t.result_note,
@@ -283,18 +303,21 @@ SELECT
     t.rating, t.rating_comment, t.send_back_count,
     t.expected_done_on, t.assessed_at, t.work_by,
     t.contractor_id, ct.name AS contractor_name, t.contractor_rating, t.contractor_rating_comment,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1) AS viewer_subscribed,
     (SELECT count(*) FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id) AS subscriber_count
 FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
-JOIN repair.buildings b ON b.id = t.building_id
-JOIN repair.floors f ON f.id = t.floor_id
+JOIN platform.buildings b ON b.id = t.building_id
+JOIN platform.floors f ON f.id = t.floor_id
 LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.people rb ON rb.id = t.resolved_by_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
+LEFT JOIN platform.assets ast ON ast.id = t.asset_id
 WHERE t.id = $2
 `
 
@@ -312,6 +335,7 @@ type GetTicketRow struct {
 	PrioritySource          string
 	CategoryID              *uuid.UUID
 	CategoryName            *string
+	CategoryIcon            *string
 	CategoryOther           *string
 	SymptomOther            *string
 	BuildingID              uuid.UUID
@@ -323,6 +347,8 @@ type GetTicketRow struct {
 	LocationDetail          *string
 	Details                 *string
 	AssetCode               *string
+	LinkedAssetCode         *string
+	LinkedAssetName         *string
 	ReporterID              uuid.UUID
 	ReporterName            string
 	ReporterDepartment      *string
@@ -343,6 +369,9 @@ type GetTicketRow struct {
 	ContractorName          *string
 	ContractorRating        *int16
 	ContractorRatingComment *string
+	AssigneeID              *uuid.UUID
+	AssigneeName            *string
+	AssigneeRoleName        *string
 	AutoCloseAt             *time.Time
 	ResolvedAt              *time.Time
 	ClosedAt                *time.Time
@@ -364,6 +393,7 @@ func (q *Queries) GetTicket(ctx context.Context, arg GetTicketParams) (GetTicket
 		&i.PrioritySource,
 		&i.CategoryID,
 		&i.CategoryName,
+		&i.CategoryIcon,
 		&i.CategoryOther,
 		&i.SymptomOther,
 		&i.BuildingID,
@@ -375,6 +405,8 @@ func (q *Queries) GetTicket(ctx context.Context, arg GetTicketParams) (GetTicket
 		&i.LocationDetail,
 		&i.Details,
 		&i.AssetCode,
+		&i.LinkedAssetCode,
+		&i.LinkedAssetName,
 		&i.ReporterID,
 		&i.ReporterName,
 		&i.ReporterDepartment,
@@ -395,6 +427,9 @@ func (q *Queries) GetTicket(ctx context.Context, arg GetTicketParams) (GetTicket
 		&i.ContractorName,
 		&i.ContractorRating,
 		&i.ContractorRatingComment,
+		&i.AssigneeID,
+		&i.AssigneeName,
+		&i.AssigneeRoleName,
 		&i.AutoCloseAt,
 		&i.ResolvedAt,
 		&i.ClosedAt,
@@ -432,6 +467,23 @@ func (q *Queries) GetTicketAccess(ctx context.Context, arg GetTicketAccessParams
 	return i, err
 }
 
+const handOverTicket = `-- name: HandOverTicket :exec
+UPDATE repair.tickets
+SET status = 'in_progress', closed_reason = NULL, closed_at = NULL, updated_at = $1
+WHERE id = $2
+`
+
+type HandOverTicketParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+// F05 (BR-F05-1/3): the same team-handled ticket goes back to the technician, waiting for the assessment.
+func (q *Queries) HandOverTicket(ctx context.Context, arg HandOverTicketParams) error {
+	_, err := q.db.Exec(ctx, handOverTicket, arg.Now, arg.ID)
+	return err
+}
+
 const insertAutoClosedEvents = `-- name: InsertAutoClosedEvents :exec
 INSERT INTO repair.ticket_events (ticket_id, type, created_at)
 SELECT unnest($1::uuid[]), 'auto_closed', $2
@@ -447,21 +499,47 @@ func (q *Queries) InsertAutoClosedEvents(ctx context.Context, arg InsertAutoClos
 	return err
 }
 
+const insertSubscriber = `-- name: InsertSubscriber :execrows
+INSERT INTO repair.ticket_subscribers (ticket_id, user_id, created_at, updated_at)
+VALUES ($1, $2, $3, $3)
+ON CONFLICT (ticket_id, user_id) DO NOTHING
+`
+
+type InsertSubscriberParams struct {
+	TicketID uuid.UUID
+	UserID   uuid.UUID
+	Now      time.Time
+}
+
+// F03: 0 rows = already following.
+func (q *Queries) InsertSubscriber(ctx context.Context, arg InsertSubscriberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertSubscriber, arg.TicketID, arg.UserID, arg.Now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertTicket = `-- name: InsertTicket :exec
 
 INSERT INTO repair.tickets (
-    id, ticket_no, status, priority, priority_source, category_id, category_other, symptom_other,
-    building_id, floor_id, room_id, location_detail, details, asset_code, reporter_id
+    id, ticket_no, status, closed_reason, closed_at, priority, priority_source, category_id, category_other, symptom_other,
+    building_id, floor_id, room_id, location_detail, details, asset_code, asset_id, reporter_id, created_at, updated_at
 ) VALUES (
-    $1, $2, 'in_progress', $3, $4, $5::uuid,
-    $6::text, $7::text,
-    $8, $9, $10, $11, $12, $13, $14
+    $1, $2, $3, $4::text, $5::timestamptz,
+    $6, $7, $8::uuid,
+    $9::text, $10::text,
+    $11, $12, $13, $14, $15, $16, $17::uuid,
+    $18, $19, $19
 )
 `
 
 type InsertTicketParams struct {
 	ID             uuid.UUID
 	TicketNo       string
+	Status         string
+	ClosedReason   *string
+	ClosedAt       *time.Time
 	Priority       string
 	PrioritySource string
 	CategoryID     *uuid.UUID
@@ -473,7 +551,9 @@ type InsertTicketParams struct {
 	LocationDetail *string
 	Details        *string
 	AssetCode      *string
+	AssetID        *uuid.UUID
 	ReporterID     uuid.UUID
+	CreatedAt      time.Time
 }
 
 // Step (CR-005) = the progress shown to people, derived from the row:
@@ -482,10 +562,14 @@ type InsertTicketParams struct {
 //	· in_progress after a send back → reworking · else in_repair.
 //
 // The same CASE is repeated in the list / count queries; keep them identical.
+// A team-handled record (F04) is created `closed` / `team_handled`; every other ticket `in_progress`.
 func (q *Queries) InsertTicket(ctx context.Context, arg InsertTicketParams) error {
 	_, err := q.db.Exec(ctx, insertTicket,
 		arg.ID,
 		arg.TicketNo,
+		arg.Status,
+		arg.ClosedReason,
+		arg.ClosedAt,
 		arg.Priority,
 		arg.PrioritySource,
 		arg.CategoryID,
@@ -497,7 +581,9 @@ func (q *Queries) InsertTicket(ctx context.Context, arg InsertTicketParams) erro
 		arg.LocationDetail,
 		arg.Details,
 		arg.AssetCode,
+		arg.AssetID,
 		arg.ReporterID,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -546,6 +632,236 @@ func (q *Queries) InsertTicketSymptoms(ctx context.Context, arg InsertTicketSymp
 	return err
 }
 
+const isTechnician = `-- name: IsTechnician :one
+SELECT EXISTS (
+    SELECT 1 FROM repair.staff st
+    WHERE st.id = $1 AND (st.role_key = 'super_admin' OR EXISTS (
+        SELECT 1 FROM platform.role_permissions rp JOIN platform.roles r ON r.id = rp.role_id
+        WHERE r.key = st.role_key AND rp.permission = 'repair.ticket.work')))::boolean
+`
+
+// #9 (CR-034): the picked assignee still has `repair.ticket.work` (same rule as ListTechnicians).
+func (q *Queries) IsTechnician(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isTechnician, id)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const listDuplicateTickets = `-- name: ListDuplicateTickets :many
+SELECT t.id, t.reporter_id, t.status,
+       (CASE WHEN t.room_id IS NULL THEN $1::text = ''
+             ELSE $1::text = '' OR lower(regexp_replace(btrim(coalesce(t.location_detail, '')), '\s+', ' ', 'g')) = $1::text
+        END)::boolean AS blocks_report
+FROM repair.tickets t
+WHERE t.status IN ('in_progress', 'resolved')
+  AND t.category_id = $2 AND t.floor_id = $3
+  AND (t.room_id = $4
+       OR (t.room_id IS NULL AND lower(btrim(t.location_detail)) =
+           (SELECT lower(btrim(rm.name)) FROM platform.rooms rm WHERE rm.id = $4)))
+ORDER BY blocks_report DESC, t.created_at DESC, t.id
+LIMIT $5
+`
+
+type ListDuplicateTicketsParams struct {
+	Spot       string
+	CategoryID *uuid.UUID
+	FloorID    uuid.UUID
+	RoomID     *uuid.UUID
+	MaxRows    int32
+}
+
+type ListDuplicateTicketsRow struct {
+	ID           uuid.UUID
+	ReporterID   uuid.UUID
+	Status       string
+	BlocksReport bool
+}
+
+// F03 (BR-F03-1, CR-009 / CR-014): open tickets with the same category, floor and room; old tickets
+// without a room match when their location text equals the room name (trimmed, case-insensitive).
+// CR-020: `blocks_report` = the report is a duplicate of it: the reporter gave no extra spot (@spot is
+// the normalised spot, ” when empty) or the same spot. A different spot is only "similar" (allowed).
+// Old tickets have no separate spot (their text is the room name), so only an empty @spot blocks.
+// Blocking matches come first so MaxDuplicates never cuts one off.
+func (q *Queries) ListDuplicateTickets(ctx context.Context, arg ListDuplicateTicketsParams) ([]ListDuplicateTicketsRow, error) {
+	rows, err := q.db.Query(ctx, listDuplicateTickets,
+		arg.Spot,
+		arg.CategoryID,
+		arg.FloorID,
+		arg.RoomID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDuplicateTicketsRow
+	for rows.Next() {
+		var i ListDuplicateTicketsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ReporterID,
+			&i.Status,
+			&i.BlocksReport,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyTickets = `-- name: ListMyTickets :many
+SELECT
+    t.id, t.ticket_no, t.status, t.closed_reason,
+    t.category_id, c.name AS category_name, c.icon AS category_icon, t.category_other,
+    concat_ws(' · ',
+        (SELECT string_agg(sy.name, ' · ' ORDER BY ts.sort_order)
+         FROM repair.ticket_symptoms ts JOIN repair.symptoms sy ON sy.id = ts.symptom_id
+         WHERE ts.ticket_id = t.id),
+        t.symptom_other)::text AS title,
+    t.building_id, b.name AS building_name,
+    t.floor_id, f.name AS floor_name,
+    t.room_id, rm.name AS room_name,
+    t.location_detail,
+    (t.reporter_id = $1)::boolean AS is_reporter,
+    t.rating, t.send_back_count, t.expected_done_on,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
+    t.auto_close_at, t.resolved_at, t.updated_at
+FROM repair.tickets t
+LEFT JOIN repair.categories c ON c.id = t.category_id
+JOIN platform.buildings b ON b.id = t.building_id
+JOIN platform.floors f ON f.id = t.floor_id
+LEFT JOIN platform.rooms rm ON rm.id = t.room_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
+WHERE (($2::text IN ('all', 'reported') AND t.reporter_id = $1)
+     OR ($2::text IN ('all', 'following') AND EXISTS (
+            SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1)))
+  AND (cardinality($3::text[]) = 0 OR t.status = ANY($3::text[]))
+  AND (cardinality($4::text[]) = 0 OR (CASE
+        WHEN t.status = 'closed' THEN 'closed'
+        WHEN t.status = 'resolved' THEN 'awaiting_rating'
+        WHEN t.expected_done_on IS NULL THEN 'awaiting_assessment'
+        WHEN t.send_back_count > 0 THEN 'reworking'
+        ELSE 'in_repair' END) = ANY($4::text[]))
+  AND ($5::text IS NULL OR t.closed_reason = $5::text)
+  AND ($6::text IS NULL OR t.ticket_no ILIKE '%' || $6::text || '%'
+       OR t.location_detail ILIKE '%' || $6::text || '%'
+       OR rm.name ILIKE '%' || $6::text || '%')
+ORDER BY
+    -- BR-F06-2: resolved tickets awaiting the viewer's rating first
+    (t.status = 'resolved' AND t.reporter_id = $1) DESC,
+    CASE WHEN $7::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
+    CASE WHEN $7::text = 'createdAt:desc' THEN t.created_at END DESC,
+    CASE WHEN $7::text = 'createdAt:asc' THEN t.created_at END ASC,
+    t.updated_at DESC, t.id
+LIMIT $9 OFFSET $8
+`
+
+type ListMyTicketsParams struct {
+	ViewerID     uuid.UUID
+	Relation     string
+	Statuses     []string
+	Steps        []string
+	ClosedReason *string
+	Q            *string
+	Sort         string
+	PageOffset   int32
+	PageLimit    int32
+}
+
+type ListMyTicketsRow struct {
+	ID               uuid.UUID
+	TicketNo         string
+	Status           string
+	ClosedReason     *string
+	CategoryID       *uuid.UUID
+	CategoryName     *string
+	CategoryIcon     *string
+	CategoryOther    *string
+	Title            string
+	BuildingID       uuid.UUID
+	BuildingName     string
+	FloorID          uuid.UUID
+	FloorName        string
+	RoomID           *uuid.UUID
+	RoomName         *string
+	LocationDetail   *string
+	IsReporter       bool
+	Rating           *int16
+	SendBackCount    int32
+	ExpectedDoneOn   pgtype.Date
+	AssigneeID       *uuid.UUID
+	AssigneeName     *string
+	AssigneeRoleName *string
+	AutoCloseAt      *time.Time
+	ResolvedAt       *time.Time
+	UpdatedAt        time.Time
+}
+
+// #35 (S06, CR-019): one page of the viewer's own tickets with only the table's columns — no people, contractor,
+// photo or symptom-row lookups; the title is joined here. Same WHERE as CountTickets with scope_all = false.
+func (q *Queries) ListMyTickets(ctx context.Context, arg ListMyTicketsParams) ([]ListMyTicketsRow, error) {
+	rows, err := q.db.Query(ctx, listMyTickets,
+		arg.ViewerID,
+		arg.Relation,
+		arg.Statuses,
+		arg.Steps,
+		arg.ClosedReason,
+		arg.Q,
+		arg.Sort,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMyTicketsRow
+	for rows.Next() {
+		var i ListMyTicketsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TicketNo,
+			&i.Status,
+			&i.ClosedReason,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.CategoryIcon,
+			&i.CategoryOther,
+			&i.Title,
+			&i.BuildingID,
+			&i.BuildingName,
+			&i.FloorID,
+			&i.FloorName,
+			&i.RoomID,
+			&i.RoomName,
+			&i.LocationDetail,
+			&i.IsReporter,
+			&i.Rating,
+			&i.SendBackCount,
+			&i.ExpectedDoneOn,
+			&i.AssigneeID,
+			&i.AssigneeName,
+			&i.AssigneeRoleName,
+			&i.AutoCloseAt,
+			&i.ResolvedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRecentPlaces = `-- name: ListRecentPlaces :many
 SELECT p.building_id, p.building_name, p.floor_id, p.floor_name, p.room_id, p.room_name,
        p.location_detail, p.last_reported_at
@@ -554,8 +870,8 @@ FROM (
         t.building_id, b.name AS building_name, t.floor_id, f.name AS floor_name,
         t.room_id, rm.name AS room_name, t.location_detail, t.created_at AS last_reported_at
     FROM repair.tickets t
-    JOIN repair.buildings b ON b.id = t.building_id AND b.is_active
-    JOIN repair.floors f ON f.id = t.floor_id AND f.is_active
+    JOIN platform.buildings b ON b.id = t.building_id AND b.is_active
+    JOIN platform.floors f ON f.id = t.floor_id AND f.is_active
     JOIN platform.rooms rm ON rm.id = t.room_id AND rm.is_active AND rm.floor_id = t.floor_id
     WHERE t.reporter_id = $1
     ORDER BY t.building_id, t.floor_id, t.room_id, t.created_at DESC
@@ -639,6 +955,42 @@ func (q *Queries) ListSymptomsForTickets(ctx context.Context, ticketIds []uuid.U
 	return items, nil
 }
 
+const listTechnicians = `-- name: ListTechnicians :many
+SELECT st.id, st.name, st.role_name
+FROM repair.staff st
+WHERE st.role_key = 'super_admin' OR EXISTS (
+    SELECT 1 FROM platform.role_permissions rp JOIN platform.roles r ON r.id = rp.role_id
+    WHERE r.key = st.role_key AND rp.permission = 'repair.ticket.work')
+ORDER BY st.name COLLATE "th-x-icu", st.id
+`
+
+type ListTechniciansRow struct {
+	ID       uuid.UUID
+	Name     string
+	RoleName string
+}
+
+// #36 (CR-034): everyone whose role has `repair.ticket.work`; super_admin has every key in code (BR-F25-1).
+func (q *Queries) ListTechnicians(ctx context.Context) ([]ListTechniciansRow, error) {
+	rows, err := q.db.Query(ctx, listTechnicians)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTechniciansRow
+	for rows.Next() {
+		var i ListTechniciansRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.RoleName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTicketEvents = `-- name: ListTicketEvents :many
 SELECT e.id, e.type, e.actor_id, ap.name AS actor_name, ap.department AS actor_department,
        e.note, e.data, e.created_at
@@ -691,7 +1043,7 @@ func (q *Queries) ListTicketEvents(ctx context.Context, ticketID uuid.UUID) ([]L
 const listTickets = `-- name: ListTickets :many
 SELECT
     t.id, t.ticket_no, t.status, t.closed_reason, t.priority, t.priority_source,
-    t.category_id, c.name AS category_name, t.category_other, t.symptom_other,
+    t.category_id, c.name AS category_name, c.icon AS category_icon, t.category_other, t.symptom_other,
     t.building_id, b.name AS building_name,
     t.floor_id, f.name AS floor_name,
     t.room_id, rm.name AS room_name,
@@ -701,16 +1053,18 @@ SELECT
     t.rating, t.send_back_count,
     t.expected_done_on, t.assessed_at, t.work_by,
     t.contractor_id, ct.name AS contractor_name,
+    t.assignee_id, asg.name AS assignee_name, asg.role_name AS assignee_role_name,
     t.auto_close_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at,
     EXISTS (SELECT 1 FROM repair.ticket_subscribers s WHERE s.ticket_id = t.id AND s.user_id = $1) AS viewer_subscribed
 FROM repair.tickets t
 LEFT JOIN repair.categories c ON c.id = t.category_id
-JOIN repair.buildings b ON b.id = t.building_id
-JOIN repair.floors f ON f.id = t.floor_id
+JOIN platform.buildings b ON b.id = t.building_id
+JOIN platform.floors f ON f.id = t.floor_id
 LEFT JOIN platform.rooms rm ON rm.id = t.room_id
 JOIN repair.people rp ON rp.id = t.reporter_id
 LEFT JOIN repair.people hp ON hp.id = t.holder_id
 LEFT JOIN repair.contractors ct ON ct.id = t.contractor_id
+LEFT JOIN repair.staff asg ON asg.id = t.assignee_id
 WHERE ($2::boolean OR (
         ($3::text IN ('all', 'reported') AND t.reporter_id = $1)
      OR ($3::text IN ('all', 'following') AND EXISTS (
@@ -735,10 +1089,6 @@ WHERE ($2::boolean OR (
 ORDER BY
     -- BR-F06-2: resolved tickets awaiting the viewer's rating first
     ($14::boolean AND t.status = 'resolved' AND t.reporter_id = $1) DESC,
-    -- technician work list (BR-F21-1): most urgent, then oldest
-    CASE WHEN $15::text = 'priority:asc' THEN
-        CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END END ASC,
-    CASE WHEN $15::text = 'priority:asc' THEN t.created_at END ASC,
     CASE WHEN $15::text = 'closedAt:desc' THEN t.closed_at END DESC NULLS LAST,
     CASE WHEN $15::text = 'createdAt:desc' THEN t.created_at END DESC,
     CASE WHEN $15::text = 'createdAt:asc' THEN t.created_at END ASC,
@@ -775,6 +1125,7 @@ type ListTicketsRow struct {
 	PrioritySource     string
 	CategoryID         *uuid.UUID
 	CategoryName       *string
+	CategoryIcon       *string
 	CategoryOther      *string
 	SymptomOther       *string
 	BuildingID         uuid.UUID
@@ -797,6 +1148,9 @@ type ListTicketsRow struct {
 	WorkBy             *string
 	ContractorID       *uuid.UUID
 	ContractorName     *string
+	AssigneeID         *uuid.UUID
+	AssigneeName       *string
+	AssigneeRoleName   *string
 	AutoCloseAt        *time.Time
 	ResolvedAt         *time.Time
 	ClosedAt           *time.Time
@@ -842,6 +1196,7 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Lis
 			&i.PrioritySource,
 			&i.CategoryID,
 			&i.CategoryName,
+			&i.CategoryIcon,
 			&i.CategoryOther,
 			&i.SymptomOther,
 			&i.BuildingID,
@@ -864,6 +1219,9 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Lis
 			&i.WorkBy,
 			&i.ContractorID,
 			&i.ContractorName,
+			&i.AssigneeID,
+			&i.AssigneeName,
+			&i.AssigneeRoleName,
 			&i.AutoCloseAt,
 			&i.ResolvedAt,
 			&i.ClosedAt,
@@ -881,8 +1239,19 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Lis
 	return items, nil
 }
 
+const lockDuplicateKey = `-- name: LockDuplicateKey :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
+`
+
+// Serialises reports on one category + floor + room, so two people sending the same problem at the
+// same moment cannot both pass the duplicate check (BR-F03-2, CR-009).
+func (q *Queries) LockDuplicateKey(ctx context.Context, key string) error {
+	_, err := q.db.Exec(ctx, lockDuplicateKey, key)
+	return err
+}
+
 const lockTicket = `-- name: LockTicket :one
-SELECT id, status, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating FROM repair.tickets
+SELECT id, status, closed_reason, reporter_id, expected_done_on, work_by, contractor_id, contractor_rating, send_back_count FROM repair.tickets
 WHERE id = $1
 FOR UPDATE
 `
@@ -890,11 +1259,13 @@ FOR UPDATE
 type LockTicketRow struct {
 	ID               uuid.UUID
 	Status           string
+	ClosedReason     *string
 	ReporterID       uuid.UUID
 	ExpectedDoneOn   pgtype.Date
 	WorkBy           *string
 	ContractorID     *uuid.UUID
 	ContractorRating *int16
+	SendBackCount    int32
 }
 
 // Every status change locks the row first, so concurrent actions see each other's result.
@@ -904,11 +1275,13 @@ func (q *Queries) LockTicket(ctx context.Context, id uuid.UUID) (LockTicketRow, 
 	err := row.Scan(
 		&i.ID,
 		&i.Status,
+		&i.ClosedReason,
 		&i.ReporterID,
 		&i.ExpectedDoneOn,
 		&i.WorkBy,
 		&i.ContractorID,
 		&i.ContractorRating,
+		&i.SendBackCount,
 	)
 	return i, err
 }

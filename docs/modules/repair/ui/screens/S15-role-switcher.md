@@ -1,6 +1,8 @@
 # S15 — ตัวสลับบทบาท (dev / UAT)
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below)
+
+> **CR-024 (approved 2026-10-26):** the list has 5 roles — ผู้บริหาร is removed; no S13 header variant.
 
 - **Flows:** F01-B (all), BR-F01B-1 … BR-F01B-3, D-005 (see ../../02-flows.md)
 - **Persona:** testers in dev and UAT (see ../../01-users.md)

@@ -23,6 +23,28 @@ func (q *Queries) ActiveContractorExists(ctx context.Context, id uuid.UUID) (boo
 	return exists, err
 }
 
+const contractorWithName = `-- name: ContractorWithName :one
+SELECT id, is_active FROM repair.contractors WHERE lower(name) = lower($1) AND id <> $2 LIMIT 1
+`
+
+type ContractorWithNameParams struct {
+	Name      string
+	ExcludeID uuid.UUID
+}
+
+type ContractorWithNameRow struct {
+	ID       uuid.UUID
+	IsActive bool
+}
+
+// CR-023: names are unique ignoring case (inactive included); exclude_id is the contractor being edited.
+func (q *Queries) ContractorWithName(ctx context.Context, arg ContractorWithNameParams) (ContractorWithNameRow, error) {
+	row := q.db.QueryRow(ctx, contractorWithName, arg.Name, arg.ExcludeID)
+	var i ContractorWithNameRow
+	err := row.Scan(&i.ID, &i.IsActive)
+	return i, err
+}
+
 const countContractorJobs = `-- name: CountContractorJobs :one
 SELECT count(*) FROM repair.tickets WHERE contractor_id = $1
 `
@@ -119,19 +141,20 @@ func (q *Queries) GetContractor(ctx context.Context, id uuid.UUID) (GetContracto
 }
 
 const getContractorTypeByName = `-- name: GetContractorTypeByName :one
-SELECT id, name FROM repair.contractor_types
+SELECT id, name, is_active FROM repair.contractor_types
 WHERE lower(name) = lower($1)
 `
 
 type GetContractorTypeByNameRow struct {
-	ID   uuid.UUID
-	Name string
+	ID       uuid.UUID
+	Name     string
+	IsActive bool
 }
 
 func (q *Queries) GetContractorTypeByName(ctx context.Context, name string) (GetContractorTypeByNameRow, error) {
 	row := q.db.QueryRow(ctx, getContractorTypeByName, name)
 	var i GetContractorTypeByNameRow
-	err := row.Scan(&i.ID, &i.Name)
+	err := row.Scan(&i.ID, &i.Name, &i.IsActive)
 	return i, err
 }
 
@@ -261,6 +284,7 @@ func (q *Queries) ListContractorJobs(ctx context.Context, arg ListContractorJobs
 
 const listContractorTypes = `-- name: ListContractorTypes :many
 SELECT id, name FROM repair.contractor_types
+WHERE is_active
 ORDER BY lower(name)
 `
 
@@ -269,6 +293,7 @@ type ListContractorTypesRow struct {
 	Name string
 }
 
+// Active types only: a type deactivated in ตั้งค่าระบบ is no longer offered (settings F28).
 func (q *Queries) ListContractorTypes(ctx context.Context) ([]ListContractorTypesRow, error) {
 	rows, err := q.db.Query(ctx, listContractorTypes)
 	if err != nil {
@@ -395,6 +420,21 @@ func (q *Queries) ListTypesForContractors(ctx context.Context, contractorIds []u
 		return nil, err
 	}
 	return items, nil
+}
+
+const reactivateContractorType = `-- name: ReactivateContractorType :exec
+UPDATE repair.contractor_types SET is_active = true, updated_by_id = $1, updated_at = now() WHERE id = $2
+`
+
+type ReactivateContractorTypeParams struct {
+	ActorID *uuid.UUID
+	ID      uuid.UUID
+}
+
+// #14 (settings CR-007 C): typing the name of an inactive type re-activates it.
+func (q *Queries) ReactivateContractorType(ctx context.Context, arg ReactivateContractorTypeParams) error {
+	_, err := q.db.Exec(ctx, reactivateContractorType, arg.ActorID, arg.ID)
+	return err
 }
 
 const updateContractor = `-- name: UpdateContractor :execrows

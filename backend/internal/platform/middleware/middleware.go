@@ -113,3 +113,20 @@ func RequireAuth(r SessionResolver) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// RequirePermission lets the request through when the principal has any of the keys, otherwise
+// 403 FORBIDDEN (settings BR-ALL-1, CR-001). Mount it after RequireAuth; services check again.
+func RequirePermission(keys ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		p, ok := CurrentUser(c)
+		if !ok {
+			httpx.Error(c, apperr.ErrUnauthenticated)
+			return
+		}
+		if !slices.ContainsFunc(keys, p.Can) {
+			httpx.Error(c, apperr.ErrForbidden)
+			return
+		}
+		c.Next()
+	}
+}

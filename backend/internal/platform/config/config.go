@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +34,10 @@ type Config struct {
 	// PhotoStorageDir is the persistent directory for repair photos (D-022).
 	// Required outside development; development defaults to ./data/photos.
 	PhotoStorageDir string
+
+	// SuperAdminEmployeeCodes always have the super_admin role (SUPER_ADMIN_EMPLOYEE_CODES,
+	// comma separated; settings BR-F25-2). Empty is allowed: the API logs a warning at start.
+	SuperAdminEmployeeCodes []string
 
 	// RoleSwitcherEnabled is true only when ROLE_SWITCHER_ENABLED=true and APP_ENV is not production (D-005).
 	RoleSwitcherEnabled bool
@@ -115,6 +120,11 @@ func FromLookup(lookup func(string) (string, bool)) (Config, error) {
 	for _, o := range strings.Split(get("CORS_ALLOWED_ORIGINS", ""), ",") {
 		if o = strings.TrimSpace(o); o != "" {
 			c.CORSAllowedOrigins = append(c.CORSAllowedOrigins, o)
+		}
+	}
+	for _, code := range strings.Split(get("SUPER_ADMIN_EMPLOYEE_CODES", ""), ",") {
+		if code = strings.TrimSpace(code); code != "" && !slices.Contains(c.SuperAdminEmployeeCodes, code) {
+			c.SuperAdminEmployeeCodes = append(c.SuperAdminEmployeeCodes, code)
 		}
 	}
 	if c.AppEnv == EnvDevelopment {

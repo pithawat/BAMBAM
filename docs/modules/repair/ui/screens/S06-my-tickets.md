@@ -1,6 +1,25 @@
 # S06 — ติดตามงานซ่อม
 
-Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068)
+> **CR-040 (2026-11-10):** the `สแกน QR` button in the `พบปัญหาในที่ทำงาน?` card is removed; scanning starts from the raised button in the app's bottom tab bar. (CR-040)
+
+Status: APPROVED (2026-10-14) · redesigned by CR-002 · renamed by CR-003 (approved 2026-10-14) · **layout replaced by CR-011 (approved 2026-10-18)** · visual polish 2026-10-19 (D-068) · **layout replaced again by CR-019 (approved 2026-10-24)** · lead CTA / tabs and card heading changed by CR-021 (approved 2026-10-25) · CR-024 applied 2026-10-26 (block below) · CR-034 applied 2026-11-01 (block below) · CR-035 top row 2026-11-01 (block below)
+
+> **CR-035 (approved 2026-11-01) — top row from `output/home-user-redesign/repair-my-option-b.html` (layout only):** breadcrumb `หน้าแรก › ติดตามงานซ่อม`; blue mascot panel (tracking mascot, H1, `งานที่คุณแจ้งและติดตาม / ดูความคืบหน้าและตรวจงานเมื่อซ่อมเสร็จ`, no eyebrow) 1.55 : 1 beside a navy report card (white `แจ้งซ่อมใหม่` with + / →; leads add the outlined `บันทึกงานที่ทีมแก้แล้ว`); stacked below 1024px. List card unchanged.
+> **CR-036 (approved 2026-11-01, Stage 5):** on phones only (`(pointer: coarse)` + camera API), the report card adds a secondary outlined-on-navy button `สแกน QR` (`QrCode` icon) → S16 `/repair/scan`, under `แจ้งซ่อมใหม่` (leads: after `บันทึกงานที่ทีมแก้แล้ว`). Desktop unchanged.
+
+> **CR-034 (approved 2026-11-01):** needs `repair.ticket.report`; without it the repair nav has no `ติดตามงานซ่อม` and `/repair/my` shows the forbidden state (`ไม่มีสิทธิ์ดูหน้านี้`).
+
+> **CR-024 (approved 2026-10-26):** no executive role; Admin sees the same page with their own tickets.
+
+> **CR-021 (approved 2026-10-25) — layout from `maintenance-demo.html`, no stats row (owner).** (1) **All roles:** the list card starts with a heading row — `รายการงานซ่อม` + count badge (total of the current filters) left, `อัปเดตล่าสุด {time}` right; the `แสดง {n} งาน` line is removed. Rows of `closedReason = team_handled` tickets add `· ทีมแก้เอง` after the ticket no. (2) **`housekeeper_lead` / `security_lead`:** CTA sub-line `เรียกช่างช่วยดูแล หรือบันทึกงานที่ทีมแก้ไขแล้ว` and two buttons — white `แจ้งซ่อมใหม่` (→ `/repair/new`) + outlined-on-blue `บันทึกงานที่ทีมแก้แล้ว` (→ `/repair/new?mode=team`); tabs `ทั้งหมด · ที่ฉันแจ้ง · ที่ฉันติดตาม · ทีมแก้เอง` (`?scope=team` → #35 `relation=reported&closedReason=team_handled`; a handed-over ticket leaves the tab). Other roles: one button, three tabs (`?scope=team` ignored).
+>
+> **Polish 2026-10-26 (owner, no flow change):** leads only — the hero scales up beside the two-button CTA card (mascot 160px, H1 34px, sub-line 16px on desktop) so it has no empty band above and below.
+
+> **CR-019 (approved 2026-10-24) — replaces items 1–5 of the CR-011 block below; visual source `bam-workplace-mascot-v4-refined.html` (layout only, fonts / colours unchanged).**
+> 1. **Top:** hero card (tracking mascot · eyebrow `MAINTENANCE CENTER` · H1 `ติดตามงานซ่อม` · sub-line) beside a primary CTA card (`พบปัญหาในที่ทำงาน?` / `แจ้งรายละเอียด เพื่อให้ทีมอาคารเข้าดูแล` / white `แจ้งซ่อมใหม่` → `/repair/new`); stacked on phones. No review banner, no "ภาพรวมงานคงค้าง" strip.
+> 2. **Filters:** relation tabs (unchanged) · search · status dropdown `ทุกสถานะ · รับเรื่องแล้ว (awaiting_assessment) · กำลังดำเนินการ (in_repair + reworking) · รอประเมินตรวจงาน (resolved) · ปิดงานแล้ว (closed)` (`?status=`) · `เรียงลำดับ` (3 sorts, `?sort=`). Date-range filter removed. `แสดง {n} งาน` + `อัปเดตล่าสุด {time}`.
+> 3. **One table** (no status groups): category icon tile + title + `{ticket no} · {category}` · สถานที่ · สถานะล่าสุด · กำหนด / อัปเดต · รายละเอียด (chevron; violet-tinted row + `ตรวจงาน` for the reporter's awaiting ticket, first in the list — BR-F06-2 by the API). Column names unchanged. Phone: title + place side by side, status / dates below.
+> 4. **Paging:** 10 per page from #35 `GET /tickets/mine` (CR-019 follow-up 2026-10-24), `แสดง {a}–{b} จาก {n} งาน` + page numbers (`?page=`).
 
 > **Polish 2026-10-19 (owner, D-068, no flow change):** desktop rows two lines tall (title one line, full text on hover; `{ticket no} · คุณติดตามงานนี้` on one line; 36px row link); closed caption `ประเมินตรวจงานแล้ว · {n}/5` (no star icon); `ปิดงานแล้ว` group icon = folder-check; status tags radius 5px.
 

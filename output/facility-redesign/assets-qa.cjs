@@ -1,0 +1,51 @@
+const {chromium,expect}=require('../../frontend/node_modules/@playwright/test');
+const path=require('path');
+const fs=require('fs');
+const vm=require('vm');
+const file=fs.readFileSync(path.join(__dirname,'../../แผนผังงานซ่อมอาคาร.html'),'utf8');
+new vm.Script(file.match(/<script>([\s\S]*?)<\/script>/)[1]);
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'}),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{const raf=requestAnimationFrame;window.requestAnimationFrame=cb=>{window.__frame=cb;return window.__freeze?0:raf(cb);};});
+  const url='http://127.0.0.1:8766/'+encodeURIComponent('แผนผังงานซ่อมอาคาร.html');
+  await page.goto(url,{waitUntil:'networkidle'});
+  if(process.env.QA_ONLINE==='1')await page.waitForFunction(()=>!!window.facility);
+  await page.evaluate(()=>window.__freeze=true);
+  await page.locator('[data-directory="assets"]').click();await expect(page.locator('#directoryTitle')).toHaveText('อุปกรณ์');
+  await page.locator('#directoryDialog [data-add-asset]').click();await expect(page.locator('#assetDialog')).toBeVisible();
+  await expect(page.locator('#assetCode')).toHaveValue('AC-1-001');
+  await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#assetError')).toHaveText('กรุณาใส่ชื่ออุปกรณ์');
+  await page.locator('#assetName').fill('แอร์ห้อง Data ตัวใหม่');
+  await page.locator('#assetCode').fill('AC 001');await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#assetError')).toContainText('ใช้ได้เฉพาะ');
+  await page.locator('#assetCode').fill('FCU-1-02');await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#assetError')).toHaveText('รหัสนี้มีอุปกรณ์อื่นใช้แล้ว');
+  await page.locator('#assetCode').fill('AC-1-001');await page.locator('#assetRoom').selectOption('zone-0');
+  await expect(page.locator('#assetX')).toHaveValue('6.00');await expect(page.locator('#assetZ')).toHaveValue('3.00');
+  await page.locator('#assetX').fill('30');await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#assetError')).toContainText('วางอุปกรณ์ในห้อง');
+  await page.locator('#assetRoomCenter').click();
+  await page.locator('#assetMap').evaluate(svg=>{const p=new DOMPoint(4,2).matrixTransform(svg.getScreenCTM());svg.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:p.x,clientY:p.y}));});
+  const x=Number(await page.locator('#assetX').inputValue());if(Math.abs(x-4)>.1)throw Error('Map position was not applied');
+  await page.screenshot({path:path.join(__dirname,'add-equipment.png'),fullPage:false});
+  await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#directoryTitle')).toHaveText('เพิ่มอุปกรณ์แล้ว');
+  if(await page.evaluate(()=>window.assetInventory.getAll().length)!==1)throw Error('Asset missing');
+  if(await page.evaluate(()=>JOBS.length)!==12)throw Error('Adding an asset changed the ticket dataset');
+  await page.locator('[data-locate-asset]').click();await expect(page.locator('#crumb')).toContainText('ชั้น 1');await expect(page.locator('#panelAssets')).toContainText('AC-1-001');
+  if(await page.evaluate(()=>!!window.facility)){await page.evaluate(()=>window.__frame(performance.now()));await expect(page.locator('.asset-marker')).toHaveCount(1);await page.locator('.asset-marker').click();await expect(page.locator('#directoryTitle')).toHaveText('รายละเอียดอุปกรณ์');await page.keyboard.press('Escape');}
+  await page.reload({waitUntil:'networkidle'});if(process.env.QA_ONLINE==='1')await page.waitForFunction(()=>!!window.facility);await page.evaluate(()=>window.__freeze=true);
+  if(await page.evaluate(()=>window.assetInventory.getAll().length)!==1)throw Error('Asset was not persisted');
+  await page.locator('[data-add-asset]').first().click();await expect(page.locator('#assetCode')).toHaveValue('AC-1-002');await page.locator('#assetName').fill('ทดสอบรหัสซ้ำ');await page.locator('#assetCode').fill('ac-1-001');await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#assetError')).toHaveText('รหัสนี้มีอุปกรณ์อื่นใช้แล้ว');
+  await page.locator('#assetCode').fill('AC-1-003');
+  await page.evaluate(()=>{window.__saveItem=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='facility-demo.assets.v1')throw new DOMException('Quota exceeded','QuotaExceededError');return window.__saveItem.call(this,k,v);};});
+  await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#assetError')).toContainText('บันทึกไม่ได้');await expect(page.locator('#assetName')).toHaveValue('ทดสอบรหัสซ้ำ');
+  if(await page.evaluate(()=>window.assetInventory.getAll().length)!==1)throw Error('Failed save mutated inventory');
+  await page.evaluate(()=>Storage.prototype.setItem=window.__saveItem);await page.keyboard.press('Escape');
+  await page.setViewportSize({width:390,height:844});await page.locator('[data-add-asset]').first().click();await page.locator('#assetType').selectOption('microphone');await page.locator('#assetBuilding').selectOption('B2');await page.locator('#assetFloor').selectOption('7');await expect(page.locator('#assetCode')).toHaveValue('MIC-7-001');await page.locator('#assetName').fill('ไมค์ประชุมชั้น 7');await page.locator('#assetForm [type=submit]').click();await expect(page.locator('#directoryTitle')).toHaveText('เพิ่มอุปกรณ์แล้ว');
+  if(await page.evaluate(()=>window.assetInventory.getAll().length)!==2)throw Error('Mobile asset missing');
+  await page.screenshot({path:path.join(__dirname,'equipment-mobile.png'),fullPage:false});
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow');
+  if(errors.length)throw Error(errors.join('\n'));
+  console.log('PASS: required fields, code format, duplicate/case-insensitive codes, room bounds, point selection, save/reload, 3D marker (when online), storage failure, mobile creation, unchanged JOBS, no JS errors.');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>System Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!--ATLAS_DATA-->
+<style>
+/* System Atlas UI — same look in every project; only project.json (theme, actors) and the module data change.
+   Layout: slim top bar, tabbed views; flows as swimlanes (one column per actor); timeline as a stepper. */
+:root{
+  color-scheme:light;
+  --bg:#F6F7FA; --card:#FFFFFF; --canvas:#FAFBFD; --grid:rgba(24,34,56,.05); --fg:#182238; --muted:#667085; --border:#E5E8EF; --input:#D0D6E2;
+  --primary:#2741FA; --primary-fg:#FFFFFF; --soft:#EFF2FF; --soft-fg:#1B31D6;
+  --ok:#0B7A5E; --ok-bg:#E7F5EF; --ok-fg:#FFFFFF; --wait:#8C6600; --wait-bg:#FBF3DC; --attn:#B93D0A; --attn-bg:#FDEEE6;
+  --bad:#B42318; --bad-bg:#FDECEA; --none:#667085; --none-bg:#F1F3F7; --track:#E3E8F0;
+  --dec:#A86A00; --dec-bg:#FFF6E0; --end-bg:#182238; --end-fg:#FFFFFF; --edge:#7A8698; --hl:#EA580C;
+  --font:"Anuphan",system-ui,"Leelawadee UI","Noto Sans Thai",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --shadow:0 12px 40px rgba(24,34,56,.18);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1420; --card:#171E2C; --canvas:#131A27; --grid:rgba(200,215,255,.05); --fg:#E6EAF2; --muted:#98A2B3; --border:#2A3344; --input:#3A4558;
+  --primary:#6B7FFF; --primary-fg:#0F1420; --soft:#1E2647; --soft-fg:#AEB9FF;
+  --ok:#3CC79A; --ok-bg:#12302A; --ok-fg:#0F1420; --wait:#D9B44A; --wait-bg:#2F2914; --attn:#F08A5D; --attn-bg:#33201A;
+  --bad:#F0716A; --bad-bg:#351A1A; --none:#98A2B3; --none-bg:#222A39; --track:#263044;
+  --dec:#E3B44C; --dec-bg:#2C2414; --end-bg:#DCE3EE; --end-fg:#0F1420; --edge:#8A97AB; --hl:#FB923C;
+  --shadow:0 12px 40px rgba(0,0,0,.5); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0F1420; --card:#171E2C; --canvas:#131A27; --grid:rgba(200,215,255,.05); --fg:#E6EAF2; --muted:#98A2B3; --border:#2A3344; --input:#3A4558;
+  --primary:#6B7FFF; --primary-fg:#0F1420; --soft:#1E2647; --soft-fg:#AEB9FF;
+  --ok:#3CC79A; --ok-bg:#12302A; --ok-fg:#0F1420; --wait:#D9B44A; --wait-bg:#2F2914; --attn:#F08A5D; --attn-bg:#33201A;
+  --bad:#F0716A; --bad-bg:#351A1A; --none:#98A2B3; --none-bg:#222A39; --track:#263044;
+  --dec:#E3B44C; --dec-bg:#2C2414; --end-bg:#DCE3EE; --end-fg:#0F1420; --edge:#8A97AB; --hl:#FB923C;
+  --shadow:0 12px 40px rgba(0,0,0,.5); color-scheme:dark }
+
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.55}
+h1,h2,h3,h4{margin:0;text-wrap:balance;line-height:1.25}
+h2{font-size:20px;font-weight:600}
+h3{font-size:16px;font-weight:600}
+p{margin:0}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer}
+button[disabled]{cursor:not-allowed;opacity:.55}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.mono{font-family:var(--mono);font-size:12.5px}
+.muted{color:var(--muted)}
+.spacer{flex:1}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--border)}
+.top-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+.brand-mark{width:28px;height:28px;border-radius:8px;background:var(--primary);color:var(--primary-fg);display:grid;place-items:center;font-size:14px}
+.brand small{font-weight:500;color:var(--muted);font-size:13px}
+.select{border:1px solid var(--input);background:var(--card);border-radius:8px;padding:5px 10px;font:inherit;font-size:14px;color:var(--fg)}
+.runner{display:flex;align-items:center;gap:8px;font-size:13px;border:1px solid var(--border);border-radius:999px;padding:4px 12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.runner.off .dot{background:var(--none)}
+.gen{font-size:12.5px;color:var(--muted)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{border:0;background:none;padding:10px 14px;font-size:14.5px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--primary);font-weight:600}
+.tab .n{font-size:12px;background:var(--none-bg);color:var(--muted);border-radius:999px;padding:0 7px;margin-left:4px}
+
+main{padding-block:24px 64px}
+.view{display:grid;gap:24px;min-width:0}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;min-width:0}
+.panel-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:16px 18px 0}
+.panel-b{padding:16px 18px 18px;min-width:0}
+.lede{max-width:72ch;color:var(--muted)}
+.fatal{max-width:640px;margin:64px auto;display:grid;gap:10px}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:1px 10px;font-size:12.5px;font-weight:500;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-accepted{color:var(--ok);background:var(--ok-bg)}
+.s-built{color:var(--soft-fg);background:var(--soft)}
+.s-progress{color:var(--wait);background:var(--wait-bg)}
+.s-attn{color:var(--attn);background:var(--attn-bg)}
+.s-bad{color:var(--bad);background:var(--bad-bg)}
+.s-pending,.s-later,.s-replaced{color:var(--none);background:var(--none-bg)}
+.s-later::before,.s-replaced::before{background:none;border:1px solid currentColor}
+.e-pass{color:var(--ok)} .e-fail{color:var(--bad)} .e-none{color:var(--muted)}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:0 7px;font-size:12.5px;white-space:nowrap;background:var(--card)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.role{display:inline-block;border-radius:6px;padding:0 7px;font-size:12.5px;background:var(--none-bg);white-space:nowrap}
+
+/* overview */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{font-size:13px;color:var(--muted)}
+.roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.rolecard{border:1px solid var(--border);border-radius:10px;padding:14px;display:grid;gap:8px;align-content:start}
+.rolecard h3{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.rolecard h3 i{width:10px;height:10px;border-radius:3px;display:inline-block;background:var(--c)}
+.rolecard code{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400}
+.rolecard ul{margin:0;padding-left:18px;font-size:14px}
+.life{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.life .arrow{color:var(--muted)}
+.life-note{font-size:13px;color:var(--muted);margin-top:10px}
+
+/* tables */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:12.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.matrix td,.matrix th{text-align:center}
+.matrix td:first-child,.matrix th:first-child{text-align:left}
+.yes{color:var(--ok);font-weight:600}
+.part{color:var(--wait);font-size:12.5px}
+.no{color:var(--muted);opacity:.4}
+.notebtn{border:1px solid var(--border);background:var(--card);border-radius:6px;padding:1px 9px;font-size:12.5px;white-space:nowrap}
+.notebtn.has{border-color:var(--attn);color:var(--attn);background:var(--attn-bg)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.fbtn{border:1px solid var(--border);background:var(--card);border-radius:999px;padding:3px 12px;font-size:13px}
+.fbtn[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.search{border:1px solid var(--input);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;background:var(--card);color:var(--fg);min-width:0;width:220px}
+
+/* flow browser */
+.flows{display:grid;grid-template-columns:290px minmax(0,1fr);gap:16px;align-items:start}
+.flowlist{display:grid;gap:2px;padding:8px}
+.fitem{display:grid;grid-template-columns:56px 1fr auto;gap:2px 8px;text-align:left;border:1px solid transparent;background:none;border-radius:8px;padding:8px 10px}
+.fitem:hover{background:var(--bg)}
+.fitem[aria-current="true"]{background:var(--soft);border-color:var(--soft)}
+.fitem .fid{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:2px}
+.fitem .fname{font-size:14px;font-weight:500}
+.fitem .fmeta{grid-column:2/4;font-size:12px;color:var(--muted)}
+.fitem .tour{font-size:11px;align-self:start;padding-top:3px;white-space:nowrap;color:var(--ok);font-weight:600}
+.group-label{font-size:12px;color:var(--muted);letter-spacing:.04em;padding:10px 10px 2px}
+.fd-head{display:grid;gap:10px;padding:18px}
+.fd-title{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.fd-title h2{font-size:22px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:14px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.runbar{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--border);background:var(--bg)}
+.runbar.locked{color:var(--muted);font-size:13.5px}
+.btn{border:1px solid var(--input);background:var(--card);border-radius:8px;padding:7px 14px;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+.btn.sm{padding:4px 10px;font-size:13px}
+.kbd{font-family:var(--mono);font-size:11.5px;border:1px solid currentColor;border-radius:4px;padding:0 5px;opacity:.75}
+.hint{font-size:13px;color:var(--muted)}
+.lock{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--none-bg);font-size:12px}
+
+/* swimlane diagram */
+.dg-wrap{padding:0 18px 18px;display:grid;gap:10px;min-width:0}
+.dg-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--canvas)}
+.dg{position:relative;margin-inline:auto;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;min-height:120px}
+.lane{position:absolute;top:0;bottom:0;border-left:1px dashed var(--border);background:color-mix(in srgb,var(--c) 4%,transparent)}
+.lane.first{border-left:0}
+.lane-h{position:absolute;inset:0 0 auto 0;display:flex;flex-direction:column;justify-content:center;padding:4px 12px;border-top:3px solid var(--c);border-bottom:1px solid var(--border);background:var(--canvas)}
+.lane-h b{font-size:14px;font-weight:600;color:var(--c);line-height:1.3}
+.lane-h small{font-size:11.5px;color:var(--muted);line-height:1.3}
+.edges{position:absolute;left:0;top:0;z-index:1;overflow:visible;pointer-events:none}
+.edges path{fill:none;stroke:var(--edge);stroke-width:1.6;stroke-linejoin:round}
+.edges path.dash{stroke-dasharray:5 5}
+.el{position:absolute;z-index:2;font-size:11.5px;line-height:1.6;color:var(--fg);background:var(--canvas);border:1px solid var(--input);border-radius:999px;padding:0 7px;white-space:nowrap}
+.nd{position:absolute;z-index:3;font-size:13px;line-height:1.45;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--fg)}
+.t-act{background:var(--card);border:1.5px solid color-mix(in srgb,var(--c) 55%,transparent);border-radius:10px;padding:9px 10px}
+.t-start{background:var(--card);border:2px solid var(--c);border-radius:22px;padding:8px 12px;font-weight:500}
+.t-end{background:var(--end-bg);color:var(--end-fg);border-radius:22px;padding:9px 12px;font-weight:500}
+.t-dec{background:var(--dec-bg);border:1.5px solid var(--dec);border-radius:14px;padding:7px 10px;font-weight:500}
+.t-dec .k{font-size:10.5px;color:var(--dec);font-weight:600;letter-spacing:.04em}
+.t-link{background:var(--card);border:1.5px dashed var(--primary);border-radius:12px;padding:8px 10px;color:var(--soft-fg);font-weight:500;cursor:pointer}
+.t-link:hover{background:var(--soft)}
+.t-link .go{font-family:var(--mono);font-size:11.5px}
+.t-note{background:transparent;border:1px dashed var(--input);border-radius:8px;padding:7px 10px;color:var(--muted);font-size:12.5px;text-align:left}
+.fchip{font-family:var(--mono);font-size:11px;line-height:1.6;padding:0 6px;border-radius:6px;border:1px solid var(--input);color:var(--soft-fg);background:var(--card)}
+.fchip:hover{border-color:var(--primary)}
+.nd.play{cursor:pointer}
+.nd.play:hover{box-shadow:0 0 0 3px color-mix(in srgb,var(--hl) 30%,transparent)}
+.nd.cur{box-shadow:0 0 0 3px var(--hl)}
+.tb{position:absolute;top:-11px;right:-8px;background:var(--hl);color:#fff;font-family:var(--mono);font-size:10.5px;font-weight:500;line-height:1;padding:4px 7px;border-radius:999px;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:22px;height:14px}
+.lg-start{border:2px solid var(--primary);border-radius:8px}
+.lg-act{border:1.5px solid var(--input);border-radius:4px;background:var(--card)}
+.lg-dec{border:1.5px solid var(--dec);border-radius:5px;background:var(--dec-bg)}
+.lg-end{background:var(--end-bg);border-radius:8px}
+.lg-link{border:1.5px dashed var(--primary);border-radius:5px}
+.lg-tb{background:var(--hl);border-radius:8px;width:28px!important}
+
+/* UAT steps */
+details.uat{border-top:1px solid var(--border)}
+details.uat summary{cursor:pointer;padding:12px 18px;font-weight:500}
+.steps{display:grid}
+.step{display:grid;grid-template-columns:32px 110px minmax(0,1fr) minmax(0,1fr);gap:12px;padding:10px 18px;border-top:1px solid var(--border);font-size:14px}
+.step-h{font-size:12.5px;color:var(--muted);padding-block:8px}
+.step .no{color:var(--muted);opacity:1;font-family:var(--mono);font-size:12.5px;padding-top:2px}
+.step button{border:0;background:none;padding:0;color:var(--primary);font-size:12.5px}
+
+/* catalog */
+.cat{display:grid;gap:20px}
+.cat-group h3{margin-bottom:8px}
+.cat-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px}
+.cat-item{border:1px solid var(--border);background:var(--card);border-radius:10px;padding:12px 14px;display:grid;gap:6px;align-content:start}
+.cat-item b{font-weight:600}
+.cat-item p{font-size:14px;color:var(--muted)}
+
+/* timeline: stepper */
+.tl-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px 24px;flex-wrap:wrap;padding:18px 18px 4px}
+.tl-kpi{display:flex;align-items:center;gap:14px}
+.ring{--p:0;width:64px;height:64px;border-radius:50%;background:conic-gradient(var(--ok) calc(var(--p) * 1%),var(--track) 0);display:grid;place-items:center;flex:none}
+.ring b{width:50px;height:50px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.tl-kpi div{display:grid;line-height:1.35}
+.tl-kpi strong{font-size:15px;font-weight:600}
+.tl-kpi span{font-size:13px;color:var(--muted)}
+.tl-legend{display:flex;gap:8px;flex-wrap:wrap}
+.tl-legend span{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;border:1px solid var(--border);border-radius:999px;padding:2px 10px;background:var(--card)}
+.tl-legend i{width:10px;height:10px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fg) 15%,transparent)}
+.st-scroll{overflow-x:auto;padding:14px 18px 8px}
+.st{--col:100px;position:relative;display:grid;grid-template-columns:repeat(var(--n),minmax(var(--col),1fr));min-width:calc(var(--n) * var(--col));padding-bottom:78px}
+.st-col{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 8px}
+.st-col::before,.st-col::after{content:"";position:absolute;top:44px;height:4px;width:50%;background:var(--track)}
+.st-col::before{left:0;border-radius:0 2px 2px 0}
+.st-col::after{right:0;border-radius:2px 0 0 2px}
+.st-col:first-child::before,.st-col:last-child::after{display:none}
+.st-col.l-accepted::before,.st-col.r-accepted::after{background:var(--ok)}
+.st-col.l-built::before,.st-col.r-built::after{background:color-mix(in srgb,var(--primary) 45%,var(--track))}
+.st-top{height:28px;display:flex;align-items:center}
+.st-date{font-size:12.5px;font-weight:600;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:1px 9px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.st-next{font-size:12px;font-weight:600;color:var(--primary-fg);background:var(--primary);border-radius:999px;padding:1px 9px;white-space:nowrap}
+.st-dot{position:relative;z-index:1;width:32px;height:32px;margin-top:2px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:2px solid var(--track);color:var(--muted);font-size:13px;font-weight:700;font-family:var(--mono)}
+.st-dot.accepted{background:var(--ok);border-color:var(--ok);color:var(--ok-fg);font-family:var(--font);font-size:15px}
+.st-dot.built{background:var(--soft);border-color:var(--primary);color:var(--primary);font-family:var(--font);font-size:15px}
+.st-dot.next{border:2px dashed var(--primary);color:var(--primary);box-shadow:0 0 0 5px color-mix(in srgb,var(--primary) 14%,transparent)}
+.st-name{margin-top:10px;font-size:13.5px;font-weight:600;line-height:1.35;text-wrap:balance}
+.st-meta{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4}
+.st-meta.accepted{color:var(--ok)} .st-meta.built{color:var(--soft-fg)}
+.st-cr{position:absolute;bottom:4px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;line-height:1.3;text-align:center;cursor:default}
+.st-cr::before{content:"";position:absolute;bottom:100%;left:50%;width:0;height:var(--pole);border-left:1.5px dashed color-mix(in srgb,var(--attn) 55%,transparent)}
+.st-cr::after{content:"";position:absolute;left:50%;bottom:calc(100% + var(--pole) - 5px);width:9px;height:9px;background:var(--attn);transform:translateX(-50%) rotate(45deg);border-radius:2px}
+.st-cr b{font-family:var(--mono);font-weight:500;color:var(--attn);background:var(--attn-bg);border-radius:6px;padding:0 6px}
+.st-cr span{color:var(--muted)}
+.tl-foot{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 18px;padding:12px 18px 16px;border-top:1px solid var(--border);font-size:14px}
+.tl-foot b{font-weight:600}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(15,20,32,.45);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--card);z-index:21;display:flex;flex-direction:column;box-shadow:var(--shadow);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer-h{display:flex;gap:10px;align-items:flex-start;padding:16px 18px;border-bottom:1px solid var(--border)}
+.drawer-h div{flex:1;min-width:0}
+.x{border:0;background:var(--none-bg);border-radius:8px;width:32px;height:32px;font-size:18px;line-height:1}
+.drawer-b{flex:1;overflow:auto;padding:16px 18px;display:grid;gap:10px;align-content:start}
+.note{border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:grid;gap:4px;font-size:14px}
+.note-m{display:flex;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);align-items:center}
+.note.done{opacity:.6}
+.note.done .note-t{text-decoration:line-through}
+.note-actions{display:flex;gap:10px}
+.note-actions button{border:0;background:none;color:var(--primary);font-size:12.5px;padding:0}
+.drawer-f{border-top:1px solid var(--border);padding:14px 18px;display:grid;gap:8px}
+.drawer-f textarea,.drawer-f input{width:100%;border:1px solid var(--input);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;background:var(--card);color:var(--fg)}
+.drawer-f textarea{min-height:72px;resize:vertical}
+.drawer-f .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drawer-f .row input{width:140px;flex:none}
+.info-note{font-size:12.5px;color:var(--muted);border:1px dashed var(--input);border-radius:8px;padding:8px 12px}
+
+/* live run panel */
+.runpanel{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:15;width:min(380px,calc(100vw - 32px));background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;display:grid;gap:8px}
+.rp-top{display:flex;gap:8px;align-items:center}
+.rp-top b{flex:1;min-width:0}
+.rp-step{font-size:14px}
+.rp-msg{font-size:13px;color:var(--muted)}
+.rp-btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.rp-bar{display:flex;gap:3px}
+.rp-bar i{flex:1;height:4px;border-radius:2px;background:var(--border)}
+.rp-bar i.on{background:var(--primary)}
+
+/* popup (embedded run) */
+.popup{position:fixed;inset:0;z-index:30;background:rgba(10,14,24,.78);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sw{width:min(1080px,100%);max-height:100%;background:var(--card);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.sw-h{display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.sw-h b{flex:1;min-width:0}
+.sw-img{flex:1;min-height:0;overflow:auto;background:var(--bg);cursor:pointer}
+.sw-img img{display:block;width:100%;height:auto}
+.sw-f{display:flex;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--border);flex-wrap:wrap;font-size:13.5px}
+.sw-f .exp{flex:1;min-width:200px;color:var(--muted)}
+.prog{display:flex;gap:3px;padding:0 14px 8px}
+.prog i{flex:1;height:4px;border-radius:2px;background:var(--border)}
+.prog i.on{background:var(--primary)}
+
+/* embedded run: the headless Chromium streamed into a browser-like popup */
+.embed .sw{width:min(1180px,100%)}
+.bw-bar{display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--border);background:var(--bg);font-size:12.5px}
+.pdots{display:flex;gap:6px}
+.pdots i{width:10px;height:10px;border-radius:50%;background:var(--input)}
+.bw-url{flex:1;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:2px 10px;font-family:var(--mono);font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bw-tag{color:var(--attn);white-space:nowrap}
+.bw-view{position:relative;aspect-ratio:16/10;max-height:calc(100vh - 230px);display:grid;place-items:center;outline:none}
+.bw-view canvas{width:100%;height:100%;object-fit:contain;background:var(--bg);display:block}
+.bw-view:focus-visible{box-shadow:inset 0 0 0 2px var(--primary)}
+.bw-wait{display:grid;justify-items:center;gap:10px;color:var(--muted);font-size:14px;text-align:center;padding:24px}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--track);border-top-color:var(--primary);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+@media (max-width:900px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .flows{grid-template-columns:1fr}
+  .step{grid-template-columns:28px minmax(0,1fr)}
+  .step .who,.step .exp,.step .act{grid-column:2}
+  .step-h{display:none}
+}
+@media (max-width:520px){ .gen{display:none} .search{width:100%} }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <marker id="arw" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0.8 L10,5 L0,9.2 Z" style="fill:var(--edge)"/></marker>
+</defs></svg>
+
+<header class="top" id="top" hidden>
+  <div class="wrap top-row">
+    <div class="brand"><span class="brand-mark">A</span>System Atlas <small id="pname"></small></div>
+    <select class="select" id="module" aria-label="โมดูล"></select>
+    <div class="spacer"></div>
+    <span class="gen" id="gen"></span>
+    <div class="runner" id="runner"><span class="dot"></span><span id="runnerTxt"></span></div>
+  </div>
+  <nav class="wrap tabs" role="tablist" id="tabs"></nav>
+</header>
+<main class="wrap" id="main"></main>
+<div id="layer"></div>
+<div id="runpanel"></div>
+
+<script>
+"use strict";
+/* ===== state ===== */
+let D, P, M, NOTES_ALL, runnerOn = false;
+let cur = "overview", curFlow = null, flowRole = "all", statusFilter = "all", statusQ = "", catRole = "all";
+let live = null;          // last /api/run status while a run panel is shown
+let lastNode = null;      // {f, n} box to ring in the diagram
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const STATUS = {accepted:"ตรวจรับแล้ว",built:"สร้างแล้ว รอตรวจรับ",progress:"กำลังทำ",pending:"ยังไม่เริ่ม",later:"ช่วงถัดไป",replaced:"ยกเลิก"};
+const pill = s => `<span class="pill s-${s}">${STATUS[s]}</span>`;
+const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+function fmtDate(iso, year){ if(!iso) return ""; const [y,m,d]=iso.slice(0,10).split("-").map(Number); return `${d} ${MONTHS[m-1]}${year?" "+(y+543):""}`; }
+const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const actorName = k => P.actors[k]?.name ?? k;
+const roleChips = rs => rs.map(r=>`<span class="role">${esc(actorName(r))}</span>`).join(" ");
+const E2E = {pass:'<span class="e-pass">● ผ่าน</span>',fail:'<span class="e-fail">● ไม่ผ่าน</span>',none:'<span class="e-none">— ยังไม่มี</span>'};
+const FLOW = id => M.flows.find(f=>f.id===id);
+const STAGE = id => M.stages.find(s=>s.id===id);
+function flowStages(f){ return (f.stages || M.stages.filter(s=>s.flows.includes(f.id)).map(s=>s.id)).map(STAGE).filter(s=>s && s.status!=="replaced"); }
+function flowStatus(f){ const st=flowStages(f), order=["pending","progress","built","accepted"]; return st.length ? st.map(s=>s.status).sort((a,b)=>order.indexOf(a)-order.indexOf(b))[0] : "later"; }
+const isRunnable = f => !!f.tour?.steps?.length && flowStages(f).length>0 && flowStages(f).every(s=>s.status==="accepted");
+const canPlay = f => isRunnable(f) && runnerOn;
+const NOTES = () => (NOTES_ALL[M.key] ??= {});
+const openCount = id => (NOTES()[id]||[]).filter(n=>!n.done).length;
+
+async function api(method, url, body){
+  const r = await fetch(url, {method, headers:{"content-type":"application/json"}, body: body ? JSON.stringify(body) : undefined});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+
+/* ===== theme from project.json ===== */
+function applyTheme(){
+  const t = P.theme || {}, css = [];
+  const dark = rules => `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) ${rules}} :root[data-theme="dark"] ${rules}`;
+  if(t.primary) css.push(`:root{--primary:${t.primary}}`);
+  if(t.primaryDark) css.push(`@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--primary:${t.primaryDark}}} :root[data-theme="dark"]{--primary:${t.primaryDark}}`);
+  for(const [k,a] of Object.entries(P.actors)){
+    css.push(`.ln-${k}{--c:${a.color || "var(--muted)"}}`);
+    if(a.dark) css.push(dark(`.ln-${k}{--c:${a.dark}}`));
+  }
+  const s = document.createElement("style"); s.textContent = css.join("\n"); document.head.appendChild(s);
+}
+/* CR markers hang from the connector line (y = 46px) down to their label */
+function fixPoles(){ document.querySelectorAll(".st-cr").forEach(el=>el.style.setProperty("--pole", Math.max(0, el.offsetTop - 46) + "px")); }
+
+/* ===== swimlane renderer ===== */
+const K = {SLOT:212,NODE:164,PAD:12,HEAD:48,TOP:20,GAP:40,BOT:22};
+/* [0,1,2,4] → "1–3, 5" */
+function stepLabel(idx){
+  const parts = []; let a = idx[0], b = idx[0];
+  for(const i of idx.slice(1).concat(null)){ if(i===b+1){ b=i; continue; } parts.push(a===b?`${a+1}`:`${a+1}–${b+1}`); a=b=i; }
+  return parts.join(", ");
+}
+function stepsOf(f, nodeId){ return canPlay(f) ? f.tour.steps.map((s,i)=>s.node===nodeId?i:-1).filter(i=>i>=0) : []; }
+function nodeHTML(n, f){
+  const st = stepsOf(f, n.i);
+  const isCur = lastNode && lastNode.f===f.id && lastNode.n===n.i;
+  const cls = `nd t-${n.t} ln-${n.l}${st.length?" play":""}${isCur?" cur":""}`;
+  const act = n.t==="link" ? ` data-flow="${esc(n.to)}" role="button" tabindex="0"` : st.length ? ` data-play="${esc(f.id)}|${st[0]}" role="button" tabindex="0" title="เริ่มจากขั้น ${st[0]+1}"` : "";
+  let h = n.t==="dec" ? `<span class="k">ทางแยก</span>` : "";
+  h += `<span>${esc(n.x).replace(/\n/g,"<br>")}</span>`;
+  if(n.t==="link") h += `<span class="go">${esc(n.to)} →</span>`;
+  if(n.ln) h += `<span class="chips">${n.ln.map(id=>`<button type="button" class="fchip" data-flow="${esc(id)}">${esc(id)}</button>`).join("")}</span>`;
+  if(st.length) h += `<span class="tb">▶ ${stepLabel(st)}</span>`;
+  return `<div class="${cls}" data-nid="${esc(n.i)}"${act}>${h}</div>`;
+}
+function route(e, A, B, rowTop){
+  const m = e.m || (A.r===B.r ? "h" : B.r<A.r ? "loop" : (A.t==="dec" && Math.abs(A.cx-B.cx)>1 ? "h" : "v"));
+  const mid = (a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+  let pts, k = 0;
+  if(m==="h"){
+    const R=B.cx>A.cx;
+    if(A.r===B.r) pts=[{x:R?A.rgt:A.lft,y:A.cy},{x:R?B.lft:B.rgt,y:B.cy}];
+    else pts=[{x:R?A.rgt:A.lft,y:A.cy},{x:B.cx,y:A.cy},{x:B.cx,y:B.r>A.r?B.top:B.bot}];
+  } else if(m==="v"){
+    if(Math.abs(A.cx-B.cx)<1) pts=[{x:A.cx,y:A.bot},{x:B.cx,y:B.top}];
+    else { const gy=rowTop[B.r]-K.GAP/2; pts=[{x:A.cx,y:A.bot},{x:A.cx,y:gy},{x:B.cx,y:gy},{x:B.cx,y:B.top}]; k=1; }
+  } else if(m==="vr"){
+    pts=[{x:A.cx,y:A.bot},{x:A.cx,y:B.cy},{x:B.cx<A.cx?B.rgt:B.lft,y:B.cy}]; k=1;
+  } else {
+    const x=Math.max(A.rgt,B.rgt)+18; pts=[{x:A.rgt,y:A.cy},{x,y:A.cy},{x,y:B.cy},{x:B.rgt,y:B.cy}]; k=1;
+  }
+  if(e.lp==="last") k = pts.length-2;
+  const a=pts[k], b=pts[k+1];
+  return {pts, lp:mid(a,b), seg:Math.hypot(b.x-a.x,b.y-a.y), horiz:Math.abs(a.y-b.y)<1};
+}
+function drawDg(dg){
+  const f = FLOW(dg.dataset.dg); if(!f) return;
+  let st = 0;
+  const lanes = f.lanes.map(l=>{const a=P.actors[l.id]||{}; const L={id:l.id,label:l.label||a.lane||a.name||l.id,sub:l.sub||a.sub||"",slots:l.slots||1,start:st}; st+=L.slots; return L;});
+  const X = u => K.PAD + u*K.SLOT;
+  const laneOf = Object.fromEntries(lanes.map(L=>[L.id,L]));
+  const nodes = f.nodes.map(n=>{const L=laneOf[n.l]; return Object.assign({},n,{slot:L.start+(n.s==null?(L.slots-1)/2:n.s)});});
+  dg.innerHTML = lanes.map((L,i)=>`<div class="lane ln-${esc(L.id)}${i?"":" first"}" style="left:${X(L.start)}px;width:${L.slots*K.SLOT}px"><div class="lane-h" style="height:${K.HEAD}px"><b>${esc(L.label)}</b><small>${esc(L.sub)}</small></div></div>`).join("")
+    + nodes.map(n=>nodeHTML(n,f)).join("") + `<svg class="edges" aria-hidden="true"></svg>`;
+  nodes.forEach(n=>{ n.el=dg.querySelector(`[data-nid="${CSS.escape(n.i)}"]`); n.el.style.width=K.NODE+"px"; n.ch=n.el.offsetHeight; });
+  const maxR = Math.max(...nodes.map(n=>n.r));
+  const rowH = Array(maxR+1).fill(30); nodes.forEach(n=>rowH[n.r]=Math.max(rowH[n.r],n.ch));
+  const rowTop = []; let y = K.HEAD+K.TOP;
+  for(let r=0;r<=maxR;r++){ rowTop[r]=y; y+=rowH[r]+K.GAP; }
+  const H = y-K.GAP+K.BOT;
+  nodes.forEach(n=>{ n.cx=X(n.slot+.5); n.cy=rowTop[n.r]+rowH[n.r]/2; n.top=n.cy-n.ch/2; n.bot=n.cy+n.ch/2; n.lft=n.cx-K.NODE/2; n.rgt=n.cx+K.NODE/2; n.el.style.left=n.lft+"px"; n.el.style.top=n.top+"px"; });
+  const by = Object.fromEntries(nodes.map(n=>[n.i,n]));
+  let W = st*K.SLOT + 2*K.PAD, d = ""; const labels = [];
+  f.edges.forEach(e=>{
+    if(!by[e.f] || !by[e.t]) return;
+    const r = route(e, by[e.f], by[e.t], rowTop);
+    r.pts.forEach(p=>W=Math.max(W,p.x+14));
+    d += `<path d="M${r.pts.map(p=>p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" L")}"${e.dash?' class="dash"':""} marker-end="url(#arw)"/>`;
+    if(e.lb) labels.push({t:e.lb,r});
+  });
+  const svg = dg.querySelector("svg"); svg.setAttribute("width",W); svg.setAttribute("height",H); svg.innerHTML = d;
+  labels.forEach(l=>{
+    const s=document.createElement("span"); s.className="el"; s.textContent=l.t; dg.appendChild(s);
+    const w=s.offsetWidth, h=s.offsetHeight; let {x,y}=l.r.lp;
+    if(l.r.horiz && l.r.seg < w+28) y -= h/2+8;
+    s.style.left=(x-w/2)+"px"; s.style.top=(y-h/2)+"px";
+  });
+  dg.style.width=W+"px"; dg.style.height=H+"px";
+}
+function drawAll(){ document.querySelectorAll(".dg[data-dg]").forEach(drawDg); }
+function ringNode(){
+  document.querySelectorAll(".nd.cur").forEach(n=>n.classList.remove("cur"));
+  if(!lastNode) return;
+  const dg = document.querySelector(`.dg[data-dg="${CSS.escape(lastNode.f)}"]`);
+  dg?.querySelector(`[data-nid="${CSS.escape(lastNode.n)}"]`)?.classList.add("cur");
+}
+const legend = f => `<div class="legend"><span><i class="lg-start"></i>เริ่ม</span><span><i class="lg-act"></i>ขั้นตอน</span><span><i class="lg-dec"></i>ทางแยก</span><span><i class="lg-end"></i>จบ</span><span><i class="lg-link"></i>ไปต่อ flow อื่น (กดได้)</span>${canPlay(f)?`<span><i class="lg-tb"></i>กดเพื่อรันจากขั้นนั้น</span>`:""}<span>แต่ละคอลัมน์ = คนหรือระบบที่ทำขั้นนั้น</span></div>`;
+
+function runBar(f){
+  if(isRunnable(f)){
+    if(!runnerOn) return `<div class="runbar locked"><span class="lock" aria-hidden="true">▶</span>ตรวจรับแล้ว มี tour · รันบนแอพจริงได้เมื่อเปิด Atlas ผ่าน runner บนเครื่องที่มีแอพ (<span class="mono">node tools/atlas/cli.mjs serve</span>)</div>`;
+    return `<div class="runbar"><button class="btn primary" type="button" data-embed="${esc(f.id)}|0">▶ รันบนแอพจริง (Playwright)</button><button class="btn sm" type="button" data-run="${esc(f.id)}" title="เปิด Chromium เป็นหน้าต่างแยกบนเครื่องนี้">เปิดในหน้าต่างแยก</button><span class="hint">เปิดแอพจริงในหน้าต่างบนหน้านี้ กด <span class="kbd">Space</span> หรือคลิกที่ภาพเพื่อไปทีละขั้น · รันบน ${esc(D.meta.target || D.meta.baseURL)}</span></div>`;
+  }
+  if(flowStatus(f)==="accepted") return `<div class="runbar locked"><span class="lock" aria-hidden="true">▶</span>ตรวจรับแล้ว แต่ยังไม่มี tour script ของ flow นี้</div>`;
+  const left = flowStages(f).filter(s=>s.status!=="accepted").map(s=>`Stage ${esc(s.id)} ${s.status==="built"?"รอตรวจรับ":"ยังไม่เริ่ม"}`).join(" · ");
+  return `<div class="runbar locked"><span class="lock" aria-hidden="true">🔒</span>รันบนแอพจริงได้เมื่อ flow นี้ตรวจรับครบทุก stage${left?` · ยังเหลือ ${left}`:""}</div>`;
+}
+function uatTable(f){
+  const T = f.tour.steps, roles = P.sessionRoles || {};
+  let role = null;
+  const rows = T.map((s,i)=>{
+    const nr = s.role || s.becomes;
+    const sw = nr && nr!==role && i>0; if(nr) role = nr;
+    const btn = canPlay(f) ? ` <button type="button" data-play="${esc(f.id)}|${i}">▶ เริ่มจากขั้นนี้</button>` : "";
+    return `<div class="step"><span class="no">${String(i+1).padStart(2,"0")}</span><span class="who">${sw?"↻ ":""}${esc(roles[role]??role??"")}</span><span class="act"><b style="font-weight:500">${esc(s.title)}</b><br><span class="muted">${esc(s.desc)}</span>${btn}</span><span class="exp">${esc(s.expect)}</span></div>`;
+  }).join("");
+  return `<details class="uat" open><summary>ขั้นตอนทดสอบ UAT (${T.length} ขั้น)</summary><div class="steps">
+    <div class="step step-h"><span>#</span><span>ใครทำ</span><span>ทำอะไร</span><span>ผลที่ควรเห็น</span></div>${rows}</div></details>`;
+}
+
+/* ===== views ===== */
+const VIEWS = () => [
+  {k:"overview",label:"ภาพรวม"},
+  {k:"flows",label:"Flow",n:M.flows.filter(f=>f.id!==M.overviewFlow).length},
+  {k:"status",label:"ฟีเจอร์ & สถานะ",n:M.features.length},
+  {k:"catalog",label:"ฟีเจอร์ทั้งหมด"},
+  {k:"timeline",label:"Timeline"},
+];
+function renderTabs(){ $("#tabs").innerHTML = VIEWS().map(v=>`<button class="tab" role="tab" type="button" data-v="${v.k}" aria-selected="${v.k===cur}">${v.label}${v.n?`<span class="n">${v.n}</span>`:""}</button>`).join(""); }
+function render(){
+  renderTabs();
+  $("#main").innerHTML = `<div class="view">${({overview,flows,status,catalog,timeline})[cur]()}</div>`;
+  drawAll();
+  fixPoles();
+}
+
+function overview(){
+  const liveSt = M.stages.filter(s=>s.status!=="replaced");
+  const acc = liveSt.filter(s=>s.status==="accepted").length;
+  const ov = M.overviewFlow && FLOW(M.overviewFlow);
+  const runnable = M.flows.filter(isRunnable);
+  const cols = M.matrix?.cols || [];
+  const cell = v => v===true?'<td class="yes">✓</td>':v?`<td class="part">${esc(v)}</td>`:'<td class="no">—</td>';
+  return `
+  <section class="panel"><div class="panel-b" style="display:grid;gap:6px">
+    <h2>${esc(M.name)}</h2><p class="lede">${esc(M.summary)}</p>
+  </div></section>
+  <div class="stats">
+    <div class="stat"><b>${M.roleCount ?? M.roles.length}</b><span>role ผู้ใช้</span></div>
+    <div class="stat"><b>${M.flows.filter(f=>f.id!==M.overviewFlow).length}</b><span>flow</span></div>
+    <div class="stat"><b>${M.features.length}</b><span>ฟีเจอร์</span></div>
+    <div class="stat"><b>${runnable.length}</b><span>flow ที่รันบนแอพจริงได้</span></div>
+    <div class="stat"><b>${acc}/${liveSt.length}</b><span>stage ตรวจรับแล้ว</span></div>
+  </div>
+  ${ov?`<section class="panel">
+    <div class="panel-h"><h2>${esc(ov.name)}</h2>${pill(flowStatus(ov))}</div>
+    <div class="panel-b" style="padding-bottom:12px"><p class="lede">${esc(ov.why||"")} กดรหัส flow บนกล่องเพื่อดู flow ละเอียด${runnable.length?` · flow ที่ตรวจรับครบแล้ว (${runnable.map(f=>esc(f.id)).join(", ")}) รันบนแอพจริงได้ในแท็บ Flow`:""}</p></div>
+    <div class="dg-wrap"><div class="dg-scroll"><div class="dg" data-dg="${esc(ov.id)}"></div></div>${legend(ov)}</div>
+  </section>`:""}
+  <section class="panel">
+    <div class="panel-h"><h2>ใครใช้ระบบนี้</h2>${M.roleNote?`<span class="muted">${esc(M.roleNote)}</span>`:""}</div>
+    <div class="panel-b roles">${M.roles.map(r=>`<div class="rolecard ln-${esc(r.actor)}"><h3><i></i>${esc(r.name)} <code>${esc(r.code)}</code></h3><ul>${r.can.map(c=>`<li>${esc(c)}</li>`).join("")}</ul></div>`).join("")}</div>
+  </section>
+  ${M.matrix?`<section class="panel">
+    <div class="panel-h"><h2>สิทธิ์แต่ละ role</h2></div>
+    <div class="panel-b tbl-wrap"><table class="matrix"><thead><tr><th>ทำอะไรได้</th><th>Flow</th>${cols.map(c=>`<th>${esc(actorName(c))}</th>`).join("")}</tr></thead>
+    <tbody>${M.matrix.rows.map(r=>`<tr><td>${esc(r.label)}</td><td class="mono">${esc(r.flows)}</td>${cols.map(c=>cell(r.cells[c])).join("")}</tr>`).join("")}</tbody></table></div>
+  </section>`:""}
+  ${M.lifecycle?`<section class="panel">
+    <div class="panel-h"><h2>${esc(M.lifecycle.title)}</h2></div>
+    <div class="panel-b">
+      <div class="life">${M.lifecycle.steps.map((s,i)=>`${i?'<span class="arrow">→</span>':""}<span class="pill s-${esc(s.tone)}">${esc(s.label)}</span>`).join("")}</div>
+      ${M.lifecycle.note?`<p class="life-note">${esc(M.lifecycle.note)}</p>`:""}
+    </div>
+  </section>`:""}`;
+}
+
+function flows(){
+  const others = M.flows.filter(f=>f.id!==M.overviewFlow && (flowRole==="all"||f.actors.includes(flowRole)||f.actors.includes("all")));
+  const f = FLOW(curFlow) || FLOW(M.overviewFlow) || M.flows[0];
+  curFlow = f.id;
+  const item = x => `<button class="fitem" type="button" data-flow="${esc(x.id)}" aria-current="${x.id===f.id}"><span class="fid">${x.id===M.overviewFlow?"★":esc(x.id)}</span><span class="fname">${esc(x.name)}</span>${isRunnable(x)?`<span class="tour">▶ ${runnerOn?"รันได้":"มี tour"}</span>`:"<span></span>"}<span class="fmeta">${STATUS[flowStatus(x)]} · Stage ${flowStages(x).map(s=>esc(s.id)).join(" · ")||"—"}</span></button>`;
+  const ready = others.filter(isRunnable), rest = others.filter(x=>!isRunnable(x));
+  const ov = M.overviewFlow && FLOW(M.overviewFlow);
+  return `
+  <div class="flows">
+    <section class="panel">
+      <div class="panel-b" style="padding-bottom:6px"><div class="filters">${["all",...(M.matrix?.cols||[])].map(r=>`<button class="fbtn" type="button" data-frole="${esc(r)}" aria-pressed="${flowRole===r}">${esc(actorName(r))}</button>`).join("")}</div></div>
+      <div class="flowlist">
+        ${ov?`<div class="group-label">ภาพรวม</div>${item(ov)}`:""}
+        ${ready.length?`<div class="group-label">ตรวจรับแล้ว ${runnerOn?"รันได้":"มี tour"} (${ready.length})</div>${ready.map(item).join("")}`:""}
+        <div class="group-label">ยังไม่เสร็จ ดูแผนภาพได้ (${rest.length})</div>${rest.map(item).join("")}
+      </div>
+    </section>
+    <section class="panel">
+      <div class="fd-head">
+        <div class="fd-title"><span class="mono muted">${f.id===M.overviewFlow?"ภาพรวม":esc(f.id)}</span><h2>${esc(f.name)}</h2>${pill(flowStatus(f))}</div>
+        ${f.why?`<p class="lede">${esc(f.why)}</p>`:""}
+        <dl class="kv"><dt>ใครเกี่ยวข้อง</dt><dd>${roleChips(f.actors)}</dd><dt>หน้าจอ</dt><dd class="chips">${(f.screens||[]).map(s=>`<span class="chip mono">${esc(s)}</span>`).join("")}</dd><dt>Stage</dt><dd>${flowStages(f).map(s=>`Stage ${esc(s.id)} <span class="muted">(${STATUS[s.status]})</span>`).join(" · ")||"—"}</dd>${f.tour?.from?`<dt>tour จาก e2e</dt><dd><span class="mono">${esc(f.tour.from.spec)}</span>${(f.tour.from.tests||[]).length?` <span class="muted">· ${f.tour.from.tests.length} test</span>`:""}</dd>`:""}</dl>
+      </div>
+      ${runBar(f)}
+      <div class="dg-wrap" style="padding-top:16px"><div class="dg-scroll"><div class="dg" data-dg="${esc(f.id)}"></div></div>${legend(f)}</div>
+      ${isRunnable(f)?uatTable(f):""}
+    </section>
+  </div>`;
+}
+
+function status(){
+  const counts = {}; M.features.forEach(f=>counts[f.status]=(counts[f.status]||0)+1);
+  const q = statusQ.trim().toLowerCase();
+  const rows = M.features.filter(f=>(statusFilter==="all"||f.status===statusFilter)&&(!q||(f.name+f.flow+f.screens).toLowerCase().includes(q)));
+  return `
+  <section class="panel">
+    <div class="panel-h"><h2>ฟีเจอร์และสถานะ</h2><span class="muted">สำหรับทีมตรวจงาน · คลิกโน้ตเพื่อจดสิ่งที่ต้องแก้ในหน้านั้น</span></div>
+    <div class="panel-b" style="display:grid;gap:12px">
+      <div class="filters">
+        <button class="fbtn" type="button" data-sf="all" aria-pressed="${statusFilter==="all"}">ทั้งหมด ${M.features.length}</button>
+        ${["accepted","built","progress","pending"].filter(s=>counts[s]).map(s=>`<button class="fbtn" type="button" data-sf="${s}" aria-pressed="${statusFilter===s}">${STATUS[s]} ${counts[s]}</button>`).join("")}
+        <span class="spacer"></span>
+        <input class="search" id="sq" type="search" placeholder="ค้นชื่อ / flow / หน้าจอ" value="${esc(statusQ)}" aria-label="ค้นหาฟีเจอร์">
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>ฟีเจอร์</th><th>Flow</th><th>หน้าจอ</th><th>Stage</th><th>สถานะ</th><th>e2e</th><th>โน้ต</th></tr></thead>
+        <tbody>${rows.map(f=>{const n=openCount(f.id),all=(NOTES()[f.id]||[]).length;return `<tr><td><b style="font-weight:500">${esc(f.name)}</b></td><td><button type="button" class="fchip" data-flow="${esc(f.flow)}">${esc(f.flow)}</button></td><td class="mono">${esc(f.screens)}</td><td class="mono">${esc(f.stage)}</td><td>${pill(f.status)}</td><td>${E2E[f.e2e]||E2E.none}</td><td><button type="button" class="notebtn ${n?"has":""}" data-note="${esc(f.id)}">${n?n+" ค้าง":all?"✓ "+all:"+ โน้ต"}</button></td></tr>`}).join("") || `<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">ไม่พบฟีเจอร์ที่ตรงกับคำค้น</td></tr>`}</tbody>
+      </table></div>
+    </div>
+  </section>`;
+}
+
+function catalog(){
+  const groups = [...new Set(M.features.map(f=>f.group))];
+  const vis = f => catRole==="all" || f.roles.includes(catRole) || f.roles.includes("all");
+  return `
+  <section class="panel"><div class="panel-b" style="display:grid;gap:10px">
+    <h2>${esc(M.name)}ทำอะไรได้บ้าง</h2>
+    <p class="lede">รายการฟีเจอร์ทั้งหมดโดยไม่แสดงสถานะการพัฒนา ใช้อธิบายผู้ใช้ก่อน UAT หรือแนบในเอกสารส่งมอบ</p>
+    <div class="filters"><span class="muted" style="font-size:13px">ดูในมุมของ</span>${["all",...(M.matrix?.cols||[])].map(r=>`<button class="fbtn" type="button" data-crole="${esc(r)}" aria-pressed="${catRole===r}">${esc(actorName(r))}</button>`).join("")}</div>
+  </div></section>
+  <div class="cat">${groups.map(g=>{const items=M.features.filter(f=>f.group===g&&vis(f));return items.length?`<section class="cat-group"><h3>${esc(g)} <span class="muted" style="font-weight:400;font-size:13px">${items.length}</span></h3><div class="cat-list">${items.map(f=>`<div class="cat-item"><b>${esc(f.name)}</b><p>${esc(f.desc)}</p><div class="chips">${roleChips(f.roles)}</div></div>`).join("")}</div></section>`:""}).join("")}</div>`;
+}
+
+function timeline(){
+  const st = M.stages.filter(s=>s.status!=="replaced"), n = st.length;
+  const cnt = k => st.filter(s=>s.status===k).length;
+  const pct = n ? Math.round(cnt("accepted")/n*100) : 0;
+  const nextIdx = st.findIndex(s=>s.status==="pending");
+  const meta = {accepted:"ตรวจรับแล้ว",built:"รอตรวจรับ",pending:"ยังไม่เริ่ม",progress:"กำลังทำ"};
+  const cols = st.map((s,i)=>{
+    const isNext = i===nextIdx;
+    const top = s.status==="accepted" ? `<span class="st-date">${fmtDate(s.date)}</span>` : isNext ? `<span class="st-next">ถัดไป</span>` : "";
+    const dot = s.status==="accepted"||s.status==="built" ? "✓" : esc(s.id);
+    const r = st[i+1]?.status;
+    return `<div class="st-col l-${s.status}${r?` r-${r}`:""}"><div class="st-top">${top}</div><span class="st-dot ${s.status}${isNext?" next":""}">${dot}</span><span class="st-name">${esc(s.short||s.name)}</span><span class="st-meta mono">Stage ${esc(s.id)}</span><span class="st-meta ${s.status}">${meta[s.status]||""}</span></div>`;
+  }).join("");
+  const crs = (M.crs||[]).map(c=>{
+    const i = st.findIndex(s=>s.id===c.after); if(i<0 || i>=n-1) return "";
+    return `<div class="st-cr" style="left:${(i+1)/n*100}%" title="${esc(c.text)}"><b>${esc(c.id)}</b><span>${fmtDate(c.date)}</span></div>`;
+  }).join("");
+  const nx = nextIdx>=0 ? st[nextIdx] : null;
+  const dot = c => `<i style="background:${c}"></i>`;
+  const replaced = M.stages.filter(s=>s.status==="replaced");
+  return `
+  <section class="panel">
+    <div class="tl-head">
+      <div style="display:grid;gap:4px"><h2>Timeline ${esc(M.name)}</h2><span class="muted" style="font-size:13.5px">วันที่บนแต่ละ stage คือวันที่ตรวจรับ · เพชรสีส้มคือ change request ระหว่างทาง (ชี้เพื่อดูรายละเอียด)</span></div>
+      <div class="tl-kpi"><span class="ring" style="--p:${pct}"><b>${pct}%</b></span><div><strong>ตรวจรับแล้ว ${cnt("accepted")} จาก ${n} stage</strong><span>${nx?`ถัดไป Stage ${esc(nx.id)} · ${esc(nx.short||nx.name)}`:"ครบทุก stage"}</span></div></div>
+    </div>
+    <div style="padding:10px 18px 0" class="tl-legend"><span>${dot("var(--ok)")}ตรวจรับแล้ว ${cnt("accepted")}</span><span>${dot("var(--primary)")}สร้างแล้ว รอตรวจรับ ${cnt("built")}</span><span>${dot("var(--track)")}ยังไม่เริ่ม ${cnt("pending")}</span>${(M.crs||[]).length?`<span>${dot("var(--attn)")}Change request ${(M.crs||[]).length}</span>`:""}</div>
+    <div class="st-scroll"><div class="st" style="--n:${n}">${cols}${crs}</div></div>
+    ${replaced.length?`<div class="tl-foot muted">${replaced.map(s=>`Stage ${esc(s.id)} ${esc(s.short||s.name)} ยกเลิก${s.note?` (${esc(s.note)})`:""}`).join(" · ")}</div>`:""}
+  </section>
+  <section class="panel">
+    <div class="panel-h"><h2>รายละเอียดแต่ละ stage</h2></div>
+    <div class="panel-b tbl-wrap"><table>
+      <thead><tr><th>Stage</th><th>สิ่งที่ส่งมอบ</th><th>Flow</th><th>สถานะ</th><th>ตรวจรับเมื่อ</th></tr></thead>
+      <tbody>${M.stages.map(s=>`<tr><td class="mono">${esc(s.id)}</td><td>${esc(s.name)}${s.cr?` <span class="chip mono">${esc(s.cr)}</span>`:""}</td><td class="mono">${esc(s.flows.join(", ")||s.note||"—")}</td><td>${pill(s.status)}</td><td>${s.status==="accepted"?fmtDate(s.date,true):"—"}</td></tr>`).join("")}</tbody>
+    </table></div>
+  </section>`;
+}
+
+/* ===== notes ===== */
+async function persistNotes(){
+  if(runnerOn){ try{ await api("PUT","/api/notes",NOTES_ALL); return true; }catch(e){ alertBar("บันทึกโน้ตไม่สำเร็จ: "+e.message); return false; } }
+  try{ localStorage.setItem(`atlas-notes:${P.name}`, JSON.stringify(NOTES_ALL)); }catch(e){}
+  return true;
+}
+function openNotes(id){
+  const f = M.features.find(x=>x.id===id);
+  let me = ""; try{ me = localStorage.getItem("atlas-me")||""; }catch(e){}
+  const draw = () => {
+    const ns = NOTES()[id]||[];
+    $("#layer").innerHTML = `<div class="scrim" data-close></div>
+    <aside class="drawer" role="dialog" aria-modal="true" aria-label="โน้ตของ ${esc(f.name)}">
+      <div class="drawer-h"><div><span class="mono muted">${esc(f.flow)} · ${esc(f.screens)}</span><h3>${esc(f.name)}</h3></div><button class="x" type="button" data-close aria-label="ปิด">×</button></div>
+      <div class="drawer-b">${ns.length?ns.map((n,i)=>`<div class="note ${n.done?"done":""}"><div class="note-m"><span class="chip">${esc(n.kind)}</span><span class="mono">${esc(n.page)}</span><span>${esc(n.by)} · ${fmtDate(n.date,true)}</span></div><div class="note-t">${esc(n.t)}</div><div class="note-actions"><button type="button" data-toggle="${i}">${n.done?"เปิดอีกครั้ง":"ทำแล้ว"}</button></div></div>`).join(""):`<p class="muted">ยังไม่มีโน้ต จดสิ่งที่เห็นในหน้านี้ได้เลย</p>`}
+        <p class="info-note">${runnerOn?`โน้ตบันทึกลง <span class="mono">${esc(D.meta.notesFile||"docs/atlas/notes.json")}</span> ใน repo · บอก Claude ให้อ่านโน้ตแล้วทำ /change-request ได้`:"เปิดจากไฟล์ export: โน้ตเก็บในเบราว์เซอร์นี้เท่านั้น ส่งให้ทีมโดยแคปหน้าจอหรือคัดลอกข้อความ"}</p>
+      </div>
+      <form class="drawer-f" id="nf">
+        <textarea id="nt" placeholder="เช่น ปุ่มยืนยันส่งอยู่ต่ำไป บนมือถือต้องเลื่อนหา" aria-label="โน้ต"></textarea>
+        <div class="row"><input id="nb" placeholder="ชื่อคุณ" aria-label="ชื่อผู้จด" value="${esc(me)}"><select class="select" id="nk" aria-label="ประเภท"><option>แก้ไข</option><option>คำถาม</option><option>ไอเดีย</option></select>
+        <select class="select" id="np" aria-label="หน้าจอ">${String(f.screens).split(" · ").map(s=>`<option>${esc(s)}</option>`).join("")}</select>
+        <span class="spacer"></span><button class="btn primary" type="submit">บันทึกโน้ต</button></div>
+      </form>
+    </aside>`;
+    $("#nt").focus();
+  };
+  draw();
+  $("#layer").onclick = async e => {
+    if(e.target.closest("[data-close]")) return closeLayer();
+    const t = e.target.closest("[data-toggle]");
+    if(t){ const n=NOTES()[id][+t.dataset.toggle]; n.done=!n.done; await persistNotes(); draw(); }
+  };
+  $("#layer").onsubmit = async e => {
+    e.preventDefault(); const t=$("#nt").value.trim(); if(!t) return;
+    const by = $("#nb").value.trim() || "ผู้ตรวจ"; try{ localStorage.setItem("atlas-me", by); }catch(_){}
+    (NOTES()[id] ??= []).push({t,kind:$("#nk").value,page:$("#np").value,by,date:todayISO(),done:false});
+    if(await persistNotes()) draw();
+  };
+}
+function closeLayer(){ $("#layer").innerHTML=""; $("#layer").onclick=null; $("#layer").onsubmit=null; render(); }
+function alertBar(msg){ live = {state:"error", message:msg, flow:"", total:0, step:0}; drawRunPanel(); }
+
+/* ===== live run (runner) ===== */
+let pollTimer = null;
+async function startRun(flowId, from){
+  try{
+    const s = await api("POST", "/api/run", {module:M.key, flow:flowId, from, mode:"live"});
+    live = {...s, mode:"live"}; lastNode = null; drawRunPanel(); poll();
+  }catch(e){ alertBar(e.message); }
+}
+function poll(){
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(async ()=>{
+    try{
+      const s = await api("GET","/api/run");
+      live = {...live, ...s};
+      const f = FLOW(s.flow);
+      if(f && f.tour && s.step!=null && f.tour.steps[s.step]){ lastNode = {f:f.id, n:f.tour.steps[s.step].node}; ringNode(); }
+      drawRunPanel();
+      if(["starting","working","waiting","skipping"].includes(s.state)) poll();
+    }catch(e){ poll(); }
+  }, 600);
+}
+const STATE_TXT = {
+  starting:"กำลังเปิด Chromium และเตรียม session ผู้ใช้ตัวอย่าง…",
+  skipping:"กำลังทำขั้นก่อนหน้าให้อัตโนมัติ…",
+  working:"กำลังทำขั้นนี้ในแอพ…",
+  waiting:"รอคุณกด Space หรือคลิกในหน้าต่าง Chromium (หรือกด ถัดไป ที่นี่)",
+  done:"จบ flow แล้ว", stopped:"หยุดแล้ว", error:"หยุดรันเพราะเกิดข้อผิดพลาด",
+};
+function drawRunPanel(){
+  const el = $("#runpanel");
+  if(!live){ el.innerHTML=""; return; }
+  const f = live.flow && FLOW(live.flow), T = f?.tour?.steps || [];
+  const active = ["starting","working","waiting","skipping"].includes(live.state);
+  const tone = live.state==="error"?"s-bad":live.state==="done"?"s-accepted":active?"s-built":"s-pending";
+  el.innerHTML = `<div class="runpanel" role="status" aria-live="polite">
+    <div class="rp-top"><b>${f?`${esc(f.id)} · ${esc(f.name)}`:"System Atlas"}</b><span class="pill ${tone}">${active?"กำลังรัน":STATUS[live.state]||esc(live.state)}</span></div>
+    ${T.length?`<div class="rp-bar">${T.map((_,i)=>`<i class="${i<=live.step?"on":""}"></i>`).join("")}</div><div class="rp-step">ขั้น ${Math.min(live.step+1,T.length)} / ${T.length} · ${esc(T[live.step]?.title||"")}</div>`:""}
+    <div class="rp-msg">${esc(live.message || STATE_TXT[live.state] || "")}</div>
+    <div class="rp-btns">${active&&live.state==="waiting"?`<button class="btn primary sm" type="button" data-rnext>ถัดไป →</button>`:""}${active?`<button class="btn sm" type="button" data-rstop>หยุด</button>`:`<button class="btn sm" type="button" data-rclose>ปิด</button>`}</div>
+  </div>`;
+}
+
+/* ===== embedded run: headless Chromium streamed into a popup on this page ===== */
+let es = null, emb = null;
+const ACTIVE = ["starting","working","waiting","skipping"];
+function openEmbed(flowId, from){
+  if(live && ACTIVE.includes(live.state)){ alertBar("มีการรันอยู่แล้ว หยุดรอบเดิมก่อน"); return; }
+  const f = FLOW(flowId); if(!f || !isRunnable(f)) return;
+  emb = {f, from:from||0, s:{state:"starting", step:from||0}};
+  const T = f.tour.steps;
+  $("#layer").innerHTML = `<div class="popup embed" role="dialog" aria-modal="true" aria-label="รัน ${esc(f.name)} บนแอพจริง">
+    <div class="sw">
+      <div class="sw-h"><b>${esc(f.id)} · ${esc(f.name)}</b><span class="pill s-built" id="eb-state">กำลังเปิด</span><button class="btn sm" type="button" data-estop id="eb-close">หยุดและปิด <span class="kbd">Esc</span></button></div>
+      <div class="bw-bar"><span class="pdots" aria-hidden="true"><i></i><i></i><i></i></span><span class="bw-url" id="eb-url">${esc(D.meta.baseURL)}</span><span class="bw-tag">${esc(D.meta.target ? D.meta.target.replace(/^.*· DB /, "DB ") : "Chromium · Playwright")}</span></div>
+      <div class="prog" style="padding-top:8px" id="eb-prog">${T.map(()=>"<i></i>").join("")}</div>
+      <div class="sw-img bw-view" id="eb-view" tabindex="0" aria-label="หน้าจอแอพ กด Space หรือคลิกเพื่อไปต่อ">
+        <div class="bw-wait" id="eb-wait"><span class="spin" aria-hidden="true"></span><span id="eb-wait-t">กำลังเปิด browser และเตรียม session ผู้ใช้ตัวอย่าง…</span></div>
+        <canvas id="eb-canvas" hidden></canvas>
+      </div>
+      <div class="sw-f"><span class="mono" id="eb-step"></span><b style="font-weight:600" id="eb-title"></b><span class="exp" id="eb-msg"></span><button class="btn primary sm" type="button" data-enext id="eb-next" disabled>ถัดไป →</button></div>
+    </div></div>`;
+  $("#layer").onclick = e => {
+    if(e.target.closest("[data-estop]")) return closeEmbed();
+    if(e.target.closest("[data-enext]") || e.target.closest("#eb-view")) return embedNext();
+  };
+  $("#eb-view").focus();
+  es = new EventSource("/api/run/stream");
+  es.addEventListener("frame", ev => showFrame(ev.data));
+  // statuses can arrive before the POST answers; keep the newest and apply it once the run id is known
+  es.addEventListener("status", ev => {
+    const s = JSON.parse(ev.data); if(!emb) return;
+    if(emb.id==null){ emb.pending = s; return; }
+    if(s.id===emb.id) updateEmbed(s);
+  });
+  api("POST","/api/run",{module:M.key, flow:flowId, from:emb.from, mode:"embed"})
+    .then(r => { if(!emb) return; emb.id = r.id; updateEmbed(emb.pending && emb.pending.id===r.id ? emb.pending : r); })
+    .catch(err => updateEmbed({state:"error", step:emb.from, message:err.message}));
+}
+/* frames are decoded off the main thread (createImageBitmap) and drawn on a canvas; while one decodes,
+   newer frames replace the queued one, so a slow moment never builds a backlog */
+let nextFrame = null, decoding = false;
+function showFrame(b64){ nextFrame = b64; if(!decoding) pumpFrames(); }
+async function pumpFrames(){
+  decoding = true;
+  try{
+    while(nextFrame){
+      const data = nextFrame; nextFrame = null;
+      const bmp = await createImageBitmap(await (await fetch("data:image/jpeg;base64," + data)).blob());
+      const c = $("#eb-canvas");
+      if(!c){ bmp.close(); nextFrame = null; break; }
+      if(c.width !== bmp.width || c.height !== bmp.height){ c.width = bmp.width; c.height = bmp.height; }
+      c.getContext("2d").drawImage(bmp, 0, 0); bmp.close();
+      if(c.hidden){ c.hidden = false; $("#eb-wait").hidden = true; }
+    }
+  }catch(e){ /* a broken frame: wait for the next one */ }
+  decoding = false;
+}
+function updateEmbed(s){
+  if(!emb || !$("#eb-state")) return;
+  emb.s = {...emb.s, ...s};
+  const T = emb.f.tour.steps, st = emb.s, i = Math.min(st.step ?? 0, T.length-1);
+  const active = ACTIVE.includes(st.state);
+  const pillTxt = {starting:"กำลังเปิด",skipping:"กำลังข้าม",working:"กำลังทำ",waiting:"รอคุณ",done:"จบแล้ว",stopped:"หยุดแล้ว",error:"ผิดพลาด"}[st.state] || st.state;
+  const tone = st.state==="error"?"s-bad":st.state==="done"?"s-accepted":st.state==="waiting"?"s-attn":active?"s-built":"s-pending";
+  $("#eb-state").className = `pill ${tone}`; $("#eb-state").textContent = pillTxt;
+  if(st.url) $("#eb-url").textContent = st.url;
+  document.querySelectorAll("#eb-prog i").forEach((el,k)=>el.classList.toggle("on", k<=i));
+  $("#eb-step").textContent = `ขั้น ${i+1} / ${T.length}`;
+  $("#eb-title").textContent = T[i]?.title || "";
+  const msg = {
+    starting: st.message || "กำลังเปิด browser และเตรียม session ผู้ใช้ตัวอย่าง…",
+    skipping:`กำลังทำขั้น 1–${emb.from} ให้อัตโนมัติ…`,
+    working:"กำลังทำขั้นนี้ในแอพ…",
+    waiting:"กด Space หรือคลิกที่ภาพเพื่อไปต่อ",
+    done:"รันครบทุกขั้นแล้ว", stopped:"หยุดแล้ว",
+  }[st.state];
+  if(st.state==="starting" && st.message && $("#eb-wait-t")) $("#eb-wait-t").textContent = st.message;
+  $("#eb-msg").textContent = st.state==="error" ? `หยุดที่ขั้นนี้: ${st.message||""}` : msg || st.message || "";
+  const nb = $("#eb-next");
+  nb.disabled = !(st.state==="waiting" || st.state==="done");
+  nb.textContent = st.state==="done" ? "ปิด" : "ถัดไป →";
+  $("#eb-close").innerHTML = active ? `หยุดและปิด <span class="kbd">Esc</span>` : `ปิด <span class="kbd">Esc</span>`;
+  if(T[i]){ lastNode = {f:emb.f.id, n:T[i].node}; }
+  live = {...st, mode:"embed"};
+}
+function embedNext(){
+  if(!emb) return;
+  const st = emb.s.state;
+  if(st==="waiting") api("POST","/api/run/next").catch(()=>{});
+  else if(st==="done"){ api("POST","/api/run/next").catch(()=>{}); closeEmbed(); }
+  else if(["error","stopped"].includes(st)) closeEmbed();
+}
+function closeEmbed(){
+  if(emb && ACTIVE.concat("done").includes(emb.s.state)) api("POST","/api/run/stop").catch(()=>{});
+  if(es){ es.close(); es = null; }
+  emb = null; live = null;
+  closeLayer(); ringNode();
+}
+
+/* ===== events ===== */
+document.addEventListener("click", e => {
+  const t = e.target;
+  if(t.closest("[data-rnext]")){ api("POST","/api/run/next").catch(()=>{}); return; }
+  if(t.closest("[data-rstop]")){ api("POST","/api/run/stop").catch(()=>{}); return; }
+  if(t.closest("[data-rclose]")){ live=null; drawRunPanel(); return; }
+  if(t.closest("#layer")) return;
+  const tab = t.closest("[data-v]"); if(tab){ cur=tab.dataset.v; try{history.replaceState(null,"","#"+cur)}catch(_){} render(); window.scrollTo(0,0); return; }
+  const fl = t.closest("[data-flow]"); if(fl){ if(FLOW(fl.dataset.flow)){ curFlow=fl.dataset.flow; if(cur!=="flows"){cur="flows"; try{history.replaceState(null,"","#flows")}catch(_){}} render(); window.scrollTo(0,0);} return; }
+  const pl = t.closest("[data-play]"); if(pl){ const [fid,i]=pl.dataset.play.split("|"); const f=FLOW(fid); if(f && canPlay(f)) openEmbed(fid,+i); return; }
+  const eb = t.closest("[data-embed]"); if(eb){ const [fid,i]=eb.dataset.embed.split("|"); openEmbed(fid,+i); return; }
+  const rb = t.closest("[data-run]"); if(rb){ startRun(rb.dataset.run,0); return; }
+  const fr = t.closest("[data-frole]"); if(fr){ flowRole=fr.dataset.frole; render(); return; }
+  const sf = t.closest("[data-sf]"); if(sf){ statusFilter=sf.dataset.sf; render(); return; }
+  const cr = t.closest("[data-crole]"); if(cr){ catRole=cr.dataset.crole; render(); return; }
+  const nb = t.closest("[data-note]"); if(nb){ openNotes(nb.dataset.note); return; }
+});
+document.addEventListener("input", e => {
+  if(e.target.id==="sq"){ statusQ=e.target.value; const pos=e.target.selectionStart; render(); const el=$("#sq"); el.focus(); el.setSelectionRange(pos,pos); }
+});
+document.addEventListener("keydown", e => {
+  if($(".embed")){
+    if(e.key==="Escape"){ e.preventDefault(); return closeEmbed(); }
+    if(e.code==="Space"||e.key==="ArrowRight"){ e.preventDefault(); return embedNext(); }
+    return;
+  }
+  if(e.key==="Escape" && $("#layer").innerHTML) return closeLayer();
+  if(e.key==="Enter" && e.target.classList && e.target.classList.contains("nd")){ e.preventDefault(); e.target.click(); }
+});
+$("#module").addEventListener("change", e => { M = D.modules.find(m=>m.key===e.target.value); curFlow=null; render(); });
+
+/* ===== boot ===== */
+async function reload(){
+  const keep = M?.key;
+  D = await api("GET","/api/data");
+  NOTES_ALL = D.notes || {};
+  M = D.modules.find(m=>m.key===keep) || D.modules[0];
+  render();
+}
+async function boot(){
+  try{
+    if(window.__ATLAS__){ D = window.__ATLAS__; }
+    else D = await api("GET","/api/data");
+  }catch(e){
+    $("#main").innerHTML = `<div class="fatal panel panel-b"><h2>เปิด System Atlas ไม่ได้</h2><p class="lede">หน้านี้ต้องเปิดผ่าน runner: รัน <span class="mono">node tools/atlas/cli.mjs serve</span> ที่ root ของโปรเจค แล้วเปิด <span class="mono">http://127.0.0.1:4400</span> หรือเปิดไฟล์ที่ได้จาก <span class="mono">export</span></p><p class="muted mono">${esc(e.message)}</p></div>`;
+    return;
+  }
+  P = D.project; runnerOn = !!D.runner;
+  NOTES_ALL = D.notes || {};
+  if(!runnerOn){ try{ const ls = JSON.parse(localStorage.getItem(`atlas-notes:${P.name}`)); if(ls) NOTES_ALL = ls; }catch(e){} }
+  applyTheme();
+  M = D.modules[0];
+  document.title = `${P.name} · System Atlas`;
+  $("#top").hidden = false;
+  $("#pname").textContent = P.name;
+  $("#module").innerHTML = D.modules.map(m=>`<option value="${esc(m.key)}">${esc(m.name)} (${esc(m.key)})</option>`).join("");
+  $("#gen").textContent = `ข้อมูลจาก ${D.meta.dataDir||"docs/atlas"} · อัปเดต ${fmtDate(D.meta.updated,true)}${D.meta.commit?" · commit "+D.meta.commit:""}`;
+  $("#runner").classList.toggle("off", !runnerOn);
+  $("#runnerTxt").textContent = runnerOn ? `Runner พร้อม · ${D.meta.target || D.meta.baseURL}` : "ไฟล์ export · ดูได้อย่างเดียว";
+  const h = location.hash.slice(1); if(VIEWS().some(v=>v.k===h)) cur = h;
+  render();
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(drawAll);
+  if(runnerOn && D.run && ["starting","working","waiting","skipping"].includes(D.run.state)){ live = D.run; drawRunPanel(); poll(); }
+}
+boot();
+</script>
+</body>
+</html>

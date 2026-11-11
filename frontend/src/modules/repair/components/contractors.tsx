@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { AlertCircle, Check, ChevronRight, HardHat, Loader2, Pencil, Phone, Plus, Search, UserRound } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { AlertCircle, Check, ChevronRight, HardHat, Loader2, Pencil, Phone, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
+import { Pager, pageRange } from "@/components/shared/pager";
 import { EmptyState, ErrorState, ForbiddenState } from "@/components/shared/states";
 import { useCurrentUser } from "@/components/shared/me-provider";
+import { can, PERM } from "@/lib/platform/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,15 +20,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { createContractor, createContractorType, getContractor, getContractorJobs, getContractors, getContractorTypes, updateContractor } from "../api";
-import { contractorFieldMessages, errorCode, errorMessage, fieldErrors } from "../errors";
-import type { Contractor, ContractorJob, Ref } from "../types";
+import { contractorFieldMessages, contractorNameTaken, errorCode, errorMessage, fieldErrors } from "../errors";
+import type { Contractor, ContractorJob, ContractorNameTakenDetails, Ref } from "../types";
 import { Stars } from "./ticket-ui";
 import { ticketHref } from "./ticket-presentation";
 
 // S18 ช่างภายนอก (F24, CR-005): the technician adds / edits contractors and their types;
-// technician, admin and executive see job history and scores.
+// whoever sees every ticket (`repair.ticket.view_all`) sees job history and scores; `repair.contractor.manage` edits.
+// CR-042: the list shows 5 contractors per page — search, แสดงที่ปิดใช้งาน and the page (?page=) go to #15, the API pages.
 
-const STAFF = ["technician", "admin", "executive"];
+const LIST_PAGE_SIZE = 5;
+
 
 function Score({ c }: { c: Pick<Contractor, "avgRating" | "ratedCount"> }) {
   if (c.avgRating === null) return <span className="text-xs text-muted-foreground">ยังไม่มีคะแนน</span>;
@@ -34,43 +39,66 @@ function Score({ c }: { c: Pick<Contractor, "avgRating" | "ratedCount"> }) {
 
 export function ContractorsScreen() {
   const me = useCurrentUser();
-  const [q, setQ] = useState("");
-  const [query, setQuery] = useState("");
-  const [inactive, setInactive] = useState(false);
-  const [list, setList] = useState<{ items: Contractor[]; total: number }>();
+  const params = useSearchParams();
+  // Search, แสดงที่ปิดใช้งาน and the page live in the URL, so one change sends one request (a new filter = page 1).
+  const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1);
+  const query = (params.get("q") ?? "").slice(0, 50);
+  const inactive = params.get("inactive") === "1";
+  const [q, setQ] = useState(query);
+  // `key` = the request the list answers; a different key (new page / search) shows the skeleton.
+  const [list, setList] = useState<{ key: string; items: Contractor[]; total: number }>();
   const [error, setError] = useState<unknown>();
   const [revision, setRevision] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
-  useEffect(() => { const t = window.setTimeout(() => setQuery(q.trim()), 300); return () => window.clearTimeout(t); }, [q]);
+  const change = useCallback((values: Record<string, string | null>) => {
+    const url = new URL(window.location.href);
+    for (const [k, v] of Object.entries(values)) { if (v) url.searchParams.set(k, v); else url.searchParams.delete(k); }
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+  const goTo = (p: number) => change({ page: p > 1 ? String(p) : null });
   useEffect(() => {
-    if (!STAFF.includes(me.role)) return;
+    const next = q.trim();
+    if (next === query) return;
+    const t = window.setTimeout(() => change({ q: next, page: null }), 300);
+    return () => window.clearTimeout(t);
+  }, [q, query, change]);
+  const key = `${query}|${inactive}|${page}`;
+  useEffect(() => {
+    if (!can(me, PERM.ticketViewAll)) return;
     let active = true;
-    getContractors({ q: query || undefined, includeInactive: inactive, pageSize: 100 }).then(
-      (page) => { if (active) { setList({ items: page.items, total: page.meta.total }); setError(undefined); } },
+    getContractors({ q: query || undefined, includeInactive: inactive, page, pageSize: LIST_PAGE_SIZE }).then(
+      (res) => { if (active) { setList({ key, items: res.items, total: res.meta.total }); setError(undefined); } },
       (err: unknown) => { if (active) setError(err); });
     return () => { active = false; };
-  }, [query, inactive, revision, me.role]);
-  if (!STAFF.includes(me.role)) return <><PageHeader title="ช่างภายนอก" variant="bar" /><ForbiddenState /></>;
-  const canEdit = me.role === "technician";
+  }, [key, query, inactive, page, revision, me]);
+  if (!can(me, PERM.ticketViewAll)) return <><PageHeader title="ช่างภายนอก" variant="bar" /><ForbiddenState /></>;
+  const canEdit = can(me, PERM.contractorManage);
+  // PageHeader shows `action` on phones and `search` on desktop: the same button in both.
+  const add = canEdit ? <Button size="sm" onClick={() => setFormOpen(true)}><Plus aria-hidden />เพิ่มช่างภายนอก</Button> : undefined;
   return <>
-    <PageHeader title="ช่างภายนอก" variant="service" service="repair" subtitle="ประวัติงานและคะแนนของช่างนอกระบบ"
-      action={canEdit ? <Button size="sm" onClick={() => setFormOpen(true)}><Plus aria-hidden />เพิ่มช่างภายนอก</Button> : undefined} />
+    <PageHeader title="ช่างภายนอก" variant="service" service="repair" subtitle="ประวัติงานและคะแนนของช่างนอกระบบ" action={add} search={add} />
     <div className="space-y-3 px-4 py-4 lg:px-0 lg:py-0">
       <Card className="gap-3 p-3 shadow-card sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-muted-foreground" aria-hidden />
           <Input aria-label="ค้นหาชื่อร้าน หรือผู้ติดต่อ" placeholder="ค้นหาชื่อร้าน หรือผู้ติดต่อ" value={q} onChange={(e) => setQ(e.target.value)} maxLength={50} className="h-11 rounded-full pl-10" /></div>
-        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} className="size-4 accent-primary" />แสดงที่ปิดใช้งาน</label>
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={inactive} onChange={(e) => change({ inactive: e.target.checked ? "1" : null, page: null })} className="size-4 accent-primary" />แสดงที่ปิดใช้งาน</label>
       </Card>
       {error !== undefined ? (errorCode(error) === "FORBIDDEN" ? <ForbiddenState /> : <ErrorState variant="inline" title="โหลดรายชื่อช่างภายนอกไม่สำเร็จ" onRetry={() => setRevision((r) => r + 1)} />)
-        : !list ? <div className="space-y-2" aria-busy="true" aria-label="กำลังโหลด">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}</div>
+        : list?.key !== key ? <div className="space-y-2" aria-busy="true" aria-label="กำลังโหลด">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}</div>
+        : list.items.length === 0 && page > 1 ? <EmptyState title="ไม่มีรายการในหน้านี้" action={<Button variant="outline" onClick={() => goTo(1)}><RotateCcw aria-hidden />กลับหน้าแรก</Button>} />
         : list.items.length === 0 ? <EmptyState title={query ? `ไม่พบช่างภายนอกที่ตรงกับ "${query}"` : "ยังไม่มีช่างภายนอก"} hint={canEdit && !query ? "เพิ่มช่างภายนอกได้จากปุ่มด้านบน หรือตอนบันทึกผลซ่อม" : undefined} />
-        : <Card className="gap-0 divide-y py-0 shadow-card">{list.items.map((c) => <Link key={c.id} href={`/repair/contractors/${c.id}`} className="flex items-start gap-3 px-3.5 py-3.5 outline-none hover:bg-muted/50 focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        : <Card className="gap-0 py-0 shadow-card"><div className="divide-y">{list.items.map((c) => <Link key={c.id} href={`/repair/contractors/${c.id}`} className="flex items-start gap-3 px-3.5 py-3.5 outline-none hover:bg-muted/50 focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-secondary text-primary"><HardHat className="size-5" aria-hidden /></span>
           <span className="min-w-0 flex-1 space-y-1"><span className="flex items-center gap-2"><span className="truncate font-semibold">{c.name}</span>{!c.isActive && <Badge variant="secondary">ปิดใช้งาน</Badge>}</span>
             <span className="flex flex-wrap gap-1">{c.types.map((t) => <Badge key={t.id} variant="outline">{t.name}</Badge>)}</span>
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1"><Score c={c} /><span className="text-xs text-muted-foreground">{c.jobCount} งาน</span>{c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}</span></span>
           <ChevronRight className="mt-3 size-4 shrink-0 text-muted-foreground" aria-hidden />
-        </Link>)}</Card>}
+        </Link>)}</div>
+          <footer className="flex flex-col items-center gap-2 border-t px-3.5 py-3 sm:flex-row sm:justify-between">
+            <p className="text-[13px] text-muted-foreground">{pageRange(page, LIST_PAGE_SIZE, list.total, "ร้าน")}</p>
+            <Pager page={page} pages={Math.max(1, Math.ceil(list.total / LIST_PAGE_SIZE))} onPage={(p) => { goTo(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+          </footer>
+        </Card>}
     </div>
     {canEdit && <ContractorFormDialog open={formOpen} onOpenChange={setFormOpen} onSaved={() => { setFormOpen(false); setRevision((r) => r + 1); toast.success("เพิ่มช่างภายนอกแล้ว"); }} />}
   </>;
@@ -86,13 +114,13 @@ export function ContractorDetailScreen({ id }: { id: string }) {
   const [moreBusy, setMoreBusy] = useState(false);
   const [page, setPage] = useState(1);
   useEffect(() => {
-    if (!STAFF.includes(me.role)) return;
+    if (!can(me, PERM.ticketViewAll)) return;
     let active = true;
     Promise.all([getContractor(id), getContractorJobs(id, 1, 20)]).then(([c, j]) => {
       if (active) { setContractor(c); setJobs({ items: j.items, total: j.meta.total }); setPage(1); setError(undefined); }
     }, (err: unknown) => { if (active) setError(err); });
     return () => { active = false; };
-  }, [id, revision, me.role]);
+  }, [id, revision, me]);
   async function more() {
     setMoreBusy(true);
     try { const next = await getContractorJobs(id, page + 1, 20); setPage(page + 1); setJobs((old) => ({ items: [...(old?.items ?? []), ...next.items], total: next.meta.total })); }
@@ -100,12 +128,12 @@ export function ContractorDetailScreen({ id }: { id: string }) {
     finally { setMoreBusy(false); }
   }
   const header = <PageHeader title="ช่างภายนอก" variant="bar" backHref="/repair/contractors" />;
-  if (!STAFF.includes(me.role)) return <>{header}<ForbiddenState /></>;
+  if (!can(me, PERM.ticketViewAll)) return <>{header}<ForbiddenState /></>;
   if (error !== undefined) {
     return <>{header}{errorCode(error) === "CONTRACTOR_NOT_FOUND" ? <ForbiddenState title="ไม่พบช่างภายนอกนี้" /> : errorCode(error) === "FORBIDDEN" ? <ForbiddenState /> : <ErrorState onRetry={() => setRevision((r) => r + 1)} />}</>;
   }
   if (!contractor || !jobs) return <>{header}<div className="space-y-3 px-4 py-4 lg:px-0"><Skeleton className="h-40 w-full rounded-xl" /><Skeleton className="h-60 w-full rounded-xl" /></div></>;
-  const canEdit = me.role === "technician";
+  const canEdit = can(me, PERM.contractorManage);
   return <>{header}
     <div className="space-y-3 px-4 py-4 lg:px-0 lg:py-0">
       <Card className="gap-3 p-4 shadow-card lg:p-5">
@@ -139,24 +167,32 @@ export function ContractorDetailScreen({ id }: { id: string }) {
 
 // ---- add / edit (technician) ----
 
-export function ContractorFormDialog({ contractor, open, onOpenChange, onSaved }: {
+/** `onPickExisting` (S17 เพิ่มช่างภายนอกใหม่): a name that an active contractor has offers เลือกร้านนี้ instead of ดูร้านนี้ (CR-023). */
+export function ContractorFormDialog({ contractor, open, onOpenChange, onSaved, onPickExisting }: {
   contractor?: Contractor; open: boolean; onOpenChange: (open: boolean) => void; onSaved: (c: Contractor) => void;
+  onPickExisting?: (c: Contractor) => void;
 }) {
   const [types, setTypes] = useState<Ref[]>();
   const [values, setValues] = useState({ name: "", contactName: "", phone: "", note: "", typeIds: [] as string[], isActive: true });
   const [newType, setNewType] = useState("");
   const [addingType, setAddingType] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [taken, setTaken] = useState<ContractorNameTakenDetails | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
     getContractorTypes().then(setTypes, () => setTypes([]));
   }, [open]);
-  function reset() {
-    setValues(contractor
-      ? { name: contractor.name, contactName: contractor.contactName ?? "", phone: contractor.phone ?? "", note: contractor.note ?? "", typeIds: contractor.types.map((t) => t.id), isActive: contractor.isActive }
-      : { name: "", contactName: "", phone: "", note: "", typeIds: [], isActive: true });
-    setNewType(""); setErrors({});
+  // Reset each time the dialog opens — the parent opens it (`open`), so onOpenChange does not fire on open.
+  const [seen, setSeen] = useState(false);
+  if (open !== seen) {
+    setSeen(open);
+    if (open) {
+      setValues(contractor
+        ? { name: contractor.name, contactName: contractor.contactName ?? "", phone: contractor.phone ?? "", note: contractor.note ?? "", typeIds: contractor.types.map((t) => t.id), isActive: contractor.isActive }
+        : { name: "", contactName: "", phone: "", note: "", typeIds: [], isActive: true });
+      setNewType(""); setErrors({}); setTaken(null);
+    }
   }
   const toggle = (id: string) => setValues((v) => ({ ...v, typeIds: v.typeIds.includes(id) ? v.typeIds.filter((x) => x !== id) : [...v.typeIds, id] }));
   async function addType() {
@@ -181,19 +217,32 @@ export function ContractorFormDialog({ contractor, open, onOpenChange, onSaved }
     const req = { name: values.name.trim(), typeIds: values.typeIds, contactName: values.contactName.trim(), phone: values.phone.trim(), note: values.note.trim(), isActive: values.isActive };
     try { onSaved(contractor ? await updateContractor(contractor.id, req) : await createContractor(req)); }
     catch (err) {
-      const fields = fieldErrors(err, contractorFieldMessages);
+      // CR-023: the name belongs to another contractor — offer that one (re-activate it when inactive).
+      const owner = contractorNameTaken(err);
+      const fields = owner ? { name: owner.isActive ? "มีช่างภายนอกชื่อนี้แล้ว" : "มีร้านชื่อนี้แต่ปิดใช้งานอยู่ — เปิดใช้งานร้านเดิมแทนการเพิ่มใหม่" } : fieldErrors(err, contractorFieldMessages);
+      setTaken(owner);
       if (Object.keys(fields).length) setErrors(fields); else toast.error(errorMessage(err));
     } finally { setBusy(false); }
   }
+  async function pickExisting() {
+    if (!taken || !onPickExisting) return;
+    setBusy(true);
+    try { onPickExisting(await getContractor(taken.contractorId)); }
+    catch (err) { toast.error(errorMessage(err)); }
+    finally { setBusy(false); }
+  }
   const field = (name: "name" | "contactName" | "phone", label: string, opts: { required?: boolean; max: number; type?: string; placeholder?: string }) =>
     <div className="space-y-1.5"><label htmlFor={`contractor-${name}`} className="text-sm font-medium">{label}{opts.required && <span className="text-destructive">*</span>}</label>
-      <Input id={`contractor-${name}`} type={opts.type} value={values[name]} maxLength={opts.max} placeholder={opts.placeholder} onChange={(e) => setValues((v) => ({ ...v, [name]: e.target.value }))} aria-invalid={!!errors[name]} className="h-11" />
+      <Input id={`contractor-${name}`} type={opts.type} value={values[name]} maxLength={opts.max} placeholder={opts.placeholder} onChange={(e) => { setValues((v) => ({ ...v, [name]: e.target.value })); if (name === "name") setTaken(null); }} aria-invalid={!!errors[name]} className="h-11" />
       {errors[name] && <p role="alert" className="flex items-center gap-1 text-sm text-destructive"><AlertCircle className="size-4" aria-hidden />{errors[name]}</p>}</div>;
-  return <Dialog open={open} onOpenChange={(o) => { if (o) reset(); onOpenChange(o); }}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
       <form onSubmit={submit} noValidate className="space-y-4">
-        <DialogHeader><DialogTitle>{contractor ? "แก้ไขช่างภายนอก" : "เพิ่มช่างภายนอก"}</DialogTitle><DialogDescription>ข้อมูลนี้เห็นเฉพาะช่าง Admin และผู้บริหาร</DialogDescription></DialogHeader>
-        {field("name", "ชื่อร้าน / บริษัท", { required: true, max: 100, placeholder: "เช่น ร้านแอร์เย็นฉ่ำ" })}
+        <DialogHeader><DialogTitle>{contractor ? "แก้ไขช่างภายนอก" : "เพิ่มช่างภายนอก"}</DialogTitle><DialogDescription>ข้อมูลนี้เห็นเฉพาะช่างและ Admin</DialogDescription></DialogHeader>
+        {field("name", "ชื่อร้าน / บริษัท", { required: true, max: 100, placeholder: "เช่น ร้านแอร์เย็นฉ่ำ หรือ ร้านแอร์เย็นฉ่ำ สาขาบางนา" })}
+        {taken && <div className="-mt-2">{taken.isActive && onPickExisting
+          ? <Button type="button" variant="link" className="h-9 px-0" disabled={busy} onClick={pickExisting}>เลือกร้านนี้</Button>
+          : <Button asChild variant="link" className="h-9 px-0"><Link href={`/repair/contractors/${taken.contractorId}`} onClick={() => onOpenChange(false)}>{taken.isActive ? "ดูร้านนี้" : "ไปหน้าร้านนี้"}</Link></Button>}</div>}
         <fieldset className="space-y-2"><legend className="text-sm font-medium">ประเภท<span className="text-destructive">*</span> <span className="font-normal text-muted-foreground">เลือกได้หลายประเภท</span></legend>
           {!types ? <Skeleton className="h-10 w-full" /> : <div className="flex flex-wrap gap-2">{types.map((t) => {
             const on = values.typeIds.includes(t.id);

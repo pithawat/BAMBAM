@@ -57,7 +57,7 @@ func (ctl *Controller) DemoUsers(c *gin.Context) {
 	}
 	out := make([]DemoUserResponse, 0, len(list))
 	for _, u := range list {
-		out = append(out, DemoUserResponse{Role: u.Role, Name: u.DisplayName()})
+		out = append(out, DemoUserResponse(u))
 	}
 	httpx.OK(c, out)
 }

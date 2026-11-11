@@ -3,32 +3,42 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, LogOut, UserRound } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Check, ChevronDown, Home, LogOut, QrCode, Settings, UserRound, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { initials, ROLE_LABELS } from "@/lib/platform/roles";
+import { canAnySettings, canReport, repairHome, usesService, type ServiceKey } from "@/lib/platform/permissions";
+import { initials } from "@/lib/platform/roles";
 import type { Me } from "@/lib/platform/types";
 import { applyTheme, currentTheme, THEMES, type ThemeId } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { BellButton } from "./bell-button";
+import { useCanScanInApp } from "@/modules/repair/qr";
+import { SettingsMenuDesktop, SettingsMenuMobile } from "@/modules/settings/components/settings-menu";
 import { LogoutDialog } from "./logout-dialog";
 import { SERVICES, type Service } from "./service-icon";
 
-// Top navigation (_common.md §1, CR-010): BAMBAM · หน้าแรก · three equal services · bell · account menu.
-// No sidebar, no bottom nav and no repair-only shortcut here; repair tracking and staff tools live in the repair
-// section nav (modules/repair/components/repair-nav.tsx). Desktop: floating sticky bar. Phone / tablet: brand row
-// + a row of the three services; it scrolls away so route-local sticky bars keep the top edge.
+// Top navigation on every page, settings included (_common.md §1, CR-010; settings CR-006 layout from
+// mockups/CR-006-design/App.tsx, flush with the top and side edges — owner 2026-11-01). repair CR-034 (D-138,
+// `changes/CR-034/navbar.html`): stacked BAMBAM / WORKPLACE lock-up (option B) close to the left edge · หน้าแรก · the
+// services the user may use (`usesService`; a technician sees only แจ้งซ่อม) · on the right the "ตั้งค่าระบบ" gear
+// (option A, any `settings.*` permission) and the account menu (no bell, repair CR-024). Repair tracking and staff tools live in the repair
+// section nav (modules/repair/components/repair-nav.tsx). Desktop: sticky full-width bar. Phone / tablet: brand row
+// (+ settings sheet, account) that scrolls away; repair CR-040 moved หน้าแรก and the services to a fixed bottom tab bar
+// (`AppBottomNav`), hidden while the keyboard is up. Route-local sticky / fixed bottom bars sit on `--app-bottom`.
 
-type ServiceLink = { service: Service; href: string; match: string };
+type ServiceLink = { service: Service & ServiceKey; href: string; match: string };
 
 function serviceLinks(me: Me): ServiceLink[] {
-  return [
-    // The technician's repair home is their work list (CR-005); everyone else tracks their own tickets.
-    { service: "repair", href: me.role === "technician" ? "/repair/work" : "/repair/my", match: "/repair" },
+  const links: ServiceLink[] = [
+    // Whoever works tickets starts at the work list (CR-005, `repair.ticket.work`); everyone else tracks their own.
+    { service: "repair", href: repairHome(me), match: "/repair" },
     { service: "car", href: "/car-booking", match: "/car-booking" },
     { service: "room", href: "/room-booking", match: "/room-booking" },
   ];
+  return links.filter((l) => usesService(me, l.service));
 }
+
+// bottom tab bar: หน้าแรก + one column per visible service (+ สแกน QR) (static classes for Tailwind)
+const TAB_COLS = ["grid-cols-1", "grid-cols-2", "grid-cols-3", "grid-cols-4", "grid-cols-5"];
 
 const within = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
@@ -36,65 +46,129 @@ export function AppNavbar({ me }: { me: Me }) {
   const pathname = usePathname();
   const links = serviceLinks(me);
   const home = pathname === "/";
+  const settings = canAnySettings(me);
 
   return (
-    <div className="print:hidden lg:sticky lg:top-3 lg:z-30 lg:mt-3 lg:px-8">
-      <header className="mx-auto w-full border-b bg-card lg:max-w-7xl lg:rounded-2xl lg:border lg:shadow-card">
-        <div className="flex h-15 items-center gap-2 px-4 lg:h-19 lg:gap-6 lg:px-5">
-          <Link href="/" aria-label="BAMBAM หน้าแรก" className="shrink-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
-            <Image src="/brand/bam-logo.webp" alt="BAMBAM" width={96} height={31} className="h-7 w-auto lg:h-8" priority />
+    <header className="border-b bg-card print:hidden lg:sticky lg:top-0 lg:z-30">
+      <div className="flex h-15 items-center gap-2 pr-2 pl-3 lg:h-20 lg:gap-0 lg:pr-4 lg:pl-5">
+        <Link
+          href="/"
+          aria-label="BAMBAM หน้าแรก"
+          className="flex shrink-0 flex-col items-start gap-0.75 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30 lg:mr-14"
+        >
+          <Image src="/brand/bam-logo.webp" alt="BAMBAM" width={96} height={31} className="h-7 w-auto lg:h-7.5" priority />
+          <span className="pl-0.5 text-[9px] leading-none font-semibold tracking-[0.32em] text-muted-foreground">WORKPLACE</span>
+        </Link>
+
+        <nav aria-label="บริการหลัก" className="hidden h-full min-w-0 flex-1 items-center gap-1 lg:flex">
+          <Link href="/" aria-current={home ? "page" : undefined} className={desktopItem(home)}>
+            <Home className="size-4.5" aria-hidden />
+            หน้าแรก
           </Link>
-
-          <nav aria-label="บริการหลัก" className="hidden min-w-0 flex-1 items-center gap-1 lg:flex">
-            <Link href="/" aria-current={home ? "page" : undefined} className={desktopItem(home)}>หน้าแรก</Link>
-            {links.map(({ service, href, match }) => {
-              const s = SERVICES[service];
-              const active = within(pathname, match);
-              return (
-                <Link key={service} href={href} aria-current={active ? "page" : undefined} className={desktopItem(active)}>
-                  <s.icon className="size-4.5" aria-hidden />
-                  {s.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="ml-auto flex items-center gap-1 lg:gap-2">
-            <BellButton className="bg-transparent shadow-none hover:bg-muted" />
-            <span aria-hidden className="hidden h-8 w-px bg-border lg:block" />
-            <AccountMenu me={me} />
-          </div>
-        </div>
-
-        <nav aria-label="บริการหลัก" className="grid grid-cols-3 border-t lg:hidden">
           {links.map(({ service, href, match }) => {
             const s = SERVICES[service];
             const active = within(pathname, match);
             return (
-              <Link
-                key={service}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-12 items-center justify-center gap-1.5 border-b-2 px-1 text-center text-[13.5px] leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset",
-                  active ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground",
-                )}
-              >
-                <s.icon className="size-4 shrink-0" aria-hidden />
+              <Link key={service} href={href} aria-current={active ? "page" : undefined} className={desktopItem(active)}>
+                <s.icon className="size-4.5" aria-hidden />
                 {s.label}
               </Link>
             );
           })}
         </nav>
-      </header>
-    </div>
+
+        <div className="ml-auto flex items-center gap-0.5 lg:gap-1.5">
+          {settings && (
+            <>
+              <div className="lg:hidden">
+                <SettingsMenuMobile me={me} />
+              </div>
+              <div className="hidden lg:block">
+                <SettingsMenuDesktop me={me} />
+              </div>
+            </>
+          )}
+          <AccountMenu me={me} />
+        </div>
+      </div>
+
+    </header>
   );
+}
+
+type Tab = { key: string; label: string; href: string; icon: LucideIcon; active: boolean; raised?: boolean };
+
+/**
+ * Phone / tablet tab bar (repair CR-040): icon in a pill over the label, like a native app. Fixed to the bottom.
+ * สแกน QR (F13-B, CR-036) is the raised round button in the middle, for whoever may report on a phone with a camera
+ * (`useCanScanInApp` + `repair.ticket.report`); it replaces the scan buttons on Home and S06.
+ */
+export function AppBottomNav({ me }: { me: Me }) {
+  const pathname = usePathname();
+  const scan = useCanScanInApp() && usesService(me, "repair") && canReport(me);
+  const tabs: Tab[] = [
+    { key: "home", label: "หน้าแรก", href: "/", icon: Home, active: pathname === "/" },
+    ...serviceLinks(me).map(({ service, href, match }) => ({
+      key: service, label: SERVICES[service].label, href, icon: SERVICES[service].icon,
+      active: within(pathname, match) && !(scan && within(pathname, "/repair/scan")),
+    })),
+  ];
+  if (scan) tabs.splice(Math.ceil(tabs.length / 2), 0, { key: "scan", label: "สแกน QR", href: "/repair/scan", icon: QrCode, active: within(pathname, "/repair/scan"), raised: true });
+  return (
+    <nav
+      aria-label="บริการหลัก"
+      data-testid="bottom-nav"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-nav backdrop-blur-md transition-transform duration-200 group-data-typing/shell:pointer-events-none group-data-typing/shell:translate-y-full lg:hidden print:hidden"
+    >
+      <ul className={cn("mx-auto grid h-16 max-w-140 px-1", TAB_COLS[tabs.length - 1])}>
+        {tabs.map(({ key, label, href, icon: Icon, active, raised }) => (
+          <li key={key} className="min-w-0">
+            <Link
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className="group/tab flex h-full min-w-0 flex-col items-center justify-center gap-1 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset"
+            >
+              {raised ? (
+                <span className="-mt-6 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-6px_color-mix(in_srgb,var(--primary)_70%,transparent)] ring-4 ring-card transition-transform group-active/tab:scale-95">
+                  <Icon className="size-6.5" strokeWidth={2} aria-hidden />
+                </span>
+              ) : (
+                <span className={cn("grid h-8 w-14 place-items-center rounded-full transition-colors", active ? "bg-secondary text-primary" : "text-muted-foreground")}>
+                  <Icon className="size-5.5" strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+                </span>
+              )}
+              <span className={cn("max-w-full truncate px-0.5 text-[11.5px] leading-4", active || raised ? "font-semibold text-primary" : "font-medium text-muted-foreground")}>{label}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+const TYPING = 'input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]), textarea, [contenteditable="true"]';
+
+/** True while a text field has focus (the on-screen keyboard is up on phones): the tab bar steps aside. */
+export function useTyping() {
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const update = () => setTyping(document.activeElement instanceof HTMLElement && document.activeElement.matches(TYPING));
+    // focusout fires before the next element gets focus: read the new focus on the next tick
+    const later = () => window.setTimeout(update, 0);
+    document.addEventListener("focusin", update);
+    document.addEventListener("focusout", later);
+    return () => {
+      document.removeEventListener("focusin", update);
+      document.removeEventListener("focusout", later);
+    };
+  }, []);
+  return typing;
 }
 
 function desktopItem(active: boolean) {
   return cn(
     "flex min-h-11 items-center gap-2 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30",
-    active ? "bg-secondary font-semibold text-secondary-foreground" : "text-foreground hover:bg-muted",
+    active ? "bg-secondary font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-primary",
   );
 }
 
@@ -127,10 +201,10 @@ function AccountMenu({ me }: { me: Me }) {
             aria-haspopup="menu"
             className="flex min-h-11 items-center gap-2.5 rounded-full outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 lg:rounded-xl lg:py-1 lg:pr-2 lg:pl-1"
           >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-[13px] font-semibold text-secondary-foreground">{initials(me.name)}</span>
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-[13px] font-semibold text-primary ring-4 ring-secondary/50">{initials(me.name)}</span>
             <span className="hidden max-w-40 min-w-0 text-left leading-tight lg:block">
               <b className="block truncate text-sm font-semibold">{me.name}</b>
-              <span className="block truncate text-xs text-muted-foreground">{ROLE_LABELS[me.role]}</span>
+              <span className="block truncate text-xs text-muted-foreground">{me.roleName}</span>
             </span>
             <ChevronDown className="hidden size-4 text-muted-foreground lg:block" aria-hidden />
           </button>
@@ -145,13 +219,19 @@ function AccountMenu({ me }: { me: Me }) {
         >
           <div className="border-b px-3 pt-1.5 pb-2.5 lg:hidden">
             <b className="block truncate text-sm font-semibold">{me.name}</b>
-            <span className="block truncate text-xs text-muted-foreground">{ROLE_LABELS[me.role]}</span>
+            <span className="block truncate text-xs text-muted-foreground">{me.roleName}</span>
           </div>
           <div ref={menu} role="menu" aria-label="เมนูบัญชี" onKeyDown={onMenuKey} className="pt-1 lg:pt-0">
             <Link href="/profile" role="menuitem" className={item} onClick={() => setOpen(false)}>
               <UserRound className="size-4.5 text-muted-foreground" aria-hidden />
               โปรไฟล์
             </Link>
+            {canAnySettings(me) && (
+              <Link href="/settings" role="menuitem" className={item} onClick={() => setOpen(false)}>
+                <Settings className="size-4.5 text-muted-foreground" aria-hidden />
+                ตั้งค่าระบบ
+              </Link>
+            )}
             <div role="group" aria-labelledby="theme-label" className="my-1 border-y py-1">
               <span id="theme-label" className="block px-3 pt-1.5 pb-1 text-xs text-muted-foreground">ธีมสี</span>
               {THEMES.map((t) => (

@@ -7,10 +7,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	repairdb "github.com/pithawat/BAMBAM/backend/internal/modules/repair/db"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/audit"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/db"
 )
 
@@ -40,7 +42,7 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	areas, err := r.q.ListCategoryAreaTypes(ctx)
+	types, err := r.q.ListCategoryBuildingTypes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -48,15 +50,18 @@ func (r *PgRepository) ListCategories(ctx context.Context) ([]Category, error) {
 	for _, s := range syms {
 		byCat[s.CategoryID] = append(byCat[s.CategoryID], Symptom{ID: s.ID, Name: s.Name, Priority: s.Priority})
 	}
-	areasBy := map[uuid.UUID][]string{}
-	for _, a := range areas {
-		areasBy[a.CategoryID] = append(areasBy[a.CategoryID], a.AreaType)
+	typesBy := map[uuid.UUID][]uuid.UUID{}
+	for _, t := range types {
+		typesBy[t.CategoryID] = append(typesBy[t.CategoryID], t.BuildingTypeID)
 	}
 	out := make([]Category, 0, len(cats))
 	for _, c := range cats {
+		if len(byCat[c.ID]) == 0 && !c.IsOther {
+			continue // no active symptom: not offered in the form (settings F27)
+		}
 		out = append(out, Category{
 			ID: c.ID, Name: c.Name, Icon: c.Icon, DefaultPriority: c.DefaultPriority, IsOther: c.IsOther,
-			AreaTypes: nonNil(areasBy[c.ID]), Symptoms: nonNil(byCat[c.ID]),
+			BuildingTypeIDs: nonNil(typesBy[c.ID]), Symptoms: nonNil(byCat[c.ID]),
 		})
 	}
 	return out, nil
@@ -89,53 +94,9 @@ func (r *PgRepository) ListBuildings(ctx context.Context) ([]Building, error) {
 	}
 	out := make([]Building, 0, len(blds))
 	for _, b := range blds {
-		out = append(out, Building{ID: b.ID, Name: b.Name, Floors: nonNil(byBld[b.ID])})
+		out = append(out, Building{ID: b.ID, Name: b.Name, BuildingType: Ref{ID: b.BuildingTypeID, Name: b.BuildingTypeName}, Floors: nonNil(byBld[b.ID])})
 	}
 	return out, nil
-}
-
-func (r *PgRepository) InsertSampleLocations(ctx context.Context, buildings []Building) error {
-	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
-		q := repairdb.New(tx)
-		for i, b := range buildings {
-			if err := q.InsertSampleBuilding(ctx, repairdb.InsertSampleBuildingParams{ID: b.ID, Name: b.Name, SortOrder: int32(i)}); err != nil { // #nosec G115 -- small list
-				return err
-			}
-			for _, f := range b.Floors {
-				if err := q.InsertSampleFloor(ctx, repairdb.InsertSampleFloorParams{ID: f.ID, BuildingID: b.ID, Name: f.Name, Level: f.Level}); err != nil {
-					return err
-				}
-				for k, rm := range f.Rooms {
-					if err := q.InsertSampleRoom(ctx, repairdb.InsertSampleRoomParams{
-						ID: rm.ID, FloorID: f.ID, Name: rm.Name, AreaType: rm.AreaType, SortOrder: roomSortOrder(rm, k),
-					}); err != nil {
-						return err
-					}
-				}
-			}
-		}
-		return nil
-	})
-}
-
-// roomSortOrder keeps the common area last, as the migration does (sort order 1000).
-func roomSortOrder(rm Room, i int) int32 {
-	if rm.AreaType == AreaCommon {
-		return 1000
-	}
-	return int32(i + 1) // #nosec G115 -- small list
-}
-
-func (r *PgRepository) RefreshSampleData(ctx context.Context, renames []SampleRename) error {
-	return db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
-		q := repairdb.New(tx)
-		for _, rn := range renames {
-			if err := q.RenameSampleBuilding(ctx, repairdb.RenameSampleBuildingParams{ID: rn.ID, OldName: rn.From, NewName: rn.To}); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
 }
 
 func (r *PgRepository) ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]RecentPlace, error) {
@@ -177,6 +138,7 @@ func (r *PgRepository) GetPhoto(ctx context.Context, id uuid.UUID) (Photo, error
 	return Photo{
 		ID: row.ID, UploaderID: row.UploaderID, ContentType: row.ContentType, StorageKey: row.StorageKey,
 		ThumbKey: row.ThumbKey, ThumbContentType: row.ThumbContentType, TicketID: row.TicketID,
+		Kind: row.Kind, TicketStatus: row.TicketStatus,
 	}, nil
 }
 
@@ -193,6 +155,18 @@ func (r *PgRepository) DeleteUnattachedPhotos(ctx context.Context, olderThan tim
 }
 
 // ---- tickets ----
+
+func (r *PgRepository) ListTechnicians(ctx context.Context) ([]Staff, error) {
+	rows, err := r.q.ListTechnicians(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Staff, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, Staff{ID: row.ID, Name: row.Name, RoleName: row.RoleName})
+	}
+	return out, nil
+}
 
 func (r *PgRepository) GetTicketAccess(ctx context.Context, id, viewerID uuid.UUID) (ticketAccess, error) {
 	row, err := r.q.GetTicketAccess(ctx, repairdb.GetTicketAccessParams{ID: id, ViewerID: viewerID})
@@ -217,7 +191,7 @@ func (r *PgRepository) GetTicket(ctx context.Context, id, viewerID uuid.UUID) (T
 		TicketSummary: TicketSummary{
 			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason, Priority: row.Priority,
 			PrioritySource: row.PrioritySource,
-			Category:       ref(row.CategoryID, row.CategoryName), CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
+			Category:       ref(row.CategoryID, row.CategoryName), CategoryIcon: row.CategoryIcon, CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
 			Room:             ref(row.RoomID, row.RoomName),
@@ -228,9 +202,13 @@ func (r *PgRepository) GetTicket(ctx context.Context, id, viewerID uuid.UUID) (T
 			SendBackCount:    row.SendBackCount, Rating: row.Rating,
 			ExpectedDoneOn: dateOf(row.ExpectedDoneOn), AssessedAt: row.AssessedAt, WorkBy: row.WorkBy,
 			Contractor: ref(row.ContractorID, row.ContractorName), AutoCloseAt: row.AutoCloseAt,
+			Assignee:  staff(row.AssigneeID, row.AssigneeName, row.AssigneeRoleName),
 			CreatedAt: row.CreatedAt, ResolvedAt: row.ResolvedAt, ClosedAt: row.ClosedAt, UpdatedAt: row.UpdatedAt,
 		},
 		Details: row.Details, AssetCode: row.AssetCode, SubscriberCount: row.SubscriberCount, RatingComment: row.RatingComment,
+	}
+	if row.LinkedAssetCode != nil && row.LinkedAssetName != nil {
+		d.Asset = &AssetRef{Code: *row.LinkedAssetCode, Name: *row.LinkedAssetName}
 	}
 	if err := r.fillContractorTypes(ctx, []*TicketSummary{&d.TicketSummary}); err != nil {
 		return TicketDetail{}, err
@@ -339,7 +317,7 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 		s := TicketSummary{
 			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason, Priority: row.Priority,
 			PrioritySource: row.PrioritySource,
-			Category:       ref(row.CategoryID, row.CategoryName), CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
+			Category:       ref(row.CategoryID, row.CategoryName), CategoryIcon: row.CategoryIcon, CategoryOther: row.CategoryOther, SymptomOther: row.SymptomOther,
 			Symptoms:         nonNil(symsBy[row.ID]),
 			Building:         Ref{ID: row.BuildingID, Name: row.BuildingName},
 			Floor:            Ref{ID: row.FloorID, Name: row.FloorName},
@@ -351,6 +329,7 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 			SendBackCount:    row.SendBackCount, Rating: row.Rating,
 			ExpectedDoneOn: dateOf(row.ExpectedDoneOn), AssessedAt: row.AssessedAt, WorkBy: row.WorkBy,
 			Contractor: ref(row.ContractorID, row.ContractorName), AutoCloseAt: row.AutoCloseAt,
+			Assignee:  staff(row.AssigneeID, row.AssigneeName, row.AssigneeRoleName),
 			CreatedAt: row.CreatedAt, ResolvedAt: row.ResolvedAt, ClosedAt: row.ClosedAt, UpdatedAt: row.UpdatedAt,
 		}
 		if p, ok := thumbBy[row.ID]; ok {
@@ -364,6 +343,37 @@ func (r *PgRepository) ListTickets(ctx context.Context, viewerID uuid.UUID, f Ti
 	}
 	if err := r.fillContractorTypes(ctx, ptrs); err != nil {
 		return nil, 0, err
+	}
+	return out, total, nil
+}
+
+// ListMyTickets is #35: one S06 page in one query, plus the shared count (scope mine, no staff filters).
+func (r *PgRepository) ListMyTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]MyTicket, int64, error) {
+	rows, err := r.q.ListMyTickets(ctx, repairdb.ListMyTicketsParams{
+		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), ClosedReason: f.ClosedReason, Q: f.Q, Sort: f.Sort,
+		PageLimit: int32(f.PageSize), PageOffset: int32((f.Page - 1) * f.PageSize), // #nosec G115 -- page size ≤ 100, page bounded by the controller
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.q.CountTickets(ctx, repairdb.CountTicketsParams{
+		ViewerID: viewerID, Relation: f.Relation, Statuses: nonNil(f.Statuses), Steps: nonNil(f.Steps), ClosedReason: f.ClosedReason, Q: f.Q,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]MyTicket, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, MyTicket{
+			ID: row.ID, TicketNo: row.TicketNo, Status: row.Status, ClosedReason: row.ClosedReason,
+			Category: ref(row.CategoryID, row.CategoryName), CategoryIcon: row.CategoryIcon, CategoryOther: row.CategoryOther,
+			Title:    row.Title,
+			Building: Ref{ID: row.BuildingID, Name: row.BuildingName}, Floor: Ref{ID: row.FloorID, Name: row.FloorName},
+			Room: ref(row.RoomID, row.RoomName), LocationDetail: row.LocationDetail, IsReporter: row.IsReporter,
+			Rating: row.Rating, SendBackCount: row.SendBackCount, ExpectedDoneOn: dateOf(row.ExpectedDoneOn),
+			Assignee:    staff(row.AssigneeID, row.AssigneeName, row.AssigneeRoleName),
+			AutoCloseAt: row.AutoCloseAt, ResolvedAt: row.ResolvedAt, UpdatedAt: row.UpdatedAt,
+		})
 	}
 	return out, total, nil
 }
@@ -424,6 +434,24 @@ func (r *PgRepository) AutoCloseDue(ctx context.Context, now time.Time) (int, er
 	return n, err
 }
 
+func (r *PgRepository) DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error) {
+	return duplicateTickets(ctx, r.q, k)
+}
+
+func duplicateTickets(ctx context.Context, q *repairdb.Queries, k DuplicateKey) ([]DuplicateMatch, error) {
+	rows, err := q.ListDuplicateTickets(ctx, repairdb.ListDuplicateTicketsParams{
+		CategoryID: &k.CategoryID, FloorID: k.FloorID, RoomID: &k.RoomID, Spot: k.Spot, MaxRows: MaxDuplicates,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]DuplicateMatch, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, DuplicateMatch{ID: row.ID, ReporterID: row.ReporterID, Status: row.Status, BlocksReport: row.BlocksReport})
+	}
+	return out, nil
+}
+
 // ---- contractors ----
 
 func (r *PgRepository) ListContractorTypes(ctx context.Context) ([]Ref, error) {
@@ -449,6 +477,19 @@ func (r *PgRepository) EnsureContractorType(ctx context.Context, name string, by
 	existing, err := r.q.GetContractorTypeByName(ctx, name)
 	if err != nil {
 		return Ref{}, err
+	}
+	if !existing.IsActive {
+		// settings F28: the name of a deactivated type re-activates it, with an audit row by whoever typed it
+		err := db.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
+			if err := repairdb.New(tx).ReactivateContractorType(ctx, repairdb.ReactivateContractorTypeParams{ID: existing.ID, ActorID: &by}); err != nil {
+				return err
+			}
+			return audit.Write(ctx, tx, audit.Entry{ActorID: &by, Action: "activate", TargetType: "contractor_type", TargetID: existing.ID.String(),
+				Data: map[string]any{"entityName": existing.Name, "changes": []any{}}})
+		})
+		if err != nil {
+			return Ref{}, err
+		}
 	}
 	return Ref{ID: existing.ID, Name: existing.Name}, nil
 }
@@ -566,6 +607,10 @@ func (r *pgTxRepository) ActiveRoomOnFloor(ctx context.Context, roomID, floorID 
 	return r.q.ActiveRoomOnFloor(ctx, repairdb.ActiveRoomOnFloorParams{RoomID: roomID, FloorID: floorID})
 }
 
+func (r *pgTxRepository) CategoryUsedInBuilding(ctx context.Context, categoryID, buildingID uuid.UUID) (bool, error) {
+	return r.q.CategoryUsedInBuilding(ctx, repairdb.CategoryUsedInBuildingParams{CategoryID: categoryID, BuildingID: buildingID})
+}
+
 func (r *pgTxRepository) LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error) {
 	rows, err := r.q.LockAttachablePhotos(ctx, repairdb.LockAttachablePhotosParams{Ids: ids, UploaderID: uploaderID, NotBefore: notBefore})
 	return len(rows), err
@@ -584,12 +629,17 @@ func (r *pgTxRepository) NextTicketCounter(ctx context.Context, year int) (int64
 }
 
 func (r *pgTxRepository) InsertTicket(ctx context.Context, t NewTicket) error {
-	if err := r.q.InsertTicket(ctx, repairdb.InsertTicketParams{
-		ID: t.ID, TicketNo: t.TicketNo, Priority: t.Priority, PrioritySource: t.PrioritySource,
+	p := repairdb.InsertTicketParams{
+		ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority, PrioritySource: t.PrioritySource,
 		CategoryID: &t.CategoryID, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther, BuildingID: t.BuildingID,
 		FloorID: t.FloorID, RoomID: &t.RoomID, LocationDetail: t.LocationDetail, Details: t.Details, AssetCode: t.AssetCode,
-		ReporterID: t.ReporterID,
-	}); err != nil {
+		AssetID: t.AssetID, ReporterID: t.ReporterID, CreatedAt: t.CreatedAt,
+	}
+	if t.TeamHandled {
+		reason, at := ClosedReasonTeamHandled, t.CreatedAt
+		p.Status, p.ClosedReason, p.ClosedAt = StatusClosed, &reason, &at
+	}
+	if err := r.q.InsertTicket(ctx, p); err != nil {
 		return err
 	}
 	if err := r.q.InsertTicketSymptoms(ctx, repairdb.InsertTicketSymptomsParams{TicketID: t.ID, SymptomIds: t.SymptomIDs}); err != nil {
@@ -618,6 +668,10 @@ func (r *pgTxRepository) LockTicket(ctx context.Context, id uuid.UUID) (LockedTi
 	t := LockedTicket{
 		ID: row.ID, Status: row.Status, ReporterID: row.ReporterID, ContractorID: row.ContractorID,
 		Assessed: row.ExpectedDoneOn.Valid && row.WorkBy != nil, Rated: row.ContractorRating != nil,
+		ExpectedDoneOn: dateOf(row.ExpectedDoneOn), SendBackCount: row.SendBackCount,
+	}
+	if row.ClosedReason != nil {
+		t.ClosedReason = *row.ClosedReason
 	}
 	if row.WorkBy != nil {
 		t.WorkBy = *row.WorkBy
@@ -628,8 +682,12 @@ func (r *pgTxRepository) LockTicket(ctx context.Context, id uuid.UUID) (LockedTi
 func (r *pgTxRepository) AssessTicket(ctx context.Context, id, technicianID uuid.UUID, in AssessInput, now time.Time) error {
 	return r.q.AssessTicket(ctx, repairdb.AssessTicketParams{
 		ID: id, TechnicianID: &technicianID, Now: now, ExpectedDoneOn: pgtype.Date{Time: *in.ExpectedDoneOn, Valid: true},
-		WorkBy: &in.WorkBy, ContractorID: in.ContractorID,
+		WorkBy: &in.WorkBy, ContractorID: in.ContractorID, AssigneeID: in.AssigneeID,
 	})
+}
+
+func (r *pgTxRepository) IsTechnician(ctx context.Context, id uuid.UUID) (bool, error) {
+	return r.q.IsTechnician(ctx, id)
 }
 
 func (r *pgTxRepository) ResolveTicket(ctx context.Context, id, technicianID uuid.UUID, in ResolveInput, now, autoCloseAt time.Time) error {
@@ -648,8 +706,29 @@ func (r *pgTxRepository) ConfirmTicket(ctx context.Context, id uuid.UUID, rating
 	return r.q.ConfirmTicket(ctx, repairdb.ConfirmTicketParams{ID: id, Rating: &rating, RatingComment: comment, Now: &now})
 }
 
+func (r *pgTxRepository) AdminCloseTicket(ctx context.Context, id uuid.UUID, now time.Time) error {
+	return r.q.AdminCloseTicket(ctx, repairdb.AdminCloseTicketParams{ID: id, Now: &now})
+}
+
 func (r *pgTxRepository) SendBackTicket(ctx context.Context, id uuid.UUID, now time.Time) error {
 	return r.q.SendBackTicket(ctx, repairdb.SendBackTicketParams{ID: id, Now: now})
+}
+
+func (r *pgTxRepository) HandOverTicket(ctx context.Context, id uuid.UUID, now time.Time) error {
+	return r.q.HandOverTicket(ctx, repairdb.HandOverTicketParams{ID: id, Now: now})
+}
+
+func (r *pgTxRepository) LockDuplicateKey(ctx context.Context, k DuplicateKey) error {
+	return r.q.LockDuplicateKey(ctx, k.CategoryID.String()+"/"+k.FloorID.String()+"/"+k.RoomID.String())
+}
+
+func (r *pgTxRepository) DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error) {
+	return duplicateTickets(ctx, r.q, k)
+}
+
+func (r *pgTxRepository) InsertSubscriber(ctx context.Context, ticketID, userID uuid.UUID, now time.Time) (bool, error) {
+	n, err := r.q.InsertSubscriber(ctx, repairdb.InsertSubscriberParams{TicketID: ticketID, UserID: userID, Now: now})
+	return n > 0, err
 }
 
 func (r *pgTxRepository) InsertEvent(ctx context.Context, e NewEvent) error {
@@ -677,17 +756,37 @@ func (r *pgTxRepository) CountContractorTypes(ctx context.Context, ids []uuid.UU
 	return int(n), err
 }
 
+func (r *pgTxRepository) ContractorWithName(ctx context.Context, name string, excludeID uuid.UUID) (NameOwner, bool, error) {
+	row, err := r.q.ContractorWithName(ctx, repairdb.ContractorWithNameParams{Name: name, ExcludeID: excludeID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return NameOwner{}, false, nil
+	}
+	if err != nil {
+		return NameOwner{}, false, err
+	}
+	return NameOwner{ID: row.ID, IsActive: row.IsActive}, true, nil
+}
+
 func (r *pgTxRepository) InsertContractor(ctx context.Context, id uuid.UUID, in ContractorInput, by uuid.UUID) error {
-	return r.q.InsertContractor(ctx, repairdb.InsertContractorParams{
+	return nameTaken(r.q.InsertContractor(ctx, repairdb.InsertContractorParams{
 		ID: id, Name: in.Name, ContactName: optional(in.ContactName), Phone: optional(in.Phone), Note: optional(in.Note), CreatedByID: &by,
-	})
+	}))
 }
 
 func (r *pgTxRepository) UpdateContractor(ctx context.Context, id uuid.UUID, in ContractorInput) (bool, error) {
 	n, err := r.q.UpdateContractor(ctx, repairdb.UpdateContractorParams{
 		ID: id, Name: in.Name, ContactName: optional(in.ContactName), Phone: optional(in.Phone), Note: optional(in.Note), IsActive: in.IsActive,
 	})
-	return n > 0, err
+	return n > 0, nameTaken(err)
+}
+
+// nameTaken maps the unique index on lower(name) to CONTRACTOR_NAME_TAKEN (two technicians saving one name).
+func nameTaken(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "contractors_name_key" {
+		return ErrContractorNameTaken
+	}
+	return err
 }
 
 func (r *pgTxRepository) SetContractorTypes(ctx context.Context, id uuid.UUID, typeIDs []uuid.UUID) error {
@@ -695,6 +794,20 @@ func (r *pgTxRepository) SetContractorTypes(ctx context.Context, id uuid.UUID, t
 		return err
 	}
 	return r.q.InsertContractorTypeLinks(ctx, repairdb.InsertContractorTypeLinksParams{ContractorID: id, TypeIds: typeIDs})
+}
+
+func staff(id *uuid.UUID, name, roleName *string) *Staff {
+	if id == nil {
+		return nil
+	}
+	s := &Staff{ID: *id}
+	if name != nil {
+		s.Name = *name
+	}
+	if roleName != nil {
+		s.RoleName = *roleName
+	}
+	return s
 }
 
 func person(id *uuid.UUID, name, department *string) *Person {

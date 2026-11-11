@@ -2,6 +2,8 @@
 
 Status: APPROVED (2026-10-16) — user approved screens + plan; visual style follows the new design direction (repair CR-008, pending)
 
+> **Removed by CR-001 (2026-10-26).** The owner chose no settings home page: `/settings` redirects to `/settings/buildings` (อาคารและอุปกรณ์) for Admin and Superadmin; the administration sidebar (`_common.md` §2) replaces the section cards; endpoint #1 is removed. Superadmin's app Home is the S29 dashboard. The spec below is kept for history only — do not build it.
+
 - **Flows:** F25 step 3 (see ../../02-flows.md)
 - **Persona:** Superadmin on desktop; on mobile from โปรไฟล์ (see ../../01-users.md)
 - **Purpose of this screen (one sentence):** one place to reach every settings section and see its size at a glance.

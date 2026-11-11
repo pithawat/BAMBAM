@@ -4,6 +4,8 @@
 package repair
 
 import (
+	"math"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +19,9 @@ const (
 
 var Statuses = []string{StatusInProgress, StatusResolved, StatusClosed}
 
-var ClosedReasons = []string{"confirmed", "auto_closed", "team_handled", "admin_closed"}
+const ClosedReasonTeamHandled = "team_handled"
+
+var ClosedReasons = []string{"confirmed", "auto_closed", ClosedReasonTeamHandled, "admin_closed"}
 
 // Steps are the progress shown to people (CR-005), derived from status + assessment + send backs.
 const (
@@ -69,10 +73,19 @@ const (
 	EventResolved          = "resolved"
 	EventSentBack          = "sent_back"
 	EventConfirmed         = "confirmed"
+	EventAdminClosed       = "admin_closed"
+	EventSubscribed        = "subscribed"   // F03 follow, with the follower's note and photos
+	EventTeamHandled       = "team_handled" // F04, with what the team did and the after photos
+	EventHandedOver        = "handed_over"  // F05, with the reason
 
 	PhotoKindReport   = "report"
 	PhotoKindResult   = "result"
 	PhotoKindSendBack = "send_back"
+	PhotoKindFollow   = "follow"
+	PhotoKindTeam     = "team"
+
+	// MaxDuplicates: the most open matches the duplicate check returns (#22, #5 409).
+	MaxDuplicates = 10
 
 	MaxPhotos         = 5
 	MaxLocationChars  = 100
@@ -97,6 +110,8 @@ const (
 	ActionResolve  = "resolve"
 	ActionConfirm  = "confirm"
 	ActionSendBack = "send_back"
+	ActionClose    = "close"
+	ActionHandover = "handover" // F05, Stage 4
 )
 
 // Ref is { id, name } as used across the API contract.
@@ -115,9 +130,9 @@ type Category struct {
 	ID              uuid.UUID
 	Name            string
 	Icon            string
-	DefaultPriority string   // used when only "อาการอื่นๆ" is picked (CR-008)
-	IsOther         bool     // the one "อื่น ๆ" category; only it takes a typed category name (CR-014)
-	AreaTypes       []string // room area types where its problems usually happen (CR-014)
+	DefaultPriority string      // used when only "อาการอื่นๆ" is picked (CR-008)
+	IsOther         bool        // the one "อื่น ๆ" category; only it takes a typed category name (CR-014)
+	BuildingTypeIDs []uuid.UUID // building types it is used in; empty for "อื่น ๆ" = every type (CR-025)
 	Symptoms        []Symptom
 }
 
@@ -154,16 +169,21 @@ type Room struct {
 }
 
 type Building struct {
-	ID     uuid.UUID
-	Name   string
-	Floors []Floor
+	ID           uuid.UUID
+	Name         string
+	BuildingType Ref // CR-025: always set
+	Floors       []Floor
 }
 
 // Viewer is the logged-in user as the repair service needs it.
 type Viewer struct {
-	ID   uuid.UUID
-	Role string
+	ID uuid.UUID
+	// Permissions is the effective permission set of the viewer's role (repair CR-007 A).
+	Permissions []string
 }
+
+// Can reports whether the viewer has the permission key (see permissions.go).
+func (v Viewer) Can(key string) bool { return slices.Contains(v.Permissions, key) }
 
 // TicketSummary is the list / card shape (04-api-contract.md TicketSummary).
 type TicketSummary struct {
@@ -174,6 +194,7 @@ type TicketSummary struct {
 	Priority         string
 	PrioritySource   string
 	Category         *Ref    // nil only on tickets from CR-008 to CR-014 where the reporter typed "อื่นๆ"
+	CategoryIcon     *string // lucide name of Category (CR-019: S06 / S07 tiles without loading the master)
 	CategoryOther    *string // typed category name (under the "อื่น ๆ" category since CR-014)
 	Symptoms         []Ref
 	SymptomOther     *string // typed symptom
@@ -192,6 +213,7 @@ type TicketSummary struct {
 	WorkBy           *string
 	Contractor       *Ref
 	ContractorTypes  []string
+	Assignee         *Staff // CR-034: the responsible in-house technician; nil for contractor / old jobs
 	AutoCloseAt      *time.Time
 	CreatedAt        time.Time
 	ResolvedAt       *time.Time
@@ -204,20 +226,55 @@ type TicketSummary struct {
 }
 
 // Step derives the progress step (CR-005).
-func (s TicketSummary) Step() string {
+func (s TicketSummary) Step() string { return stepOf(s.Status, s.ExpectedDoneOn, s.SendBackCount) }
+
+func stepOf(status string, expectedDoneOn *time.Time, sendBackCount int32) string {
 	switch {
-	case s.Status == StatusClosed:
+	case status == StatusClosed:
 		return StepClosed
-	case s.Status == StatusResolved:
+	case status == StatusResolved:
 		return StepAwaitingRating
-	case s.ExpectedDoneOn == nil:
+	case expectedDoneOn == nil:
 		return StepAwaitingAssessment
-	case s.SendBackCount > 0:
+	case sendBackCount > 0:
 		return StepReworking
 	default:
 		return StepInRepair
 	}
 }
+
+// MyTicket is one S06 table row (#35, CR-019): only what the table shows, so a page stays small.
+type MyTicket struct {
+	ID             uuid.UUID
+	TicketNo       string
+	Status         string
+	ClosedReason   *string
+	Category       *Ref
+	CategoryIcon   *string
+	CategoryOther  *string
+	Title          string // symptom names, then the typed symptom, joined with " · "
+	Building       Ref
+	Floor          Ref
+	Room           *Ref
+	LocationDetail *string
+	IsReporter     bool // false = in the list because the viewer follows it
+	Rating         *int16
+	SendBackCount  int32
+	ExpectedDoneOn *time.Time // date only
+	Assignee       *Staff     // CR-034
+	AutoCloseAt    *time.Time
+	ResolvedAt     *time.Time
+	UpdatedAt      time.Time
+}
+
+// Staff is a person with their role name: the ticket assignee and a #36 row (CR-034).
+type Staff struct {
+	ID       uuid.UUID
+	Name     string
+	RoleName string
+}
+
+func (t MyTicket) Step() string { return stepOf(t.Status, t.ExpectedDoneOn, t.SendBackCount) }
 
 type TicketResult struct {
 	Note                    string
@@ -243,6 +300,7 @@ type TicketDetail struct {
 	TicketSummary
 	Details         *string
 	AssetCode       *string
+	Asset           *AssetRef // the linked asset (tickets.asset_id, F13-B); nil when none
 	Photos          []uuid.UUID
 	SubscriberCount int64
 	Result          *TicketResult
@@ -265,7 +323,37 @@ type CreateTicketInput struct {
 	SymptomOther   string // CR-008: typed symptom
 	PhotoIDs       []uuid.UUID
 	AssetCode      string
-	TeamHandled    bool
+	TeamHandled    *TeamHandledInput // F04: leads only (BR-F04-1); nil = a normal report
+}
+
+// TeamHandledInput is #5 `teamHandled`: what the team did and the after photos (BR-F04-2).
+type TeamHandledInput struct {
+	Note     string
+	PhotoIDs []uuid.UUID
+}
+
+// DuplicateKey is what makes two reports "the same problem" (BR-F03-1, CR-009 / CR-014): the same
+// category, floor and room; Spot (CR-020) is the reporter's extra spot, normalised by normalizeSpot.
+type DuplicateKey struct {
+	CategoryID uuid.UUID
+	FloorID    uuid.UUID
+	RoomID     uuid.UUID
+	Spot       string
+}
+
+// DuplicateMatch is an open ticket in the same category + floor + room. BlocksReport (CR-020): the
+// report is a duplicate of it (no extra spot, or the same spot); otherwise it is only similar.
+type DuplicateMatch struct {
+	ID           uuid.UUID
+	ReporterID   uuid.UUID
+	Status       string
+	BlocksReport bool
+}
+
+// Duplicate is one #22 row: the match as the viewer sees it (S04) and whether it blocks the report.
+type Duplicate struct {
+	TicketDetail
+	BlocksReport bool
 }
 
 // AssessInput is endpoint #9 after parsing: the expected finish date and who does the work (CR-006).
@@ -273,7 +361,8 @@ type AssessInput struct {
 	ExpectedDoneOn *time.Time // date only
 	WorkBy         string
 	ContractorID   *uuid.UUID
-	Reason         string // optional, kept on a change and shown to the reporter (CR-008)
+	AssigneeID     *uuid.UUID // CR-034: required for in-house, cleared for a contractor job
+	Reason         string     // kept on a change and shown to the reporter (CR-008); required on a reschedule (CR-034)
 }
 
 // ResolveInput is endpoint #10 after parsing. Who did the work was set by the assessment;
@@ -328,6 +417,8 @@ type Photo struct {
 	ThumbKey         string
 	ThumbContentType string
 	TicketID         *uuid.UUID
+	Kind             *string // report | result | send_back | follow | team, when attached
+	TicketStatus     *string // status of the ticket it is attached to
 }
 
 // NewPhoto is a stored upload ready to be recorded.
@@ -356,11 +447,13 @@ type NewTicket struct {
 	LocationDetail *string
 	Details        *string
 	AssetCode      *string
+	AssetID        *uuid.UUID // the active asset with AssetCode (F13-B); nil when none matches
 	ReporterID     uuid.UUID
 	SymptomIDs     []uuid.UUID
 	PhotoIDs       []uuid.UUID
 	CreatedAt      time.Time
 	CreatedEventID uuid.UUID
+	TeamHandled    bool // F04: created closed / team_handled
 }
 
 // ActiveCategory is what ticket creation reads from a locked, active category.
@@ -371,13 +464,16 @@ type ActiveCategory struct {
 
 // LockedTicket is the row state read under FOR UPDATE before a status change.
 type LockedTicket struct {
-	ID           uuid.UUID
-	Status       string
-	ReporterID   uuid.UUID
-	Assessed     bool // expected date and work-by are both set (CR-006)
-	WorkBy       string
-	ContractorID *uuid.UUID
-	Rated        bool // the contractor already has a rating on this ticket
+	ID             uuid.UUID
+	Status         string
+	ClosedReason   string // "" while open
+	ReporterID     uuid.UUID
+	Assessed       bool // expected date and work-by are both set (CR-006)
+	ExpectedDoneOn *time.Time
+	SendBackCount  int32
+	WorkBy         string
+	ContractorID   *uuid.UUID
+	Rated          bool // the contractor already has a rating on this ticket
 }
 
 // NewEvent is a timeline row written together with a status change; photos are attached to it.
@@ -408,6 +504,12 @@ type Contractor struct {
 	AvgRating   float64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+// NameOwner is the contractor that already has a name (CR-023).
+type NameOwner struct {
+	ID       uuid.UUID
+	IsActive bool
 }
 
 type ContractorInput struct {
@@ -455,3 +557,204 @@ type RecentPlace struct {
 	LocationDetail *string
 	LastReportedAt time.Time
 }
+
+// ---- CR-016: dashboard (#27), floor plans (#30), equipment (#29, #31–#34) ----
+
+// PriorityCounts: open tickets per priority (pins on the building and the floor plan).
+type PriorityCounts struct {
+	Critical, High, Medium, Low int64
+}
+
+func (p PriorityCounts) Total() int64 { return p.Critical + p.High + p.Medium + p.Low }
+
+// Highest is the most urgent priority with an open ticket; nil when there is none (information only, CR-015).
+func (p PriorityCounts) Highest() *string {
+	for i, n := range []int64{p.Critical, p.High, p.Medium, p.Low} {
+		if n > 0 {
+			return &Priorities[i]
+		}
+	}
+	return nil
+}
+
+type OverviewCounts struct {
+	Open, AwaitingAssessment, InRepair, Reworking, AwaitingRating, Overdue int64
+	ReportedToday, ClosedToday, ClosedLast7Days                            int64
+	RatedLast7Days, RatingSumLast7Days                                     int64
+	OldestAwaitingAssessmentAt, NextAutoCloseAt                            *time.Time
+}
+
+// RatingAvgLast7Days: average reporter rating of tickets closed in the last 7 days; nil without ratings.
+func (c OverviewCounts) RatingAvgLast7Days() *float64 {
+	if c.RatedLast7Days == 0 {
+		return nil
+	}
+	avg := math.Round(float64(c.RatingSumLast7Days)/float64(c.RatedLast7Days)*10) / 10
+	return &avg
+}
+
+// StepCounts: open tickets per step (S11 tabs; InRepair includes reworking, CR-017).
+type StepCounts struct {
+	AwaitingAssessment, InRepair, AwaitingRating int64
+}
+
+type OverviewFloor struct {
+	ID, BuildingID uuid.UUID
+	Name           string
+	Level          int32
+	Open           PriorityCounts
+	Steps          StepCounts
+}
+
+type OverviewBuilding struct {
+	ID       uuid.UUID
+	Name     string
+	HasModel bool
+	// Footprint of the model in metres (largest floor plan); nil without a plan (CR-017).
+	WidthM, DepthM *float64
+	// Procedural 3D shape (frontend registry, CR-027); nil = no shape.
+	ModelKey *string
+	Floors   []OverviewFloor
+}
+
+// SiteBlock: one building frame of the campus map on the S29 site view (CR-027, D-126). Metres from the
+// centre of อาคาร 1 (x east, z south), RotDeg clockwise on the map. BuildingID is nil when the block is
+// not (or no longer) an active building.
+type SiteBlock struct {
+	ID                           uuid.UUID
+	MapNo                        int16
+	Name                         string
+	BuildingID                   *uuid.UUID
+	X, Z, RotDeg, WidthM, DepthM float64
+	Storeys                      int16
+	// Side of the campus shown together on the site view (CR-028): 1 ฝั่งสำนักงานใหญ่, 2 ฝั่ง Riverside.
+	Side int16
+}
+
+type Overview struct {
+	Counts    OverviewCounts
+	Buildings []OverviewBuilding
+	Site      []SiteBlock
+	Attention []TicketSummary
+}
+
+type AssetType struct {
+	ID                          uuid.UUID
+	Key, Name, CodePrefix, Icon string
+	Mount                       string
+}
+
+type AssetTypeRef struct {
+	ID        uuid.UUID
+	Key, Name string
+}
+
+// Shape is a room outline on its floor plan: [[x, z], …] in metres (origin top-left, x right, z down).
+type Shape [][2]float64
+
+type Asset struct {
+	ID          uuid.UUID
+	Code, Name  string
+	Type        AssetTypeRef
+	Room        Ref
+	X, Z        *float64 // nil = in the room, not placed on the plan yet
+	RotationDeg int16
+	OpenTickets int64
+}
+
+type PlanRoom struct {
+	ID       uuid.UUID
+	Name     string
+	AreaType string
+	Shape    Shape // nil when the room has no outline
+	Open     PriorityCounts
+}
+
+type FloorPlan struct {
+	Floor          Floor
+	Building       Ref
+	WidthM, DepthM *float64 // nil when the floor has no plan
+	ModelFile      *string
+	Rooms          []PlanRoom
+	Assets         []Asset
+}
+
+// RoomPlan is #36 (CR-038): a floor plan without tickets or equipment, plus the building's 3D shape
+// (nil = no shape or no plan footprint: the form draws the plan in 2D only).
+type RoomPlan struct {
+	Plan  FloorPlan
+	Model *PlanModel
+}
+
+// PlanModel is what the 3D engine needs to open a building: shape key, footprint, top floor level.
+type PlanModel struct {
+	Key            string
+	WidthM, DepthM float64
+	Floors         int32
+}
+
+// AssetRef is the asset line of a ticket (TicketDetail `asset`, S07).
+type AssetRef struct {
+	Code, Name string
+}
+
+// AssetLookup is #25 (F13-B): where the asset is now and the category the report form prefills.
+type AssetLookup struct {
+	Code, Name            string
+	TypeID                uuid.UUID
+	Building, Floor, Room Ref
+	Category              *Ref // nil when no category of the asset type is used in the building (CR-025)
+}
+
+// AssetCategory is one active category of an asset type, for the #25 prefill.
+type AssetCategory struct {
+	Ref
+	IsOther        bool
+	UsedInBuilding bool // the building's type uses the category (BR-F02-8)
+}
+
+// AssetInput is the body of #31 / #32 (AssetTypeID is ignored on #32: the type never changes).
+type AssetInput struct {
+	AssetTypeID uuid.UUID
+	Code, Name  string
+	RoomID      uuid.UUID
+	X, Z        *float64
+	RotationDeg *int
+}
+
+// PlacementRoom is the target room of an add / move with its floor's plan size.
+type PlacementRoom struct {
+	ID, FloorID    uuid.UUID
+	Shape          Shape
+	HasPlan        bool
+	WidthM, DepthM float64
+}
+
+type RoomShape struct {
+	ID    uuid.UUID
+	Shape Shape
+}
+
+type LockedAsset struct {
+	ID, AssetTypeID, RoomID uuid.UUID
+	Code, Name              string
+	X, Z                    *float64
+	RotationDeg             int16
+	IsActive                bool
+	LabelPrinted            bool // CR-036: the code is locked
+}
+
+// Audit actions for platform.audit_log (BR-F31-5).
+const (
+	AuditAssetCreated     = "asset.created"
+	AuditAssetUpdated     = "asset.updated"
+	AuditAssetDeactivated = "asset.deactivated"
+)
+
+// Asset limits (BR-F31-1).
+const (
+	MaxAssetCodeChars = 50
+	MaxAssetNameChars = 100
+	// AttentionLimit: rows in the S29 "งานที่ควรติดตาม" list (#27).
+	AttentionLimit = 5
+)

@@ -44,7 +44,7 @@
   --attention: #B93D0A;              /* tangerine "needs you": review banner, badge (was violet); 4.9:1 on its tint */
   --gold: #E09B0C;                   /* rating stars only */
   /* step colours: S07 status band, action card, badges — each ≥ 4.5:1 on its own 10% tint */
-  --status-new: #5B6676;             /* รับเรื่อง: waiting for the technician */
+  --status-new: #8C6600;             /* รับเรื่อง: deep yellow (CR-018), 5.2:1 on white, 4.6:1 on its tint */
   --status-in-progress: #2741FA;     /* กำลังซ่อม */
   --status-rework: #B42318;          /* กำลังแก้ไขตามที่ส่งกลับ */
   --status-resolved: #B93D0A;        /* ซ่อมเสร็จ รอให้คะแนน */
@@ -58,6 +58,11 @@
   --svc-repair: #F97316;             /* แจ้งซ่อม */
   --svc-car: #0284C7;                /* จองรถ */
   --svc-room: #0D9488;               /* จองห้องประชุม */
+  /* CR-029: mid-tone surfaces separate white fur from light cards. */
+  --mascot-blue: #A9C2D8;
+  --mascot-sage: #ABC7BF;
+  --mascot-warm: #D2C0A3;
+  --mascot-edge: #7D9EB9;
 }
 
 /* Theme "โทนสบายตา" (D-069), built from the owner's palette #2741FA · #C5CBD3 · #8CBCB9 · #DDA448.
@@ -83,7 +88,7 @@
   --warning: #94600F;               /* deep mustard */
   --attention: #8A5A12;             /* "needs you": review banner, ตรวจงาน button */
   --gold: #C08A2E;                  /* stars, 3:1 on white */
-  --status-new: #566273;            /* รับเรื่อง: waiting, nothing for the reporter to do */
+  --status-new: #7F6A00;            /* รับเรื่อง: olive yellow (CR-018), 5.3:1 on white */
   --status-in-progress: #2741FA;
   --status-rework: #B2410E;
   --status-resolved: #8A5A12;       /* รอประเมินตรวจงาน */
@@ -91,6 +96,10 @@
   --svc-repair: #C9822B;
   --svc-car: #3D8A84;
   --svc-room: #2F7FB0;
+  --mascot-blue: #AEC2D1;
+  --mascot-sage: #A3BFB9;
+  --mascot-warm: #CDBB9E;
+  --mascot-edge: #7D999F;
 }
 
 @theme inline {
@@ -146,6 +155,10 @@
   --color-svc-repair: var(--svc-repair);
   --color-svc-car: var(--svc-car);
   --color-svc-room: var(--svc-room);
+  --color-mascot-blue: var(--mascot-blue);
+  --color-mascot-sage: var(--mascot-sage);
+  --color-mascot-warm: var(--mascot-warm);
+  --color-mascot-edge: var(--mascot-edge);
 
   --shadow-card: 0 1px 2px rgb(24 34 56 / 0.04);                 /* panels */
   --shadow-raised: 0 10px 28px -16px rgb(24 34 56 / 0.25);       /* review card, success card, dialogs */
@@ -169,7 +182,22 @@
   color: var(--c);
 }
 
-/* S07 print report (A4). */
+/* CR-035: the white tiger always sits on a solid primary panel (S06 tracking treatment, replaces the CR-029
+   blob backdrops). Inside the panel focus rings turn white and shared buttons flip to the blue surface. */
+.mascot-image { filter: drop-shadow(0 3px 4px rgb(10 18 60 / 28%)); }
+.mascot-panel :is(a, button):focus-visible { outline: 3px solid var(--primary-foreground); outline-offset: 2px; }
+.mascot-panel [data-slot="button"][data-variant="default"] { background: var(--primary-foreground); color: var(--primary); }
+.mascot-panel [data-slot="button"][data-variant="default"]:hover { background: var(--secondary); }
+.mascot-panel [data-slot="button"][data-variant="outline"] {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--primary-foreground) 45%, transparent);
+  color: var(--primary-foreground);
+  box-shadow: none;
+}
+.mascot-panel [data-slot="button"][data-variant="outline"]:hover { background: color-mix(in srgb, var(--primary-foreground) 14%, transparent); }
+.mascot-panel [data-slot="button"][data-variant="link"] { color: var(--primary-foreground); text-decoration: underline; text-underline-offset: 4px; }
+
+/* S07 print report (A4); its page footer lives in ticket-report.tsx (CR-039). */
 @media print {
   @page {
     size: A4;

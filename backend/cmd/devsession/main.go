@@ -11,9 +11,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pithawat/BAMBAM/backend/internal/modules/repair"
+	"github.com/pithawat/BAMBAM/backend/internal/modules/settings"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/auth"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/config"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/db"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/permissions"
+	"github.com/pithawat/BAMBAM/backend/internal/platform/roles"
 	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
@@ -41,7 +45,8 @@ func run(role string) error {
 	}
 	defer pool.Close()
 
-	svc := users.NewService(users.NewRepository(pool))
+	catalog := permissions.MustRegistry(repair.Permissions, settings.Permissions)
+	svc := users.NewService(users.NewRepository(pool), roles.NewService(roles.NewRepository(pool), catalog), catalog, cfg.SuperAdminEmployeeCodes)
 	if err := svc.EnsureDemoUsers(ctx); err != nil {
 		return err
 	}

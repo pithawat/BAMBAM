@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/http";
-import type { FieldCode, RepairErrorCode } from "./types";
+import type { ContractorNameTakenDetails, DuplicateFoundDetails, DuplicateTicket, FieldCode, OwnTicketAwaitingRatingDetails, RepairErrorCode } from "./types";
 
 // Error code → Thai copy, from docs/modules/repair/04-api-contract.md "Error codes"
 // and the screen specs. Backend `message` is never shown to users.
@@ -13,17 +13,26 @@ const messages: Partial<Record<RepairErrorCode, string>> = {
   PHOTO_TYPE_NOT_ALLOWED: "รองรับเฉพาะไฟล์รูปภาพ",
   PHOTO_TOO_LARGE: "รูปนี้ใหญ่เกิน 10 MB",
   MASTER_DATA_CHANGED: "ข้อมูลบางอย่างเปลี่ยนไป กรุณาเลือกใหม่",
+  CATEGORY_NOT_FOR_BUILDING: "หมวดงานนี้ไม่มีในอาคารที่เลือก กรุณาเลือกใหม่", // CR-025 (#5)
   TEAM_HANDLED_NOT_ALLOWED: "คุณไม่มีสิทธิ์ทำรายการนี้",
+  DUPLICATE_FOUND: "มีคนแจ้งเรื่องนี้ไว้แล้ว ติดตามเคสเดิมแทนได้",
+  OWN_TICKET_AWAITING_RATING: "คุณแจ้งเรื่องนี้ไว้แล้ว ช่างซ่อมเสร็จแล้ว ไปประเมินตรวจงานที่งานเดิม",
   NOT_TECHNICIAN: "เฉพาะช่างเท่านั้นที่ทำรายการนี้ได้",
   NOT_REPORTER: "เฉพาะผู้แจ้งเท่านั้นที่ประเมินตรวจงานได้",
   TICKET_CLOSED: "งานนี้ปิดไปแล้ว",
   INVALID_STATE: "งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว",
-  ASSESSMENT_REQUIRED: "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และใครซ่อม) ก่อนบันทึกผล",
+  ASSESSMENT_REQUIRED: "กดเริ่มดำเนินการ (กำหนดวันที่คาดว่าจะเสร็จ และผู้ดำเนินการซ่อม) ก่อนบันทึกผล", // CR-034 copy
+  ASSIGNEE_INVALID: "ช่างคนนี้รับงานซ่อมไม่ได้แล้ว เลือกคนอื่น", // CR-034 (#9)
   CONTRACTOR_NOT_FOUND: "ไม่พบช่างภายนอกนี้ หรือถูกปิดใช้งานแล้ว",
   CONTRACTOR_TYPE_NOT_FOUND: "ประเภทช่างบางรายการไม่มีในระบบแล้ว เลือกใหม่อีกครั้ง",
+  CONTRACTOR_NAME_TAKEN: "มีช่างภายนอกชื่อนี้แล้ว",
   ALREADY_FOLLOWING: "คุณติดตามเคสนี้อยู่แล้ว",
   NOT_TEAM_HANDLED: "งานนี้มีการเปลี่ยนแปลง โหลดข้อมูลล่าสุดให้แล้ว",
   ASSET_NOT_FOUND: "ไม่พบอุปกรณ์นี้",
+  ASSET_CODE_TAKEN: "รหัสนี้มีอุปกรณ์อื่นใช้แล้ว",
+  ASSET_CODE_LOCKED: "พิมพ์ป้าย QR ของอุปกรณ์นี้แล้ว จึงเปลี่ยนรหัสไม่ได้", // CR-036 (#32, BR-F13A-5)
+  POINT_OUTSIDE_ROOM: "วางอุปกรณ์ในห้องที่เลือกเท่านั้น",
+  FLOOR_NOT_FOUND: "ไม่พบชั้นนี้",
 };
 
 /** `TICKET_CLOSED` copy depends on where it happens (contract "Error codes"). */
@@ -47,6 +56,26 @@ export function errorCode(err: unknown): RepairErrorCode | undefined {
   return err instanceof ApiError ? (err.code as RepairErrorCode) : undefined;
 }
 
+// ---- #5 409s (Stage 4, CR-009) ----
+
+/** The open matches of a `createTicket` refused with 409 `DUPLICATE_FOUND` (→ S04 dialog); `null` for any other error. */
+export function duplicateMatches(err: unknown): DuplicateTicket[] | null {
+  if (!(err instanceof ApiError) || err.code !== "DUPLICATE_FOUND") return null;
+  return (err.details as DuplicateFoundDetails | undefined)?.tickets ?? [];
+}
+
+/** The ticket id of a 409 `OWN_TICKET_AWAITING_RATING` (→ S07 of that ticket); `null` for any other error. */
+export function ownTicketAwaitingRating(err: unknown): string | null {
+  if (!(err instanceof ApiError) || err.code !== "OWN_TICKET_AWAITING_RATING") return null;
+  return (err.details as OwnTicketAwaitingRatingDetails | undefined)?.ticketId ?? null;
+}
+
+/** The contractor that already has the name of a 409 `CONTRACTOR_NAME_TAKEN` (CR-023); `null` for any other error. */
+export function contractorNameTaken(err: unknown): ContractorNameTakenDetails | null {
+  if (!(err instanceof ApiError) || err.code !== "CONTRACTOR_NAME_TAKEN") return null;
+  return (err.details as ContractorNameTakenDetails | undefined) ?? null;
+}
+
 // ---- field errors (VALIDATION_FAILED) ----
 
 /** S03 "Validation" (CR-008, CR-014): `field` + `FieldCode` → message. */
@@ -66,7 +95,11 @@ const createTicketFieldMessages: Record<string, Partial<Record<FieldCode, string
   },
   details: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
   "teamHandled.note": { REQUIRED: "กรุณาบอกสิ่งที่ทีมทำ", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
-  "teamHandled.photoIds": { MIN_ITEMS: "แนบรูปหลังทำอย่างน้อย 1 รูป" },
+  "teamHandled.photoIds": {
+    MIN_ITEMS: "แนบรูปหลังทำอย่างน้อย 1 รูป",
+    MAX_ITEMS: "แนบได้สูงสุด 5 รูป",
+    INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น",
+  },
 };
 
 /**
@@ -95,14 +128,15 @@ export function fieldErrors(err: unknown, map: FieldMessages): Record<string, st
 /** S17 รับเรื่อง / เลื่อนวันเสร็จ. */
 export const assessFieldMessages: FieldMessages = {
   expectedDoneOn: { REQUIRED: "เลือกวันที่คาดว่าจะเสร็จ", INVALID: "เลือกวันที่คาดว่าจะเสร็จ", PAST: "เลือกวันนี้หรือหลังจากนี้" },
-  workBy: { REQUIRED: "เลือกใครซ่อม", INVALID: "เลือกใครซ่อม" },
+  workBy: { REQUIRED: "เลือกประเภทผู้ดำเนินการซ่อม", INVALID: "เลือกประเภทผู้ดำเนินการซ่อม" }, // CR-034
   contractorId: { REQUIRED: "เลือกช่างภายนอก", INVALID: "เลือกช่างภายนอก" },
-  reason: { TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
+  assigneeId: { REQUIRED: "เลือกช่างผู้รับผิดชอบ", INVALID: "เลือกช่างผู้รับผิดชอบ" }, // CR-034
+  reason: { REQUIRED: "กรุณาใส่เหตุผลที่เลื่อน", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
 };
 
 /** S10 resolve. */
 export const resolveFieldMessages: FieldMessages = {
-  note: { REQUIRED: "กรุณาบอกสิ่งที่ทำ", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
+  note: { REQUIRED: "กรุณาใส่รายละเอียดการซ่อม", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" }, // CR-034
   photoIds: { MIN_ITEMS: "แนบรูปหลังซ่อมอย่างน้อย 1 รูป", MAX_ITEMS: "แนบได้สูงสุด 5 รูป", INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" },
   contractorRating: { REQUIRED: "ให้คะแนนช่างภายนอก", INVALID: "ให้คะแนนช่างภายนอก" },
   contractorRatingComment: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
@@ -116,6 +150,17 @@ export const reviewFieldMessages: FieldMessages = {
   photoIds: { MAX_ITEMS: "แนบได้สูงสุด 5 รูป", INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" },
 };
 
+/** S04 follow (#23). */
+export const followFieldMessages: FieldMessages = {
+  note: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
+  photoIds: { MAX_ITEMS: "แนบได้สูงสุด 5 รูป", INVALID: "มีรูปที่อัปโหลดไม่สำเร็จ ลองใหม่หรือลบรูปนั้น" },
+};
+
+/** Hand-over dialog (#24, `_common.md` §7). */
+export const handoverFieldMessages: FieldMessages = {
+  reason: { REQUIRED: "กรุณาใส่เหตุผล", TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
+};
+
 /** S18 contractor form. */
 export const contractorFieldMessages: FieldMessages = {
   name: { REQUIRED: "กรุณากรอกชื่อร้าน / บริษัท", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
@@ -123,4 +168,14 @@ export const contractorFieldMessages: FieldMessages = {
   contactName: { TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
   phone: { TOO_LONG: "ไม่เกิน 30 ตัวอักษร" },
   note: { TOO_LONG: "ไม่เกิน 500 ตัวอักษร" },
+};
+
+/** S29 asset dialog (CR-016). A point outside the plan comes back as `x` / `z` INVALID. */
+export const assetFieldMessages: FieldMessages = {
+  code: { REQUIRED: "กรุณาใส่รหัสอุปกรณ์", TOO_LONG: "ไม่เกิน 50 ตัวอักษร", INVALID: "ใช้ได้เฉพาะตัวอักษร ตัวเลข - และ _" },
+  name: { REQUIRED: "กรุณาใส่ชื่ออุปกรณ์", TOO_LONG: "ไม่เกิน 100 ตัวอักษร" },
+  roomId: { REQUIRED: "เลือกห้อง", INVALID: "เลือกห้อง" },
+  assetTypeId: { REQUIRED: "เลือกประเภท", INVALID: "เลือกประเภท" },
+  x: { INVALID: "วางในห้องเท่านั้น", REQUIRED: "วางในห้องเท่านั้น" },
+  z: { INVALID: "วางในห้องเท่านั้น", REQUIRED: "วางในห้องเท่านั้น" },
 };

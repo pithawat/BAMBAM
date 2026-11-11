@@ -1,12 +1,16 @@
 import { env } from "@/lib/env";
 
-/** Error envelope from docs/shared/architecture.md. `code` is mapped to Thai copy by the screen. */
+/**
+ * Error envelope from docs/shared/architecture.md. `code` is mapped to Thai copy by the screen.
+ * `details` is the extra data a module contract defines for some codes (e.g. the matches of a 409).
+ */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
     message: string,
     readonly fields: Record<string, string> = {},
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -46,7 +50,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<{ da
   const json = await res.json().catch(() => null);
   if (!res.ok) {
     const e = json?.error;
-    throw new ApiError(res.status, e?.code ?? "UNKNOWN", e?.message ?? res.statusText, e?.fields ?? {});
+    throw new ApiError(res.status, e?.code ?? "UNKNOWN", e?.message ?? res.statusText, e?.fields ?? {}, e?.details);
   }
   return { data: json?.data as T, meta: json?.meta };
 }
@@ -83,7 +87,7 @@ function upload<T>(path: string, form: FormData, opts: UploadOptions = {}): Prom
     xhr.onabort = () => reject(new DOMException("upload aborted", "AbortError"));
     xhr.onload = () => {
       if (xhr.status === 401 && typeof window !== "undefined") redirectToLogin("expired");
-      let json: { data?: T; error?: { code?: string; message?: string; fields?: Record<string, string> } } | null = null;
+      let json: { data?: T; error?: { code?: string; message?: string; fields?: Record<string, string>; details?: unknown } } | null = null;
       try {
         json = JSON.parse(xhr.responseText);
       } catch {
@@ -91,7 +95,7 @@ function upload<T>(path: string, form: FormData, opts: UploadOptions = {}): Prom
       }
       if (xhr.status < 200 || xhr.status >= 300) {
         const e = json?.error;
-        reject(new ApiError(xhr.status, e?.code ?? "UNKNOWN", e?.message ?? xhr.statusText, e?.fields ?? {}));
+        reject(new ApiError(xhr.status, e?.code ?? "UNKNOWN", e?.message ?? xhr.statusText, e?.fields ?? {}, e?.details));
         return;
       }
       opts.onProgress?.(1);

@@ -9,8 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { env } from "@/lib/env";
 import { getDemoUsers, switchRole } from "@/lib/platform/api";
-import { ROLE_LABELS } from "@/lib/platform/roles";
-import { ROLES, type DemoUser, type Role } from "@/lib/platform/types";
+import type { DemoUser, Role } from "@/lib/platform/types";
 import { cn } from "@/lib/utils";
 import { useMe } from "./me-provider";
 import { useIsDesktop } from "./use-media-query";
@@ -23,9 +22,10 @@ const PICKER_HINT = "โหมดทดสอบ ใช้ผู้ใช้ต�
 
 /**
  * Amber strip above the navbar (CR-010, every width): `DEV · กำลังดูในบทบาท: {role} · เปลี่ยน`.
+ * `variant="sidebar"`: the collapsed two-line block at the bottom of the settings sidebar (settings _common.md §2).
  * Phone / tablet open a bottom sheet, desktop a popover.
  */
-export function RoleSwitcher({ className }: { className?: string }) {
+export function RoleSwitcher({ className, variant = "strip" }: { className?: string; variant?: "strip" | "sidebar" }) {
   const meState = useMe();
   const desktop = useIsDesktop();
   const [open, setOpen] = useState(false);
@@ -35,7 +35,21 @@ export function RoleSwitcher({ className }: { className?: string }) {
   const envLabel = me.environment ?? (env.useMocks ? "DEV" : null);
   if (!envLabel) return null; // production API → never show
 
-  const trigger = (
+  const trigger = variant === "sidebar" ? (
+    <button
+      type="button"
+      className={cn(
+        "flex min-h-11 w-full flex-col items-start rounded-lg bg-warning/10 px-3 py-2 text-left text-xs text-warning outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+        className,
+      )}
+    >
+      <span><span className="font-bold tracking-wide">{envLabel}</span> · กำลังดูในบทบาท</span>
+      <span className="flex w-full items-center justify-between gap-2">
+        <span className="truncate text-sm font-semibold">{me.roleName}</span>
+        <span className="shrink-0 underline underline-offset-2">เปลี่ยน</span>
+      </span>
+    </button>
+  ) : (
     <button
       type="button"
       className={cn(
@@ -43,7 +57,7 @@ export function RoleSwitcher({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className="font-bold tracking-wide">{envLabel}</span> · กำลังดูในบทบาท: {ROLE_LABELS[me.role]} ·{" "}
+      <span className="font-bold tracking-wide">{envLabel}</span> · กำลังดูในบทบาท: {me.roleName} ·{" "}
       <span className="underline underline-offset-2">เปลี่ยน</span>
     </button>
   );
@@ -80,14 +94,14 @@ function RolePicker({ current, inSheet, onDone }: { current: Role; inSheet: bool
       .catch(() => setDemoUsers([]));
   }, []);
 
-  const nameOf = (r: Role) => demoUsers?.find((d) => d.role === r)?.name;
+  const roleName = (r: Role) => demoUsers?.find((d) => d.role === r)?.roleName ?? r;
 
   async function submit() {
     setBusy(true);
     try {
       await switchRole(picked);
       try {
-        window.sessionStorage.setItem(TOAST_KEY, `กำลังดูในบทบาท ${ROLE_LABELS[picked]}`);
+        window.sessionStorage.setItem(TOAST_KEY, `กำลังดูในบทบาท ${roleName(picked)}`);
       } catch {
         // ignore
       }
@@ -116,25 +130,24 @@ function RolePicker({ current, inSheet, onDone }: { current: Role; inSheet: bool
       )}
       <RadioGroup
         value={picked}
-        onValueChange={(v) => setPicked(v as Role)}
+        onValueChange={setPicked}
         className="mt-3 gap-1"
         aria-label="เลือกบทบาท"
       >
-        {ROLES.map((r) => (
+        {/* One row per role in role order, custom roles included (settings P2); names are data. */}
+        {(demoUsers ?? []).map((d) => (
           <label
-            key={r}
-            htmlFor={`role-${r}`}
+            key={d.role}
+            htmlFor={`role-${d.role}`}
             className={cn(
               "flex min-h-13 cursor-pointer items-center gap-3 rounded-sm px-3 py-2",
-              picked === r ? "bg-secondary" : "hover:bg-muted",
+              picked === d.role ? "bg-secondary" : "hover:bg-muted",
             )}
           >
-            <RadioGroupItem id={`role-${r}`} value={r} />
+            <RadioGroupItem id={`role-${d.role}`} value={d.role} />
             <span className="min-w-0">
-              <span className="block font-heading text-[15px] leading-6 font-semibold">{ROLE_LABELS[r]}</span>
-              <span className="block text-[13.5px] text-muted-foreground">
-                {nameOf(r) ? `${nameOf(r)} (ตัวอย่าง)` : " "}
-              </span>
+              <span className="block font-heading text-[15px] leading-6 font-semibold">{d.roleName}</span>
+              <span className="block text-[13.5px] text-muted-foreground">{`${d.name} (ตัวอย่าง)`}</span>
             </span>
           </label>
         ))}

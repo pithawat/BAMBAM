@@ -22,48 +22,47 @@ import (
 // ---- fakes ----
 
 type fakeRepo struct {
-	cats      map[uuid.UUID]bool               // id → active
-	catDef    map[uuid.UUID]string             // category → default priority
-	catOther  map[uuid.UUID]bool               // the "อื่น ๆ" category (CR-014)
-	symptoms  map[uuid.UUID]uuid.UUID          // symptom → category
-	symPrio   map[uuid.UUID]string             // symptom → priority
-	recent    []RecentPlace                    // #28 result
-	floors    map[uuid.UUID]uuid.UUID          // floor → building
-	rooms     map[uuid.UUID]uuid.UUID          // active room → floor (CR-014)
-	photos    map[uuid.UUID]*Photo             // all photos
-	photoAt   map[uuid.UUID]time.Time          // created at
-	format    TicketNumberFormat               // repair.settings
-	counters  map[int]int64                    // year → last number
-	tickets   map[uuid.UUID]*TicketDetail      // by id
-	order     []uuid.UUID                      // insertion order
-	subs      map[uuid.UUID]map[uuid.UUID]bool // ticket → subscribers
-	inserted  []NewTicket
-	sampleIns []Building
-	refreshed int
+	cats     map[uuid.UUID]bool               // id → active
+	catDef   map[uuid.UUID]string             // category → default priority
+	catOther map[uuid.UUID]bool               // the "อื่น ๆ" category (CR-014)
+	symptoms map[uuid.UUID]uuid.UUID          // symptom → category
+	symPrio  map[uuid.UUID]string             // symptom → priority
+	recent   []RecentPlace                    // #28 result
+	floors   map[uuid.UUID]uuid.UUID          // floor → building
+	rooms    map[uuid.UUID]uuid.UUID          // active room → floor (CR-014)
+	notUsed  map[[2]uuid.UUID]bool            // {category, building}: not used in the building's type (CR-025)
+	photos   map[uuid.UUID]*Photo             // all photos
+	photoAt  map[uuid.UUID]time.Time          // created at
+	kinds    map[uuid.UUID]string             // attached photo → kind (report, follow, team …)
+	dupLocks []DuplicateKey                   // keys locked by the duplicate check (Stage 4)
+	format   TicketNumberFormat               // repair.settings
+	counters map[int]int64                    // year → last number
+	tickets  map[uuid.UUID]*TicketDetail      // by id
+	order    []uuid.UUID                      // insertion order
+	subs     map[uuid.UUID]map[uuid.UUID]bool // ticket → subscribers
+	inserted []NewTicket
+	events   []NewEvent // ticket events written by actions
+	dash     *dashFake  // CR-016 dashboard and equipment (service_dashboard_test.go)
+
+	contractors map[uuid.UUID]*Contractor // F24 (CR-023 name checks)
+	techs       map[uuid.UUID]bool        // users with repair.ticket.work (CR-034)
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
 		cats: map[uuid.UUID]bool{}, catDef: map[uuid.UUID]string{}, catOther: map[uuid.UUID]bool{},
 		symptoms: map[uuid.UUID]uuid.UUID{}, symPrio: map[uuid.UUID]string{},
-		floors: map[uuid.UUID]uuid.UUID{}, rooms: map[uuid.UUID]uuid.UUID{},
-		photos: map[uuid.UUID]*Photo{}, photoAt: map[uuid.UUID]time.Time{},
+		floors: map[uuid.UUID]uuid.UUID{}, rooms: map[uuid.UUID]uuid.UUID{}, notUsed: map[[2]uuid.UUID]bool{},
+		photos: map[uuid.UUID]*Photo{}, photoAt: map[uuid.UUID]time.Time{}, kinds: map[uuid.UUID]string{},
 		format:   TicketNumberFormat{Prefix: "RP", YearFormat: "be", Digits: 6},
 		counters: map[int]int64{}, tickets: map[uuid.UUID]*TicketDetail{},
 		subs: map[uuid.UUID]map[uuid.UUID]bool{},
+		dash: newDashFake(), contractors: map[uuid.UUID]*Contractor{}, techs: map[uuid.UUID]bool{},
 	}
 }
 
 func (f *fakeRepo) ListCategories(context.Context) ([]Category, error) { return nil, nil }
 func (f *fakeRepo) ListBuildings(context.Context) ([]Building, error)  { return nil, nil }
-func (f *fakeRepo) InsertSampleLocations(_ context.Context, b []Building) error {
-	f.sampleIns = b
-	return nil
-}
-func (f *fakeRepo) RefreshSampleData(context.Context, []SampleRename) error {
-	f.refreshed++
-	return nil
-}
 func (f *fakeRepo) ListRecentPlaces(context.Context, uuid.UUID) ([]RecentPlace, error) {
 	return f.recent, nil
 }
@@ -80,7 +79,12 @@ func (f *fakeRepo) GetPhoto(_ context.Context, id uuid.UUID) (Photo, error) {
 	if !ok {
 		return Photo{}, ErrPhotoNotFound
 	}
-	return *p, nil
+	out := *p
+	if p.TicketID != nil {
+		kind, status := f.kinds[id], f.tickets[*p.TicketID].Status
+		out.Kind, out.TicketStatus = &kind, &status
+	}
+	return out, nil
 }
 
 func (f *fakeRepo) DeleteUnattachedPhotos(_ context.Context, olderThan time.Time) ([]string, error) {
@@ -130,6 +134,10 @@ func (f *fakeRepo) ListTickets(_ context.Context, viewerID uuid.UUID, flt Ticket
 	return out, int64(len(out)), nil
 }
 
+func (f *fakeRepo) ListMyTickets(context.Context, uuid.UUID, TicketFilter) ([]MyTicket, int64, error) {
+	return nil, 0, nil
+}
+
 func (f *fakeRepo) CountTickets(context.Context, uuid.UUID, TicketFilter) (TicketCounts, error) {
 	return TicketCounts{}, nil
 }
@@ -143,7 +151,10 @@ func (f *fakeRepo) EnsureContractorType(context.Context, string, uuid.UUID) (Ref
 func (f *fakeRepo) ListContractors(context.Context, ContractorFilter) ([]Contractor, int64, error) {
 	return nil, 0, nil
 }
-func (f *fakeRepo) GetContractor(context.Context, uuid.UUID) (Contractor, error) {
+func (f *fakeRepo) GetContractor(_ context.Context, id uuid.UUID) (Contractor, error) {
+	if c, ok := f.contractors[id]; ok {
+		return *c, nil
+	}
 	return Contractor{}, ErrContractorNotFound
 }
 func (f *fakeRepo) ListContractorJobs(context.Context, uuid.UUID, int, int) ([]ContractorJob, int64, error) {
@@ -154,9 +165,21 @@ func (f *fakeRepo) LockTicket(_ context.Context, id uuid.UUID) (LockedTicket, er
 	if !ok {
 		return LockedTicket{}, ErrTicketNotFound
 	}
-	return LockedTicket{ID: id, Status: t.Status, ReporterID: t.Reporter.ID, Assessed: t.ExpectedDoneOn != nil}, nil
+	lt := LockedTicket{ID: id, Status: t.Status, ReporterID: t.Reporter.ID, Assessed: t.ExpectedDoneOn != nil,
+		ExpectedDoneOn: t.ExpectedDoneOn, SendBackCount: t.SendBackCount}
+	if t.ClosedReason != nil {
+		lt.ClosedReason = *t.ClosedReason
+	}
+	return lt, nil
 }
-func (f *fakeRepo) AssessTicket(context.Context, uuid.UUID, uuid.UUID, AssessInput, time.Time) error {
+func (f *fakeRepo) AssessTicket(_ context.Context, id, _ uuid.UUID, in AssessInput, _ time.Time) error {
+	t := f.tickets[id]
+	d := *in.ExpectedDoneOn
+	t.ExpectedDoneOn, t.WorkBy = &d, &in.WorkBy
+	t.Assignee = nil
+	if in.AssigneeID != nil {
+		t.Assignee = &Staff{ID: *in.AssigneeID}
+	}
 	return nil
 }
 func (f *fakeRepo) ResolveTicket(context.Context, uuid.UUID, uuid.UUID, ResolveInput, time.Time, time.Time) error {
@@ -165,16 +188,102 @@ func (f *fakeRepo) ResolveTicket(context.Context, uuid.UUID, uuid.UUID, ResolveI
 func (f *fakeRepo) ConfirmTicket(context.Context, uuid.UUID, int16, *string, time.Time) error {
 	return nil
 }
-func (f *fakeRepo) SendBackTicket(context.Context, uuid.UUID, time.Time) error      { return nil }
-func (f *fakeRepo) InsertEvent(context.Context, NewEvent) error                     { return nil }
+func (f *fakeRepo) SendBackTicket(context.Context, uuid.UUID, time.Time) error { return nil }
+func (f *fakeRepo) AdminCloseTicket(_ context.Context, id uuid.UUID, now time.Time) error {
+	t := f.tickets[id]
+	reason := "admin_closed"
+	t.Status, t.ClosedReason, t.ClosedAt, t.AutoCloseAt = StatusClosed, &reason, &now, nil
+	return nil
+}
+func (f *fakeRepo) InsertEvent(_ context.Context, e NewEvent) error {
+	f.events = append(f.events, e)
+	f.attach(e.TicketID, e.PhotoKind, e.PhotoIDs)
+	return nil
+}
+
+func (f *fakeRepo) attach(ticketID uuid.UUID, kind string, ids []uuid.UUID) {
+	for _, pid := range ids {
+		tid := ticketID
+		f.photos[pid].TicketID = &tid
+		f.kinds[pid] = kind
+	}
+}
+
+func (f *fakeRepo) HandOverTicket(_ context.Context, id uuid.UUID, now time.Time) error {
+	t := f.tickets[id]
+	t.Status, t.ClosedReason, t.ClosedAt, t.UpdatedAt = StatusInProgress, nil, nil, now
+	return nil
+}
+
+func (f *fakeRepo) LockDuplicateKey(_ context.Context, k DuplicateKey) error {
+	f.dupLocks = append(f.dupLocks, k)
+	return nil
+}
+
+// DuplicateTickets: open tickets with the same category, floor and room, blocking ones first, then
+// newest first (BR-F03-1, CR-020: a different extra spot does not block).
+func (f *fakeRepo) DuplicateTickets(_ context.Context, k DuplicateKey) ([]DuplicateMatch, error) {
+	var blocking, similar []DuplicateMatch
+	for i := len(f.order) - 1; i >= 0; i-- {
+		t := f.tickets[f.order[i]]
+		if t.Status == StatusClosed || t.Category == nil || t.Category.ID != k.CategoryID || t.Floor.ID != k.FloorID ||
+			t.Room == nil || t.Room.ID != k.RoomID {
+			continue
+		}
+		spot := ""
+		if t.LocationDetail != nil {
+			spot = normalizeSpot(*t.LocationDetail)
+		}
+		m := DuplicateMatch{ID: t.ID, ReporterID: t.Reporter.ID, Status: t.Status, BlocksReport: k.Spot == "" || spot == k.Spot}
+		if m.BlocksReport {
+			blocking = append(blocking, m)
+		} else {
+			similar = append(similar, m)
+		}
+	}
+	out := append(blocking, similar...)
+	if len(out) > MaxDuplicates {
+		out = out[:MaxDuplicates]
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) InsertSubscriber(_ context.Context, ticketID, userID uuid.UUID, _ time.Time) (bool, error) {
+	if f.subs[ticketID][userID] {
+		return false, nil
+	}
+	if f.subs[ticketID] == nil {
+		f.subs[ticketID] = map[uuid.UUID]bool{}
+	}
+	f.subs[ticketID][userID] = true
+	return true, nil
+}
 func (f *fakeRepo) ActiveContractorExists(context.Context, uuid.UUID) (bool, error) { return true, nil }
+func (f *fakeRepo) IsTechnician(_ context.Context, id uuid.UUID) (bool, error) {
+	return f.techs[id], nil
+}
+func (f *fakeRepo) ListTechnicians(context.Context) ([]Staff, error) { return nil, nil }
 func (f *fakeRepo) CountContractorTypes(_ context.Context, ids []uuid.UUID) (int, error) {
 	return len(ids), nil
 }
-func (f *fakeRepo) InsertContractor(context.Context, uuid.UUID, ContractorInput, uuid.UUID) error {
+func (f *fakeRepo) ContractorWithName(_ context.Context, name string, excludeID uuid.UUID) (NameOwner, bool, error) {
+	for id, c := range f.contractors {
+		if id != excludeID && strings.EqualFold(c.Name, name) {
+			return NameOwner{ID: id, IsActive: c.IsActive}, true, nil
+		}
+	}
+	return NameOwner{}, false, nil
+}
+func (f *fakeRepo) InsertContractor(_ context.Context, id uuid.UUID, in ContractorInput, _ uuid.UUID) error {
+	f.contractors[id] = &Contractor{ID: id, Name: in.Name, IsActive: true}
 	return nil
 }
-func (f *fakeRepo) UpdateContractor(context.Context, uuid.UUID, ContractorInput) (bool, error) {
+func (f *fakeRepo) UpdateContractor(_ context.Context, id uuid.UUID, in ContractorInput) (bool, error) {
+	c, ok := f.contractors[id]
+	if !ok {
+		return false, nil
+	}
+	c.Name, c.IsActive = in.Name, in.IsActive
 	return true, nil
 }
 func (f *fakeRepo) SetContractorTypes(context.Context, uuid.UUID, []uuid.UUID) error { return nil }
@@ -219,6 +328,10 @@ func (f *fakeRepo) ActiveRoomOnFloor(_ context.Context, roomID, floorID uuid.UUI
 	return ok && fl == floorID, nil
 }
 
+func (f *fakeRepo) CategoryUsedInBuilding(_ context.Context, categoryID, buildingID uuid.UUID) (bool, error) {
+	return !f.notUsed[[2]uuid.UUID{categoryID, buildingID}], nil
+}
+
 func (f *fakeRepo) LockAttachablePhotos(_ context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error) {
 	n := 0
 	for _, id := range ids {
@@ -240,16 +353,18 @@ func (f *fakeRepo) NextTicketCounter(_ context.Context, year int) (int64, error)
 
 func (f *fakeRepo) InsertTicket(_ context.Context, t NewTicket) error {
 	f.inserted = append(f.inserted, t)
-	for _, pid := range t.PhotoIDs {
-		tid := t.ID
-		f.photos[pid].TicketID = &tid
-	}
+	f.attach(t.ID, PhotoKindReport, t.PhotoIDs)
 	reporter := t.ReporterID
+	status, reason := StatusInProgress, (*string)(nil)
+	if t.TeamHandled {
+		r := ClosedReasonTeamHandled
+		status, reason = StatusClosed, &r
+	}
 	f.tickets[t.ID] = &TicketDetail{
 		TicketSummary: TicketSummary{
-			ID: t.ID, TicketNo: t.TicketNo, Status: StatusInProgress, Priority: t.Priority, PrioritySource: t.PrioritySource,
+			ID: t.ID, TicketNo: t.TicketNo, Status: status, ClosedReason: reason, Priority: t.Priority, PrioritySource: t.PrioritySource,
 			Category: &Ref{ID: t.CategoryID}, CategoryOther: t.CategoryOther, SymptomOther: t.SymptomOther,
-			Room: &Ref{ID: t.RoomID}, LocationDetail: t.LocationDetail,
+			Building: Ref{ID: t.BuildingID}, Floor: Ref{ID: t.FloorID}, Room: &Ref{ID: t.RoomID}, LocationDetail: t.LocationDetail,
 			Reporter: Person{ID: t.ReporterID}, CreatedAt: t.CreatedAt, UpdatedAt: t.CreatedAt,
 		},
 		Photos:   t.PhotoIDs,
@@ -314,7 +429,7 @@ func newFixture(t *testing.T) *fixture {
 		now: time.Date(2026, 10, 14, 3, 15, 0, 0, time.UTC),
 		cat: uuid.New(), sym1: uuid.New(), sym2: uuid.New(), building: uuid.New(), floor: uuid.New(), room: uuid.New(),
 		other: uuid.New(), otherSym: uuid.New(),
-		reporter: Viewer{ID: uuid.New(), Role: users.RoleEmployee},
+		reporter: viewerAs(users.RoleEmployee, uuid.New()),
 	}
 	f.repo.cats[f.cat] = true
 	f.repo.catDef[f.cat] = PriorityLow
@@ -354,10 +469,14 @@ func (f *fixture) upload(t *testing.T, v Viewer) uuid.UUID {
 	return id
 }
 
+// input is a valid report in a new room of the floor, so tickets of one test are not duplicates of
+// each other (F03); duplicate tests set RoomID to f.room.
 func (f *fixture) input(photos ...uuid.UUID) CreateTicketInput {
+	room := uuid.New()
+	f.repo.rooms[room] = f.floor
 	return CreateTicketInput{
 		CategoryID: &f.cat, SymptomIDs: []uuid.UUID{f.sym1, f.sym2}, BuildingID: &f.building, FloorID: &f.floor,
-		RoomID: &f.room, LocationDetail: " ฝั่งหน้าต่าง ", Details: "น้ำหยดใส่โต๊ะประชุม", PhotoIDs: photos,
+		RoomID: &room, LocationDetail: " ฝั่งหน้าต่าง ", Details: "น้ำหยดใส่โต๊ะประชุม", PhotoIDs: photos,
 	}
 }
 
@@ -543,9 +662,65 @@ func TestCreateTicketRoomAndOtherRules(t *testing.T) {
 	}
 
 	f := newFixture(t)
-	d := f.create(t)
-	if ins := f.repo.inserted[0]; ins.RoomID != f.room || *ins.LocationDetail != "ฝั่งหน้าต่าง" || d.Room == nil {
-		t.Fatalf("room / extra spot not stored: %+v", ins)
+	in := f.input(f.upload(t, f.reporter))
+	d, err := f.svc.CreateTicket(ctx, f.reporter, in)
+	if ins := f.repo.inserted[0]; err != nil || ins.RoomID != *in.RoomID || *ins.LocationDetail != "ฝั่งหน้าต่าง" || d.Room == nil {
+		t.Fatalf("room / extra spot not stored: %+v err=%v", ins, err)
+	}
+}
+
+// BR-F02-8 (CR-025): the category must be used in the building's type; "อื่น ๆ" is used in every type.
+// The rule runs after the master data checks and before the duplicate check, in normal and team mode.
+func TestCreateTicketCategoryForBuilding(t *testing.T) {
+	ctx := context.Background()
+	lead := viewerAs(users.RoleHousekeeperLead, uuid.New())
+	normal := func(t *testing.T, f *fixture, v Viewer) CreateTicketInput { return f.input(f.upload(t, v)) }
+	cases := []struct {
+		name    string
+		lead    bool
+		input   func(t *testing.T, f *fixture, v Viewer) CreateTicketInput
+		blocked bool
+		want    string
+	}{
+		{"used in the type", false, normal, false, ""},
+		{"not used in the type", false, normal, true, "CATEGORY_NOT_FOR_BUILDING"},
+		{"team mode, used", true, func(t *testing.T, f *fixture, v Viewer) CreateTicketInput { return f.teamInput(t, v) }, false, ""},
+		{"team mode, not used", true, func(t *testing.T, f *fixture, v Viewer) CreateTicketInput { return f.teamInput(t, v) }, true, "CATEGORY_NOT_FOR_BUILDING"},
+		{"อื่น ๆ is used everywhere", false, func(t *testing.T, f *fixture, v Viewer) CreateTicketInput {
+			in := f.input(f.upload(t, v))
+			in.CategoryID, in.SymptomIDs = &f.other, []uuid.UUID{f.otherSym}
+			return in
+		}, true, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			v := f.reporter
+			if tc.lead {
+				v = lead
+			}
+			in := tc.input(t, f, v)
+			if tc.blocked {
+				f.repo.notUsed[[2]uuid.UUID{*in.CategoryID, f.building}] = true
+			}
+			_, err := f.svc.CreateTicket(ctx, v, in)
+			if code(err) != tc.want || (tc.want == "" && err != nil) {
+				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+			if tc.want != "" && (len(f.repo.inserted) != 0 || len(f.repo.dupLocks) != 0 || len(f.repo.counters) != 0) {
+				t.Fatal("a refused report was inserted, checked for duplicates or used a number")
+			}
+		})
+	}
+
+	// An inactive room is still MASTER_DATA_CHANGED, even when the category is not used there.
+	f := newFixture(t)
+	in := f.input(f.upload(t, f.reporter))
+	r := uuid.New()
+	in.RoomID = &r
+	f.repo.notUsed[[2]uuid.UUID{f.cat, f.building}] = true
+	if _, err := f.svc.CreateTicket(ctx, f.reporter, in); code(err) != "MASTER_DATA_CHANGED" {
+		t.Fatalf("err = %v, want MASTER_DATA_CHANGED first", err)
 	}
 }
 
@@ -650,7 +825,7 @@ func TestCreateTicketRejectsChangedMasterData(t *testing.T) {
 
 func TestCreateTicketRejectsPhotosNotAttachable(t *testing.T) {
 	f := newFixture(t)
-	someoneElse := Viewer{ID: uuid.New(), Role: users.RoleEmployee}
+	someoneElse := viewerAs(users.RoleEmployee, uuid.New())
 	cases := map[string]func() uuid.UUID{
 		"unknown":      func() uuid.UUID { return uuid.New() },
 		"other user's": func() uuid.UUID { return f.upload(t, someoneElse) },
@@ -674,16 +849,6 @@ func TestCreateTicketRejectsPhotosNotAttachable(t *testing.T) {
 				t.Fatalf("err = %v, want 422 PHOTO_NOT_FOUND", err)
 			}
 		})
-	}
-}
-
-func TestCreateTicketTeamHandledNotInStage1(t *testing.T) {
-	f := newFixture(t)
-	in := f.input(f.upload(t, f.reporter))
-	in.TeamHandled = true
-	_, err := f.svc.CreateTicket(context.Background(), Viewer{ID: f.reporter.ID, Role: users.RoleHousekeeperLead}, in)
-	if code(err) != "TEAM_HANDLED_NOT_ALLOWED" {
-		t.Fatalf("err = %v", err)
 	}
 }
 
@@ -719,14 +884,14 @@ func TestTicketVisibilityMatrix(t *testing.T) {
 		relation string
 	}{
 		{"reporter", f.reporter, true, RelationReporter},
-		{"subscriber", Viewer{ID: subscriber, Role: users.RoleEmployee}, true, RelationSubscriber},
-		{"holder technician", Viewer{ID: holder, Role: users.RoleTechnician}, true, RelationTechnician},
-		{"admin", Viewer{ID: uuid.New(), Role: users.RoleAdmin}, true, RelationNone},
-		{"executive", Viewer{ID: uuid.New(), Role: users.RoleExecutive}, true, RelationNone},
-		{"other employee", Viewer{ID: uuid.New(), Role: users.RoleEmployee}, false, ""},
-		{"housekeeper lead", Viewer{ID: uuid.New(), Role: users.RoleHousekeeperLead}, false, ""},
-		{"security lead", Viewer{ID: uuid.New(), Role: users.RoleSecurityLead}, false, ""},
-		{"any technician (CR-005)", Viewer{ID: uuid.New(), Role: users.RoleTechnician}, true, RelationTechnician},
+		{"subscriber", viewerAs(users.RoleEmployee, subscriber), true, RelationSubscriber},
+		{"holder technician", viewerAs(users.RoleTechnician, holder), true, RelationTechnician},
+		{"admin", viewerAs(users.RoleAdmin, uuid.New()), true, RelationNone},
+		{"super_admin (has work)", viewerAs(users.RoleSuperAdmin, uuid.New()), true, RelationTechnician},
+		{"other employee", viewerAs(users.RoleEmployee, uuid.New()), false, ""},
+		{"housekeeper lead", viewerAs(users.RoleHousekeeperLead, uuid.New()), false, ""},
+		{"security lead", viewerAs(users.RoleSecurityLead, uuid.New()), false, ""},
+		{"any technician (CR-005)", viewerAs(users.RoleTechnician, uuid.New()), true, RelationTechnician},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -760,7 +925,7 @@ func TestTicketHidesContractorFromReporter(t *testing.T) {
 	if mine.Contractor != nil || mine.Result.ContractorRating != nil {
 		t.Fatalf("reporter sees contractor=%v rating=%v (BR-F24-4)", mine.Contractor, mine.Result.ContractorRating)
 	}
-	admin, _ := f.svc.Ticket(context.Background(), Viewer{ID: uuid.New(), Role: users.RoleAdmin}, d.ID)
+	admin, _ := f.svc.Ticket(context.Background(), viewerAs(users.RoleAdmin, uuid.New()), d.ID)
 	if admin.Contractor == nil || admin.Result.ContractorRating == nil {
 		t.Fatal("admin must see the contractor and its rating")
 	}
@@ -772,16 +937,16 @@ func TestListScopeAndDecoration(t *testing.T) {
 	f.repo.tickets[d.ID].Status = StatusResolved
 
 	for _, role := range []string{users.RoleEmployee, users.RoleHousekeeperLead, users.RoleSecurityLead} {
-		_, _, err := f.svc.Tickets(context.Background(), Viewer{ID: uuid.New(), Role: role}, TicketFilter{ScopeAll: true})
+		_, _, err := f.svc.Tickets(context.Background(), viewerAs(role, uuid.New()), TicketFilter{ScopeAll: true})
 		if !errors.Is(err, apperr.ErrForbidden) {
 			t.Fatalf("%s scope=all: %v", role, err)
 		}
-		if _, err := f.svc.TicketCounts(context.Background(), Viewer{ID: uuid.New(), Role: role}, TicketFilter{ScopeAll: true}); !errors.Is(err, apperr.ErrForbidden) {
+		if _, err := f.svc.TicketCounts(context.Background(), viewerAs(role, uuid.New()), TicketFilter{ScopeAll: true}); !errors.Is(err, apperr.ErrForbidden) {
 			t.Fatalf("%s counts scope=all: %v", role, err)
 		}
 	}
-	for _, role := range []string{users.RoleAdmin, users.RoleExecutive, users.RoleTechnician} {
-		if _, _, err := f.svc.Tickets(context.Background(), Viewer{ID: uuid.New(), Role: role}, TicketFilter{ScopeAll: true}); err != nil {
+	for _, role := range []string{users.RoleAdmin, users.RoleSuperAdmin, users.RoleTechnician} {
+		if _, _, err := f.svc.Tickets(context.Background(), viewerAs(role, uuid.New()), TicketFilter{ScopeAll: true}); err != nil {
 			t.Fatalf("%s scope=all: %v", role, err)
 		}
 	}
@@ -831,7 +996,7 @@ func TestUploadPhoto(t *testing.T) {
 func TestOpenPhotoPermissions(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	other := Viewer{ID: uuid.New(), Role: users.RoleEmployee}
+	other := viewerAs(users.RoleEmployee, uuid.New())
 
 	loose := f.upload(t, f.reporter)
 	if _, _, err := f.svc.OpenPhoto(ctx, other, loose, true); !errors.Is(err, apperr.ErrForbidden) {
@@ -845,10 +1010,11 @@ func TestOpenPhotoPermissions(t *testing.T) {
 
 	d := f.create(t)
 	attached := d.Photos[0]
+	f.setStatus(d.ID, StatusClosed) // open tickets' report photos are shown on S04 (D-098)
 	if _, _, err := f.svc.OpenPhoto(ctx, other, attached, false); !errors.Is(err, apperr.ErrForbidden) {
 		t.Fatalf("attached photo by unrelated user: %v", err)
 	}
-	if _, _, err := f.svc.OpenPhoto(ctx, Viewer{ID: uuid.New(), Role: users.RoleAdmin}, attached, false); err != nil {
+	if _, _, err := f.svc.OpenPhoto(ctx, viewerAs(users.RoleAdmin, uuid.New()), attached, false); err != nil {
 		t.Fatalf("admin: %v", err)
 	}
 	if _, _, err := f.svc.OpenPhoto(ctx, f.reporter, uuid.New(), false); code(err) != "PHOTO_NOT_FOUND" {
@@ -880,50 +1046,68 @@ func TestPurgeUnattachedPhotos(t *testing.T) {
 	}
 }
 
-func TestEnsureSampleData(t *testing.T) {
+func TestAdminClose(t *testing.T) {
 	f := newFixture(t)
-	if err := f.svc.EnsureSampleData(context.Background()); err != nil || f.repo.refreshed != 1 || len(f.repo.sampleIns) == 0 {
-		t.Fatalf("sample data: %v refreshed=%d buildings=%d", err, f.repo.refreshed, len(f.repo.sampleIns))
-	}
-	if a, b := sampleBuildings()[0].Floors[0].Rooms[0].ID, sampleBuildings()[0].Floors[0].Rooms[0].ID; a != b {
-		t.Fatal("sample ids must be stable")
-	}
-}
+	d := f.create(t)
+	admin := viewerAs(users.RoleAdmin, uuid.New())
+	ctx := context.Background()
 
-// CR-014: every sample floor has rooms with valid area types and exactly one common area, named
-// like the migration's; one floor has more than 9 rooms so S03 shows the picker.
-func TestSampleRooms(t *testing.T) {
-	areas := map[string]bool{AreaMeetingRoom: true, AreaRestroom: true, AreaOffice: true, AreaPantry: true, AreaCommon: true, AreaParking: true, AreaOther: true}
-	picker := false
-	for _, b := range sampleBuildings() {
-		for _, fl := range b.Floors {
-			common, names := 0, map[string]bool{}
-			for _, rm := range fl.Rooms {
-				if !areas[rm.AreaType] || names[strings.ToLower(rm.Name)] {
-					t.Fatalf("%s %s: bad or duplicate room %+v", b.Name, fl.Name, rm)
-				}
-				names[strings.ToLower(rm.Name)] = true
-				if rm.AreaType == AreaCommon {
-					common++
-					if rm.Name != "พื้นที่ส่วนกลางชั้น "+fl.Name {
-						t.Fatalf("common area name %q", rm.Name)
-					}
-				}
-			}
-			if common != 1 {
-				t.Fatalf("%s %s: %d common areas", b.Name, fl.Name, common)
-			}
-			picker = picker || len(fl.Rooms) > 9
+	for _, role := range []string{users.RoleTechnician, users.RoleEmployee, users.RoleHousekeeperLead, users.RoleSecurityLead} {
+		if _, err := f.svc.Close(ctx, viewerAs(role, uuid.New()), d.ID, "ปิด"); !errors.Is(err, apperr.ErrForbidden) {
+			t.Fatalf("%s close: %v, want FORBIDDEN", role, err)
 		}
 	}
-	if !picker {
-		t.Fatal("no sample floor has more than 9 rooms")
+	if _, err := f.svc.Close(ctx, admin, d.ID, "   "); code(err) != "VALIDATION_FAILED" {
+		t.Fatalf("blank reason: %v", err)
+	}
+	if _, err := f.svc.Close(ctx, admin, d.ID, strings.Repeat("ก", MaxNoteChars+1)); code(err) != "VALIDATION_FAILED" {
+		t.Fatalf("long reason: %v", err)
+	}
+	if _, err := f.svc.Close(ctx, admin, uuid.New(), "ปิด"); code(err) != "TICKET_NOT_FOUND" {
+		t.Fatalf("unknown ticket: %v", err)
+	}
+
+	before, _ := f.svc.Ticket(ctx, admin, d.ID)
+	if !contains(before.AllowedActions, ActionClose) {
+		t.Fatalf("admin actions on an open ticket: %v", before.AllowedActions)
+	}
+	got, err := f.svc.Close(ctx, admin, d.ID, "  ส่งเรื่องเปลี่ยนเครื่องใหม่แล้ว  ")
+	if err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if got.Status != StatusClosed || got.ClosedReason == nil || *got.ClosedReason != "admin_closed" || contains(got.AllowedActions, ActionClose) {
+		t.Fatalf("after close: status=%s reason=%v actions=%v", got.Status, got.ClosedReason, got.AllowedActions)
+	}
+	last := f.repo.events[len(f.repo.events)-1]
+	if last.Type != EventAdminClosed || last.Note == nil || *last.Note != "ส่งเรื่องเปลี่ยนเครื่องใหม่แล้ว" || *last.ActorID != admin.ID {
+		t.Fatalf("event: %+v", last)
+	}
+	if _, err := f.svc.Close(ctx, admin, d.ID, "อีกครั้ง"); code(err) != "TICKET_CLOSED" {
+		t.Fatalf("close twice: %v", err)
 	}
 }
 
-func TestSampleBuildingRenames(t *testing.T) {
-	b, rn := sampleBuildings(), sampleBuildingRenames()
-	if b[0].Name != "อาคารฝั่ง Office" || rn[0].ID != b[0].ID || rn[0].From != "อาคารหลัก" {
-		t.Fatalf("renamed building keeps its id: %+v %+v", b[0], rn[0])
+// Every status that is not closed can be closed by admin (BR-F08B-1).
+func TestAdminCloseFromAnyOpenStatus(t *testing.T) {
+	for _, status := range []string{StatusInProgress, StatusResolved} {
+		f := newFixture(t)
+		d := f.create(t)
+		f.repo.tickets[d.ID].Status = status
+		if _, err := f.svc.Close(context.Background(), viewerAs(users.RoleAdmin, uuid.New()), d.ID, "ปิด"); err != nil {
+			t.Fatalf("%s: %v", status, err)
+		}
+	}
+}
+
+// CR-007 A: seeing every ticket (view_all) gives no actions by itself.
+func TestViewAllAloneHasNoActions(t *testing.T) {
+	f := newFixture(t)
+	d := f.create(t)
+	for _, status := range []string{StatusInProgress, StatusResolved, StatusClosed} {
+		f.repo.tickets[d.ID].Status = status
+		got, err := f.svc.Ticket(context.Background(), Viewer{ID: uuid.New(), Permissions: []string{PermViewAll}}, d.ID)
+		if err != nil || len(got.AllowedActions) != 0 {
+			t.Fatalf("%s: actions=%v err=%v", status, got.AllowedActions, err)
+		}
 	}
 }

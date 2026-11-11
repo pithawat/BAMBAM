@@ -4,9 +4,11 @@ SELECT id, name, icon, default_priority, is_other FROM repair.categories
 WHERE is_active
 ORDER BY is_other, sort_order, name;
 
--- name: ListCategoryAreaTypes :many
-SELECT category_id, area_type FROM repair.category_area_types
-ORDER BY category_id, area_type;
+-- name: ListCategoryBuildingTypes :many
+-- CR-025: the active building types each category is used in (none for "อื่น ๆ" = every type).
+SELECT cbt.category_id, cbt.building_type_id FROM repair.category_building_types cbt
+JOIN platform.building_types bt ON bt.id = cbt.building_type_id AND bt.is_active
+ORDER BY cbt.category_id, bt.sort_order, bt.name;
 
 -- name: ListActiveSymptoms :many
 SELECT s.id, s.category_id, s.name, s.priority FROM repair.symptoms s
@@ -15,13 +17,15 @@ WHERE s.is_active AND c.is_active
 ORDER BY s.sort_order, s.name;
 
 -- name: ListActiveBuildings :many
-SELECT id, name FROM repair.buildings
-WHERE is_active
-ORDER BY sort_order, name;
+SELECT b.id, b.name, bt.id AS building_type_id, bt.name AS building_type_name, b.model_key
+FROM platform.buildings b
+JOIN platform.building_types bt ON bt.id = b.building_type_id
+WHERE b.is_active
+ORDER BY b.sort_order, b.name;
 
 -- name: ListActiveFloors :many
-SELECT f.id, f.building_id, f.name, f.level FROM repair.floors f
-JOIN repair.buildings b ON b.id = f.building_id
+SELECT f.id, f.building_id, f.name, f.level FROM platform.floors f
+JOIN platform.buildings b ON b.id = f.building_id
 WHERE f.is_active AND b.is_active
 ORDER BY f.level;
 
@@ -30,19 +34,6 @@ ORDER BY f.level;
 SELECT r.id, r.floor_id, r.name, r.area_type FROM platform.rooms r
 WHERE r.is_active
 ORDER BY r.sort_order, r.name;
-
--- Sample locations (dev / UAT only, D-032): inserted by id, existing rows are left as they are.
--- name: InsertSampleBuilding :exec
-INSERT INTO repair.buildings (id, name, sort_order) VALUES (@id, @name, @sort_order)
-ON CONFLICT DO NOTHING;
-
--- name: InsertSampleFloor :exec
-INSERT INTO repair.floors (id, building_id, name, level) VALUES (@id, @building_id, @name, @level)
-ON CONFLICT DO NOTHING;
-
--- name: InsertSampleRoom :exec
-INSERT INTO platform.rooms (id, floor_id, name, area_type, sort_order) VALUES (@id, @floor_id, @name, @area_type, @sort_order)
-ON CONFLICT DO NOTHING;
 
 -- name: LockActiveCategory :one
 -- Locks the category so it cannot be deactivated while a ticket is created in it; returns its default
@@ -58,8 +49,8 @@ WHERE id = ANY(@ids::uuid[]) AND category_id = @category_id AND is_active;
 
 -- name: ActiveFloorInBuilding :one
 SELECT EXISTS (
-    SELECT 1 FROM repair.floors f
-    JOIN repair.buildings b ON b.id = f.building_id
+    SELECT 1 FROM platform.floors f
+    JOIN platform.buildings b ON b.id = f.building_id
     WHERE f.id = @floor_id AND f.building_id = @building_id AND f.is_active AND b.is_active
 );
 
@@ -68,6 +59,14 @@ SELECT EXISTS (
 SELECT EXISTS (
     SELECT 1 FROM platform.rooms r
     WHERE r.id = @room_id AND r.floor_id = @floor_id AND r.is_active
+);
+
+-- name: CategoryUsedInBuilding :one
+-- CR-025 (BR-F02-8): the category is used in the building's type. The caller skips "อื่น ๆ".
+SELECT EXISTS (
+    SELECT 1 FROM platform.buildings b
+    JOIN repair.category_building_types cbt ON cbt.building_type_id = b.building_type_id
+    WHERE b.id = @building_id AND cbt.category_id = @category_id
 );
 
 -- name: GetSettings :one
@@ -79,6 +78,4 @@ INSERT INTO repair.ticket_counters (year, last_no) VALUES (@year, 1)
 ON CONFLICT (year) DO UPDATE SET last_no = repair.ticket_counters.last_no + 1, updated_at = now()
 RETURNING last_no;
 
--- Sample data refresh (dev / UAT only, D-032, CR-008): applied by id so existing databases keep their ids.
--- name: RenameSampleBuilding :exec
-UPDATE repair.buildings SET name = @new_name, updated_at = now() WHERE id = @id AND name = @old_name;
+

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -11,11 +12,16 @@ import (
 // CurrentUser and never look at cookies or tokens themselves.
 type Principal struct {
 	UserID uuid.UUID
-	Role   string
-	IsDemo bool
+	Role   string // role key
+	// Permissions is the effective set of the role, loaded on every request (D-049, BR-F29-7).
+	Permissions []string
+	IsDemo      bool
 	// OriginUserID is the real SSO user behind a role-switcher session (nil otherwise).
 	OriginUserID *uuid.UUID
 }
+
+// Can reports whether the principal has the permission key.
+func (p Principal) Can(key string) bool { return slices.Contains(p.Permissions, key) }
 
 type principalKey struct{}
 

@@ -55,7 +55,8 @@ func (ctl *Controller) Assess(c *gin.Context) {
 		return
 	}
 	fields := map[string]string{}
-	in := AssessInput{WorkBy: req.WorkBy, ContractorID: parseOptionalID(req.ContractorID, "contractorId", fields), Reason: req.Reason}
+	in := AssessInput{WorkBy: req.WorkBy, ContractorID: parseOptionalID(req.ContractorID, "contractorId", fields),
+		AssigneeID: parseOptionalID(req.AssigneeID, "assigneeId", fields), Reason: req.Reason}
 	if s := strings.TrimSpace(req.ExpectedDoneOn); s != "" {
 		if d, err := time.Parse(time.DateOnly, s); err != nil {
 			fields["expectedDoneOn"] = "INVALID"
@@ -108,6 +109,54 @@ func (ctl *Controller) Confirm(c *gin.Context) {
 	respondTicket(c, t, err)
 }
 
+// Close handles #21 POST /repair/tickets/{id}/close (admin, F08-B).
+func (ctl *Controller) Close(c *gin.Context) {
+	v, id, ok := ticketAction(c)
+	if !ok {
+		return
+	}
+	var req CloseRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	t, err := ctl.svc.Close(c.Request.Context(), v, id, req.Reason)
+	respondTicket(c, t, err)
+}
+
+// Follow handles #23 POST /repair/tickets/{id}/follow (F03).
+func (ctl *Controller) Follow(c *gin.Context) {
+	v, id, ok := ticketAction(c)
+	if !ok {
+		return
+	}
+	var req FollowRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	fields := map[string]string{}
+	photos := parseIDs(req.PhotoIDs, "photoIds", fields)
+	if len(fields) > 0 {
+		httpx.Error(c, apperr.Validation(fields))
+		return
+	}
+	t, err := ctl.svc.Follow(c.Request.Context(), v, id, req.Note, photos)
+	respondTicket(c, t, err)
+}
+
+// Handover handles #24 POST /repair/tickets/{id}/handover (F05).
+func (ctl *Controller) Handover(c *gin.Context) {
+	v, id, ok := ticketAction(c)
+	if !ok {
+		return
+	}
+	var req HandoverRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	t, err := ctl.svc.HandOver(c.Request.Context(), v, id, req.Reason)
+	respondTicket(c, t, err)
+}
+
 // SendBack handles #12 POST /repair/tickets/{id}/send-back.
 func (ctl *Controller) SendBack(c *gin.Context) {
 	v, id, ok := ticketAction(c)
@@ -140,6 +189,20 @@ func (ctl *Controller) ContractorTypes(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, toRefDTOs(list))
+}
+
+// Technicians handles #36 GET /repair/technicians (CR-034).
+func (ctl *Controller) Technicians(c *gin.Context) {
+	v, ok := viewer(c)
+	if !ok {
+		return
+	}
+	list, err := ctl.svc.Technicians(c.Request.Context(), v)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	httpx.OK(c, toStaffDTOs(list))
 }
 
 // CreateContractorType handles #14 POST /repair/contractor-types (existing name → that type).

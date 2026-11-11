@@ -3,6 +3,7 @@ package repair
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,18 +13,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pithawat/BAMBAM/backend/internal/platform/apperr"
-	"github.com/pithawat/BAMBAM/backend/internal/platform/users"
 )
 
 // Repository is the data layer the service needs (implemented by PgRepository).
 type Repository interface {
 	ListCategories(ctx context.Context) ([]Category, error)
 	ListBuildings(ctx context.Context) ([]Building, error)
-	// InsertSampleLocations inserts sample buildings, floors and rooms by id, leaving existing rows
-	// as they are (dev / UAT only, D-032, CR-014).
-	InsertSampleLocations(ctx context.Context, buildings []Building) error
-	// RefreshSampleData renames sample buildings still at their first sample name (dev / UAT only, CR-008).
-	RefreshSampleData(ctx context.Context, renames []SampleRename) error
 	ListRecentPlaces(ctx context.Context, reporterID uuid.UUID) ([]RecentPlace, error)
 
 	InsertPhoto(ctx context.Context, p NewPhoto) error
@@ -33,16 +28,45 @@ type Repository interface {
 	GetTicketAccess(ctx context.Context, id, viewerID uuid.UUID) (ticketAccess, error)
 	GetTicket(ctx context.Context, id, viewerID uuid.UUID) (TicketDetail, error)
 	ListTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]TicketSummary, int64, error)
+	ListMyTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) ([]MyTicket, int64, error)
 	CountTickets(ctx context.Context, viewerID uuid.UUID, f TicketFilter) (TicketCounts, error)
+	// DuplicateTickets: open tickets matching the key, newest first, at most MaxDuplicates (BR-F03-1).
+	DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error)
 	// AutoCloseDue closes resolved tickets whose auto_close_at has passed and writes their events.
 	AutoCloseDue(ctx context.Context, now time.Time) (int, error)
 
 	ListContractorTypes(ctx context.Context) ([]Ref, error)
+	// ListTechnicians: every user whose role has `repair.ticket.work`, by name (CR-034, #36).
+	ListTechnicians(ctx context.Context) ([]Staff, error)
 	// EnsureContractorType returns the type with this name (case-insensitive), creating it when missing.
 	EnsureContractorType(ctx context.Context, name string, by uuid.UUID) (Ref, error)
 	ListContractors(ctx context.Context, f ContractorFilter) ([]Contractor, int64, error)
 	GetContractor(ctx context.Context, id uuid.UUID) (Contractor, error)
 	ListContractorJobs(ctx context.Context, id uuid.UUID, page, pageSize int) ([]ContractorJob, int64, error)
+
+	// CR-016 dashboard, floor plans and equipment (service_dashboard.go).
+	// OverviewCounts: dayStart / weekStart are Bangkok midnights, today the Bangkok date (BR-F23-1).
+	OverviewCounts(ctx context.Context, today, dayStart, weekStart time.Time) (OverviewCounts, error)
+	OverviewBuildings(ctx context.Context) ([]OverviewBuilding, error)
+	SiteBlocks(ctx context.Context) ([]SiteBlock, error)
+	AttentionTicketIDs(ctx context.Context, today time.Time, limit int) ([]uuid.UUID, error)
+	ListAssetTypes(ctx context.Context) ([]AssetType, error)
+	// GetFloorPlan returns ErrFloorNotFound for an unknown or inactive floor.
+	GetFloorPlan(ctx context.Context, floorID uuid.UUID) (FloorPlan, error)
+	// GetAsset returns ErrAssetNotFound for an unknown or inactive asset.
+	GetAsset(ctx context.Context, id uuid.UUID) (Asset, error)
+	// ActiveFloorName returns ErrFloorNotFound for an unknown or inactive floor.
+	ActiveFloorName(ctx context.Context, floorID uuid.UUID) (string, error)
+	// ActiveAssetType: ok is false when the type is unknown or inactive.
+	ActiveAssetType(ctx context.Context, id uuid.UUID) (t AssetType, ok bool, err error)
+	AssetCodesWithPrefix(ctx context.Context, prefix string) ([]string, error)
+
+	// Stage 5 QR (service_qr.go). LookupAsset returns ErrAssetNotFound unless the asset, its room,
+	// floor and building are active; the code is matched ignoring case.
+	LookupAsset(ctx context.Context, code string) (AssetLookup, error)
+	// AssetTypeCategories: the active categories of the type, "อื่น ๆ" last, each with whether the
+	// building's type uses it.
+	AssetTypeCategories(ctx context.Context, typeID, buildingID uuid.UUID) ([]AssetCategory, error)
 
 	// InTx runs fn in one transaction with a repository bound to it.
 	InTx(ctx context.Context, fn func(tx TxRepository) error) error
@@ -57,9 +81,13 @@ type TxRepository interface {
 	ActiveSymptomPriorities(ctx context.Context, categoryID uuid.UUID, ids []uuid.UUID) ([]string, error)
 	ActiveFloorInBuilding(ctx context.Context, floorID, buildingID uuid.UUID) (bool, error)
 	ActiveRoomOnFloor(ctx context.Context, roomID, floorID uuid.UUID) (bool, error)
+	// CategoryUsedInBuilding: the category is used in the building's type (CR-025, BR-F02-8).
+	CategoryUsedInBuilding(ctx context.Context, categoryID, buildingID uuid.UUID) (bool, error)
 	LockAttachablePhotos(ctx context.Context, uploaderID uuid.UUID, ids []uuid.UUID, notBefore time.Time) (int, error)
 	TicketNumberFormat(ctx context.Context) (TicketNumberFormat, error)
 	NextTicketCounter(ctx context.Context, year int) (int64, error)
+	// ActiveAssetIDByCode: ok is false when no active asset has the code (ignoring case).
+	ActiveAssetIDByCode(ctx context.Context, code string) (id uuid.UUID, ok bool, err error)
 	// InsertTicket writes the ticket, its symptoms, attaches the photos and writes the `created` event.
 	InsertTicket(ctx context.Context, t NewTicket) error
 
@@ -68,15 +96,42 @@ type TxRepository interface {
 	ResolveTicket(ctx context.Context, id, technicianID uuid.UUID, in ResolveInput, now, autoCloseAt time.Time) error
 	ConfirmTicket(ctx context.Context, id uuid.UUID, rating int16, comment *string, now time.Time) error
 	SendBackTicket(ctx context.Context, id uuid.UUID, now time.Time) error
+	AdminCloseTicket(ctx context.Context, id uuid.UUID, now time.Time) error
+	HandOverTicket(ctx context.Context, id uuid.UUID, now time.Time) error
+	// LockDuplicateKey serialises creates on one category + floor + room until the transaction ends.
+	LockDuplicateKey(ctx context.Context, k DuplicateKey) error
+	DuplicateTickets(ctx context.Context, k DuplicateKey) ([]DuplicateMatch, error)
+	// InsertSubscriber returns false when the user already follows the ticket.
+	InsertSubscriber(ctx context.Context, ticketID, userID uuid.UUID, now time.Time) (bool, error)
 	// InsertEvent writes a timeline event and attaches its photos.
 	InsertEvent(ctx context.Context, e NewEvent) error
 	ActiveContractorExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// IsTechnician: the user's role has `repair.ticket.work` (CR-034 assignee check).
+	IsTechnician(ctx context.Context, id uuid.UUID) (bool, error)
+	// ContractorWithName finds another contractor with this name, ignoring case, inactive included (CR-023).
+	ContractorWithName(ctx context.Context, name string, excludeID uuid.UUID) (owner NameOwner, found bool, err error)
 
 	CountContractorTypes(ctx context.Context, ids []uuid.UUID) (int, error)
 	InsertContractor(ctx context.Context, id uuid.UUID, in ContractorInput, by uuid.UUID) error
+	// InsertContractor / UpdateContractor return ErrContractorNameTaken when the unique index rejects the name.
 	// UpdateContractor returns false when the contractor does not exist.
 	UpdateContractor(ctx context.Context, id uuid.UUID, in ContractorInput) (bool, error)
 	SetContractorTypes(ctx context.Context, id uuid.UUID, typeIDs []uuid.UUID) error
+
+	// CR-016 equipment writes.
+	ActiveAssetType(ctx context.Context, id uuid.UUID) (t AssetType, ok bool, err error)
+	// PlacementRoom: ok is false when the room (or its floor) is unknown or inactive.
+	PlacementRoom(ctx context.Context, roomID uuid.UUID) (room PlacementRoom, ok bool, err error)
+	RoomShapesOnFloor(ctx context.Context, floorID uuid.UUID) ([]RoomShape, error)
+	// AssetCodeTaken: an asset other than excludeID uses the code, ignoring case (inactive included).
+	AssetCodeTaken(ctx context.Context, code string, excludeID uuid.UUID) (bool, error)
+	// LockAsset returns ErrAssetNotFound for an unknown asset.
+	LockAsset(ctx context.Context, id uuid.UUID) (LockedAsset, error)
+	// InsertAsset / UpdateAsset return ErrAssetCodeTaken when the unique index rejects the code.
+	InsertAsset(ctx context.Context, id uuid.UUID, in AssetInput, by uuid.UUID) error
+	UpdateAsset(ctx context.Context, id uuid.UUID, in AssetInput, by uuid.UUID) error
+	DeactivateAsset(ctx context.Context, id, by uuid.UUID) error
+	InsertAudit(ctx context.Context, actor uuid.UUID, action string, assetID uuid.UUID, data []byte) error
 }
 
 // photoTTL: unattached uploads older than this are deleted and cannot be attached (D-022).
@@ -100,19 +155,6 @@ func (s *Service) Categories(ctx context.Context) ([]Category, error) {
 
 func (s *Service) Buildings(ctx context.Context) ([]Building, error) {
 	return s.repo.ListBuildings(ctx)
-}
-
-// EnsureSampleData inserts the sample buildings, floors and rooms (seed.go) that are missing and
-// renames sample buildings still at their first sample name. Categories and symptoms are the real
-// master loaded by migration (CR-014). main.go calls it only in dev/UAT (D-032).
-func (s *Service) EnsureSampleData(ctx context.Context) error {
-	if err := s.repo.RefreshSampleData(ctx, sampleBuildingRenames()); err != nil {
-		return fmt.Errorf("refresh sample master data: %w", err)
-	}
-	if err := s.repo.InsertSampleLocations(ctx, sampleBuildings()); err != nil {
-		return fmt.Errorf("insert sample locations: %w", err)
-	}
-	return nil
 }
 
 // ---- photos ----
@@ -166,11 +208,14 @@ func (s *Service) OpenPhoto(ctx context.Context, v Viewer, id uuid.UUID, thumb b
 	if err != nil {
 		return nil, "", err
 	}
-	if p.TicketID == nil {
+	switch {
+	case p.TicketID == nil:
 		if p.UploaderID != v.ID {
 			return nil, "", apperr.ErrForbidden
 		}
-	} else {
+	case isOpenReportPhoto(p):
+		// D-098: S04 shows the report photos of open matching tickets to every reporter (F03).
+	default:
 		acc, err := s.repo.GetTicketAccess(ctx, *p.TicketID, v.ID)
 		if err != nil {
 			return nil, "", err
@@ -216,10 +261,15 @@ func (s *Service) deleteFiles(ctx context.Context, keys ...string) {
 // ---- tickets ----
 
 // CreateTicket implements endpoint #5. The ticket starts `in_progress`, waiting for the
-// technician's assessment (CR-005); team handled comes in Stage 4.
+// technician's assessment (CR-005); a lead's team-handled record starts `closed` / `team_handled`
+// (F04). Both are refused when an open ticket matches (F03, BR-F03-2, BR-F04-3).
 func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInput) (TicketDetail, error) {
-	if in.TeamHandled {
+	if in.TeamHandled != nil && !isLead(v) {
 		return TicketDetail{}, ErrTeamHandledNotAllowed
+	}
+	// a lead's team-handled record needs only team_handle; a report needs report (settings CR-006)
+	if in.TeamHandled == nil && !reports(v) {
+		return TicketDetail{}, apperr.ErrForbidden
 	}
 	in, fields := validateCreate(in)
 	if len(fields) > 0 {
@@ -233,7 +283,7 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 		BuildingID: *in.BuildingID, FloorID: *in.FloorID, RoomID: *in.RoomID,
 		LocationDetail: optional(in.LocationDetail), Details: optional(in.Details), AssetCode: optional(in.AssetCode),
 		ReporterID: v.ID, SymptomIDs: in.SymptomIDs, PhotoIDs: in.PhotoIDs,
-		CreatedAt: now, CreatedEventID: uuid.New(),
+		CreatedAt: now, CreatedEventID: uuid.New(), TeamHandled: in.TeamHandled != nil,
 	}
 
 	err := s.repo.InTx(ctx, func(tx TxRepository) error {
@@ -270,7 +320,31 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 		} else if !ok {
 			return ErrMasterDataChanged
 		}
-		if err := lockPhotos(ctx, tx, v.ID, t.PhotoIDs, now); err != nil {
+		// BR-F02-8 (CR-025): only categories used in the building's type; "อื่น ๆ" is used everywhere.
+		if !cat.IsOther {
+			if ok, err := tx.CategoryUsedInBuilding(ctx, t.CategoryID, t.BuildingID); err != nil {
+				return err
+			} else if !ok {
+				return ErrCategoryNotForBuilding
+			}
+		}
+		// F13-B: a report from a QR links the asset; an unknown code is kept as typed, unlinked.
+		if t.AssetCode != nil {
+			if id, ok, err := tx.ActiveAssetIDByCode(ctx, *t.AssetCode); err != nil {
+				return err
+			} else if ok {
+				t.AssetID = &id
+			}
+		}
+		k := DuplicateKey{CategoryID: t.CategoryID, FloorID: t.FloorID, RoomID: t.RoomID, Spot: normalizeSpot(in.LocationDetail)}
+		if err := checkDuplicates(ctx, tx, v, k); err != nil {
+			return err
+		}
+		photoIDs := t.PhotoIDs
+		if in.TeamHandled != nil {
+			photoIDs = append(append([]uuid.UUID{}, t.PhotoIDs...), in.TeamHandled.PhotoIDs...)
+		}
+		if err := lockPhotos(ctx, tx, v.ID, photoIDs, now); err != nil {
 			return err
 		}
 
@@ -286,10 +360,19 @@ func (s *Service) CreateTicket(ctx context.Context, v Viewer, in CreateTicketInp
 		if t.TicketNo, err = FormatTicketNo(format, year, seq); err != nil {
 			return err
 		}
-		return tx.InsertTicket(ctx, t)
+		if err := tx.InsertTicket(ctx, t); err != nil {
+			return err
+		}
+		if in.TeamHandled == nil {
+			return nil
+		}
+		// One microsecond after `created`, so the timeline (newest first) always lists it on top.
+		note := in.TeamHandled.Note
+		return tx.InsertEvent(ctx, NewEvent{ID: uuid.New(), TicketID: t.ID, Type: EventTeamHandled, ActorID: &v.ID,
+			At: now.Add(time.Microsecond), Note: &note, Data: []byte("{}"), PhotoKind: PhotoKindTeam, PhotoIDs: in.TeamHandled.PhotoIDs})
 	})
 	if err != nil {
-		return TicketDetail{}, err
+		return TicketDetail{}, s.withDuplicates(ctx, v, err)
 	}
 	return s.Ticket(ctx, v, t.ID)
 }
@@ -327,7 +410,7 @@ func (s *Service) Ticket(ctx context.Context, v Viewer, id uuid.UUID) (TicketDet
 		return TicketDetail{}, apperr.ErrForbidden
 	}
 	decorate(v, &d.TicketSummary)
-	if !isStaff(v.Role) && d.Result != nil {
+	if !isStaff(v) && d.Result != nil {
 		// The contractor's score is internal (BR-F24-4).
 		r := *d.Result
 		r.ContractorRating, r.ContractorRatingComment = nil, nil
@@ -352,6 +435,23 @@ func (s *Service) Tickets(ctx context.Context, v Viewer, f TicketFilter) ([]Tick
 	return list, total, nil
 }
 
+// MyTickets implements endpoint #35 (S06 table, CR-019): always the viewer's own tickets (BR-F06-1).
+// CR-034: tracking belongs to reporting — without `repair.ticket.report` there is no own list.
+func (s *Service) MyTickets(ctx context.Context, v Viewer, f TicketFilter) ([]MyTicket, int64, error) {
+	if !reports(v) {
+		return nil, 0, apperr.ErrForbidden
+	}
+	return s.repo.ListMyTickets(ctx, v.ID, f)
+}
+
+// Technicians implements endpoint #36 (CR-034): the S17 `ช่างผู้รับผิดชอบ` picker.
+func (s *Service) Technicians(ctx context.Context, v Viewer) ([]Staff, error) {
+	if !v.Can(PermWork) {
+		return nil, ErrNotTechnician
+	}
+	return s.repo.ListTechnicians(ctx)
+}
+
 // TicketCounts implements endpoint #7.
 func (s *Service) TicketCounts(ctx context.Context, v Viewer, f TicketFilter) (TicketCounts, error) {
 	if err := s.checkScope(v, f); err != nil {
@@ -360,9 +460,9 @@ func (s *Service) TicketCounts(ctx context.Context, v Viewer, f TicketFilter) (T
 	return s.repo.CountTickets(ctx, v.ID, f)
 }
 
-// checkScope: scope=all is for the technician, admin and executive (BR-F06-1, CR-005).
+// checkScope: scope=all needs `repair.ticket.view_all` (BR-F06-1, CR-005, CR-007).
 func (s *Service) checkScope(v Viewer, f TicketFilter) error {
-	if f.ScopeAll && !seesAllTickets(v.Role) {
+	if f.ScopeAll && !seesAllTickets(v) {
 		return apperr.ErrForbidden
 	}
 	return nil
@@ -390,7 +490,7 @@ func checkState(t LockedTicket, want string) error {
 // Assess implements endpoint #9: the technician sets (or changes) the expected finish date and
 // who does the work — in house or a contractor (BR-F21-2, CR-006).
 func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessInput) (TicketDetail, error) {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermWork) {
 		return TicketDetail{}, ErrNotTechnician
 	}
 	now := s.now()
@@ -399,6 +499,8 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 	}
 	if in.WorkBy == WorkByInHouse {
 		in.ContractorID = nil
+	} else {
+		in.AssigneeID = nil
 	}
 	in.Reason = strings.TrimSpace(in.Reason)
 	data := map[string]string{"expectedDoneOn": in.ExpectedDoneOn.Format(time.DateOnly), "workBy": in.WorkBy}
@@ -406,6 +508,9 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 		t, err := lockOpen(ctx, tx, id, StatusInProgress)
 		if err != nil {
 			return err
+		}
+		if in.Reason == "" && rescheduleNeedsReason(t, *in.ExpectedDoneOn) {
+			return apperr.Validation(map[string]string{"reason": "REQUIRED"})
 		}
 		// CR-008: the reason is kept only when the assessment changes; the reporter sees it.
 		if t.Assessed && in.Reason != "" {
@@ -418,6 +523,15 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 			}
 			if !ok {
 				return ErrContractorInactive
+			}
+		}
+		if in.AssigneeID != nil {
+			ok, err := tx.IsTechnician(ctx, *in.AssigneeID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return ErrAssigneeInvalid
 			}
 		}
 		if err := tx.AssessTicket(ctx, id, v.ID, in, now); err != nil {
@@ -438,7 +552,7 @@ func (s *Service) Assess(ctx context.Context, v Viewer, id uuid.UUID, in AssessI
 // Resolve implements endpoint #10: result note + photos and, for a contractor job, the contractor
 // rating (BR-F21-4, BR-F24-3). Who did the work was set by the assessment (CR-006).
 func (s *Service) Resolve(ctx context.Context, v Viewer, id uuid.UUID, in ResolveInput) (TicketDetail, error) {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermWork) {
 		return TicketDetail{}, ErrNotTechnician
 	}
 	now := s.now()
@@ -548,6 +662,39 @@ func (s *Service) SendBack(ctx context.Context, v Viewer, id uuid.UUID, reason s
 	return s.Ticket(ctx, v, id)
 }
 
+// Close implements endpoint #21: admin closes any open ticket with a reason, without waiting for
+// the reporter (F08-B, BR-F08B-1); needs `repair.ticket.close_any`.
+func (s *Service) Close(ctx context.Context, v Viewer, id uuid.UUID, reason string) (TicketDetail, error) {
+	if !v.Can(PermCloseAny) {
+		return TicketDetail{}, apperr.ErrForbidden
+	}
+	reason = strings.TrimSpace(reason)
+	fields := map[string]string{}
+	checkText(fields, "reason", reason, MaxNoteChars, true)
+	if len(fields) > 0 {
+		return TicketDetail{}, apperr.Validation(fields)
+	}
+	now := s.now()
+	err := s.repo.InTx(ctx, func(tx TxRepository) error {
+		t, err := tx.LockTicket(ctx, id)
+		if err != nil {
+			return err
+		}
+		if t.Status == StatusClosed {
+			return ErrTicketClosed
+		}
+		if err := tx.AdminCloseTicket(ctx, id, now); err != nil {
+			return err
+		}
+		return tx.InsertEvent(ctx, NewEvent{ID: uuid.New(), TicketID: id, Type: EventAdminClosed, ActorID: &v.ID, At: now,
+			Note: &reason, Data: []byte("{}")})
+	})
+	if err != nil {
+		return TicketDetail{}, err
+	}
+	return s.Ticket(ctx, v, id)
+}
+
 // AutoClose closes resolved tickets nobody rated within 3 days (BR-F07-4). main.go runs it periodically.
 func (s *Service) AutoClose(ctx context.Context) (int, error) {
 	return s.repo.AutoCloseDue(ctx, s.now())
@@ -556,7 +703,7 @@ func (s *Service) AutoClose(ctx context.Context) (int, error) {
 // ---- contractors (F24) ----
 
 func checkStaff(v Viewer) error {
-	if !isStaff(v.Role) {
+	if !isStaff(v) {
 		return apperr.ErrForbidden
 	}
 	return nil
@@ -571,8 +718,9 @@ func (s *Service) ContractorTypes(ctx context.Context, v Viewer) ([]Ref, error) 
 }
 
 // CreateContractorType implements endpoint #14: an existing name (any case) returns that type (BR-F24-2).
+// Types are created from the assess sheet (`work`, D-041) and the contractor form (`contractor.manage`).
 func (s *Service) CreateContractorType(ctx context.Context, v Viewer, name string) (Ref, error) {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermWork) && !v.Can(PermContractorManage) {
 		return Ref{}, ErrNotTechnician
 	}
 	name = strings.Join(strings.Fields(name), " ")
@@ -638,14 +786,14 @@ func (s *Service) UpdateContractor(ctx context.Context, v Viewer, id uuid.UUID, 
 }
 
 func (s *Service) saveContractor(ctx context.Context, v Viewer, in ContractorInput, write func(TxRepository, ContractorInput) error, id uuid.UUID) error {
-	if v.Role != users.RoleTechnician {
+	if !v.Can(PermContractorManage) {
 		return ErrNotTechnician
 	}
 	in, fields := validateContractor(in)
 	if len(fields) > 0 {
 		return apperr.Validation(fields)
 	}
-	return s.repo.InTx(ctx, func(tx TxRepository) error {
+	err := s.repo.InTx(ctx, func(tx TxRepository) error {
 		n, err := tx.CountContractorTypes(ctx, in.TypeIDs)
 		if err != nil {
 			return err
@@ -653,11 +801,31 @@ func (s *Service) saveContractor(ctx context.Context, v Viewer, in ContractorInp
 		if n != len(in.TypeIDs) {
 			return ErrContractorTypeAbsent
 		}
+		if err := checkContractorName(ctx, tx, in.Name, id); err != nil {
+			return err
+		}
 		if err := write(tx, in); err != nil {
 			return err
 		}
 		return tx.SetContractorTypes(ctx, id, in.TypeIDs)
 	})
+	if errors.Is(err, ErrContractorNameTaken) {
+		// Two saves raced past the check: read who has the name now, for the details.
+		return s.repo.InTx(ctx, func(tx TxRepository) error { return checkContractorName(ctx, tx, in.Name, id) })
+	}
+	return err
+}
+
+// checkContractorName refuses a name another contractor has (BR-F24-6, CR-023).
+func checkContractorName(ctx context.Context, tx TxRepository, name string, self uuid.UUID) error {
+	owner, found, err := tx.ContractorWithName(ctx, name, self)
+	if err != nil {
+		return err
+	}
+	if found {
+		return contractorNameTaken(owner)
+	}
+	return nil
 }
 
 func mustJSON(v any) []byte {

@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "frontend/src/app/(auth)/login/login.css"
+        ],
+        "createdAt": "2026-11-03T12:56:34.270Z",
+        "reason": "owner design output/qr-login-redesign/login.html: notice has a 3px left accent"
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "frontend/src/app/(auth)/login/login.css"
+        ],
+        "createdAt": "2026-11-03T12:56:34.441Z",
+        "reason": "owner asked to keep the previous headline style: the swoosh under the second line is a curved border on a pseudo element"
+      }
+    ]
+  }
+}

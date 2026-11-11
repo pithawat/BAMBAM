@@ -1,6 +1,10 @@
 # S10 — บันทึกผลซ่อม
 
-Status: APPROVED (2026-10-14)
+Status: APPROVED (2026-10-14) · CR-024 applied 2026-10-26 (block below) · CR-034 applied 2026-11-01 (block below)
+
+> **CR-034 (approved 2026-11-01):** top of the sheet / page: profile card of the responsible technician from S17 (initials avatar · name · role, caption `ช่างผู้รับผิดชอบ`; old tickets without one → `ยังไม่ระบุช่าง`); contractor job → contractor shop card (name · types). Label `ทำอะไรไป *` → `รายละเอียดการซ่อม *`, error `กรุณาใส่รายละเอียดการซ่อม`.
+
+> **CR-024 (approved 2026-10-26):** resolve toast "ส่งผลแล้ว รอผู้แจ้งตรวจรับ" (`_common.md` §9).
 
 > **CR-008 (approved 2026-10-16):** opened as a sheet from the S07 action card (`บันทึกผลซ่อม` / `บันทึกผลการแก้ไข`); the `/repair/tickets/[id]/resolve` page stays for direct links. Layout: `ก่อนซ่อม · จากผู้แจ้ง` photo, then `หลังซ่อม *` camera tile `ถ่ายรูปหลังซ่อม` (thumbs + `ถ่ายเพิ่ม` afterwards) · hint `ถ่ายมุมเดียวกับรูปก่อนซ่อม ผู้แจ้งจะเทียบได้ทันที` · `ทำอะไรไป *` · contractor stars for contractor jobs · `ส่งผลการซ่อม`. Mockup: `../../changes/CR-008/ticket-detail.html`.
 

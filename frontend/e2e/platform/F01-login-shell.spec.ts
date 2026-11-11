@@ -9,7 +9,7 @@ test.describe("signed out", () => {
     await page.goto("/profile");
     await expect(page).toHaveURL(/\/login\?next=%2Fprofile/);
     await expect(page.getByRole("button", { name: "เข้าสู่ระบบ" }).filter({ visible: true }).first()).toBeVisible();
-    await expect(page.getByText("ยินดีต้อนรับสู่ BAMBAM").filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /ทุกเรื่องในที่ทำงาน/ })).toBeVisible(); // D-095: S01 copy from bam-workplace-login-v7.html
   });
 
   test("login button starts the PKCE flow at RMC SSO", async ({ request }) => {
@@ -42,7 +42,7 @@ test.describe("employee session", () => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "บริการหลัก" }).filter({ visible: true });
     for (const service of ["แจ้งซ่อม", "จองรถ", "จองห้องประชุม"]) await expect(nav.getByRole("link", { name: service })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "สวัสดี คุณวรรณา" }).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole("main").getByText(/สวัสดี คุณวรรณา/)).toBeVisible(); // CR-035 greeting line
     const account = page.getByRole("button", { name: /เมนูบัญชี วรรณา สุขประเสริฐ/ });
     await account.click();
     await expect(page.getByRole("menuitem", { name: "โปรไฟล์" })).toBeVisible();
